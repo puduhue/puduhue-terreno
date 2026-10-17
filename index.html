@@ -1966,7 +1966,7 @@ function fdCalc(p){
   const cola=[];const usar=q=>{while(q>0.5&&cola.length){const c=cola[0],u=Math.min(q,c.r);c.r-=u;q-=u;if(c.r<=0.5)cola.shift()}};
   movs.forEach(x=>{const m=num(x.m)||0;if(m>0)cola.push({f:String(x.f).slice(0,10),r:m});else usar(-m)});usar(enTram);
   const viejo=porRendir>0.5&&cola.length?cola[0].f:"";
-  const ent=movs.filter(x=>x.t==="entrega"&&num(x.m)>0).pop()||null;
+  const ent=movs.filter(x=>num(x.m)>0&&x.t!=="inicial").pop()||null;
   const ultRend=[...movs.filter(x=>x.t==="rendicion").map(x=>String(x.f).slice(0,10)),...R.filter(r=>r.enviada&&r.estado!=="borrador").map(r=>String(r.enviada).slice(0,10))].sort().pop()||"";
   /* días sin rendir: desde la última rendición (enviada en la app o contabilizada); si nunca rindió, desde que recibió el fondo.
      Con fondo fijo la plata siempre está afuera: lo que importa es cuánto lleva sin rendir. */
