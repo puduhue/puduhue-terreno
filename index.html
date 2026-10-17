@@ -1966,9 +1966,12 @@ function fdCalc(p){
   const cola=[];const usar=q=>{while(q>0.5&&cola.length){const c=cola[0],u=Math.min(q,c.r);c.r-=u;q-=u;if(c.r<=0.5)cola.shift()}};
   movs.forEach(x=>{const m=num(x.m)||0;if(m>0)cola.push({f:String(x.f).slice(0,10),r:m});else usar(-m)});usar(enTram);
   const viejo=porRendir>0.5&&cola.length?cola[0].f:"";
-  const dias=viejo?Math.max(0,Math.round((new Date(today()+"T12:00:00Z")-new Date(viejo+"T12:00:00Z"))/864e5)):0;
   const ent=movs.filter(x=>x.t==="entrega"&&num(x.m)>0).pop()||null;
   const ultRend=[...movs.filter(x=>x.t==="rendicion").map(x=>String(x.f).slice(0,10)),...R.filter(r=>r.enviada&&r.estado!=="borrador").map(r=>String(r.enviada).slice(0,10))].sort().pop()||"";
+  /* días sin rendir: desde la última rendición (enviada en la app o contabilizada); si nunca rindió, desde que recibió el fondo.
+     Con fondo fijo la plata siempre está afuera: lo que importa es cuánto lleva sin rendir. */
+  const base=porRendir>0.5?(ultRend||viejo):"";
+  const dias=base?Math.max(0,Math.round((new Date(today()+"T12:00:00Z")-new Date(base+"T12:00:00Z"))/864e5)):0;
   return{saldo,enTram,enBorr,porRendir,viejo,dias,ent,ultRend,tram,borr,movs};
 }
 const fdNivel=c=>c.porRendir<=0.5?"":c.dias>=FD_DIAS_R?"rr":c.dias>=FD_DIAS_A?"aa":"";
@@ -1993,7 +1996,7 @@ function fdTarjeta(){
   return `<section class="fdc" aria-label="Tu fondo por rendir"><div class="fdh"><b>Tu fondo por rendir</b></div>
     ${big}
     ${k.enTram>0.5?`<dl class="fdl"><div><dt>Saldo en Contabilidad</dt><dd>${fmtP(k.saldo)}</dd></div><div><dt>Enviado, en revisión</dt><dd>−${fmtP(k.enTram)}</dd></div></dl>`:""}
-    ${k.viejo?`<p class="fdal ${n}">${n?`<b>${k.dias} días sin rendir:</b> `:""}lo más antiguo es del ${fdF(k.viejo,1)}${n?".":` (${haceDias(k.viejo)}).`}</p>`:""}
+    ${k.porRendir>0.5&&(k.ultRend||k.viejo)?`<p class="fdal ${n}">${n?`<b>${k.dias} días sin rendir:</b> `:""}${k.ultRend?`${n?"tu":"Tu"} última rendición fue el ${fdF(k.ultRend,1)}${n?".":` (${haceDias(k.ultRend)}).`}`:`${n?"recibiste":"Recibiste"} el fondo el ${fdF(k.viejo,1)} y todavía no hay rendiciones.`}</p>`:""}
     ${k.enBorr>0.5&&k.porRendir>0.5?`<p class="fdn">En tu rendición sin enviar hay ${fmtP(k.enBorr)}${k.porRendir-k.enBorr>0.5?`; al enviarla te quedarían ${fmtP(k.porRendir-k.enBorr)} por rendir`:k.porRendir-k.enBorr<-0.5?`, ${fmtP(k.enBorr-k.porRendir)} más que tu saldo`:"; con eso quedas al día"}.</p>`:""}
     <div class="fdpie"><span>${k.ent?`Último fondo: <b>${fmtP(num(k.ent.m))}</b> el ${fdF(k.ent.f)}`:"Sin fondos entregados en el período"}${pie}</span><button class="btn" data-a="fdMov" data-k="${esc(normRut(c.rut))}">Movimientos</button></div></section>`;
 }
@@ -2043,7 +2046,7 @@ function renderFDL(){
   const ini=t=>String(t||"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
   const fila=x=>{const n=fdNivel(x),q=hzNorm(x.nom+" "+(x.p.rut||""));
     return `<button class="smrow fdrow" data-a="fdMovT" data-k="${esc(fdKey(x.p))}" data-q="${esc(q)}"${hzCoincide(fdQ,q)?"":" hidden"}><span class="fdav ${n}" aria-hidden="true">${esc(ini(x.nom))}</span>
-      <span class="smt"><b>${esc(x.nom)}</b><span class="sms">${x.ent?`Último fondo ${fmtP(num(x.ent.m))} el ${fdF(x.ent.f)}`:"Sin fondos en el período"}${x.ultRend?` · rindió ${haceDias(x.ultRend)}`:""}</span>
+      <span class="smt"><b>${esc(x.nom)}</b><span class="sms">${x.ent?`Último fondo ${fmtP(num(x.ent.m))} el ${fdF(x.ent.f)}`:"Sin fondos en el período"}${x.ultRend&&!n?` · rindió ${haceDias(x.ultRend)}`:!x.ultRend&&x.porRendir>0.5?" · sin rendiciones":""}</span>
       ${n||x.enTram>0.5?`<span class="smch">${n?`<span class="smc ${n}">${x.dias} días sin rendir</span>`:""}${x.enTram>0.5?`<span class="smc cur">En revisión ${fmtP(x.enTram)}</span>`:""}</span>`:""}</span>
       <span class="fdrm${x.porRendir<-0.5?" fav":""}"><b>${fmtP(Math.abs(x.porRendir))}</b><small>${x.porRendir<-0.5?"a favor":x.porRendir>0.5?"por rendir":"al día"}</small></span></button>`};
   const sp=Math.abs(D.sinPersona)>0.5;
@@ -2058,7 +2061,7 @@ function renderFDL(){
     ${favor.length?`<div class="smsep">Con saldo a favor <b>${favor.length}</b></div><div class="list fdlist">${favor.sort((a,b)=>a.porRendir-b.porRendir).map(fila).join("")}</div>`:""}
     ${alDia.length?`<button class="fdmas" data-a="fdAlDia" aria-expanded="${fdAlDia}">${fdAlDia?"Ocultar":"Ver"} ${alDia.length===1?"la persona al día":`las ${alDia.length} personas al día`}</button>${fdAlDia?`<div class="list fdlist">${alDia.sort((a,b)=>cmpEs(a.nom,b.nom)).map(fila).join("")}</div>`:""}`:""}
     <div class="btns" style="margin-top:16px"><button class="btn" data-a="fdActualizar" ${FD.cargando?"disabled":""}>${FD.cargando===2?"Consultando Finnegans…":"Actualizar desde Finnegans"}</button></div>
-    <p class="note">Datos de Finnegans de ${esc(fdHora(D.hora))}${D.desde?`, movimientos desde el ${fdF(D.desde,1)}`:""}. Más de ${FD_DIAS_A} días en ámbar y más de ${FD_DIAS_R} en rojo, contando desde lo más antiguo sin rendir.</p>
+    <p class="note">Datos de Finnegans de ${esc(fdHora(D.hora))}${D.desde?`, movimientos desde el ${fdF(D.desde,1)}`:""}. Con saldo y más de ${FD_DIAS_A} días sin rendir en ámbar, más de ${FD_DIAS_R} en rojo, contando desde la última rendición (enviada en la app o contabilizada).</p>
     ${cfg}</main>`;
 }
 function fdBuscar(q){fdQ=q;document.querySelectorAll(".fdrow[data-q]").forEach(r=>{r.hidden=!hzCoincide(q,r.dataset.q)})}
