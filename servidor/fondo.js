@@ -43,11 +43,14 @@ export function columnas(filas) {
   const uno = (...pr) => { for (const p of pr) { const h = n.find(([, v]) => typeof p === "string" ? v === p : p(v)); if (h) return h[0]; } return null; };
   return {
     fecha: uno("fecha", v => /^fecha/.test(v) && !/comprob|venc|alta|modif|contab/.test(v), v => v.includes("fecha") && !/ano|mes|comprob|venc/.test(v)),
-    debe: uno("debe", v => /^debe/.test(v) && !/moneda|ext/.test(v)),
-    haber: uno("haber", v => /^haber/.test(v) && !/moneda|ext/.test(v)),
-    imp: uno(v => v.includes("importeoperacion") || v.includes("impoperacion"), "importe", "saldo"),
+    debe: uno("debe", "debemonedappal", v => /^debe/.test(v) && v.includes("ppal"), v => /^debe/.test(v) && !/secund|transac|ext/.test(v)),
+    haber: uno("haber", "habermonedappal", v => /^haber/.test(v) && v.includes("ppal"), v => /^haber/.test(v) && !/secund|transac|ext/.test(v)),
+    imp: uno("importeoperacionppal", v => v.includes("importeoperacion") || v.includes("impoperacion"), "importe"),
+    saldo: uno("saldomonedappal", "saldo", v => /^saldo/.test(v) && v.includes("ppal")),
     orgCod: uno(v => v.includes("organizacion") && v.includes("codigo"), v => v.includes("organizacion") && v.includes("rut")),
-    orgNom: uno("organizaciontransaccion", "organizacion", v => v.includes("organizacion") && !v.includes("codigo") && !v.endsWith("id") && !v.includes("rut")),
+    /* el Libro Mayor trae dos organizaciones: la de la línea (transacción) y la del documento (cabecera) */
+    orgNom: uno("organizaciontransaccion", v => v.includes("organizacion") && v.includes("transac") && !v.includes("id") && !v.includes("codigo")),
+    orgDoc: uno("organizacion", "organizaciondocumento"),
     doc: uno("documento", v => /^documento/.test(v) && !v.includes("tipo")),
     tipo: uno("tipodedocumento", "tipodocumento", v => v.includes("tipo") && v.includes("doc")),
     comp: uno("comprobante", "numero", v => v.includes("comprobante") && !/adicional|fecha/.test(v)),
@@ -64,10 +67,12 @@ export function movimientos(datos, cuenta) {
   for (const f of filas) {
     if (!f || typeof f !== "object") continue;
     if (C.cta && txt(f, C.cta) && normTxt(txt(f, C.cta)) !== normTxt(cuenta)) continue;
-    const m = Math.round(C.debe || C.haber ? numero(f[C.debe]) - numero(f[C.haber]) : numero(f[C.imp]));
+    let m = Math.round(C.debe || C.haber ? numero(f[C.debe]) - numero(f[C.haber]) : numero(f[C.imp]));
     const fe = fechaISO(f[C.fecha]);
     const desc = txt(f, C.desc), det = txt(f, C.det), tipo = txt(f, C.tipo), doc = txt(f, C.doc), comp = txt(f, C.comp);
     const todo = normTxt([desc, det, tipo, doc].join(" "));
+    /* la fila «Saldo Inicial» trae el saldo anterior a la fecha desde (sin debe ni haber) */
+    if (!m && /SALDOINICIAL|SALDOANTERIOR/.test(normTxt(doc + " " + tipo)) && C.saldo) m = Math.round(numero(f[C.saldo]));
     if (!m) continue;
     let t;
     if (/SALDOINICIAL|SALDOANTERIOR|APERTURA/.test(todo)) t = "inicial";
@@ -77,7 +82,8 @@ export function movimientos(datos, cuenta) {
     else if (/RENDIC|ASIENTO/.test(todo)) t = "rendicion";
     else t = "otro";
     const ref = [doc || tipo, comp].filter(Boolean).join(" ").replace(/\s+/g, " ").slice(0, 60);
-    out.push({ f: fe, t, m, ref, d: (desc || det).slice(0, 80), oc: txt(f, C.orgCod), on: txt(f, C.orgNom) });
+    const onT = txt(f, C.orgNom), onD = txt(f, C.orgDoc);
+    out.push({ f: fe, t, m, ref, d: (desc || det).slice(0, 80), oc: txt(f, C.orgCod), on: onT || onD, de: onT ? "linea" : onD ? "documento" : "" });
   }
   const f0 = filas.find(f => f && typeof f === "object");
   return { movs: out, columnas: C, filas: filas.length, claves: f0 ? Object.keys(f0) : [], crudo: filas.slice(0, 3) };
@@ -152,7 +158,14 @@ export async function rutasFondo(req, env, ctx, url, correo, json, admin, obj, r
   const mios = new Set(padron.personas.filter(p => p.correos.includes(correo)).map(p => normRut(p.rut)));
   if (!todos && !diag && !mios.size) return json({ ok: true, hora: new Date().toISOString(), personas: [], sinPadron: !padron.personas.length, aviso: padron.personas.length ? "Tu correo no está en la lista de colaboradores." : "Contabilidad todavía no publica la lista de colaboradores." });
   const M = await mayorFondo(env, ctx, reporte, diag || url.searchParams.get("forzar") === "1" && esContab);
-  if (diag) return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, filas: M.filas, claves: M.claves, columnas: M.columnas, crudo: M.crudo || [], movimientos: M.movs.length, muestra: M.movs.slice(0, 8), padron: { personas: padron.personas.length, hora: padron.hora || null } });
+  if (diag) {
+    const est = {}; for (const mv of M.movs) { const k = (mv.de || "sin") + "|" + mv.t; const e = est[k] = est[k] || { n: 0, debe: 0, haber: 0 }; e.n++; if (mv.m > 0) e.debe += mv.m; else e.haber -= mv.m; }
+    const g = agrupar(M.movs, padron, null);
+    return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, filas: M.filas, claves: M.claves, columnas: M.columnas, crudo: M.crudo || [], movimientos: M.movs.length, muestra: M.movs.slice(0, 8), estadistica: est,
+      saldoTotal: M.movs.reduce((s, x) => s + x.m, 0), sinPersona: g.sinPersona, sinPersonaN: g.sinPersonaN,
+      porOrganizacion: g.personas.map(p => ({ n: p.nombre, s: p.movs.reduce((s, x) => s + x.m, 0), k: p.movs.length })).sort((a, b) => b.s - a.s),
+      padron: { personas: padron.personas.length, hora: padron.hora || null } });
+  }
   const g = agrupar(M.movs, padron, todos ? null : mios);
   return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, personas: g.personas, ...(todos ? { sinPersona: g.sinPersona, sinPersonaN: g.sinPersonaN } : {}) });
 }
