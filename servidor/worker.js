@@ -25,14 +25,16 @@
     DOMINIO             (texto)   opcional. Por defecto puduhue.cl
   Notificaciones (v83): no requieren variables. Los equipos registrados y las claves de envío se guardan en el
   Durable Object AVISOS (ver push.js y wrangler.toml); se crea solo al publicar.
+  Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
   Recordatorios (v84): una tarea programada cada hora (wrangler.toml, [triggers]); a las 9:00 de Santiago en
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
+import { rutasFondo } from "./fondo.js";
 export { Avisos };
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v85"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
+const VERSION_SERVIDOR = "v94"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
 
 /* ---- Lectura de boletas con Claude ---- */
 const PROMPT_BOLETA = `Eres un asistente contable chileno. Lee la foto de este documento tributario (boleta, factura, boleta de honorarios, vale o comprobante) y devuelve SOLO un objeto JSON, sin texto adicional ni marcas de código, con esta forma exacta:
@@ -103,7 +105,7 @@ async function listarMaestro(env, entidad, desde) {
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const origenes = ["https://puduhue.github.io", "https://benjaminbarrientoscardenas-glitch.github.io"].concat((env.ORIGEN_APP || "").split(",").map(x => x.trim().replace(/\/+$/, "")).filter(Boolean));
     const pide = req.headers.get("Origin") || "", origen = origenes.includes(pide) ? pide : origenes[0];
     const cors = { "Access-Control-Allow-Origin": origen, Vary: "Origin", "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type", "Access-Control-Max-Age": "86400" };
@@ -127,6 +129,8 @@ export default {
     try {
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)
       const rp = await rutasPush(req, env, url, correo, json, autorizado); if (rp) return rp;
+      // /fondo → saldo del fondo por rendir (110106) desde el Libro Mayor de Finnegans (v94)
+      const rf = await rutasFondo(req, env, ctx, url, correo, json, permitidos.includes(correo), env.AVISOS ? objetoAvisos(env) : null, reporte); if (rf) return rf;
       // /boleta → lectura de un documento con IA (cualquier cuenta de Puduhue)
       if (url.pathname === "/boleta" && req.method === "POST") {
         let body; try { body = await req.json() } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }

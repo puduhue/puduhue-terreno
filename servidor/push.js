@@ -102,6 +102,9 @@ export class Avisos extends DurableObject {
   /* v84: agenda de pendientes que deja la app y recordatorios diarios */
   async guardarAgenda(ag) { await this.ctx.storage.put("agenda", ag); return { aprobar: ag.aprobar.length, enviar: ag.enviar.length }; }
   async leerAgenda() { return (await this.ctx.storage.get("agenda")) || null; }
+  /* v94: lista de colaboradores (correo → RUT) para el saldo del fondo por rendir; la publica Contabilidad */
+  async guardarPadron(p) { await this.ctx.storage.put("fondo:padron", p); return true; }
+  async leerPadron() { return (await this.ctx.storage.get("fondo:padron")) || null; }
   async estadoRec() { const a = await this.leerAgenda(); return { agenda: a ? a.generado : null, ultimo: (await this.ctx.storage.get("rec:ultimo")) || null }; }
   async correrRecordatorios(sujeto, cuando, forzar) {
     const ahora = new Date(cuando || Date.now()), s = santiago(ahora);
