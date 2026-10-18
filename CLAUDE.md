@@ -5,9 +5,15 @@ El proceso para hacer una versión (scripts, pruebas, vista previa, historial de
 privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README antes de tocar el código.
 
 ## Archivos
-- `index.html`: la app (HTML, CSS y el código general en un `<script>`), salvo Rendiciones. ~0,6 MB desde la v102.
-- `modulos/rendiciones.js`: el módulo Rendiciones completo (desde la v102), ~225 KB. Ver «Mapa de modulos/rendiciones.js».
-- `sw.js`: service worker. Guarda la app para abrir sin señal (index.html y `modulos/rendiciones.js` en la caché de la versión),
+- `index.html`: HTML y el código general (sesión, OneDrive, base local, bloques transversales, Actas de vivienda, Inicio)
+  y el arranque. ~250 KB desde la v103.
+- `estilos.css`: todo el CSS (desde la v103), ~105 KB. El de cada versión se agregó al final.
+- `modulos/`: un archivo por módulo (desde la v102-v103). Cada uno termina con `window.MOD_…=true` (no quitar):
+  - `checklist.js` (~95 KB): catálogo y MÓDULO: Check list de visitas (con el check list de bodega v58 y los predios v91).
+  - `bodega.js` (~55 KB): MÓDULO: Stock y MÓDULO: Control de bodega.
+  - `rendiciones.js` (~220 KB): Rendiciones completo, con el fondo por rendir y la lectura de boletas.
+  - `actas-entrega.js` (~80 KB): Actas de entrega de vehículos y activos fijos (v72).
+- `sw.js`: service worker. Guarda la app para abrir sin señal (index.html, estilos.css y los módulos, en la caché de la versión),
   separa las bibliotecas en cachés propias y muestra las notificaciones.
 - `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.18.5 mini (Excel),
   jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF) y zxing-wasm 3.1.4 (código del SII). Además, `lib/marca-puduhue-1/marcas.js` define
@@ -19,57 +25,52 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
 - `prueba/` (solo mientras se prueba una versión): copia para probar en el teléfono antes de publicar. Se arma con `armar_prueba.py` (herramientas).
 
 ## Cómo leer el código sin gastar de más
-- No leer `index.html` entero. Sacar el código con `extraer_app.py` (herramientas) y buscar por los títulos de sección de abajo con grep.
-- Para trabajar en Rendiciones basta `modulos/rendiciones.js`; de index.html, solo lo que se busque con grep (render(), barra, Inicio).
+- Leer solo el archivo del módulo en que se trabaja. De index.html, solo lo que se busque con grep (render(), barra, Inicio);
+  sacar su código con `extraer_app.py` (herramientas). No leer index.html ni estilos.css enteros.
 - Las bibliotecas de `lib/` no se leen ni se modifican.
 
-## Mapa de index.html
-1. `<head>`: metas, manifest, `<script src="lib/...">` de MSAL, SheetJS y jsPDF (normales, no diferidos: la app los usa al cargar).
-2. `<style>` que empieza con `:root{`: todo el CSS (el de cada versión se agregó al final).
-3. `<body>`: solo `<div id="app">` con «Cargando…»; todo lo demás lo dibuja el código. Antes del código, `<script src="lib/marca-puduhue-1/marcas.js">`.
-   Orden de carga (v102): código general (`<script>` inline) → `<script src="modulos/rendiciones.js?v=NN">` → arranque (`<script>` inline
-   con el registro del service worker e `init()`). Todos son scripts normales y comparten las variables globales. Si rendiciones.js
-   no cargó (`window.MOD_RENDICIONES` falta), el arranque muestra «No se pudo cargar la app» con «Reintentar».
-4. `<script>` que empieza con `const APP_VER=`: el código general. Está ordenado por versión, no por módulo. Donde salió un bloque de
-   Rendiciones queda una línea `/* v102: «…» está en modulos/rendiciones.js */`. Secciones (buscar el título; líneas aproximadas en la v102):
+## Carga
+`<head>`: metas, manifest, `<script src="lib/...">` de MSAL, SheetJS y jsPDF (normales: la app los usa al cargar) y
+`<link rel="stylesheet" href="estilos.css?v=NN">`. `<body>`: `<div id="app">` con «Cargando…» y, en este orden:
+`lib/marca-puduhue-1/marcas.js` → código general (inline) → `modulos/checklist.js` → `bodega.js` → `rendiciones.js` →
+`actas-entrega.js` → arranque (inline: registro del service worker e `init()`). Todos son scripts normales y comparten las
+variables globales; el orden es el mismo que tenían en el archivo único. Si falta un módulo, el arranque muestra «No se pudo cargar
+la app» con «Reintentar». Los escuchadores globales (`document/window.addEventListener`) de los módulos se quedaron en index.html,
+en su lugar, para no cambiar el orden en que reaccionan. Al mover código entre archivos, revisar el orden con
+`analiza_division.js`/`carga_modulos.js` (herramientas).
+
+## Mapa del código general (index.html, líneas aproximadas en la v103)
+Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: «…» está en modulos/… */`.
 
 | Líneas | Título de sección (buscar) | Qué hay |
 |---|---|---|
-| 1-92 | `const APP_VER=`, `Datos fijos del protocolo`, `Utilidades` | Constantes (los logos vienen de `marcas.js`; si no cargó, se reemplazan por uno transparente), utilidades |
-| 93-411 | `Microsoft 365: inicio de sesión`, `Almacenamiento: primero en el teléfono` | MSAL, OneDrive (Graph), base local (IndexedDB) y sincronización |
-| 412-913 | `v93:` a `v99:` | Bloques transversales: barra de navegación (v93), Administración (v95), diseño nativo y gestos (v96, sin lo de Rendiciones), hojas (v97), fila de notificaciones (v99). Aquí quedan los 4 escuchadores globales del botón «Rendir» y del buscador del fondo (`fdbus`) |
-| 914-1849 | `Render`, `Acciones`, `Firma`, `Fotos`, `PDF`, `Pantalla de inicio: elegir versión` | Actas de vivienda |
-| 1734-1849 | `Traspaso por archivo` | Restos de la versión descargable (ver abajo) |
-| 1850-2088 | `Catálogo del check list` | Catálogo de puntos (valor inicial y el de OneDrive) |
-| 2089-2819 | `MÓDULO: Check list de visitas` | Visitas, hallazgos, check list de bodega (v58), predios (v91), Excel e informe PDF; al final, Excel de actas de vivienda y `Servidor Puduhue (Cloudflare)` |
-| 2820-2935 | `MÓDULO: Stock` | Stock desde Finnegans |
-| 2936-3227 | `MÓDULO: Control de bodega` | Conteo físico contra el stock |
-| 3228-3677 | `v83: notificaciones`, `v85: la app se muda`, `v86: instalar`, `v87`, `v88: diseño`, `v89`, `v90` | Bloques transversales que estaban en medio de Rendiciones |
-| 3678-4323 | `Actas de entrega (v72)` | Actas de vehículos y activos fijos |
-| 4324-4399 | `---------- Inicio ----------` | Pantalla de inicio |
-| 4400-fin | `Actualización automática` | Aviso de versión nueva (el registro del service worker e `init()` están en el `<script>` de arranque) |
+| 1-91 | `const APP_VER=`, `Datos fijos del protocolo`, `Utilidades` | Constantes, utilidades |
+| 92-409 | `Microsoft 365: inicio de sesión`, `Almacenamiento: primero en el teléfono` | MSAL, OneDrive (Graph), base local (IndexedDB) y sincronización |
+| 410-911 | `v93:` a `v99:` | Transversal: barra de navegación (v93), Administración (v95), diseño nativo y gestos (v96), hojas (v97), fila de notificaciones (v99); escuchadores del botón «Rendir» y del buscador del fondo |
+| 912-1843 | `Render`, `Acciones`, `Firma`, `Fotos`, `PDF`, `Pantalla de inicio: elegir versión`, `Traspaso por archivo` | Actas de vivienda; pantalla de sincronización e importar desde archivo |
+| 1844-1972 | `Excel: reintentos`, `Excel consolidado de actas de vivienda`, `Servidor Puduhue (Cloudflare)` | Reintentos de Excel (todos los módulos), Excel de actas de vivienda, servidor |
+| 1973-1979 | (escuchadores de Stock y Control de bodega) | |
+| 1981-2421 | `v83: notificaciones`, `v85`, `v86: instalar`, `v87`, `v88: diseño`, `v89`, `v90` | Transversal |
+| 2423-2498 | `---------- Inicio ----------` | Pantalla de inicio |
+| 2499-fin | `Actualización automática` | Aviso de versión nueva |
 
-## Mapa de modulos/rendiciones.js (líneas aproximadas en la v102)
-| Líneas | Título de sección (buscar) | Qué hay |
-|---|---|---|
-| 1-181 | `v94: saldo del fondo por rendir` | Fondo por rendir (cuenta 110106): tarjeta, movimientos, vista de Contabilidad |
-| 182-270 | `«Para hoy»: fondo`, `1) botón flotante «Rendir»`, `disRendirArchivos` | «Para hoy» del fondo (v95), botón «Rendir», tarjeta del documento e íconos de estado (v96) |
-| 271-494 | `v98: lectura de boletas` | Código del SII, foto borrosa, tipo de gasto por comercio, medición |
-| 495-667 | `MÓDULO: Rendiciones`, `Maestros contables`, `Personas, roles y estados` | Catálogo de tipos de gasto, maestros, roles |
-| 668-825 | `Avisos por correo (v78)`, `v84: agenda` | Correos de cada paso y agenda para los recordatorios automáticos |
-| 826-1055 | `Link de los correos`, `Motor contable`, `Lectura con IA` | Link ?rd=, saveRend, problemas del documento, asiento para FinnegansGO, lectura vía servidor |
-| 1056-1584 | `v92: seguimiento`, `Selector con buscador`, `Maestros contables: pantalla` | Pantallas |
-| 1585-1784 | `Acciones`, `v81: facturas y boletas en PDF` | Acciones y PDF |
-| 1785-fin | `OneDrive: carpeta, Excel mensual y PDF` | Excel mensual; al final `window.MOD_RENDICIONES=true` (no quitar) |
+## Mapa de los módulos (líneas aproximadas en la v103)
+- `checklist.js`: 1 catálogo inicial · 147 catálogo en OneDrive · 243 `MÓDULO: Check list de visitas` · 284 traspaso al check list de
+  bodega (v58) · 323 predios (v91) · 483 la visita · 567 administración del catálogo · 628 acciones · 742 informe PDF y Excel.
+- `bodega.js`: 6 `MÓDULO: Stock` · 122 `MÓDULO: Control de bodega` · 171 pantallas · 269 acciones · 345 OneDrive, Excel e informe.
+- `rendiciones.js`: 7 fondo por rendir (v94) · 192 botón «Rendir» y tarjeta (v96) · 270 lectura de boletas (v98) · 496 `MÓDULO:
+  Rendiciones` (tipos de gasto, maestros, roles) · 665 avisos por correo (v78) y agenda (v84) · 823 link ?rd=, motor contable, lectura
+  con IA · 1052 pantallas (v92) · 1580 acciones y PDF (v81) · 1780 OneDrive y Excel mensual.
+- `actas-entrega.js`: 18 textos del acta · 82 devoluciones (v77) · 98 datos comunes · 152 pantallas · 364 eventos · 437 PDF · 625 Excel.
 
 Funcionamiento general: el estado vive en variables globales (`view`, `cur`, `ACTAS`, `VIS`, `REND`, `MAE`…); `go(vista)` cambia
 de pantalla y `render()` dibuja; los botones llevan `data-a="acción"` y cada módulo los atiende en su sección «Acciones».
 Ojo: `saludo` y `fechaLarga` están definidas dos veces (cerca de «Pantalla de inicio: elegir versión»); vale la segunda.
 
 ## Reglas fijas
-- **Versión:** en cada versión subir juntos `APP_VER` (index.html), `VER` de sw.js (`"actas-vNN"`) y el `?v=NN` del
-  `<script src="modulos/rendiciones.js">`, con el mismo número.
-  Si no cambia sw.js, el teléfono no se entera de la versión nueva.
+- **Versión:** en cada versión subir juntos `APP_VER` (index.html), `VER` de sw.js (`"actas-vNN"`) y el `?v=NN` de `estilos.css`
+  y de cada `modulos/*.js`, con el mismo número. Si no cambia sw.js, el teléfono no se entera de la versión nueva.
+- **Archivo nuevo:** todo archivo propio que la app cargue al abrir va en `FILES` de sw.js y en el control del arranque (`MOD_OK`).
 - **Bibliotecas:** nunca cambiar un archivo dentro de una carpeta de `lib/` que ya existe (el teléfono lo tiene guardado y no lo
   vuelve a bajar). Para actualizar una: carpeta nueva con la versión en el nombre, agregarla a `LIBS` en sw.js (y a `LIB_INICIO`
   si la app la usa al abrir) y cambiar el `<script src>`.
@@ -85,13 +86,12 @@ Ojo: `saludo` y `fechaLarga` están definidas dos veces (cerca de «Pantalla de 
 - **Copia de prueba:** el service worker reconoce la carpeta `prueba/` y usa cachés con prefijo `prueba-`, sin tocar las de la app real.
   Comparte con la app real los datos del teléfono (misma dirección): lo que se hace en la prueba es real.
 
-## Código sobrante (no se mantiene)
-Restos de cuando la app era un archivo descargable: `URL_ONLINE`, `OFFLINE`, `PWA`, `CLOUD` y la sección `Traspaso por archivo`
-(`sincronizar`, `abrirOnlineModal`, `exportarActas`, `marcarExportado`). Decidido el 18-10-2026 no mantener esa versión.
-Se borran cuando toque trabajar en Actas de vivienda, revisando antes qué sigue en uso (`PWA` sí se usa) y con prueba.
+## Código sobrante
+En la v103 se borró el código sin uso (16 declaraciones, entre ellas `OFFLINE` y `CLOUD`; se buscan con `muertos.js` en herramientas).
+La sección `Traspaso por archivo` sigue en uso: arma la pantalla de sincronización («Sincronizar ahora», «Importar actas desde archivo»)
+y funciones para compartir y descargar archivos. Quitar «Importar actas desde archivo» cambia lo que ve el usuario: requiere la
+aprobación de Benja.
 
-## Reorganización para gastar menos (desde la v100, una versión por paso)
-1. v100: MSAL, SheetJS y jsPDF a `lib/`, con cachés aparte. ✓
-2. v101: logos en base64 (MARCA, MARCA_HZ, LOGO) a `lib/marca-puduhue-1/marcas.js`. ✓
-3. v102: Rendiciones a `modulos/rendiciones.js`. ✓ Los demás módulos, solo si conviene (mismo método: `split102.py` en herramientas).
-4. CSS a `estilos.css`, cuando convenga (ahorra poco).
+## Reorganización para gastar menos (desde la v100) ✓
+v100 bibliotecas a `lib/` · v101 logos a `lib/marca-puduhue-1/` · v102 Rendiciones a `modulos/` · v103 Check list, Stock/Bodega
+y Actas de entrega a `modulos/`, CSS a `estilos.css` y código sin uso borrado.
