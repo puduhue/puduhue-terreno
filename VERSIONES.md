@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 105 | 2026-10-18 | [1ca7f4e](https://github.com/puduhue/puduhue-terreno/tree/1ca7f4e) | Valle Verde sale de la lista de predios (es planta lechera); los registros antiguos lo conservan |
 | 104 | 2026-10-18 | [d494232](https://github.com/puduhue/puduhue-terreno/tree/d494232) | conflictos entre teléfonos en su módulo (rendiciones y conteos) y actualización automática solo en pantallas de lista |
 | 103 | 2026-10-18 | [c9e8437](https://github.com/puduhue/puduhue-terreno/tree/c9e8437) | CSS a estilos.css, módulos Check list, Stock/Bodega y Actas de entrega aparte, código sin uso borrado |
 | 102 | 2026-10-18 | [43487d0](https://github.com/puduhue/puduhue-terreno/tree/43487d0) | Rendiciones a modulos/rendiciones.js (paso 3 de la reorganización) |
