@@ -15,6 +15,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
 - `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, Finnegans, lectura de boletas). Se publica solo con
   GitHub Actions al subir cambios de `servidor/` a main.
 - `manifest.json`, `icon-*.png`, `badge-96.png`: instalación y notificaciones.
+- `VERSIONES.md`: historial de versiones publicadas (versión, fecha y commit de main, con enlace para ver o recuperar cada una).
 - `prueba/` (solo mientras se prueba una versión): copia para probar en el teléfono antes de publicar. Se arma con `armar_prueba.py` (herramientas).
 
 ## Cómo leer el código sin gastar de más
@@ -79,6 +80,8 @@ Ojo: `saludo` y `fechaLarga` están definidas dos veces (cerca de «Pantalla de 
   primero en vista previa con aprobación de Benja.
 - **Textos:** español neutro, simple, sin modismos chilenos.
 - **Repositorio público:** sin nombres ni RUT de colaboradores, sin claves ni tokens (las claves van como secretos en Cloudflare o GitHub).
+- **Historial de versiones:** al publicar, agregar arriba en `VERSIONES.md` la fila de la versión con el commit de publicación.
+  Las ramas `vNN` son solo para probar; después de publicar las borra Benja (esta sesión no puede borrar ramas ni crear etiquetas).
 - **Copia de prueba:** el service worker reconoce la carpeta `prueba/` y usa cachés con prefijo `prueba-`, sin tocar las de la app real.
   Comparte con la app real los datos del teléfono (misma dirección): lo que se hace en la prueba es real.
 
