@@ -1,10 +1,11 @@
 /* Guarda la app en el teléfono para que abra sin señal. Cambia VER al publicar una versión nueva. */
-const VER="actas-v101";
+const VER="actas-v102";
 /* v100: la copia de prueba (carpeta prueba/) usa cachés con otro nombre y solo borra las suyas,
    para no tocar las de la app real (las cachés son comunes a todo puduhue.github.io). */
 const PRUEBA=self.registration.scope.includes("/prueba/"),PRE=PRUEBA?"prueba-":"";
 const CACHE=PRE+VER;
-const FILES=["./","index.html","manifest.json","icon-180.png","icon-192.png","icon-512.png","badge-96.png"];
+/* v102: modulos/rendiciones.js va en la misma caché que index.html: se bajan juntos en cada versión */
+const FILES=["./","index.html","modulos/rendiciones.js","manifest.json","icon-180.png","icon-192.png","icon-512.png","badge-96.png"];
 /* Bibliotecas que no cambian entre versiones: cada una queda guardada en su propia caché (por carpeta y versión)
    y no se baja de nuevo con cada versión de la app. */
 const LIBS=["pdfjs-6.3.289","zxing-wasm-3.1.4","msal-browser-3.30.0","xlsx-0.18.5","jspdf-2.5.1","marca-puduhue-1"];
