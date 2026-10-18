@@ -18,7 +18,9 @@
                                   parámetros del stock, separados por coma: b.barrientos@puduhue.cl.
                                   El stock (/stock) lo puede traer cualquier cuenta de Puduhue (desde la app v61).
     ANTHROPIC_API_KEY   (Secret)  clave de la API de Claude, para leer boletas (módulo Rendiciones)
-    ANTHROPIC_MODEL     (texto)   opcional. Por defecto claude-haiku-4-5
+    MODELO_LECTURA      (texto)   opcional. Modelo de la primera lectura. Por defecto claude-haiku-5-5 (desde la v98)
+    MODELO_REVISION     (texto)   opcional. Modelo que revisa las lecturas dudosas. Por defecto claude-sonnet-5-5; "no" la desactiva
+                                  (ANTHROPIC_MODEL ya no se usa: se puede borrar)
     ORIGEN_APP          (texto)   opcional. Direcciones adicionales desde donde se puede usar el servidor, separadas por coma.
                                   Siempre se aceptan https://puduhue.github.io (app en la organización Puduhue, desde la v85)
                                   y https://benjaminbarrientoscardenas-glitch.github.io (dirección anterior, durante la mudanza).
@@ -32,30 +34,12 @@
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
 import { rutasFondo } from "./fondo.js";
+import { leerBoleta, MODELO_LECTURA, MODELO_REVISION } from "./boleta.js";
 export { Avisos };
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v94"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
+const VERSION_SERVIDOR = "v98"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
 
-/* ---- Lectura de boletas con Claude ---- */
-const PROMPT_BOLETA = `Eres un asistente contable chileno. Lee la foto de este documento tributario (boleta, factura, boleta de honorarios, vale o comprobante) y devuelve SOLO un objeto JSON, sin texto adicional ni marcas de código, con esta forma exacta:
-{"legible":true,"tipo":"boleta|factura|boleta_honorarios|vale|otro","emisor":"razón social o nombre del comercio","rut_emisor":"12.345.678-9 o cadena vacía","folio":"número de boleta o factura, cadena vacía si no se ve","fecha":"AAAA-MM-DD o cadena vacía","neto":0,"iva":0,"total":0,"moneda":"CLP","glosa":"descripción breve de lo comprado, máximo 12 palabras","rut_receptor":"RUT del cliente al que se emitió (solo facturas), o cadena vacía","receptor":"razón social del cliente (solo facturas), o cadena vacía","problemas":["lista de problemas: foto borrosa, documento cortado, no se lee el total, no se lee el folio, no se lee la fecha, no es un documento tributario, etc."],"confianza":0.0}
-Reglas: los montos son números enteros en pesos chilenos, sin puntos ni símbolos; si el documento no desglosa IVA (boletas), deja neto e iva en 0 y pon solo el total; si el total no se lee con claridad, pon 0 y agrégalo a problemas; la fecha en formato AAAA-MM-DD, interpretando día/mes/año como en Chile; el RUT con puntos y guion si aparece; verifica el dígito verificador del RUT (módulo 11) y, si no calza, vuelve a mirar cada número (es común confundir 0, 6, 8 y 9, o 1 y 7); si aun así no calza, déjalo tal como se ve y agrega "RUT con dígito verificador que no calza" a problemas; confianza entre 0 y 1 según cuán seguro estés del total, la fecha y el folio. Si la imagen no es un documento tributario, legible=false y explica en problemas.`;
-/* Si la app envía su catálogo de tipos de gasto, se pide además el que mejor calce con lo comprado */
-const promptBoleta = tipos => !Array.isArray(tipos) || !tipos.length ? PROMPT_BOLETA :
-  PROMPT_BOLETA + `\nAdemás agrega al JSON el campo "tipo_gasto" con el id del tipo de gasto que mejor calce con lo comprado, eligiendo solo uno de esta lista (id: nombre); si ninguno calza, usa "otro":\n` +
-  tipos.slice(0, 60).map(t => `${String(t.id).slice(0, 30)}: ${String(t.n).slice(0, 80)}`).join("\n");
-async function leerBoleta(env, imagen, mime, tipos) {
-  if (!env.ANTHROPIC_API_KEY) throw { status: 500, error: "La lectura automática no está configurada: falta ANTHROPIC_API_KEY en el servidor." };
-  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: env.ANTHROPIC_MODEL || "claude-haiku-4-5", max_tokens: 700, messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mime || "image/jpeg", data: imagen } }, { type: "text", text: promptBoleta(tipos) }] }] }) });
-  const t = await r.text();
-  if (!r.ok) throw { status: 502, error: "El servicio de lectura rechazó la solicitud.", detalle: t.slice(0, 300) };
-  let j; try { j = JSON.parse(t) } catch (e) { throw { status: 502, error: "Respuesta no válida del servicio de lectura." } }
-  const texto = (j.content || []).filter(c => c.type === "text").map(c => c.text).join("\n").replace(/```json|```/g, "").trim();
-  let datos; try { datos = JSON.parse(texto) } catch (e) { const m = texto.match(/\{[\s\S]*\}/); if (m) { try { datos = JSON.parse(m[0]) } catch (e2) {} } }
-  if (!datos) throw { status: 502, error: "No se pudo interpretar la lectura de la boleta.", detalle: texto.slice(0, 300) };
-  return { datos, uso: j.usage || null, modelo: j.model || null };
-}
+/* ---- Lectura de boletas con Claude: ver boleta.js (desde la v98, con revisión y timbre del SII) ---- */
 const PARAMS_STOCK = "PARAMWEBREPORT_Empresa=2&PARAMWEBREPORT_tipoStock=0&PARAMWEBREPORT_soloStockNoCero=true&PARAMWEBREPORT_soloStockDebajoPtoReposicion=false&PARAMWEBREPORT_soloDepositos=0&PARAMWEBREPORT_TipoPrecio=0&PARAMWEBREPORT_AgruparPor=1";
 const hoyChile = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
 
@@ -112,7 +96,7 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
     const url = new URL(req.url);
-    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null });
+    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null });
 
     // Quién pide: se valida la sesión Microsoft que ya tiene la app
     const auth = req.headers.get("Authorization") || "";
@@ -137,8 +121,8 @@ export default {
         const imagen = String(body.imagen || "").replace(/^data:[^;]+;base64,/, "");
         if (!imagen || imagen.length < 100) return json({ error: "Falta la imagen." }, 400);
         if (imagen.length > 6_000_000) return json({ error: "La imagen es demasiado grande." }, 413);
-        const r = await leerBoleta(env, imagen, body.mime || "image/jpeg", body.tipos);
-        return json({ ok: true, leidoPor: correo, hora: new Date().toISOString(), datos: r.datos, uso: r.uso, modelo: r.modelo });
+        const r = await leerBoleta(env, { imagen, mime: body.mime || "image/jpeg", tipos: body.tipos, timbre: body.timbre, escaneo: body.escaneo === true });
+        return json({ ok: true, leidoPor: correo, hora: new Date().toISOString(), datos: r.datos, uso: r.uso, modelo: r.modelo, revision: r.revision });
       }
       // /stock → reporte de stock por depósito configurado en el servidor
       if (url.pathname === "/stock") {

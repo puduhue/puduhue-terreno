@@ -1,9 +1,9 @@
 /* Guarda la app en el teléfono para que abra sin señal. Cambia VER al publicar una versión nueva. */
-const VER="actas-v97";
+const VER="actas-v98";
 const FILES=["./","index.html","manifest.json","icon-180.png","icon-192.png","icon-512.png","badge-96.png"];
 /* Bibliotecas grandes que no cambian entre versiones (lector de PDF): se descargan la primera vez que se usan
    y quedan guardadas aparte, para no bajarlas de nuevo con cada versión. */
-const LIBS=["lib-pdfjs-6.3.289"];
+const LIBS=["lib-pdfjs-6.3.289","lib-zxing-wasm-3.1.4"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(VER).then(c=>c.addAll(FILES.map(f=>new Request(f,{cache:"reload"})))).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VER&&!LIBS.includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener("fetch",e=>{
