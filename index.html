@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=103">
+<link rel="stylesheet" href="estilos.css?v=104">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="103";
+const APP_VER="104";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -402,10 +402,17 @@ async function sync(){
       try{await TO(DB.doc(col+"/"+id).set(data),30000)}
       catch(e){
         if(e&&e.code==="conflict"){const rem=Object.assign({},e.remoto,{id,_col:a._col});
-          if(col==="visitas"){if(clv&&clv.id===id)clv=rem;VIS[id]=rem}else{if(cur&&cur.id===id)cur=rem;ACTAS[id]=rem}
+          /* v104: la versión más reciente queda en su módulo (antes rendiciones y conteos iban a ACTAS y la copia vieja
+             seguía abierta; el cambio siguiente en este teléfono pisaba la versión buena) */
+          let vistas;
+          if(col==="visitas"){if(clv&&clv.id===id)clv=rem;VIS[id]=rem;vistas=["cl","clp","clv","launch"]}
+          else if(col==="rendiciones"){if(rdv&&rdv.id===id){const k=rdd&&rdv.docs?Object.keys(rdv.docs).find(x=>rdv.docs[x]===rdd):null;rdv=rem;rdd=k&&rem.docs&&rem.docs[k]||null;if(view==="rdd"&&!rdd)view="rdv"}REND[id]=rem;vistas=["rd","rdv","rdd","rdm","launch"]}
+          else if(col==="conteos"){if(cbv&&cbv.id===id)cbv=rem;CONT[id]=rem;vistas=["cb","cbb","cbv","launch"]}
+          else{if(cur&&cur.id===id)cur=rem;ACTAS[id]=rem;vistas=["home","edit","axl","axe","launch"]}
           delete LOCAL[id];await localDel(id);status();
-          toast(`${col==="visitas"?"La visita":"El acta"} de ${esc(rem.trabajador||rem.predio||"")} fue modificada después desde otro teléfono; se conservó esa versión más reciente.`);
-          if(view==="home"||view==="cl"||view==="clp")render();continue}
+          const que={visitas:"La visita",rendiciones:"La rendición",conteos:"El conteo"}[col]||"El acta",de=col==="rendiciones"?rem.persona&&rem.persona.nombre:col==="conteos"?rem.bodega:rem.trabajador||rem.predio;
+          toast(`${que}${de?" de "+de:""} fue modificada después desde otro teléfono; se conservó esa versión más reciente.`);
+          if(vistas.includes(view))render();continue}
         if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);break}
       if(LOCAL[id]===a&&a.actualizado===stamp&&!LT[id]){delete LOCAL[id];await localDel(id)}
       status();
@@ -934,6 +941,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}">${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${MARCA}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
 function render(){
+  if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
   const app=$("#app");
   if(!loaded){app.innerHTML=band("Cargando actas…");return}
   if(view==="launch")app.innerHTML=renderLaunch();
@@ -2519,17 +2527,28 @@ async function init(){
   if(pend())schedSync(1500);
 }
 /* ---------- Actualización automática ---------- */
-let SWREG=null,UPD_READY=false,UPD_CHECKING=false;
-function aplicarUpdate(){flush().then(()=>{try{sessionStorage.setItem("actas-actualizado","1")}catch(e){}location.reload()})}
+let SWREG=null,UPD_READY=false,UPD_CHECKING=false,UPD_APLICANDO=false,FOTO_T=0;
+function aplicarUpdate(){if(UPD_APLICANDO)return;UPD_APLICANDO=true;flush().then(()=>{try{sessionStorage.setItem("actas-actualizado","1")}catch(e){}location.reload()})}
+/* v104: la app se recarga sola solo en una pantalla de lista, sin diálogos abiertos, sin una foto por elegir (cámara o galería)
+   y sin texto a medio escribir. Si no, avisa con la barra y se actualiza al volver a una lista (ver render()). */
+const UPD_VISTAS=["launch","home","cl","clp","rd","cb","cbb","stock","axl","axhub","fdl"];
+document.addEventListener("click",e=>{const t=e.target;if(t&&t.matches&&t.matches('input[type="file"]'))FOTO_T=Date.now()},true);
+document.addEventListener("change",e=>{const t=e.target;if(t&&t.type==="file")FOTO_T=0},true);
+function updSegura(){
+  if(!UPD_VISTAS.includes(view)||$(".modal"))return false;
+  if(FOTO_T&&Date.now()-FOTO_T<120000)return false;
+  const f=document.activeElement;if(f&&(f.tagName==="TEXTAREA"||f.tagName==="INPUT"&&f.type!=="file")&&f.value)return false;
+  return true;
+}
 function avisoUpdate(){
   UPD_READY=true;
-  /* Si no hay un acta abierta, se actualiza sola; si la hay, se avisa y se actualiza al salir */
-  if(view!=="edit"){aplicarUpdate();return}
+  if(updSegura()){aplicarUpdate();return}
   if(!$(".updbar")){const b=document.createElement("div");b.className="updbar";b.innerHTML=`<span>Hay una versión nueva de la app.</span><button class="btn pri" data-upd="1">Actualizar ahora</button>`;document.body.appendChild(b);
     b.querySelector("[data-upd]").addEventListener("click",aplicarUpdate)}
 }
 async function buscarUpdate(manual){
   if(!SWREG){if(manual)toast("Esta función solo está disponible en la app instalada.");return}
+  if(UPD_READY){if(updSegura())aplicarUpdate();return} /* v104: ya hay una versión nueva esperando */
   if(UPD_CHECKING)return;UPD_CHECKING=true;
   try{await SWREG.update();
     if(manual&&!UPD_READY){await new Promise(r=>setTimeout(r,2500));if(!UPD_READY)toast(`Ya tienes la última versión (${APP_VER}).`)}
@@ -2537,10 +2556,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=103"></script>
-<script src="modulos/bodega.js?v=103"></script>
-<script src="modulos/rendiciones.js?v=103"></script>
-<script src="modulos/actas-entrega.js?v=103"></script>
+<script src="modulos/checklist.js?v=104"></script>
+<script src="modulos/bodega.js?v=104"></script>
+<script src="modulos/rendiciones.js?v=104"></script>
+<script src="modulos/actas-entrega.js?v=104"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
