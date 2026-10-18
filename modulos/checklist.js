@@ -365,7 +365,7 @@ function semFila(x){
   return `<button class="smrow" data-a="clPredio" data-p="${esc(x.p)}">${semAnillo(x.pct)}<span class="smt"><b>${esc(x.p)}</b><span class="sms">${sub}</span>${ch.length?`<span class="smch">${ch.join("")}</span>`:""}</span>${SEM_CHEV}</button>`;
 }
 function semListaHTML(){
-  const info=PREDIOS.map(semInfo),o=clOrden(),{lista,sin}=semOrdenar(info,o);
+  const info=prediosCL().map(semInfo),o=clOrden(),{lista,sin}=semOrdenar(info,o); /* v105: más los predios antiguos con visitas */
   const tv=info.reduce((n,x)=>n+x.venc,0),th=info.reduce((n,x)=>n+x.ha,0),ts=info.filter(x=>x.sin).length;
   return `<div class="smres"><div${tv?' class="rr"':""}><b>${tv}</b><span>${tv===1?"acción con plazo vencido":"acciones con plazo vencido"}</span></div><div><b>${th}</b><span>${th===1?"hallazgo abierto":"hallazgos abiertos"}</span></div><div><b>${ts}</b><span>${ts===1?"predio sin visita":"predios sin visita"}</span></div></div>
     <div class="smol" id="smol">Ordenar por</div>

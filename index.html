@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=104">
+<link rel="stylesheet" href="estilos.css?v=105">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="104";
+const APP_VER="105";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -31,7 +31,11 @@ if(typeof MARCA==='undefined'||typeof MARCA_HZ==='undefined'||typeof LOGO==='und
 window.addEventListener("error",e=>{try{toast("Error: "+(e.message||"desconocido"))}catch(x){}});
 window.addEventListener("unhandledrejection",e=>{try{const r=e.reason;if(r&&(r.code==="wake"||r.code==="timeout"))return;toast("Error: "+((r&&(r.message||r.code))||"desconocido"))}catch(x){}});
 /* ---------- Datos fijos del protocolo ---------- */
-const PREDIOS=["Bellavista","Cadenasso","Casa Anita","Ciruelillo","Coipomó","Mi Tierra","Radales","San Francisco","San Miguel","Tradicional","Tronador","Valle Verde"];
+const PREDIOS=["Bellavista","Cadenasso","Casa Anita","Ciruelillo","Coipomó","Mi Tierra","Radales","San Francisco","San Miguel","Tradicional","Tronador"];
+/* v105: Valle Verde salió de la lista (es una planta lechera que recibe leche, no un predio). Un registro antiguo con un predio
+   que ya no está en la lista lo sigue mostrando: en las actas, como opción elegida; en el Check list, mientras tenga visitas. */
+const prediosCL=()=>{const x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&!PREDIOS.includes(v.predio))x.add(v.predio)});return PREDIOS.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
+const optPredioAntiguo=(p,lista)=>p&&p!=="Otro"&&!lista.includes(p)?`<option selected>${esc(p)}</option>`:"";
 /* Cada ítem tiene una clave fija (k) para que las actas guardadas no cambien si se reordena el check list */
 const SECC=[
  {t:"Habitaciones",i:[["s1i1","Paredes"],["s1i2","Ventanas"],["s1i3","Puertas"],["s1i4","Limpieza interior"]]},
@@ -1040,7 +1044,7 @@ function renderEdit(){
 }
 function stepDatos(){
   const a=cur,dev=a.tipo==="devolucion";
-  const opts=PREDIOS.map(p=>`<option ${a.predio===p?"selected":""}>${p}</option>`).join("");
+  const opts=PREDIOS.map(p=>`<option ${a.predio===p?"selected":""}>${p}</option>`).join("")+optPredioAntiguo(a.predio,PREDIOS);
   const rutMsg=a.rut&&!rutOk(a.rut)?`<span class="err" id="rutErr">El RUT no es válido. Revisa el dígito verificador.</span>`:`<span class="err" id="rutErr"></span>`;
   return `${dev?(a.entregaId?`<div class="info">Vivienda entregada el <b>${fmtD(a.entregaFecha)}</b>. El check list mostrará el estado de la entrega junto a cada ítem.</div>`:`<div class="info">Devolución sin acta de entrega en la app: no habrá comparación con el estado inicial.</div>`):""}
   <div class="grid2">
@@ -1737,7 +1741,7 @@ function renderLaunch(){
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${a.id}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
   cont=`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy${ph.length?`<span class="cnt">${ph.length}</span>`:""}</h2>${ph.length?`<div class="lx-conts">${disPh(ph)}</div>`:`<div class="ph-aldia">${EST_ICO.ok}<span>No tienes nada pendiente.</span></div>`}</section>`;
-  const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=PREDIOS.reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length,0);
+  const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=prediosCL().reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length,0);
   const resumen=`<section class="lx-sec"><h2 class="lx-h2">Resumen</h2><div class="lx-stats">
     <div><b>${todasAx.length}</b><span>${todasAx.length===1?"acta de entrega":"actas de entrega"}</span></div>
     <div><b>${nv}</b><span>${nv===1?"visita":"visitas"} de check list</span></div>
@@ -1750,7 +1754,7 @@ function renderLaunch(){
       <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
       ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
       ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      ${[["visitas","cl",ICO.check,"Visitas de Control y Gestión por predio, con seguimiento de hallazgos."],["bodega","clb",ICO.bodega,"Orden, aseo y seguridad de la bodega de cada predio, con seguimiento de hallazgos."]].map(([t,act,ico,desc])=>`<button class="lx-mode on" data-a="${act}"><span class="lx-mi">${ico}</span><span class="lx-mt">${CLK[t].titulo}</span><span class="lx-md">${desc}</span><span class="lx-ma">${(()=>{const vs=Object.values(VIS).filter(v=>!v.anulada&&tipoDe(v)===t);const ab=vs.filter(v=>v.estado!=="cerrada").length;const ha=PREDIOS.reduce((n,p)=>n+abiertos(p,t).length,0);return vs.length?`${vs.length} ${vs.length===1?"visita":"visitas"}${ab?` · ${ab} en curso`:""}${ha?` · ${ha} hallazgos`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`).join("")}
+      ${[["visitas","cl",ICO.check,"Visitas de Control y Gestión por predio, con seguimiento de hallazgos."],["bodega","clb",ICO.bodega,"Orden, aseo y seguridad de la bodega de cada predio, con seguimiento de hallazgos."]].map(([t,act,ico,desc])=>`<button class="lx-mode on" data-a="${act}"><span class="lx-mi">${ico}</span><span class="lx-mt">${CLK[t].titulo}</span><span class="lx-md">${desc}</span><span class="lx-ma">${(()=>{const vs=Object.values(VIS).filter(v=>!v.anulada&&tipoDe(v)===t);const ab=vs.filter(v=>v.estado!=="cerrada").length;const ha=prediosCL().reduce((n,p)=>n+abiertos(p,t).length,0);return vs.length?`${vs.length} ${vs.length===1?"visita":"visitas"}${ab?` · ${ab} en curso`:""}${ha?` · ${ha} hallazgos`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`).join("")}
     </div>
   </main>`;
 }
@@ -2556,10 +2560,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=104"></script>
-<script src="modulos/bodega.js?v=104"></script>
-<script src="modulos/rendiciones.js?v=104"></script>
-<script src="modulos/actas-entrega.js?v=104"></script>
+<script src="modulos/checklist.js?v=105"></script>
+<script src="modulos/bodega.js?v=105"></script>
+<script src="modulos/rendiciones.js?v=105"></script>
+<script src="modulos/actas-entrega.js?v=105"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
