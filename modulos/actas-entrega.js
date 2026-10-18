@@ -201,7 +201,7 @@ function renderAxList(){
 const axDis=()=>ro()?"disabled":"";
 function axInp(path,label,o){o=o||{};const v=axGet(cur,path);return `<div class="f"${o.style?` style="${o.style}"`:""}><label for="x_${path}">${esc(label)}</label><input id="x_${path}" data-x="${path}" value="${esc(v)}" ${o.type?`type="${o.type}"`:""} ${o.mode?`inputmode="${o.mode}"`:""} placeholder="${esc(o.ph||"")}" autocomplete="off" ${axDis()}>${o.hint?`<span class="hint">${esc(o.hint)}</span>`:""}${o.err||""}</div>`}
 function axPredio(){
-  const a=cur;return `<div class="f"><label for="x_predio">Predio o área</label><select id="x_predio" data-xs="predio" ${axDis()}><option value="">Elige</option>${AX_PREDIOS.map(p=>`<option ${a.predio===p?"selected":""}>${p}</option>`).join("")}<option ${a.predio==="Otro"?"selected":""}>Otro</option></select></div>
+  const a=cur;return `<div class="f"><label for="x_predio">Predio o área</label><select id="x_predio" data-xs="predio" ${axDis()}><option value="">Elige</option>${AX_PREDIOS.map(p=>`<option ${a.predio===p?"selected":""}>${p}</option>`).join("")}${optPredioAntiguo(a.predio,AX_PREDIOS)}<option ${a.predio==="Otro"?"selected":""}>Otro</option></select></div>
   ${a.predio==="Otro"?axInp("predioOtro","Nombre del predio o área"):""}`;
 }
 function axFotos(k,titulo){
