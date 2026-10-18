@@ -1085,7 +1085,7 @@ function rdEstadoFrase(r){
   const e=r.estado||"borrador",n=docsDe(r).length,dt=rdDesdeTxt(r),tarde=rdDiasEspera(r)>=3;
   if(e==="borrador")return{t:n?`Sin enviar · ${n} ${n===1?"documento":"documentos"}. Cuando estén completos, envíala a aprobación.`:"Sin enviar. Agrega las facturas y boletas del mes."};
   if(e==="observada"){const h=(r.hist||[]).filter(x=>x.a==="devuelta").pop();
-    return{t:`Devuelta${h?` por ${quien(h.por)} el ${fmtD(String(h.fecha).slice(0,10))}`:""}: corrige lo observado y reenvíala.`,k:"dev"}}
+    return{t:`Devuelta${h?` por ${quien(h.por)} el ${fmtD(isoLocal(h.fecha))}`:""}: corrige lo observado y reenvíala.`,k:"dev"}}
   if(e==="enviada"){const jn=rdJefNombre(r);return{t:jn?`Esperando la aprobación de ${jn} ${dt}.`:`Esperando la revisión de ${contabNombres()} ${dt}.`,k:tarde?"tarde":"act"}}
   if(e==="revcont")return{t:`En revisión contable (${contabNombres()}) ${dt}.`,k:tarde?"tarde":"act"};
   if(e==="aprobada")return{t:`Aprobada. Falta registrarla en FinnegansGO ${dt}.`,k:"act"};
@@ -1669,7 +1669,8 @@ async function rdChange(ev){const t=ev.target;
 async function rdGuardarFoto(r,d,file){
   let img;try{img=file&&file.dataURL&&file.blob?file:await compress(file,2560,0.8)}catch(e){toast("No se pudo leer la imagen.");return null}
   let ref=null;if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:r.id,k:d.k,col:"rendiciones"});QF[t]={actaId:r.id,k:d.k,col:"rendiciones"};ref=t}catch(e){}}
-  if(!ref)ref="m:"+uid();FOTO[ref]=img.dataURL;schedSync(800);return ref;
+  if(!ref)ref=refSinEspacio();if(!ref)return null; /* v106 (C-04) */
+  FOTO[ref]=img.dataURL;schedSync(800);return ref;
 }
 async function rdAgregarDoc(r,file,op){
   op=op||{};
@@ -1680,7 +1681,8 @@ async function rdAgregarDoc(r,file,op){
   if(!tim&&!img&&!op.sinRevisar){const q=await fotoCalidad(file);if(q.mala){const x=await fotoPregunta(q);if(x==="descartar")return;if(x&&x!=="usar")return rdAgregarDoc(r,x,op);op={...op,sinRevisar:true}}}
   const c=colabDe(r);
   const d={k:"d"+uid(),creado:new Date().toISOString(),tipo:"boleta",emisor:"",rut:"",folio:"",fecha:"",total:0,neto:0,iva:0,centro:(c&&centroExiste(c.centro))?c.centro:"",gasto:"",glosa:""};if(d.centro)d.centroSug=true;
-  r.docs[d.k]=d;d.foto=await rdGuardarFoto(r,d,img||file);if(img&&d.foto)await rdPonerPdf(r,d,file,img);
+  const foto=await rdGuardarFoto(r,d,img||file);if(!foto)return; /* v106 (C-04) */
+  r.docs[d.k]=d;d.foto=foto;if(img)await rdPonerPdf(r,d,file,img);
   if(tim)timbreAplicar(d,tim);if(op.escaneo)d.deEscaneo=true;
   if(d.rut&&!d.gasto){const gh=gastoHistorial(d.rut,d.k);if(gh){d.gasto=gh;d.gastoHist=true}}
   d.lectura={estado:navigator.onLine===false?"pendiente":"leyendo"};r.actualizado=new Date().toISOString();await saveRend(r);render();
@@ -1742,8 +1744,9 @@ async function rdCambiarDoc(r,d,f){
   let img=null;
   if(esPdf(f)){img=await rdPdfImagen(f);if(!img)return}
   else if(!esImagen(f)){toast("Elige una foto o un PDF de la factura o boleta.");return}
+  const nf=await rdGuardarFoto(r,d,img||f);if(!nf)return; /* v106 (C-04) */
   if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d);
-  d.foto=await rdGuardarFoto(r,d,img||f);if(img&&d.foto)await rdPonerPdf(r,d,f,img);
+  d.foto=nf;if(img)await rdPonerPdf(r,d,f,img);
   const tv=d.deEscaneo?d.timbre:null;delete d.timbre;delete d.deEscaneo;{const t=await timbreLeer(img?img.blob:f);if(t)timbreAplicar(d,t);else if(tv)timbreAplicar(d,tv)}
   d.lectura={estado:navigator.onLine===false?"pendiente":"leyendo"};d.revisadoManual=false;rdTouch();render();leerDoc(r,d)
 }

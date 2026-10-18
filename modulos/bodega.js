@@ -338,7 +338,8 @@ async function cbAddFotos(c,k,files){
   for(const f of files){const r=c.items[k]||(c.items[k]={});r.fotos=r.fotos||[];if(r.fotos.length>=3){toast("Máximo 3 fotos por producto.");break}
     let img;try{img=await compress(f,1600,0.75)}catch(e){toast("No se pudo leer la imagen.");continue}
     let ref=null;if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:c.id,k,col:"conteos"});QF[t]={actaId:c.id,k,col:"conteos"};ref=t}catch(e){}}
-    if(!ref)ref="m:"+uid();FOTO[ref]=img.dataURL;r.fotos.push(ref);cbTouch();cbRefresh(k)}
+    if(!ref)ref=refSinEspacio();if(!ref)continue; /* v106 (C-04) */
+    FOTO[ref]=img.dataURL;r.fotos.push(ref);cbTouch();cbRefresh(k)}
   schedSync(800);
 }
 

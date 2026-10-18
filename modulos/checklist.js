@@ -688,7 +688,7 @@ async function clAddFotos(v,k,files){
     let img;try{img=await compress(f,1600,0.75)}catch(e){toast("No se pudo leer la imagen.");continue}
     let ref=null;
     if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:v.id,k,col:"visitas"});QF[t]={actaId:v.id,k,col:"visitas"};ref=t}catch(e){}}
-    if(!ref){ref="m:"+uid()}
+    if(!ref){ref=refSinEspacio();if(!ref)continue} /* v106 (C-04) */
     FOTO[ref]=img.dataURL;r.fotos.push(ref);
     clTouch();clRefreshItem(v,k);
   }

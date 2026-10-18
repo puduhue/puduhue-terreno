@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=105">
+<link rel="stylesheet" href="estilos.css?v=106">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="105";
+const APP_VER="106";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -94,6 +94,8 @@ function descFoto(k,v){
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+/* v106 (B-01): fecha local (AAAA-MM-DD) de un instante; una fecha sola se deja igual */
+const isoLocal=x=>{if(typeof x==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(x))return x;const d=x instanceof Date?x:new Date(x==null?Date.now():x);if(isNaN(d))return String(x||"").slice(0,10);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const fmtD=s=>{if(!s)return"";const p=String(s).slice(0,10).split("-");return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:s};
 function rutClean(s){return String(s||"").replace(/[^0-9kK]/g,"").toUpperCase()}
@@ -234,12 +236,13 @@ async function pull(manual){
   if(pulling)return;if(navigator.onLine===false){if(manual)toast("Sin señal: se usa la copia guardada en el teléfono.");return}
   pulling=true;SYNC_INFO.estado="bajando";status();
   try{
+    while(syncing)await new Promise(r=>setTimeout(r,200)); /* v106 (M-02): un solo candado para bajar y subir */
     let cambios=0;for(const col of Object.keys(M365.cols)){const c=await pullCol(col);cambios+=c;if(c||manual)emitir(col)}
     try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")render()}}catch(e){console.warn("catálogo",e)}
     try{if(await stockPull()&&(view==="stock"||view==="launch"))render()}catch(e){console.warn("stock",e)}
     try{if(await rdMaePull()&&/^rd/.test(view))render()}catch(e){console.warn("maestros rendiciones",e)}
     if(CAT_PEND&&esAdmin())await guardarCatalogo(false);
-    guardarEtags();SYNC_INFO.ultima=new Date().toISOString();SYNC_INFO.error="";try{localStorage.setItem(LK,SYNC_INFO.ultima)}catch(e){}
+    guardarEtags();SYNC_INFO.ultima=new Date().toISOString();SYNC_INFO.error="";if(noWrite){noWrite=false;schedSync(1000)} /* v106 (A-03) */try{localStorage.setItem(LK,SYNC_INFO.ultima)}catch(e){}
     if(manual)toast(cambios?`Actualizado: ${cambios} ${cambios===1?"registro":"registros"} con cambios.`:"Todo al día.");
   }catch(e){SYNC_INFO.error=errMsg(e);Object.values(SNAP).forEach(x=>{if(x.err)x.err(e)});if(manual)toast(SYNC_INFO.error);if(e&&e.code==="forbidden")noWrite=true}
   finally{pulling=false;SYNC_INFO.estado="";status();setTimeout(()=>{try{traspasarBodega()}catch(e){console.warn("traspaso bodega",e)}reintentarExcel();pdfsPendientes();leerPendientes();try{rdCompletarRut();rdSinJefaturaADirecto()}catch(e){console.warn("rut rendiciones",e)}abrirEnlace(true);try{pushSincronizar()}catch(e){};rdAgendaPublicar().catch(()=>{});setTimeout(mudanzaRevisar,500);enviarCorreosPend()},1500)}
@@ -346,12 +349,12 @@ const TO=(p,ms)=>{let rj;const wk=new Promise((_,r)=>{rj=r;WK.push(r)});return P
 const DQK="actas-vivienda-borrar";
 let DELQ=new Set();try{DELQ=new Set(JSON.parse(localStorage.getItem(DQK)||"[]"))}catch(e){}
 function saveDQ(){try{localStorage.setItem(DQK,JSON.stringify([...DELQ]))}catch(e){}}
-function pend(){return (DB?Object.keys(LOCAL).length+DELQ.size:0)+(AS?Object.keys(QF).length:0)}
-let syncing=false,syncT=null,again=false;
+function pend(){return (DB?Object.keys(LOCAL).length+DELQ.size:0)+(AS?Object.keys(QF).length+NSUELTAS:0)}
+let syncing=false,syncT=null,again=false,NSUELTAS=0;
 function pendHTML(){
   const n=pend();if(!n||!DB)return"";
   if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite)return"";
-  const qs=AS?Object.values(QF):[],np=qs.filter(m=>m&&m.pdf).length,nf=qs.length-np,na=Object.keys(LOCAL).length,nd=DELQ.size;
+  const qs=AS?Object.values(QF):[],np=qs.filter(m=>m&&m.pdf).length,nf=qs.length-np+NSUELTAS,na=Object.keys(LOCAL).length,nd=DELQ.size;
   const L=[na?`${na} ${na===1?"registro con cambios":"registros con cambios"}`:"",nf?`${nf} ${nf===1?"foto":"fotos"}`:"",np?`${np} PDF`:"",nd?`${nd} ${nd===1?"borrador eliminado":"borradores eliminados"}`:""].filter(Boolean);
   const det=L.length>1?L.slice(0,-1).join(", ")+" y "+L[L.length-1]:L.join("");
   return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal; no cierres sesión ni borres los datos de la app mientras tanto.${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
@@ -377,9 +380,34 @@ function saveActa(a,deb){
 function touch(){if(!cur)return;cur.actualizado=new Date().toISOString();if(ME)cur.modificadoPor=yo();saveActa(cur,true)}
 async function flush(){const ps=[];let hubo=false;for(const id of Object.keys(LT)){clearTimeout(LT[id]);delete LT[id];hubo=true;const o=ACTAS[id]||VIS[id]||CONT[id]||REND[id];if(o)ps.push(localPut(o))}await Promise.all(ps);if(hubo||pend())schedSync(600);status()}
 function schedSync(ms){if(syncing){again=true;return}clearTimeout(syncT);syncT=setTimeout(sync,ms)}
+/* v106 (M-03): errores que afectan a toda la cola (sin red, sesión, permiso, OneDrive saturado) la detienen y se reintenta
+   después; cualquier otro es de un registro o una foto: se salta, se cuenta y se sigue con los demás (queda pendiente). */
+const errDeCola=e=>navigator.onLine===false||!!e&&(["network","timeout","wake","auth","forbidden"].includes(e.code)||e.code==="graph"&&(e.status===429||e.status>=500));
+function errSubida(e){if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);
+  if(errDeCola(e))return true;console.warn("no se pudo subir",e);SYNC_INFO.fallidos=(SYNC_INFO.fallidos||0)+1;SYNC_INFO.error=errMsg(e);return false}
+/* v106 (C-04): fotos fuera de la cola QF: «l:» (respaldo en localStorage de Actas de vivienda) y «m:» (solo en memoria,
+   en un navegador que no deja guardar). Se suben en sync() y cuentan como pendientes. */
+function fotosSueltas(){const L=[],es=r=>typeof r==="string"&&(r.startsWith("l:")||r.startsWith("m:")&&!!FOTO[r]);
+  const items=(M,col)=>Object.values(M||{}).forEach(o=>{if(!o||!o.items)return;for(const k of Object.keys(o.items)){((o.items[k]&&o.items[k].fotos)||[]).forEach(r=>{if(es(r))L.push({ref:r,meta:col?{actaId:o.id,k,col}:{actaId:o.id,k}})})}});
+  items(ACTAS);items(VIS,"visitas");items(CONT,"conteos");
+  Object.values(REND||{}).forEach(o=>{if(o&&o.docs)for(const k of Object.keys(o.docs)){const d=o.docs[k];if(d&&es(d.foto))L.push({ref:d.foto,meta:{actaId:o.id,k,col:"rendiciones"}})}});
+  return L}
+function contarSueltas(){try{NSUELTAS=fotosSueltas().length}catch(e){NSUELTAS=0}return NSUELTAS}
+/* foto ya subida: su referencia pasa a «a:<id de OneDrive>» en el registro; si el registro ya no la tiene, se borra de OneDrive */
+async function fotoSubida(ref,meta,u){
+      const nref="a:"+u.id;FOTO[nref]=FOTO[ref];
+      const a=objetoDeFoto(meta);
+      if(meta.col==="rendiciones"&&a&&a.docs&&a.docs[meta.k]&&(a.docs[meta.k].foto===ref||a.docs[meta.k].pdf===ref)){const dd=a.docs[meta.k];if(dd.foto===ref)dd.foto=nref;else dd.pdf=nref;if(u.url){(a.fotoUrl=a.fotoUrl||{})[nref]=u.url}a.actualizado=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);refrescarFotoItem(meta)}
+      else if(a&&a.items&&a.items[meta.k]&&(a.items[meta.k].fotos||[]).includes(ref)){
+        const fs=a.items[meta.k].fotos;fs[fs.indexOf(ref)]=nref;if(u.url){(a.fotoUrl=a.fotoUrl||{})[nref]=u.url}a.actualizado=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);refrescarFotoItem(meta);
+      }else{try{AS.delete(u.id).catch(()=>{})}catch(e){}}
+}
 async function sync(){
   if(syncing||(!DB&&!AS))return;
+  if(AS)contarSueltas();
   if(!pend())return;
+  while(pulling)await new Promise(r=>setTimeout(r,200)); /* v106 (M-02): si se está bajando, la subida espera */
+  if(syncing)return;
   syncing=true;status();
   try{
     if(AS){for(const ref of Object.keys(QF)){
@@ -387,18 +415,23 @@ async function sync(){
       const blob=await recBlob(rec);
       if(!blob){LOST[ref]=true;delete QF[ref];refrescarFotoItem(meta);continue}
       if(!objetoDeFoto(meta)){delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}continue}
-      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];continue}if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);break}
-      const nref="a:"+u.id;FOTO[nref]=FOTO[ref];
-      const a=objetoDeFoto(meta);
-      if(meta.col==="rendiciones"&&a&&a.docs&&a.docs[meta.k]&&(a.docs[meta.k].foto===ref||a.docs[meta.k].pdf===ref)){const dd=a.docs[meta.k];if(dd.foto===ref)dd.foto=nref;else dd.pdf=nref;if(u.url){(a.fotoUrl=a.fotoUrl||{})[nref]=u.url}a.actualizado=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);refrescarFotoItem(meta)}
-      else if(a&&a.items&&a.items[meta.k]&&(a.items[meta.k].fotos||[]).includes(ref)){
-        const fs=a.items[meta.k].fotos;fs[fs.indexOf(ref)]=nref;if(u.url){(a.fotoUrl=a.fotoUrl||{})[nref]=u.url}a.actualizado=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);refrescarFotoItem(meta);
-      }else{try{AS.delete(u.id).catch(()=>{})}catch(e){}}
+      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];continue}if(errSubida(e))break;continue}
+      noWrite=false;await fotoSubida(ref,meta,u);
       delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}
       status();
-    }}
+    }
+    for(const {ref,meta} of fotosSueltas()){
+      let src="";try{src=ref.startsWith("l:")?localStorage.getItem("actas-foto-"+ref)||"":FOTO[ref]||""}catch(e){}
+      if(!src||!objetoDeFoto(meta))continue;
+      let blob;try{blob=dataURLtoBlob(src)}catch(e){continue}
+      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone")continue;if(errSubida(e))break;continue}
+      noWrite=false;FOTO[ref]=FOTO[ref]||src;await fotoSubida(ref,meta,u);
+      if(ref.startsWith("l:")){try{localStorage.removeItem("actas-foto-"+ref)}catch(e){}}
+      contarSueltas();status();
+    }
+    contarSueltas()}
     if(DB&&!noWrite){for(const id of [...DELQ]){
-      try{await TO(DB.doc(id.includes("/")?id:"actas/"+id).delete(),20000)}catch(e){if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);break}
+      try{await TO(DB.doc(id.includes("/")?id:"actas/"+id).delete(),20000)}catch(e){if(errSubida(e))break;continue}
       DELQ.delete(id);saveDQ();status();
     }}
     if(DB&&!noWrite){for(const id of Object.keys(LOCAL)){
@@ -417,7 +450,7 @@ async function sync(){
           const que={visitas:"La visita",rendiciones:"La rendición",conteos:"El conteo"}[col]||"El acta",de=col==="rendiciones"?rem.persona&&rem.persona.nombre:col==="conteos"?rem.bodega:rem.trabajador||rem.predio;
           toast(`${que}${de?" de "+de:""} fue modificada después desde otro teléfono; se conservó esa versión más reciente.`);
           if(vistas.includes(view))render();continue}
-        if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);break}
+        if(errSubida(e))break;continue}
       if(LOCAL[id]===a&&a.actualizado===stamp&&!LT[id]){delete LOCAL[id];await localDel(id)}
       status();
     }}
@@ -686,8 +719,8 @@ if(document.body)letraAplicar();else document.addEventListener("DOMContentLoaded
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&(DIS.letra||"auto")==="auto")letraAplicar()});
 
 /* ---- 2) Inicio: chip de sincronización, buscador y «Para hoy» corto ---- */
-function disUlt(){if(!SYNC_INFO.ultima)return"nunca";const d=new Date(SYNC_INFO.ultima),hoy=today()===SYNC_INFO.ultima.slice(0,10);
-  return (hoy?"hoy a las ":fmtD(SYNC_INFO.ultima)+" a las ")+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+function disUlt(){if(!SYNC_INFO.ultima)return"nunca";const d=new Date(SYNC_INFO.ultima),hoy=today()===isoLocal(SYNC_INFO.ultima);
+  return (hoy?"hoy a las ":fmtD(isoLocal(SYNC_INFO.ultima))+" a las ")+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
 function disChip(){
   const on=RED==="ok",chk=RED==="checking",np=pend();
   if(!on&&!chk)return `<button class="lx-sig no" id="lxChip" data-a="checkRed" title="Volver a revisar la señal">${ICO.nowifi}<span>Sin señal${np?` · ${np} por subir`:""}</span></button>`;
@@ -1175,9 +1208,16 @@ document.addEventListener("drop",async e=>{if(!conArchivos(e))return;e.preventDe
   if(!ok.length){toast("Solo se pueden agregar fotos (JPG o PNG) o PDF de facturas y boletas.");return}
   if(ok.length<fs.length)toast(`Se agregan ${ok.length} ${ok.length===1?"documento":"documentos"}; los archivos que no son fotos ni PDF se omiten.`);
   {const R=rdv,ks=[];for(const f of ok)ks.push(await rdAgregarDoc(R,f));rdTrasSubir(R,ks)}});
+/* v106 (M-01): mientras una de estas acciones está en curso (diálogo abierto, guardado, correo), otro toque no hace nada */
+const UNA_VEZ=new Set(["rdEnviar","rdAprobarJef","rdAprobarCont","rdDevolver","cbNuevo","exportar","actasXlsx","clXlsx","axXlsx","rdXlsx","rdImpUna","rdImpTodas"]),OCUPADO=new Set();
 async function onClick(ev){
   const b=ev.target.closest("[data-a]");if(!b)return;
   const A=b.dataset.a;
+  if(!UNA_VEZ.has(A))return onClickAccion(ev,b,A);
+  if(OCUPADO.has(A))return;OCUPADO.add(A);
+  try{return await onClickAccion(ev,b,A)}finally{OCUPADO.delete(A)}
+}
+async function onClickAccion(ev,b,A){
   if(A==="fabRd"||A.startsWith("dis")){if(await disClick(A,b))return}
   if(A.startsWith("lec")){if(await lecClick(A,b))return}
   if(A==="pushOn"){pushSwVer(true);pushActivar().finally(pushPintar);return}
@@ -1207,7 +1247,7 @@ async function onClick(ev){
   if(A==="tema"){cambiarTema();return}
   if(A==="login"){iniciarSesion();return}
   if(A==="logout"){await cerrarSesion();return}
-  if(A==="pull"){if(!DB)return toast("Inicia sesión para sincronizar.");await flush();schedSync(100);await pull(true);return}
+  if(A==="pull"){if(!DB)return toast("Inicia sesión para sincronizar.");noWrite=false;await flush();schedSync(100);await pull(true);return}
   if(A==="sync"){if(!DB)return toast("Inicia sesión para sincronizar.");await flush();schedSync(100);await pull(true);return}
   if(A==="buscarUpd"){await buscarUpdate(true);return}
   if(A==="checkRed"){if(REDMSG)toast(REDMSG);checkRed();return}
@@ -1258,7 +1298,7 @@ async function onClick(ev){
   if(A==="informe"||A==="dlInf"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await descargarGeneral(a);return}
   if(A==="delFoto"){await quitarFoto(b.dataset.k,b.dataset.ref);return}
   if(A==="foto"){verFoto(b.dataset.ref,b.dataset.k,b.dataset.own==="1");return}
-  if(A==="syncNow"){sync();return}
+  if(A==="syncNow"){noWrite=false;sync();return}
   if(A==="exportar"){await exportarActas();return}
   if(A==="quitarLost"){const L=lostRefs();if(!(await ask(`¿Quitar ${L.length} fotos no recuperables?`,"","Quitar",true)))return;L.forEach(([k,f])=>{const r=cur.items[k];r.fotos=r.fotos.filter(x=>x!==f);delete LOST[f];IDB.del("fotos",f).catch(()=>{})});touch();render();toast("Fotos quitadas. Ya puedes tomarlas de nuevo.");return}
 }
@@ -1314,6 +1354,10 @@ function openSign(role){
 
 /* ---------- Fotos ---------- */
 const MAXF=6;let MEMWARN=false,STORE_OK=null;
+/* v106 (C-04): la foto no se pudo guardar en el teléfono. Si el navegador guarda (falta espacio), se avisa y no se adjunta;
+   si no deja guardar nada (versión sin conexión), queda en memoria con aviso y se sube mientras la app esté abierta. */
+function refSinEspacio(){if(STORE_OK!==false){toast("No queda espacio en el teléfono para más fotos.");return null}
+  const ref="m:"+uid();if(!MEMWARN){MEMWARN=true;toast("Este navegador no deja guardar fotos: quedan solo mientras la app esté abierta. Exporta antes de cerrarla.")}return ref}
 function fotoSrc(ref){
   if(FOTO[ref])return FOTO[ref];
   if(ref.startsWith("a:")){pedirFoto(ref);return""}
@@ -1348,9 +1392,7 @@ async function addFotos(a,k,files){
     let ref=null;
     if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:a.id,k});const back=await IDB.get("fotos",t);if(back&&back.data&&back.data.byteLength===buf.byteLength){QF[t]={actaId:a.id,k};ref=t}else{IDB.del("fotos",t).catch(()=>{})}}catch(e){}}
     if(!ref){const t="l:"+uid();try{localStorage.setItem("actas-foto-"+t,(await compress(f,1000,0.6)).dataURL);ref=t}catch(e){}}
-    if(!ref){if(STORE_OK!==false){toast("No queda espacio en el teléfono para más fotos.");continue}
-      /* Versión sin conexión: si el navegador no deja guardar, la foto queda en memoria y viaja en la exportación */
-      ref="m:"+uid();if(!MEMWARN){MEMWARN=true;toast("Este navegador no deja guardar fotos: quedan solo mientras la app esté abierta. Exporta antes de cerrarla.")}}
+    if(!ref){ref=refSinEspacio();if(!ref)continue}
     FOTO[ref]=img.dataURL;r.fotos.push(ref);
     if(a===cur)touch();else{a.actualizado=new Date().toISOString();saveActa(a)}
     refreshItem(a,k);
@@ -1727,7 +1769,7 @@ function renderLaunch(){
     <p class="note lx-ver">Puduhue Terreno · versión ${APP_VER} · <button class="lnk" data-a="buscarUpd">Buscar actualización</button>${instPieHTML()}</p></main>`;
   }
   const np=pend(),cerr=todas.filter(a=>a.estado==="cerrada").length;
-  const ult=SYNC_INFO.ultima?(()=>{const d=new Date(SYNC_INFO.ultima),hoy=today()===SYNC_INFO.ultima.slice(0,10);return (hoy?"hoy a las ":fmtD(SYNC_INFO.ultima)+" a las ")+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")})():"nunca";
+  const ult=SYNC_INFO.ultima?(()=>{const d=new Date(SYNC_INFO.ultima),hoy=today()===isoLocal(SYNC_INFO.ultima);return (hoy?"hoy a las ":fmtD(isoLocal(SYNC_INFO.ultima))+" a las ")+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")})():"nunca";
   const estado=SYNC_INFO.estado==="bajando"||syncing?["chk","Sincronizando<i class='dots'></i>"]:SYNC_INFO.error?["no",esc(SYNC_INFO.error)]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
   const sync=`<section class="lx-sec"><div class="lx-sync ${estado[0]}"><div class="lx-syncl"><span class="lx-synct">${estado[1]}</span><span class="lx-syncs">Última sincronización: ${ult}</span></div><button class="btn" data-a="pull" ${on?"":"disabled"}>${on?"Sincronizar":"Sin señal"}</button></div></section>`;
   let cont="";const conts=[];
@@ -1765,7 +1807,7 @@ function traspasoHTML(){
   const imp=`<label class="btn" style="display:inline-block">Importar actas desde archivo<input class="vh" type="file" accept=".json,application/json" data-imp="1"></label>`;
   const diag=STORE_OK===false?`<div class="info netbox"><b>Este navegador no permite guardar en el teléfono.</b> Las actas y fotos quedan solo mientras la app esté abierta. Ábrela desde el ícono de la pantalla de inicio.</div>`:"";
   const inst=(window.navigator.standalone===true||matchMedia("(display-mode: standalone)").matches)?"":(ESCRITORIO()?`<div class="info"><b>En el computador</b> la app se usa desde el navegador. Si quieres tenerla como programa, en Chrome o Edge usa el ícono <b>Instalar</b> de la barra de direcciones.</div>`:`<div class="info netbox"><b>Instala la app antes de salir a terreno:</b> en Safari toca Compartir y luego <b>Agregar a pantalla de inicio</b> (en Android, menú ⋮ → Instalar app). Ábrela siempre desde ese ícono: así funciona sin señal y las actas quedan guardadas.</div>`);
-  return `${inst}${diag}<h2>Sincronización</h2><p class="note" style="margin-top:0">Las actas se guardan en este teléfono y se suben solas a la carpeta compartida de Puduhue cuando hay señal. Cada acta muestra si está <b>sincronizada</b> o <b>pendiente de subir</b>.${SYNC_INFO.ultima?` Última sincronización: ${fmtD(SYNC_INFO.ultima)}.`:""}</p>
+  return `${inst}${diag}<h2>Sincronización</h2><p class="note" style="margin-top:0">Las actas se guardan en este teléfono y se suben solas a la carpeta compartida de Puduhue cuando hay señal. Cada acta muestra si está <b>sincronizada</b> o <b>pendiente de subir</b>.${SYNC_INFO.ultima?` Última sincronización: ${fmtD(isoLocal(SYNC_INFO.ultima))}.`:""}</p>
   <div class="btns" style="margin-top:8px"><button class="btn pri" data-a="pull">Sincronizar ahora</button><button class="btn" data-a="actasXlsx" ${DB?"":"disabled"}>Actualizar Excel</button><button class="btn" data-a="exportar">Exportar respaldo</button>${imp}</div>
   <p class="note">En OneDrive, cada acta tiene su carpeta <b>Actas de vivienda / Predio / fecha Tipo Trabajador</b> con sus fotos, el Acta.pdf y el Informe general.pdf, que se guardan al cerrarla. El Excel <b>Actas_de_vivienda.xlsx</b> consolida todas las actas, el detalle ítem por ítem, los hallazgos de las devoluciones y las fotos con enlace; se actualiza solo al cerrar un acta.</p>
   
@@ -1970,7 +2012,7 @@ async function workerFetch(path){
   try{r=await fetch(WORKER+path,{headers:{Authorization:"Bearer "+tok}})}catch(e){throw{error:"No se pudo conectar con el servidor de Puduhue. Revisa la señal."}}
   let j;try{j=await r.json()}catch(e){j={error:"El servidor respondió algo que no es JSON (estado "+r.status+")."}}
   if(!r.ok)throw j;return j}
-const hace=d=>{const x=new Date();x.setDate(x.getDate()-d);return x.toISOString().slice(0,10)};
+const hace=d=>{const x=new Date();x.setDate(x.getDate()-d);return isoLocal(x)};
 let FINN_PRESET="";let FT={reporte:"resumenStockPorDeposito",params:"",res:null,err:null,cargando:false,ms:0};
 function finnParamsDefault(){return ["PARAMWEBREPORT_fechaDesde="+hace(7),"PARAMWEBREPORT_fechaHasta="+today(),"PARAMWEBREPORT_Empresa=2"].join("\n")}
 function renderFinn(){
@@ -2527,7 +2569,10 @@ async function init(){
   window.addEventListener("online",()=>{schedSync(500);if(DB)programarPull(1500);setTimeout(enviarCorreosPend,2500)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){schedSync(500);if(DB)programarPull(800)}});
   if(DB)setInterval(()=>{if(document.visibilityState==="visible"&&navigator.onLine!==false&&!syncing)pull(false)},90000);
-  setInterval(()=>{if(pend()&&!syncing)sync()},20000);
+  setInterval(()=>{if((pend()||(AS&&contarSueltas()))&&!syncing)sync()},20000);
+  /* v106 (A-02): al pasar a segundo plano o cerrar la app se guarda enseguida lo pendiente (antes esperaba 250 ms) */
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")flush()});
+  window.addEventListener("pagehide",()=>{flush()});
   if(pend())schedSync(1500);
 }
 /* ---------- Actualización automática ---------- */
@@ -2560,10 +2605,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=105"></script>
-<script src="modulos/bodega.js?v=105"></script>
-<script src="modulos/rendiciones.js?v=105"></script>
-<script src="modulos/actas-entrega.js?v=105"></script>
+<script src="modulos/checklist.js?v=106"></script>
+<script src="modulos/bodega.js?v=106"></script>
+<script src="modulos/rendiciones.js?v=106"></script>
+<script src="modulos/actas-entrega.js?v=106"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
