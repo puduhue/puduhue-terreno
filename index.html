@@ -1937,7 +1937,7 @@ function tbMas(){
   const m=document.createElement("div");m.className="modal tbsheet";
   m.innerHTML=`<div class="sheet tbhoja" role="dialog" aria-modal="true" aria-label="Más"><div class="tbtir" aria-hidden="true"></div>
     ${resto.length?`<h3>Otros módulos</h3>${resto.map(x=>op(x.a,x.i(),x.tl,x.s)).join("")}`:""}
-    ${esAdmin()?`<h3>Administración</h3>${op("adm",ADM_ICO,"Herramientas de administración","Servidor, Finnegans, recordatorios, informes y catálogo")}`:""}
+    ${esAdmin()?`<h3>Administración</h3>${op("adm",ADM_ICO,"Herramientas de administración","Servidor, Finnegans, recordatorios y catálogo")}`:""}
     <h3>Tu cuenta</h3>
     ${op("tema",temaActual()==="dark"?ICO.sun:ICO.moon,temaActual()==="dark"?"Modo día":"Modo noche","")}
     ${op("logout",`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg>`,"Cerrar sesión",ME?(ME.nombre||ME.correo):"")}
@@ -2130,11 +2130,9 @@ async function fdClick(A,b){
    1) «⋯» en Actas (viviendas, vehículos y activos) y en Control de bodega, igual que en el check list: la fila abre el
       registro y el «⋯» trae el PDF, la devolución, eliminar el borrador y (administrador) anular o restaurar.
    2) Pantalla «Administración» (solo el administrador): estado del servidor, Conexión con Finnegans, recordatorios
-      automáticos, lecturas de boletas, fondos por rendir, catálogos del check list, informes PDF de visitas y fotos antiguas.
+      automáticos, lecturas de boletas, fondos por rendir, catálogos del check list y fotos antiguas.
       Se abre desde «Más» y desde el pie del Inicio. Lo que estaba repartido en Rendiciones y en el check list pasa aquí.
-   3) Regenerar los informes PDF de las visitas cerradas con el formato actual (sin los puntos N/A). El PDF nuevo
-      reemplaza al anterior en la misma carpeta de OneDrive (el anterior queda en el historial de versiones de OneDrive).
-   4) «Para hoy»: aviso del fondo por rendir cuando la persona tiene saldo y lleva 30 días o más sin rendir. */
+   3) «Para hoy»: aviso del fondo por rendir cuando la persona tiene saldo y lleva 30 días o más sin rendir. */
 const MN_DOTS=`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
 const mnBtn=(a,id,label)=>`<button class="vmenu" data-a="${a}" data-id="${esc(id)}" aria-label="${esc(label)}">${MN_DOTS}</button>`;
 /* hoja con las acciones: cada opción se ejecuta como si se hubiera tocado su botón */
@@ -2169,9 +2167,7 @@ function mnCb(c){if(!c)return;const cer=c.estado==="cerrado",an=!!c.anulado;
 
 /* ---- Administración ---- */
 const ADM_ICO=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h4"/><path d="M12 17h8"/><circle cx="10" cy="17" r="2"/><path d="M4 12h2"/><path d="M10 12h10"/><circle cx="8" cy="12" r="2"/></svg>`;
-let ADM={salud:null,saludErr:null,saludCarg:false,pdf:null};
-const admTieneNA=v=>itemsDe(v).some(it=>{const r=v.items&&v.items[it.key];return !!(r&&r.e==="NA")});
-const admVisitasPdf=()=>Object.values(VIS).filter(v=>v.estado==="cerrada"&&!v.anulada&&admTieneNA(v)).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))||String(a.predio).localeCompare(String(b.predio)));
+let ADM={salud:null,saludErr:null,saludCarg:false};
 async function admSalud(){
   if(ADM.saludCarg)return;ADM.saludCarg=true;ADM.saludErr=null;render();
   try{const r=await fetch(WORKER+"/salud",{cache:"no-store"});ADM.salud=await r.json();if(!r.ok||!ADM.salud.ok)throw 0}
@@ -2185,25 +2181,6 @@ function admSaludHTML(){
   const fila=(t,ok,txt)=>`<div class="admst"><span class="admpt ${ok===true?"ok":ok===false?"no":""}" aria-hidden="true"></span><span>${t}</span><b>${esc(txt)}</b></div>`;
   const rec=s.recordatorios||{},ult=rec.ultimo;
   return `<div class="admsts">${fila("Servidor",true,`activo · ${s.version||"?"}`)}${fila("Finnegans",!!s.credenciales,s.credenciales?"credenciales cargadas":"faltan credenciales")}${fila("Lectura de boletas",!!s.lecturaBoletas,s.lecturaBoletas?"activa":"sin clave")}${fila("Notificaciones",!!s.notificaciones,s.notificaciones?"activas":"no configuradas")}${fila("Recordatorios",ult?true:null,ult&&ult.hora?`último envío ${fdHora(ult.hora)}`:rec.agenda?`agenda del ${fdHora(rec.agenda)}`:"sin envíos todavía")}</div>`;
-}
-function admPdfHTML(){
-  const L=admVisitasPdf(),P=ADM.pdf;
-  if(P&&P.corriendo)return `<div class="admprog"><div class="admbar"><i style="width:${Math.round(P.i/P.n*100)}%"></i></div><p><b>Generando ${P.i+1>P.n?P.n:P.i+1} de ${P.n}</b>${P.actual?` · ${esc(P.actual)}`:""}</p><p class="note">No cierres la app hasta que termine. Las fotos se descargan de OneDrive, así que puede tardar unos minutos.</p></div>`;
-  const res=P&&P.fin?`<div class="info ${P.err.length||P.omit.length?"netbox":""}" style="${P.err.length||P.omit.length?"":"border-left:5px solid var(--b-ink)"}"><b>${P.ok} ${P.ok===1?"informe regenerado":"informes regenerados"}</b> en OneDrive.${P.omit.length?`<br>${P.omit.length} sin regenerar porque no se pudieron descargar todas sus fotos (se dejó el PDF anterior): ${esc(P.omit.join(", "))}.`:""}${P.err.length?`<br>${P.err.length} con error al subir: ${esc(P.err.join(", "))}.`:""}</div>`:"";
-  return `${res}<p class="note" style="margin-top:0">${L.length?`<b>${L.length} ${L.length===1?"visita cerrada tiene":"visitas cerradas tienen"}</b> puntos N/A. Si su informe se generó antes de la v82, el PDF guardado en OneDrive todavía los muestra. Al regenerarlos quedan con el formato actual, solo con los puntos que aplican. El PDF anterior se reemplaza y queda en el historial de versiones de OneDrive.`:"No hay visitas cerradas con puntos N/A: todos los informes ya tienen el formato actual."}</p>
-    ${L.length?`<div class="btns"><button class="btn pri" data-a="admPdf" ${navigator.onLine===false||!DB?"disabled":""}>Regenerar ${L.length} ${L.length===1?"informe":"informes"}</button></div>`:""}`;
-}
-async function admPdfCorrer(){
-  const L=admVisitasPdf();if(!L.length||(ADM.pdf&&ADM.pdf.corriendo))return;
-  if(!DB||navigator.onLine===false){toast("Se necesita señal para subir los informes a OneDrive.");return}
-  if(!(await ask(`¿Regenerar ${L.length} ${L.length===1?"informe":"informes"}?`,"Cada PDF se vuelve a generar con el formato actual y reemplaza al anterior en su carpeta de OneDrive (el anterior queda en el historial de versiones). Puede tardar unos minutos.","Regenerar")))return;
-  ADM.pdf={corriendo:true,i:0,n:L.length,ok:0,omit:[],err:[],actual:""};render();
-  for(const v of L){const nom=`${v.predio} · Visita ${v.n}`;ADM.pdf.actual=`${nom} (${fmtD(v.fecha)})`;render();
-    try{const r=await clPdf(v,"estricto");if(r&&r.omitido)ADM.pdf.omit.push(nom);else ADM.pdf.ok++}
-    catch(e){console.warn("regenerar",v.id,e);ADM.pdf.err.push(nom)}
-    ADM.pdf.i++}
-  ADM.pdf.corriendo=false;ADM.pdf.fin=true;ADM.pdf.actual="";render();
-  toast(`${ADM.pdf.ok} ${ADM.pdf.ok===1?"informe regenerado":"informes regenerados"} en OneDrive.`);
 }
 function renderADM(){
   const head=band("Administración");
@@ -2219,8 +2196,7 @@ function renderADM(){
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       <p class="note">Lecturas automáticas de boletas este mes desde este teléfono: ${lect} (≈ US$${(lect*0.004).toFixed(2)}).</p>`)}
-    ${sec("Check list",`<div class="admit"><b>Informes PDF de las visitas</b>${admPdfHTML()}</div>
-      <div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de visitas / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button></div></div>`)}
+    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de visitas / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
@@ -2228,7 +2204,6 @@ function renderADM(){
 async function admClick(A,b){
   if(A==="adm"){go("adm");window.scrollTo(0,0);return true}
   if(A==="admSalud"){ADM.salud=null;await admSalud();return true}
-  if(A==="admPdf"){await admPdfCorrer();return true}
   if(A==="admCat"){clTipo=b.dataset.t==="bodega"?"bodega":"visitas";await clClick("clCat",b);return true}
   return false;
 }
@@ -3935,7 +3910,6 @@ async function clPdf(v,subir){
   const conObs=ITA.filter(it=>{const r=v.items&&v.items[it.key];return r&&((r.obs||"").trim()||(r.fotos||[]).length||(esHallazgo(r.e)&&(r.acc||r.resp||r.plazo)))});
   const refs=[];conObs.forEach(it=>((v.items[it.key]||{}).fotos||[]).forEach(f=>refs.push(f)));
   const IM={};for(const f of refs)IM[f]=await pdfImg(f);
-  if(subir==="estricto"&&refs.some(f=>!IM[f]))return{omitido:true,faltan:refs.filter(f=>!IM[f]).length};
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const L=15,W=180;let y=10;
   const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
   const COL={C:[30,110,50],P:[150,110,20],N:[170,40,40],NA:[110,110,110]};const FILL={C:[226,240,224],P:[244,236,206],N:[246,222,222],NA:[236,238,240]};
@@ -4023,7 +3997,7 @@ async function clPdf(v,subir){
   }
   const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});const a=autoriaTxt(v);if(a)d.text(d.splitTextToSize("Registro en la app: "+a.charAt(0).toLowerCase()+a.slice(1),150)[0],15,289);d.setTextColor(0)}
   const name=`Informe_${KV.archivo}_${v.n}_${v.predio.replace(/\s+/g,"_")}_${fmtD(v.fecha)}.pdf`;
-  if(subir){try{await clSubir(carpetaVisita(v),name,d.output("blob"),"application/pdf",TV)}catch(e){console.warn(e);if(subir==="estricto")throw e}return{ok:true}}
+  if(subir){try{await clSubir(carpetaVisita(v),name,d.output("blob"),"application/pdf",TV)}catch(e){console.warn(e)}return}
   await guardarPDF(d,name,"Informe listo.");
 }
 
