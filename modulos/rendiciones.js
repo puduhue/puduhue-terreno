@@ -14,7 +14,6 @@
    - Cada persona ve su tarjeta solo cuando Contabilidad lo activa (MAE.fondo.mostrar), después de reclasificar la 110106. */
 const FD_K="actas-fondo",FD_TRAMITE=["enviada","revcont","aprobada"],FD_DIAS_A=30,FD_DIAS_R=60;
 let FD={p:null,t:null,cargando:0,err:null,errT:null,intento:0},fdOrd="saldo",fdQ="",fdAlDia=false;
-const FD_ICO=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.2"/><path d="M15.5 13.5h4.5"/><circle cx="16.3" cy="13.5" r=".6" fill="currentColor"/></svg>`;
 const fdConf=()=>(MAE&&MAE.fondo)||{};
 const fdVisible=()=>!!fdConf().mostrar;
 const FD_MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"],FD_MESL=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -650,7 +649,6 @@ const puedeContab=r=>!!(r&&r.estado==="revcont"&&esContab()&&!esPropia(r));
 const puedeContabilizar=r=>!!(r&&r.estado==="aprobada"&&esContab());
 const editaPersona=r=>!!(r&&esMiaR(r)&&(r.estado==="borrador"||r.estado==="observada"));
 const rdRO=r=>!(editaPersona(r)||puedeContab(r));
-const esAprobador=()=>esContab()||Object.values(REND).some(r=>soyJefeDe(r));
 const rdParaMi=()=>Object.values(REND).filter(r=>!r.anulada&&(puedeJefatura(r)||puedeContab(r)));
 const misRend=()=>Object.values(REND).filter(r=>!r.anulada&&esMiaR(r)).sort((a,b)=>String(b.periodo).localeCompare(String(a.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));
 /* v76: varias rendiciones por persona en el mismo mes. Mientras una está en borrador (u observada) se sigue agregando a esa;
@@ -661,7 +659,6 @@ const rdMismaPersona=(r,c)=>c?normRut(r.persona&&r.persona.rut)===normRut(c.rut)
 const rendPeriodo=p=>{const L=misRend().filter(r=>r.periodo===p);return L.find(rdEditable)||L.sort((a,b)=>(b.n||1)-(a.n||1))[0]||null};
 const rdAbiertaDe=(p,c)=>misRend().find(r=>r.periodo===p&&rdMismaPersona(r,c)&&rdEditable(r))||null;
 const rdSiguienteN=(p,c)=>1+Math.max(0,...Object.values(REND).filter(r=>!r.anulada&&r.periodo===p&&(c?normRut(r.persona&&r.persona.rut)===normRut(c.rut):(r.persona&&ME&&r.persona.id===ME.id))).map(r=>r.n||1));
-const rendDe=(p,c)=>misRend().find(r=>r.periodo===p&&(c?normRut(r.persona&&r.persona.rut)===normRut(c.rut):!(r.persona&&r.persona.rut)))||null;
 function nuevaRend(p,c){const per=c?{id:"rut:"+normRut(c.rut),nombre:c.nombre,correo:meCorreo(),rut:c.rut}:{id:ME.id,nombre:ME.nombre,correo:ME.correo,rut:""};
   return{id:uid(),_col:"rendiciones",persona:per,cuenta:meCorreo(),periodo:p,estado:"borrador",docs:{},hist:[],creadoPor:yo(),creado:new Date().toISOString(),actualizado:new Date().toISOString()}}
 const rdHist=(r,a,nota)=>{(r.hist=r.hist||[]).push({a,por:yo(),fecha:new Date().toISOString(),nota:nota||""})};
@@ -874,7 +871,6 @@ function problemasDoc2(r,d){
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.confianza!=null&&d.lectura.confianza<0.6&&!d.revisadoManual)a.push("Lectura automática con baja confianza: conviene revisar los datos.");
   return{b,a};
 }
-const problemasDoc=(r,d)=>{const p=problemasDoc2(r,d);return p.b.concat(p.a)};
 const docCompleto=(r,d)=>problemasDoc2(r,d).b.length===0;
 const docAdvertencias=(r,d)=>problemasDoc2(r,d).a;
 
@@ -1206,7 +1202,6 @@ function rdRevisionHTML(){
     ${L.length?grupos.map(g=>`<h3>${esc(g)}</h3><ul>${L.filter(x=>x.g===g).sort((a,b)=>({b:0,r:1,i:2}[a.n])-({b:0,r:1,i:2}[b.n])).map(x=>`<li class="rv-${x.n}">${x.id?`<button class="lnk" data-a="rdAbrir" data-id="${esc(x.id)}">${esc(x.m)}</button>`:esc(x.m)}</li>`).join("")}</ul>`).join(""):`<p class="note">Todo en orden: la lista de colaboradores, el catálogo y las rendiciones en curso no tienen problemas.</p>`}
     <p class="note">La lista de colaboradores y el catálogo se corrigen en el Excel y se vuelven a cargar en <b>Maestros contables</b>.</p></details>`;
 }
-function rdAdminHTML(){if(!esAdmin())return"";let n=0;try{n=+localStorage.getItem("rd-lecturas-"+periodoActual())||0}catch(e){}return `<div class="info pushc" style="margin-top:18px"><b>Recordatorios automáticos</b> <span class="hint">(solo lo ve el administrador)</span><br>Salen solos los días hábiles a las 9:00 a quienes tengan las notificaciones activas: aprobaciones que esperan 3 días o más (jefatura y Contabilidad), devueltas sin corregir hace 3 días o más, los últimos 3 días hábiles del mes y rendiciones de meses anteriores sin enviar.<div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div><p class="note">Lecturas automáticas este mes desde este teléfono: ${n} (≈ US$${(n*0.004).toFixed(2)}).</p>`}
 function rdDocCard(r,d){
   const P=problemasDoc2(r,d),probs=P.b;const le=d.lectura||{};const cat=gastoDe(d),centro=centroDoc(r,d);
   const src=d.foto?fotoSrc(d.foto):"";const editable=r.estado==="borrador"||r.estado==="observada";
