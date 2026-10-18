@@ -5,10 +5,11 @@ El proceso para hacer una versión (scripts, pruebas, vista previa, historial de
 privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README antes de tocar el código.
 
 ## Archivos
-- `index.html`: la app completa (HTML, CSS y el código propio en un solo `<script>`). ~0,9 MB desde la v100.
+- `index.html`: la app completa (HTML, CSS y el código propio en un solo `<script>`). ~0,8 MB desde la v101.
 - `sw.js`: service worker. Guarda la app para abrir sin señal, separa las bibliotecas en cachés propias y muestra las notificaciones.
 - `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.18.5 mini (Excel),
-  jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF) y zxing-wasm 3.1.4 (código del SII).
+  jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF) y zxing-wasm 3.1.4 (código del SII). Además, `lib/marca-puduhue-1/marcas.js` define
+  los logos en base64 (`MARCA`, `MARCA_HZ` y `LOGO`, este último para los PDF), desde la v101.
 - `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, Finnegans, lectura de boletas). Se publica solo con
   GitHub Actions al subir cambios de `servidor/` a main.
 - `manifest.json`, `icon-*.png`, `badge-96.png`: instalación y notificaciones.
@@ -21,13 +22,13 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
 ## Mapa de index.html
 1. `<head>`: metas, manifest, `<script src="lib/...">` de MSAL, SheetJS y jsPDF (normales, no diferidos: la app los usa al cargar).
 2. `<style>` que empieza con `:root{`: todo el CSS (el de cada versión se agregó al final).
-3. `<body>`: solo `<div id="app">` con «Cargando…»; todo lo demás lo dibuja el código.
+3. `<body>`: solo `<div id="app">` con «Cargando…»; todo lo demás lo dibuja el código. Antes del código, `<script src="lib/marca-puduhue-1/marcas.js">`.
 4. `<script>` que empieza con `const APP_VER=`: el código propio. Está ordenado por versión, no por módulo. Secciones
-   (buscar el título; líneas aproximadas en la v100):
+   (buscar el título; líneas aproximadas en la v101):
 
 | Líneas | Título de sección (buscar) | Qué hay |
 |---|---|---|
-| 1-91 | `const APP_VER=`, `Datos fijos del protocolo`, `Utilidades` | Constantes, imágenes en base64 (MARCA, MARCA_HZ, LOGO), utilidades |
+| 1-91 | `const APP_VER=`, `Datos fijos del protocolo`, `Utilidades` | Constantes (los logos vienen de `marcas.js`; si no cargó, se reemplazan por uno transparente), utilidades |
 | 92-411 | `Microsoft 365: inicio de sesión`, `Almacenamiento: primero en el teléfono` | MSAL, OneDrive (Graph), base local (IndexedDB) y sincronización |
 | 412-1396 | `v93:` a `v99:` | Bloques de las versiones 93-99: barra de navegación, fondo por rendir, Administración, diseño nativo, hojas, lectura de boletas, fila de notificaciones. Mezclan módulos |
 | 1397-2332 | `Render`, `Acciones`, `Firma`, `Fotos`, `PDF`, `Pantalla de inicio: elegir versión` | Actas de vivienda |
@@ -68,6 +69,6 @@ Se borran cuando toque trabajar en Actas de vivienda, revisando antes qué sigue
 
 ## Reorganización para gastar menos (desde la v100, una versión por paso)
 1. v100: MSAL, SheetJS y jsPDF a `lib/`, con cachés aparte. ✓
-2. Imágenes base64 (MARCA, MARCA_HZ, LOGO) a archivos.
-3. CSS a `estilos.css`.
-4. Separar el código por módulo, de a poco, cuando toque trabajar en cada uno.
+2. v101: logos en base64 (MARCA, MARCA_HZ, LOGO) a `lib/marca-puduhue-1/marcas.js`. ✓
+3. Separar el código por módulo, empezando por Rendiciones (el que más se trabaja).
+4. CSS a `estilos.css`, cuando convenga (ahorra poco).

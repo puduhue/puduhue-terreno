@@ -1,5 +1,5 @@
 /* Guarda la app en el teléfono para que abra sin señal. Cambia VER al publicar una versión nueva. */
-const VER="actas-v100";
+const VER="actas-v101";
 /* v100: la copia de prueba (carpeta prueba/) usa cachés con otro nombre y solo borra las suyas,
    para no tocar las de la app real (las cachés son comunes a todo puduhue.github.io). */
 const PRUEBA=self.registration.scope.includes("/prueba/"),PRE=PRUEBA?"prueba-":"";
@@ -7,11 +7,11 @@ const CACHE=PRE+VER;
 const FILES=["./","index.html","manifest.json","icon-180.png","icon-192.png","icon-512.png","badge-96.png"];
 /* Bibliotecas que no cambian entre versiones: cada una queda guardada en su propia caché (por carpeta y versión)
    y no se baja de nuevo con cada versión de la app. */
-const LIBS=["pdfjs-6.3.289","zxing-wasm-3.1.4","msal-browser-3.30.0","xlsx-0.18.5","jspdf-2.5.1"];
-/* Las que la app carga al abrir (inicio de sesión, Excel y PDF) se descargan al instalar, si no están ya,
+const LIBS=["pdfjs-6.3.289","zxing-wasm-3.1.4","msal-browser-3.30.0","xlsx-0.18.5","jspdf-2.5.1","marca-puduhue-1"];
+/* Las que la app carga al abrir (inicio de sesión, Excel, PDF y, desde la v101, los logos) se descargan al instalar, si no están ya,
    para que abra sin señal desde el primer momento. El lector de PDF y el del código del SII se guardan
    la primera vez que se usan. */
-const LIB_INICIO=["lib/msal-browser-3.30.0/msal-browser.min.js","lib/xlsx-0.18.5/xlsx.mini.min.js","lib/jspdf-2.5.1/jspdf.umd.min.js"];
+const LIB_INICIO=["lib/msal-browser-3.30.0/msal-browser.min.js","lib/xlsx-0.18.5/xlsx.mini.min.js","lib/jspdf-2.5.1/jspdf.umd.min.js","lib/marca-puduhue-1/marcas.js"];
 const libCache=n=>PRE+"lib-"+n;
 self.addEventListener("install",e=>{e.waitUntil(
   caches.open(CACHE).then(c=>c.addAll(FILES.map(f=>new Request(f,{cache:"reload"}))))
