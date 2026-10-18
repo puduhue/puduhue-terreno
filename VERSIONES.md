@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 103 | 2026-10-18 | [c9e8437](https://github.com/puduhue/puduhue-terreno/tree/c9e8437) | CSS a estilos.css, módulos Check list, Stock/Bodega y Actas de entrega aparte, código sin uso borrado |
 | 102 | 2026-10-18 | [43487d0](https://github.com/puduhue/puduhue-terreno/tree/43487d0) | Rendiciones a modulos/rendiciones.js (paso 3 de la reorganización) |
 | 101 | 2026-10-18 | [35efc0f](https://github.com/puduhue/puduhue-terreno/tree/35efc0f) | logos en lib/marca-puduhue-1/marcas.js (publicación) |
 | 100 | 2026-10-18 | [0575846](https://github.com/puduhue/puduhue-terreno/tree/0575846) | bibliotecas en lib/ y CLAUDE.md (publicación) |
