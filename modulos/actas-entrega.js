@@ -281,9 +281,13 @@ function capDatos(){
   ${!ro()?`<div class="btns"><button class="btn danger" data-a="axDel">Eliminar borrador</button></div>`:""}`;
 }
 /* Capacitación · paso 2 */
+/* quien ya firmó, con nombre y RUT válido, se muestra en una línea con «Editar» (Benja, 19-10-2026: con muchos participantes la lista queda larga) */
+let capEdit=null;
+const capListo=(a,p)=>!!(capFirma(a,p).img&&String(p.nombre||"").trim()&&p.rut&&rutOk(p.rut));
 function capPart(p,i){
   const a=cur,f=capFirma(a,p),rutE=p.rut&&!rutOk(p.rut);
-  return `<div class="it" id="cpp-${p.id}"><div class="nm"><span>${i+1}. <span class="cpn">${esc(p.nombre||"Participante")}</span></span>${f.img?'<span class="chip B">Firmó</span>':""}${!ro()?`<button class="mini danger" data-a="axCapQuitar" data-r="${p.id}">Quitar</button>`:""}</div>
+  if(capListo(a,p)&&(ro()||capEdit!==p.id))return `<div class="it cpc" id="cpp-${p.id}"><img class="cpf" src="${f.img}" alt="Firma de ${esc(p.nombre)}"><div class="cpt"><b>${i+1}. ${esc(p.nombre)}</b><span>${esc([rutFmt(p.rut),p.cargo].filter(Boolean).join(" · "))}</span></div>${ro()?"":`<button class="mini" data-a="axCapEdit" data-r="${p.id}" aria-label="Editar a ${esc(p.nombre)}">Editar</button>`}</div>`;
+  return `<div class="it" id="cpp-${p.id}"><div class="nm"><span>${i+1}. <span class="cpn">${esc(p.nombre||"Participante")}</span></span>${f.img?'<span class="chip B">Firmó</span>':""}${!ro()?`${capEdit===p.id?`<button class="mini" data-a="axCapEdit" data-r="">Listo</button>`:""}<button class="mini danger" data-a="axCapQuitar" data-r="${p.id}">Quitar</button>`:""}</div>
     <div class="f"><label for="x_${p.id}_nombre">Nombre</label><input id="x_${p.id}_nombre" data-xp="${p.id}" data-k="nombre" list="capPers" value="${esc(p.nombre)}" placeholder="Nombre y apellido" autocomplete="off" ${axDis()}></div>
     <div class="grid2"><div class="f"><label for="x_${p.id}_rut">RUT</label><input id="x_${p.id}_rut" data-xp="${p.id}" data-k="rut" value="${esc(p.rut)}" placeholder="12.345.678-9" autocomplete="off" ${axDis()}><span class="err" id="cpe-${p.id}">${rutE?"El RUT no es válido. Revisa el dígito verificador.":""}</span></div>
       <div class="f"><label for="x_${p.id}_cargo">Cargo</label><input id="x_${p.id}_cargo" data-xp="${p.id}" data-k="cargo" value="${esc(p.cargo)}" placeholder="Ej.: Ordeñador" autocomplete="off" ${axDis()}></div></div>
@@ -449,7 +453,8 @@ async function axClick(A,b){
   if(A==="axYN"){if(ro())return true;const g=b.dataset.g,k=b.dataset.k,v=b.dataset.v;cur[g]=cur[g]||{};cur[g][k]=cur[g][k]===v?undefined:v;if(!cur[g][k])delete cur[g][k];touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
   if(A==="axCapPred"){if(ro()||!cur)return true;const v=b.dataset.v,P=cur.predios=cur.predios||[];const i=P.indexOf(v);if(i>=0){P.splice(i,1);if(v==="Otro")cur.predioOtro=""}else P.push(v);
     cur.predio=capPredios(cur).join(", ");touch();const keep=window.scrollY;render();window.scrollTo(0,keep);if(v==="Otro"&&i<0){const el=$("#x_predioOtro");if(el)el.focus({preventScroll:true})}return true}
-  if(A==="axCapAdd"){if(ro()||!cur)return true;const p={id:uid().slice(-6)};cur.participantes.push(p);touch();render();const el=$("#x_"+p.id+"_nombre");if(el){el.scrollIntoView({block:"center"});el.focus()}return true}
+  if(A==="axCapEdit"){if(ro()||!cur)return true;capEdit=b.dataset.r||null;const keep=window.scrollY;render();window.scrollTo(0,keep);if(capEdit){const el=$("#x_"+capEdit+"_nombre");if(el)el.focus({preventScroll:true})}return true}
+  if(A==="axCapAdd"){if(ro()||!cur)return true;capEdit=null;const p={id:uid().slice(-6)};cur.participantes.push(p);touch();render();const el=$("#x_"+p.id+"_nombre");if(el){el.scrollIntoView({block:"center"});el.focus()}return true}
   if(A==="axCapQuitar"){if(ro()||!cur)return true;const r=b.dataset.r,p=cur.participantes.find(y=>y.id===r);if(!p)return true;
     if((p.nombre||p.rut||p.cargo||capFirma(cur,p).img)&&!(await ask("¿Quitar este participante?",[p.nombre,p.rut?rutFmt(p.rut):""].filter(Boolean).join(" · ")+(capFirma(cur,p).img?". Se borra también su firma.":""),"Quitar",true)))return true;
     cur.participantes=cur.participantes.filter(y=>y.id!==r);delete cur.firmas["p_"+r];touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}

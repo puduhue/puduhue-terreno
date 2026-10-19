@@ -1239,3 +1239,6 @@ html.letra-gr .modal.bsq .bsqs{height:calc(100vh/var(--letra,1));height:calc(100
 
 /* v109: registro de capacitaciones (firma dentro de la fila de cada participante) */
 .sig.cpsig{padding:0;margin:8px 0 0;border:0;background:none;box-shadow:none}
+.it.cpc{display:flex;align-items:center;gap:12px}
+.it.cpc .cpf{width:84px;height:38px;object-fit:contain;background:#FFFFFF;border:1px solid var(--line);border-radius:8px;flex:none}
+.it.cpc .cpt{flex:1;min-width:0}.it.cpc .cpt b{display:block;overflow-wrap:anywhere}.it.cpc .cpt span{color:var(--muted);font-size:14px}
