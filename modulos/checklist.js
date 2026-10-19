@@ -158,7 +158,10 @@ const CL_NUEVOS=[{tanda:"v71-camionetas",area:"predio",group:"Camionetas",despue
  ["cl-cam5",1,"Mantenciones al día: la camioneta se presentó en un taller autorizado por Salfa Rent cada 10.000 km (tolerancia máxima de 500 km)","Acta de entrega de vehículo, punto 2.6","Kilometraje actual vs. última mantención (registro Salfa Rent o libro de servicio)"],
  ["cl-cam6",1,"Si la camioneta tiene choques o daños visibles: el administrador avisó de inmediato a su jefatura y entregó la documentación del siniestro dentro de 24 horas (sin daños: marcar N/A)","Acta de entrega de vehículo, puntos 2.9 y 2.13","Observación de la camioneta + preguntar al administrador si avisó"],
  ["cl-cam7",0,"Chequeo diario preoperacional realizado: niveles, neumáticos, luces, frenos, cinturones, parabrisas y alarma de retroceso","Acta de entrega de vehículo, punto 2.5","Entrevista al conductor"],
- ["cl-cam8",0,"Interior sin señales de fumar o vapear; carga amarrada y bien estibada, sin personas en la pickup","Acta de entrega de vehículo, puntos 2.4 y 2.7",OBS]]}];
+ ["cl-cam8",0,"Interior sin señales de fumar o vapear; carga amarrada y bien estibada, sin personas en la pickup","Acta de entrega de vehículo, puntos 2.4 y 2.7",OBS]]},
+ /* v112: estado de cada camioneta, revisado por quien hace la visita (pedido por Benja el 19-10-2026) */
+ {tanda:"v112-estado-camionetas",area:"predio",group:"Camionetas",despues:"cl-cam8",items:[
+ ["cl-cam9",0,"Estado general de cada camioneta: carrocería, neumáticos, luces, parabrisas y limpieza interior (marcar las patentes con problemas y anotar el kilometraje en la observación)","Acta de entrega de vehículo, puntos 2.5 y 2.13","Revisión de la camioneta con fotos"]]}];
 let CAT_AGREGADO=false;
 function agregarNuevos(lista){let out=lista.map(i=>Object.assign({},i)),add=false;
   for(const t of CL_NUEVOS){if(t.items.some(x=>out.some(i=>i.key===x[0])))continue;
@@ -252,6 +255,15 @@ const respDe=t=>t==="bodega"?["Encargado de bodega"].concat(RESP):RESP;
 const codigo=it=>(it.sheet==="cl"?"CG-":"OA-")+String(it.n).padStart(2,"0");
 let VIS={},clv=null,clPredio=null,clArea="oficina",clFiltro="all";
 const esHallazgo=e=>e==="P"||e==="N";
+/* v112: ítems con patentes (estado de las camionetas): se marcan las que tienen problemas; van en la observación del PDF,
+   del Excel y de los hallazgos como «Patentes: …» */
+const CL_PAT=["cl-cam9"];
+const clObs=r=>[r&&r.pat&&r.pat.length?"Patentes: "+r.pat.join(", "):"",String(r&&r.obs||"").trim()].filter(Boolean).join(". ");
+const normPat=x=>String(x||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+/* patentes con acta de entrega de vehículo vigente (sin devolución cerrada) en el predio */
+function patentesPredio(pre){try{return [...new Set(Object.values(ACTAS).filter(a=>a.tipo==="vehiculo"&&a.mov!=="devolucion"&&!a.anulada&&predioDe(a)===pre&&!(a.devolucionId&&ACTAS[a.devolucionId]&&ACTAS[a.devolucionId].estado==="cerrada")).map(a=>normPat((a.veh||{}).patente)).filter(Boolean))].sort()}catch(e){return[]}}
+function clPatHTML(v,it,r,ro){const L=patentesPredio(v.predio),sel=r.pat||[],T=[...new Set(L.concat(sel))];
+  return `<div class="f clpat" style="margin:8px 0 14px"><label>Camionetas con problemas (patente)</label><div class="filt" style="margin:4px 0 0">${T.map(p=>`<button type="button" class="fb" data-a="clPat" data-k="${it.key}" data-v="${esc(p)}" aria-pressed="${sel.includes(p)}" ${ro?"disabled":""}>${esc(p)}</button>`).join("")}${ro?"":`<button type="button" class="fb" data-a="clPatOtra" data-k="${it.key}">+ Otra</button>`}</div>${T.length?"":`<span class="hint">No hay actas de vehículo de este predio en la app; agrega la patente con «+ Otra».</span>`}</div>`}
 
 /* ---------- Datos ---------- */
 function visitasDe(predio,tipo){tipo=tipo||clTipo;return Object.values(VIS).filter(v=>v.predio===predio&&tipoDe(v)===tipo).sort((a,b)=>(a.n-b.n)||String(a.fecha).localeCompare(String(b.fecha)))}
@@ -267,8 +279,8 @@ function hallazgos(predio,tipo){
   const vs=validas(predio,tipo).filter(v=>v.estado==="cerrada");const out={};
   vs.forEach(v=>itemsDe(v).forEach(it=>{const r=v.items&&v.items[it.key];if(!r||!r.e)return;
     const h=out[it.key]||(out[it.key]={key:it.key,it,estado:"ok",desde:null,visitas:0,ultima:null,plan:{},cerrado:null,hist:[]});h.it=it;
-    h.hist.push({v:v.n,fecha:v.fecha,e:r.e,obs:r.obs||""});
-    if(esHallazgo(r.e)){if(h.estado!=="abierto"){h.estado="abierto";h.desde={v:v.n,fecha:v.fecha};h.visitas=0;h.cerrado=null}h.visitas++;h.ultima={v:v.n,fecha:v.fecha,e:r.e,obs:r.obs||""};h.plan={acc:r.acc||"",resp:r.resp||"",plazo:r.plazo||""}}
+    h.hist.push({v:v.n,fecha:v.fecha,e:r.e,obs:clObs(r)});
+    if(esHallazgo(r.e)){if(h.estado!=="abierto"){h.estado="abierto";h.desde={v:v.n,fecha:v.fecha};h.visitas=0;h.cerrado=null}h.visitas++;h.ultima={v:v.n,fecha:v.fecha,e:r.e,obs:clObs(r)};h.plan={acc:r.acc||"",resp:r.resp||"",plazo:r.plazo||""}}
     else if(h.estado==="abierto"){h.estado="cerrado";h.cerrado={v:v.n,fecha:v.fecha,e:r.e}}
   }));
   return out;
@@ -496,6 +508,7 @@ function clItemHTML(it){
     <div class="txt">${esc(it.txt)}</div>
     <div class="ref">${esc(it.prot)}${it.evid?` · <i>${esc(it.evid)}</i>`:""}</div>
     ${prevHTML}
+    ${CL_PAT.includes(it.key)?clPatHTML(v,it,r,ro):""}
     <div class="seg seg4" role="group">${["C","P","N","NA"].map(e=>`<button data-a="clRate" data-k="${it.key}" data-e="${e}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${CL_LABEL[e]}</span></button>`).join("")}</div>
     ${fotos.length?`<div class="fotos"><div class="strip">${fotos.map(f=>ro?thumb(f,it.key,true,false):`<span class="thw">${thumb(f,it.key,true,false)}<button class="thx" data-a="clDelFoto" data-ref="${esc(f)}" data-k="${it.key}" aria-label="Eliminar foto">✕</button></span>`).join("")}</div></div>`:""}
     ${r.e||r.obs||ro?`<input class="obs" data-clf="obs" data-k="${it.key}" value="${esc(r.obs)}" placeholder="Observación" ${ro?"disabled":""}>`:""}
@@ -537,7 +550,7 @@ function clHallazgoModal(p,k){
   const H=hallazgos(p)[k];const it=(H&&H.it)||CL_BYKEY[k];if(!it)return;const vs=visitasDe(p).filter(v=>v.estado==="cerrada");const ab=visitaAbierta(p);
   const hist=vs.map(v=>{const r=v.items&&v.items[k];if(!r||!r.e)return"";const fotos=(r.fotos||[]);const cls=r.e==="N"?"M":r.e==="P"?"R":r.e==="C"?"B":"none";
     return `<div class="hh ${r.e}"><div class="hhl"><span class="chip ${cls}">${CL_LABEL[r.e]}</span><b>Visita ${v.n}</b><span class="hhd">${fmtD(v.fecha)}${v.revisor?` · ${esc(v.revisor)}`:""}</span></div>
-      ${r.obs?`<div class="hho">${esc(r.obs)}</div>`:""}
+      ${clObs(r)?`<div class="hho">${esc(clObs(r))}</div>`:""}
       ${(r.acc||r.resp||r.plazo)&&esHallazgo(r.e)?`<div class="hhp">${r.acc?`<b>Acción:</b> ${esc(r.acc)}. `:""}${r.resp?`<b>Resp.:</b> ${esc(r.resp)}. `:""}${r.plazo?`<b>Plazo:</b> ${fmtD(r.plazo)}`:""}</div>`:""}
       ${fotos.length?`<div class="strip">${fotos.map(f=>thumb(f,k,false,false)).join("")}</div>`:""}
       <div class="hhb"><button class="mini" data-m="visita" data-id="${v.id}">Abrir visita ${v.n}</button></div></div>`}).filter(Boolean).reverse().join("");
@@ -643,6 +656,9 @@ async function clClick(A,b){
   if(A==="clAbrir"){await flush();const v=VIS[b.dataset.id];if(!v)return true;clTipo=tipoDe(v);clv=v;clPredio=v.predio;if(!clv.items)clv.items={};clFiltro="all";go("clv");return true}
   if(A==="clArea"){clArea=b.dataset.area;window.scrollTo(0,0);render();return true}
   if(A==="clFiltro"){clFiltro=b.dataset.f;render();return true}
+  if(A==="clPat"){if(clRO())return true;const k=b.dataset.k,p=b.dataset.v,r=clv.items[k]||{};const S=new Set(r.pat||[]);S.has(p)?S.delete(p):S.add(p);r.pat=[...S].sort();if(!r.pat.length)delete r.pat;clv.items[k]=r;clTouch();clRefreshItem(clv,k);return true}
+  if(A==="clPatOtra"){if(clRO())return true;const k=b.dataset.k;const o=await askVal("Otra patente","Escribe la patente de la camioneta.","Agregar",`<div class="f"><label for="clPatIn">Patente</label><input id="clPatIn" data-v="pat" autocapitalize="characters" autocomplete="off" placeholder="Ej.: WBHD30"></div>`);
+    const p=normPat(o&&o.pat);if(!p)return true;const r=clv.items[k]||{};r.pat=[...new Set((r.pat||[]).concat([p]))].sort();clv.items[k]=r;clTouch();clRefreshItem(clv,k);return true}
   if(A==="clRate"){if(clRO())return true;const k=b.dataset.k,e=b.dataset.e;const r=clv.items[k]||{};r.e=r.e===e?undefined:e;if(!r.e)delete r.e;clv.items[k]=r;clTouch();clFocoA(k);clRefreshItem(clv,k);if(DIS.uno&&(r.e==="C"||r.e==="NA"))disUnoAuto(k);return true}
   if(A==="clAbrirIt"){clAbrirIt(b.dataset.k);return true}
   if(A==="clEncEd"){clEncAb[clv.id]=true;render();const f=$("#clfecha");if(f)f.focus();return true}
@@ -748,7 +764,7 @@ async function clPdf(v,subir){
   /* v82: el informe muestra solo los puntos que aplican; los N/A y las áreas donde no aplica ninguno se omiten */
   const esNA=it=>{const r=v.items&&v.items[it.key];return !!(r&&r.e==="NA")};
   const ITA=ITV.filter(it=>!esNA(it)),nNA=ITV.length-ITA.length;
-  const conObs=ITA.filter(it=>{const r=v.items&&v.items[it.key];return r&&((r.obs||"").trim()||(r.fotos||[]).length||(esHallazgo(r.e)&&(r.acc||r.resp||r.plazo)))});
+  const conObs=ITA.filter(it=>{const r=v.items&&v.items[it.key];return r&&(clObs(r)||(r.fotos||[]).length||(esHallazgo(r.e)&&(r.acc||r.resp||r.plazo)))});
   const refs=[];conObs.forEach(it=>((v.items[it.key]||{}).fotos||[]).forEach(f=>refs.push(f)));
   const IM={};for(const f of refs)IM[f]=await pdfImg(f);
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const L=15,W=180;let y=10;
@@ -787,7 +803,7 @@ async function clPdf(v,subir){
       const r=(v.items||{})[it.key]||{},pr=prev&&prev.items&&prev.items[it.key];
       if(it.group!==grupo){grupo=it.group;chk(10);d.setFont("helvetica","bolditalic");d.setFontSize(8);d.setTextColor(90);d.text(`${it.fam} · ${it.group}`,L+1.5,y+3);d.setTextColor(0);y+=5}
       d.setFontSize(8.3);const tl=d.splitTextToSize((it.star?"(Clave) ":"")+it.txt,cols[1].w-3);
-      const ob=(r.obs||"").trim();const ol=ob?d.splitTextToSize("Obs.: "+ob,cols[1].w-3):[];
+      const ob=clObs(r);const ol=ob?d.splitTextToSize("Obs.: "+ob,cols[1].w-3):[];
       const h=Math.max(6,tl.length*3.6+ol.length*3.3+2.4);
       if(y+h>282){nueva();thead()}
       d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);
@@ -823,7 +839,7 @@ async function clPdf(v,subir){
   /* 4. al final: observaciones con sus fotografías */
   if(conObs.length){
     nueva();titulo(`Observaciones y fotografías (${conObs.length})`);
-    conObs.forEach(it=>{const r=v.items[it.key]||{};const ob=(r.obs||"").trim();const fs=(r.fotos||[]).map(f=>IM[f]).filter(Boolean);
+    conObs.forEach(it=>{const r=v.items[it.key]||{};const ob=clObs(r);const fs=(r.fotos||[]).map(f=>IM[f]).filter(Boolean);
       d.setFontSize(9);const tl=d.splitTextToSize(it.txt,W-36);const ol=ob?d.splitTextToSize(ob,W-4):[];
       const IW=(W-8)/3,MH=50;const filasF=Math.ceil(Math.min(fs.length,6)/3);
       chk(8+tl.length*4.2+ol.length*4+(filasF?MH+4:0));
