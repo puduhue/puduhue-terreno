@@ -216,7 +216,7 @@ async function disRendirArchivos(files,op){
   if(!r){const n=rdSiguienteN(p,c);r=nuevaRend(p,c);if(n>1)r.n=n;await saveRend(r);if(n>1)toast(`Rendición N°${n} de ${periodoTxt(p).toLowerCase()} creada.`)}
   if(!r.docs)r.docs={};
   rdTab="mias";rdv=r;rdd=null;RD_COLA=null;DIS_EDK=null;
-  const ks=[];for(const f of ok){const k=await rdAgregarDoc(r,f,op);if(k)ks.push(k)}
+  const ks=[];for(let i=0;i<ok.length;i++){const k=await rdAgregarDoc(r,ok[i],{...(op||{}),i:i+1,de:ok.length});if(k)ks.push(k)}
   if(!ks.length){go("rdv");return}
   if(ks.length>1)RD_COLA={rid:r.id,keys:ks};
   rdd=r.docs[ks[0]];go("rdd");
@@ -575,7 +575,10 @@ const DOCABR={boleta:["BOLETA","BOLETAS"],factura:["FACT","FACTS"],boleta_honora
 const RD_ESTADO={borrador:"Borrador",enviada:"En revisión de jefatura",revcont:"En revisión contable",aprobada:"Aprobada, por contabilizar",contabilizada:"Contabilizada",observada:"Con observaciones"};
 let REND={},rdv=null,rdd=null,rdTab="mias",MAE=null,MAE_ETAG="";
 const periodoActual=()=>today().slice(0,7);
-const periodoTxt=p=>{try{const [y,m]=p.split("-");return new Date(+y,+m-1,1).toLocaleDateString("es-CL",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase())}catch(e){return p}};
+/* v116: el nombre de cada mes se arma una vez */
+const PERIODO_TXT=new Map();
+const periodoTxt=p=>{if(PERIODO_TXT.has(p))return PERIODO_TXT.get(p);const t=periodoTxt0(p);PERIODO_TXT.set(p,t);return t};
+const periodoTxt0=p=>{try{const [y,m]=p.split("-");return new Date(+y,+m-1,1).toLocaleDateString("es-CL",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase())}catch(e){return p}};
 /* dígito verificador que corresponde a los números del RUT (módulo 11) */
 function rutDV(r){const c=String(r||"").replace(/[^0-9kK]/g,"").toUpperCase();if(c.length<2)return"";const num=c.slice(0,-1);let s=0,m=2;for(let i=num.length-1;i>=0;i--){s+=+num[i]*m;m=m===7?2:m+1}const r11=11-(s%11);return r11===11?"0":r11===10?"K":String(r11)}
 const rutConDV=r=>{const c=String(r||"").replace(/[^0-9kK]/g,"").toUpperCase();return c.length<2?r:rutLimpio(c.slice(0,-1)+rutDV(c))};
@@ -611,7 +614,9 @@ const distServicios=()=>Object.keys((MAE&&MAE.dist)||{});
 const distTabla=s=>(MAE&&MAE.dist&&MAE.dist[s])||null;
 const colabs=()=>(MAE&&Array.isArray(MAE.colab)?MAE.colab:[]);
 const aprobadores=()=>(MAE&&Array.isArray(MAE.aprob)?MAE.aprob:[]);
-const correosDe=c=>String((c&&c.correo)||"").toLowerCase().split(/[\s,;]+/).filter(x=>/@/.test(x));
+/* v116: la lista de correos de cada colaborador se arma una vez (se usaba en cada tarjeta) */
+const CORREOS_DE=new Map();
+const correosDe=c=>{const s=String((c&&c.correo)||"");let L=CORREOS_DE.get(s);if(!L){L=Object.freeze(s.toLowerCase().split(/[\s,;]+/).filter(x=>/@/.test(x)));CORREOS_DE.set(s,L)}return L};
 const meCorreo=()=>String((ME&&ME.correo)||"").toLowerCase();
 const colabsDeCuenta=()=>{const m=meCorreo();return m?colabs().filter(c=>c.activo!==false&&correosDe(c).includes(m)):[]};
 const colabPorRut=rut=>{const n=normRut(rut);return n?colabs().find(c=>normRut(c.rut)===n)||null:null};
@@ -1710,13 +1715,25 @@ async function rdGuardarFoto(r,d,file){
   if(!ref)ref=refSinEspacio();if(!ref)return null; /* v106 (C-04) */
   FOTO[ref]=img.dataURL;schedSync(800);return ref;
 }
+/* v116: mientras se revisa una foto (timbre del SII y nitidez) se ve al instante la foto con «Revisando…»; antes la pantalla no
+   cambiaba por uno a varios segundos. Tapa la pantalla para que no se toque otra cosa a medias. */
+let PROC=null;
+function procMostrar(file,txt){procQuitar();const m=document.createElement("div");m.className="proc";m.setAttribute("role","status");m.setAttribute("aria-live","polite");
+  let u="";try{if(esImagen(file))u=URL.createObjectURL(file)}catch(e){}
+  m.innerHTML=`<div class="procc">${u?`<img src="${u}" alt="">`:`<span class="procpdf" aria-hidden="true">PDF</span>`}<b><span class="spin" aria-hidden="true"></span> ${esc(txt)}</b><span class="procs">Buscando el código del SII y revisando que se lea bien.</span></div>`;
+  PROC={m,u,t:setTimeout(()=>{if(PROC&&PROC.m===m)document.body.appendChild(m)},120)}}
+function procQuitar(){if(!PROC)return;const{m,u,t}=PROC;PROC=null;clearTimeout(t);m.remove();if(u)URL.revokeObjectURL(u)}
 async function rdAgregarDoc(r,file,op){
   op=op||{};
+  procMostrar(file,(esPdf(file)?"Abriendo el PDF":"Revisando la foto")+(op.de>1?` ${op.i} de ${op.de}`:"")+"…");
+  try{return await rdAgregarDoc0(r,file,op)}finally{procQuitar()}
+}
+async function rdAgregarDoc0(r,file,op){
   let img=null;if(esPdf(file)){img=await rdPdfImagen(file);if(!img)return}
   /* v98: el timbre del SII se busca en el teléfono (sirve sin señal); si no hay timbre, se revisa que la foto no esté borrosa ni oscura */
   let tim=op.timbre||null;
-  if(!tim){const t0=setTimeout(()=>toast("Revisando la foto…"),700);try{tim=await timbreLeer(img?img.blob:file)}finally{clearTimeout(t0)}}
-  if(!tim&&!img&&!op.sinRevisar){const q=await fotoCalidad(file);if(q.mala){const x=await fotoPregunta(q);if(x==="descartar")return;if(x&&x!=="usar")return rdAgregarDoc(r,x,op);op={...op,sinRevisar:true}}}
+  if(!tim)tim=await timbreLeer(img?img.blob:file); /* v116: el aviso «Revisando la foto…» ya está a la vista */
+  if(!tim&&!img&&!op.sinRevisar){const q=await fotoCalidad(file);if(q.mala){procQuitar();const x=await fotoPregunta(q);if(x==="descartar")return;if(x&&x!=="usar")return rdAgregarDoc(r,x,op);op={...op,sinRevisar:true}}}
   const c=colabDe(r);
   const d={k:"d"+uid(),creado:new Date().toISOString(),tipo:"boleta",emisor:"",rut:"",folio:"",fecha:"",total:0,neto:0,iva:0,centro:(c&&centroExiste(c.centro))?c.centro:"",gasto:"",glosa:""};if(d.centro)d.centroSug=true;
   const foto=await rdGuardarFoto(r,d,img||file);if(!foto)return; /* v106 (C-04) */

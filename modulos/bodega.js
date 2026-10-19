@@ -16,7 +16,9 @@ const cmpEs=(a,b)=>String(a||"").localeCompare(String(b||""),"es",{sensitivity:"
 const SK_CAMPOS=["PRODUCTOID","PRODUCTO","PRODUCTOCODIGO","DEPOSITOID","DEPOSITO","CANTIDAD1","UNIDAD1","CANTIDAD2","UNIDAD2","PRECIOUNIDADSTOCK1","IMPORTE","MONEDA","FAMILIA","SUBFAMILIA","RUBRO","PUNTOREPOSICION","STOCKMINIMO","STOCKDISPONIBLE","STOCKRESERVADO","PARTIDA","PARTIDA_VTO","LUGAR","ORGANIZACION"];
 let STOCK=null,STOCK_ETAG="",skDep="",skQ="",skFam="",skSub="",skModo="dep",skLim=150,skCargando=false;
 const num=x=>{if(x==null||x==="")return 0;if(typeof x==="number")return x;const n=parseFloat(String(x).replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."));return isNaN(n)?0:n};
-const fmtN=(n,d)=>{try{return Number(n).toLocaleString("es-CL",{maximumFractionDigits:d==null?2:d,minimumFractionDigits:0})}catch(e){return String(n)}};
+/* v116: un formateador por cantidad de decimales (crearlo en cada número era lento) */
+const FMTN_F={};
+const fmtN=(n,d)=>{try{const k=d==null?2:d;const f=FMTN_F[k]||(FMTN_F[k]=new Intl.NumberFormat("es-CL",{maximumFractionDigits:k,minimumFractionDigits:0}));return f.format(Number(n))}catch(e){return String(n)}};
 const fmtP=n=>"$"+fmtN(Math.round(n),0);
 function stockFilas(){if(!STOCK)return[];return STOCK.filas.map(r=>{const o={};SK_CAMPOS.forEach((c,i)=>o[c]=r[i]);o.cant=num(o.CANTIDAD1);o.imp=num(o.IMPORTE);o.pr=num(o.PUNTOREPOSICION);o.bajo=o.pr>0&&o.cant<o.pr;return o})}
 let SKF=null,SKF_T="";function filas(){if(!STOCK)return[];if(SKF_T!==STOCK.hora){SKF=stockFilas();SKF_T=STOCK.hora}return SKF}
