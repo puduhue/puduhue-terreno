@@ -863,7 +863,10 @@ function problemasDoc2(r,d){
   if(d.fecha&&d.fecha>today())b.push("La fecha es futura.");
   if(!centroDoc(r,d))b.push("Falta el centro de costo.");
   if(!gastoDe(d))b.push("Falta el tipo de gasto.");
-  if(d.rut&&d.folio){const igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&String(y.folio).trim()===String(d.folio).trim();const dup=Object.values(REND).some(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual))||Object.values(r.docs||{}).some(igual);if(dup)b.push("Ya existe otro documento con este RUT y número (duplicado).")}
+  if(d.rut&&d.folio){const igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&String(y.folio).trim()===String(d.folio).trim();const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
+    if(otra){const quien_=otra.persona&&otra.persona.nombre||quien(otra.creadoPor)||"otra persona",mia=esMiaR(otra);
+      b.push(`Documento duplicado: esta boleta o factura (mismo RUT y número) ya está en ${mia?"tu rendición":"la rendición de "+quien_} de ${periodoTxt(otra.periodo).toLowerCase()} (${(RD_ESTADO[otra.estado]||otra.estado||"").toLowerCase()}). Debe quedar en una sola rendición: elimínala de una de las dos.`)}
+    else if(Object.values(r.docs||{}).some(igual))b.push("Documento duplicado: esta boleta o factura (mismo RUT y número) está dos veces en esta misma rendición. Elimina una.")}
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
   if(d.lectura&&d.lectura.estado==="error")a.push("La lectura automática falló; los datos quedan como los escribas.");
   if(!d.emisor)a.push("Sin nombre del emisor.");
