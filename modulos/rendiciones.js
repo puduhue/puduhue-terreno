@@ -1502,6 +1502,7 @@ function renderRDM(){
     ${esContab()?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""} style="flex:1">${ORGS_TRAYENDO?"Consultando Finnegans…":"Traer organizaciones desde Finnegans"}</button></div><p class="note">Las organizaciones (proveedores y personas) se traen directo de Finnegans; se actualizan solas cada 12 horas cuando Contabilidad abre Rendiciones.</p>`:""}
     ${esContab()?`<div class="btns"><label class="btn pri" style="flex:1;text-align:center">Cargar archivos Excel<input class="vh" type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-rdmae="1"></label></div><p class="note">Puedes elegir varios a la vez. Cada archivo reemplaza solo su propio maestro.</p>`:""}
     ${MAE_TIPOS.map(([k,t,h])=>{const a=ar[k];return `<div class="rdmf${a?" ok":""}"><b>${esc(t)}</b><span>${a?`${fmtN(a.filas,0)} registros · ${esc(a.nombre)} · ${fmtD(String(a.hora||"").slice(0,10))}${a.por?` · ${esc(a.por)}`:""}`:k==="tipos"?"Se usa el catálogo de la app ("+CATALOGO_DEF.length+" tipos)":"No cargado"}</span><span class="hint">${esc(h)}</span></div>`}).join("")}
+    ${esContab()?`<div class="btns"><button class="btn pri" data-a="rdCol" style="flex:1">Colaboradores y aprobadores: ver y editar</button></div><p class="note">Agrega personas, cambia su jefatura o centro y desactiva a quien ya no rinde. Se guarda también en el Excel.</p>`:""}
     <div class="btns"><button class="btn" data-a="rdMaeColab">Descargar colaboradores y aprobadores</button><button class="btn" data-a="rdMaeCat">Descargar catálogo de tipos de gasto</button></div>
     <h2>Revisión de los maestros<span class="cnt">${rev.length}</span></h2>
     ${MAE?rev.length?`<div class="info" style="border-left:5px solid var(--r-ink)"><ul>${rev.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:`<div class="info" style="border-left:5px solid var(--b-ink)">Todo cuadra: los códigos del catálogo existen y cada persona tiene RUT, correo y jefatura.</div>`:`<div class="empty">Todavía no se han cargado maestros.</div>`}
@@ -1609,6 +1610,144 @@ function rdMaeCatXlsx(){
 }
 
 /* ---------- Acciones ---------- */
+/* ---------- v117: editar colaboradores y aprobadores en la app (pedido por Benja el 19-10-2026) ----------
+   - Contabilidad y administración (esContab) editan, agregan, desactivan; los demás no ven esta pantalla.
+   - Se guarda en maestros.json (lo que usa la app) y, celda por celda, en el Excel de _maestros (hojas Colaboradores y
+     Aprobadores) con la API de Excel de Microsoft 365: no se tocan las demás hojas, columnas ni colores. Si el Excel no se
+     puede actualizar (sin señal, abierto con bloqueo), queda pendiente y se reintenta al volver a la pantalla.
+   - Cada cambio queda en el historial (MAE.colabHist): quién, cuándo y qué cambió. */
+const RDCOL_HOJA={colab:"Colaboradores",aprob:"Aprobadores"},RDCOL_PEND="rd-col-excel-pend";
+let rdColQ="",RDCOL_EXCEL="";
+const rdColJefes=()=>aprobadores().filter(a=>a.rol==="jef"&&a.nombre).map(a=>a.nombre);
+function rdColCentros(){const m=new Map(CENTROS_DEF.map(x=>[x[0],x[1]]));if(maeTiene("centros"))Object.entries(MAE.centros).forEach(([k,v])=>{if(!m.has(k))m.set(k,(v&&v.n)||k)});return [...m.entries()].sort((a,b)=>cmpEs(a[1],b[1]))}
+function rdColFaltan(c){const o=[];if(!c.rut||!rutValido(c.rut))o.push("RUT");if(!correosDe(c).length)o.push("correo");if(!c.centro)o.push("centro");else if(!centroExiste(c.centro))o.push("el centro no existe");
+  if(!c.jefe)o.push("jefatura");else{const j=jefaturaDe(c);if(!j||!j.correo)o.push("la jefatura no tiene correo")}return o}
+/* quienes rinden con su cuenta y no están en la lista (por ejemplo, una persona nueva): se pueden agregar con un toque */
+function rdColFuera(){const m={};Object.values(REND).forEach(r=>{if(!r||r.anulada||!r.persona)return;const co=String(r.persona.correo||"").toLowerCase();
+  if(!/@/.test(co)||colabs().some(c=>correosDe(c).includes(co)))return;(m[co]=m[co]||{correo:co,nombre:r.persona.nombre||co,n:0}).n++});return Object.values(m).sort((a,b)=>cmpEs(a.nombre,b.nombre))}
+const rdColPend=()=>{try{return JSON.parse(localStorage.getItem(RDCOL_PEND)||"[]")}catch(e){return[]}};
+const rdColPendSet=L=>{try{L.length?localStorage.setItem(RDCOL_PEND,JSON.stringify(L.slice(-50))):localStorage.removeItem(RDCOL_PEND)}catch(e){}};
+function rdColListaHTML(){
+  const q=normTxt(rdColQ),C=colabs().filter(c=>!q||normTxt([c.nombre,c.rut,c.correo,c.jefe,c.centro,centroNombre(c.centro)].join(" ")).includes(q)).slice().sort((a,b)=>(a.activo===false)-(b.activo===false)||cmpEs(a.nombre,b.nombre));
+  const fila=c=>{const f=c.activo===false?[]:rdColFaltan(c);return `<button class="rdcc${c.activo===false?" inact":""}" data-a="rdColEd" data-k="${esc(normRut(c.rut)||"n:"+c.nombre)}">
+    <span class="rdcc-t"><b>${esc(c.nombre||"Sin nombre")}</b><span class="tag ${c.activo===false?"none":f.length?"borrador":"cerrada"}">${c.activo===false?"Inactivo":f.length?"Incompleto":"Completo"}</span></span>
+    <span class="rdcc-l">${esc([c.rut?rutLimpio(c.rut):"",correosDe(c).join(", ")].filter(Boolean).join(" · ")||"Sin RUT ni correo")}</span>
+    <span class="rdcc-l">${esc(c.jefe?"Aprueba "+c.jefe:"Sin jefatura")} · ${esc(c.centro?centroNombre(c.centro):"Sin centro")}</span>${f.length?`<span class="rdcc-f">Falta: ${esc(f.join(", "))}</span>`:""}</button>`};
+  return C.map(fila).join("")||`<div class="empty">${q?"Nadie coincide con la búsqueda.":"La lista está vacía."}</div>`}
+function renderRDCol(){
+  if(!esContab())return band("Colaboradores","rdMae","Maestros")+`<main class="wrap"><p class="note">Solo Contabilidad y administración editan la lista.</p></main>`;
+  const F=rdColFuera(),A=aprobadores(),H=((MAE&&MAE.colabHist)||[]).slice(-8).reverse(),pend=rdColPend().length,inc=colabs().filter(c=>c.activo!==false&&rdColFaltan(c).length).length;
+  return band("Colaboradores","rdMae","Maestros")+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
+    <h1>Colaboradores y aprobadores</h1>
+    <p class="lead">Quién rinde, con qué centro y fondo, y quién le aprueba. Lo que cambies aquí se guarda en la app y en el Excel de <b>Rendiciones / _maestros</b>.</p>
+    ${pend||RDCOL_EXCEL?`<div class="info netbox"><b>El Excel no está al día.</b> ${esc(RDCOL_EXCEL||`Hay ${pend} ${pend===1?"cambio":"cambios"} por pasar al Excel.`)} La app ya usa los cambios. <button class="lnk" data-a="rdColReint">Reintentar</button></div>`:""}
+    ${F.length?`<h2>Rinden y no están en la lista<span class="cnt">${F.length}</span></h2><p class="note" style="margin-top:0">Sin estar en la lista, sus rendiciones salen sin RUT y van directo a Contabilidad.</p><div class="list">${F.map(x=>`<div class="rdcc"><span class="rdcc-t"><b>${esc(x.nombre)}</b><span class="tag borrador">Fuera de la lista</span></span><span class="rdcc-l">${esc(x.correo)} · ${x.n} ${x.n===1?"rendición":"rendiciones"}</span><button class="btn pri" data-a="rdColNuevo" data-n="${esc(x.nombre)}" data-c="${esc(x.correo)}" style="margin-top:8px">Agregar a la lista</button></div>`).join("")}</div>`:""}
+    <h2>Colaboradores<span class="cnt">${colabs().length}</span></h2>
+    ${inc?`<p class="note" style="margin-top:0">${inc} ${inc===1?"persona tiene":"personas tienen"} datos por completar.</p>`:""}
+    <div class="btns"><button class="btn pri" data-a="rdColNuevo">+ Agregar colaborador</button></div>
+    <input class="search" id="rdColQ" type="search" placeholder="Buscar nombre, RUT, correo, jefatura o centro" value="${esc(rdColQ)}" style="margin-top:14px">
+    <div class="list" id="rdcoll">${rdColListaHTML()}</div>
+    <h2>Aprobadores<span class="cnt">${A.length}</span></h2>
+    <div class="list">${A.map(a=>`<button class="rdcc" data-a="rdAprEd" data-c="${esc(a.correo||"")}" data-n="${esc(a.nombre)}"><span class="rdcc-t"><b>${esc(a.nombre)}</b><span class="tag ${a.rol==="cont"?"cerrada":"borrador"}">${a.rol==="cont"?"Contabilidad":"Jefatura"}</span></span><span class="rdcc-l">${esc(a.correo||"Sin correo")}</span><span class="rdcc-l">${a.rol==="jef"?(n=>`${n} ${n===1?"persona":"personas"} a cargo`)(colabs().filter(c=>c.activo!==false&&normTxt(c.jefe)===normTxt(a.nombre)).length):"Revisión contable"}</span></button>`).join("")}</div>
+    <div class="btns"><button class="btn" data-a="rdAprNuevo">+ Agregar aprobador</button></div>
+    ${H.length?`<h2>Últimos cambios</h2><ul class="rdcolh">${H.map(h=>`<li><b>${esc(h.quien)}</b>: ${esc(h.que)}<span>${esc(fmtD(String(h.f||"").slice(0,10)))} · ${esc(h.por||"")}</span></li>`).join("")}</ul>`:""}
+    <p class="note">Versión ${APP_VER}</p>
+  </main>`}
+function rdColPintar(){const L=$("#rdcoll");if(L)L.innerHTML=rdColListaHTML()}
+const rdColBuscar=k=>colabs().find(c=>(normRut(c.rut)||"n:"+c.nombre)===k)||null;
+/* formulario: se repite con los datos escritos si algo no está bien */
+async function rdColForm(c,nuevo){
+  let v={nombre:c.nombre||"",rut:c.rut?rutLimpio(c.rut):"",correo:c.correo||"",centro:c.centro||"",jefe:c.jefe||"",fondo:c.fondo||"Fondo por rendir",cuenta:c.cuenta||"110106",obs:c.obs||"",activo:c.activo===false?"no":"si"},err="";
+  const J=rdColJefes(),CE=rdColCentros();
+  while(true){
+    const op=(L,sel)=>L.map(([val,t])=>`<option value="${esc(val)}"${val===sel?" selected":""}>${esc(t)}</option>`).join("");
+    const html=`${err?`<div class="info" style="border-left:5px solid var(--r-ink);margin:0 0 10px">${esc(err)}</div>`:""}
+      <div class="f"><label for="rcN">Nombre</label><input id="rcN" data-v="nombre" value="${esc(v.nombre)}" autocomplete="off"></div>
+      <div class="f"><label for="rcR">RUT</label><input id="rcR" data-v="rut" value="${esc(v.rut)}" inputmode="text" autocomplete="off" placeholder="12.345.678-5"></div>
+      <div class="f"><label for="rcM">Correo Microsoft (@puduhue.cl)</label><input id="rcM" data-v="correo" value="${esc(v.correo)}" type="email" autocomplete="off" placeholder="nombre@puduhue.cl"><span class="hint">Si usa la cuenta del predio, esa cuenta. Varios correos, separados por coma.</span></div>
+      <div class="f"><label for="rcC">Centro por defecto</label><select id="rcC" data-v="centro"><option value="">Elegir…</option>${op(CE.map(([k,n])=>[k,n+" ("+k+")"]).concat(v.centro&&!CE.some(x=>x[0]===v.centro)?[[v.centro,v.centro+" (no existe)"]]:[]),v.centro)}</select></div>
+      <div class="f"><label for="rcJ">Jefatura que aprueba</label><select id="rcJ" data-v="jefe"><option value="">Sin jefatura (aprueba Contabilidad)</option>${op(J.map(n=>[n,n]).concat(v.jefe&&!J.some(n=>normTxt(n)===normTxt(v.jefe))?[[v.jefe,v.jefe+" (no está en Aprobadores)"]]:[]),J.find(n=>normTxt(n)===normTxt(v.jefe))||v.jefe)}</select></div>
+      <div class="f"><label for="rcF">Tipo de fondo</label><select id="rcF" data-v="fondo">${op([["Fondo por rendir","Fondo por rendir"],["Fondo fijo","Fondo fijo"]].concat(["Fondo por rendir","Fondo fijo"].includes(v.fondo)?[]:[[v.fondo,v.fondo]]),v.fondo)}</select></div>
+      <div class="f"><label for="rcCu">Cuenta del fondo</label><input id="rcCu" data-v="cuenta" value="${esc(v.cuenta)}" inputmode="numeric" autocomplete="off"><span class="hint">110106 Fondos por rendir · 110105 Fondo fijo</span></div>
+      <div class="f"><label for="rcO">Observaciones</label><input id="rcO" data-v="obs" value="${esc(v.obs)}" autocomplete="off"></div>
+      ${nuevo?"":`<div class="f"><label for="rcA">Estado</label><select id="rcA" data-v="activo">${op([["si","Activo: rinde"],["no","Inactivo: ya no rinde"]],v.activo)}</select></div>`}`;
+    const o=await askVal(nuevo?"Agregar colaborador":"Editar colaborador","",nuevo?"Agregar":"Guardar",html);if(!o)return null;
+    v=Object.assign(v,o);v.nombre=v.nombre.trim().replace(/\s+/g," ");v.cuenta=String(v.cuenta||"").replace(/\D/g,"");
+    const rut=normRut(v.rut),cos=correosDe({correo:v.correo}),otro=rut&&colabs().find(x=>x!==c&&normRut(x.rut)===rut);
+    err=!v.nombre?"Escribe el nombre.":!rut||!rutValido(v.rut)?"El RUT no es válido: revisa los números y el dígito verificador.":otro?`Ese RUT ya es de ${otro.nombre}.`:!cos.length?"Escribe el correo con el que entra a la app.":!v.centro?"Elige el centro por defecto.":!v.cuenta?"Escribe la cuenta del fondo.":(maeTiene("cuentas")&&!MAE.cuentas[v.cuenta])?`La cuenta ${v.cuenta} no está en el plan de cuentas.`:"";
+    if(err)continue;
+    return{rut:rutLimpio(v.rut).replace(/\./g,""),nombre:v.nombre,centro:v.centro,fondo:v.fondo,cuenta:v.cuenta,jefe:v.jefe,correo:cos.join(", "),obs:v.obs.trim(),activo:v.activo!=="no"}
+  }
+}
+const RDCOL_ETQ={nombre:"Nombre",rut:"RUT",correo:"Correo",centro:"Centro",jefe:"Jefatura",fondo:"Tipo de fondo",cuenta:"Cuenta",obs:"Observaciones",activo:"Estado"};
+function rdColDif(a,b){return Object.keys(RDCOL_ETQ).filter(k=>String(a[k]==null?"":a[k])!==String(b[k]==null?"":b[k])).map(k=>{const f=x=>k==="activo"?(x===false?"inactivo":"activo"):k==="centro"?centroNombre(x):String(x||"—");return `${RDCOL_ETQ[k]}: ${f(a[k])} → ${f(b[k])}`}).join("; ")}
+/* Excel: celdas que cambian, por hoja, buscando la fila por RUT (colaboradores) o correo/nombre (aprobadores) */
+function colLetra(n){let s="";n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
+function colNum(L){let n=0;for(const ch of L)n=n*26+(ch.charCodeAt(0)-64);return n-1}
+async function rdColExcelAplicar(ops){
+  const nom=(MAE&&MAE.archivos&&MAE.archivos.colab&&MAE.archivos.colab.nombre)||"Colaboradores_y_Aprobaciones_Rendiciones.xlsx";
+  const dir=await rdCarpeta([RD.maeDir]);const it=await gjson(`/drives/${M365.drive}/items/${dir}:/${encName(nom)}`);
+  const base=`/drives/${M365.drive}/items/${it.id}/workbook/worksheets/`;
+  const poner=(hoja,addr,val)=>gfetch(`${base}${encodeURIComponent(hoja)}/range(address='${addr}')`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({values:[[val]]})});
+  for(const op of ops){
+    const hoja=RDCOL_HOJA[op.tipo];const ur=await gjson(`${base}${encodeURIComponent(hoja)}/usedRange?$select=address,values`);
+    const m=/!?\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(String(ur.address||"").split("!").pop()||"");if(!m)throw{error:"No se pudo leer la hoja "+hoja+"."};
+    const c0=colNum(m[1]),r0=+m[2],V=ur.values||[];const h=(V[0]||[]).map(x=>String(x==null?"":x));let ancho=h.length;
+    const col=op.tipo==="colab"?{rut:colIdx(h,"RUT"),nombre:colIdx(h,"Nombre"),centro:colIdx(h,"Centro por defecto (codigo)","Centro (codigo)","Centro"),centroN:colIdx(h,"Centro por defecto (nombre)","Centro (nombre)"),fondo:colIdx(h,"Tipo de fondo"),cuenta:colIdx(h,"Cuenta fondo"),jefe:colIdx(h,"Jefatura que aprueba","Jefatura"),obs:colIdx(h,"Observaciones"),correo:colIdx(h,"Correo Microsoft","Correo"),activo:colIdx(h,"Activo")}
+      :{nombre:colIdx(h,"Nombre"),correo:colIdx(h,"Correo"),rol:colIdx(h,"Rol")};
+    const g=(r,i)=>i>=0?String(r[i]==null?"":r[i]).trim():"";
+    let fi=V.slice(1).findIndex(r=>op.tipo==="colab"?(op.clave.rut?normRut(g(r,col.rut))===normRut(op.clave.rut):normTxt(g(r,col.nombre))===normTxt(op.clave.nombre)):(op.clave.correo&&(correosDe({correo:g(r,col.correo)})[0]||"")===op.clave.correo)||normTxt(g(r,col.nombre))===normTxt(op.clave.nombre));
+    let fila=fi>=0?r0+1+fi:0;
+    if(!fila){let u=V.length;while(u>1&&!(V[u-1]||[]).some(x=>String(x==null?"":x).trim()))u--;fila=r0+u}
+    const d=Object.assign({},op.datos);
+    if(op.tipo==="colab"&&d.activo!==undefined){if(col.activo<0){if(d.activo)delete d.activo;else{col.activo=ancho;ancho++;await poner(hoja,colLetra(c0+col.activo)+r0,"Activo")}}if(d.activo!==undefined)d.activo=d.activo?"Sí":"No"}
+    if(op.tipo==="colab"&&d.centro!==undefined&&col.centroN>=0)d.centroN=centroNombre(d.centro);
+    if(op.tipo==="aprob"&&d.rol!==undefined)d.rol=d.rol==="cont"?"Revisión contable":"Jefatura";
+    for(const [k,val] of Object.entries(d)){const i=col[k];if(i===undefined||i<0)continue;await poner(hoja,colLetra(c0+i)+fila,val==null?"":String(val))}
+  }
+}
+async function rdColExcel(ops){
+  const L=rdColPend().concat(ops||[]);if(!L.length){RDCOL_EXCEL="";return true}
+  try{if(navigator.onLine===false)throw{error:"Sin señal."};await rdColExcelAplicar(L);rdColPendSet([]);RDCOL_EXCEL="";return true}
+  catch(e){console.warn("Excel colaboradores",e);rdColPendSet(L);RDCOL_EXCEL=(e&&e.error)||errMsg(e)||"No se pudo actualizar el Excel.";return false}
+}
+const rdColHist=(n,quien,que)=>{(n.colabHist=n.colabHist||[]).push({f:new Date().toISOString(),por:ME&&ME.nombre||"",quien,que});if(n.colabHist.length>300)n.colabHist=n.colabHist.slice(-300)};
+async function rdColGuardar(tipo,clave,nuevo,datos,quien,que){
+  if(!DB||navigator.onLine===false){toast("Se necesita señal para guardar la lista.");return false}
+  try{await rdMaeGuardar(n=>{
+      const L=n[tipo]=Array.isArray(n[tipo])?n[tipo]:[];
+      const i=clave?L.findIndex(x=>tipo==="colab"?(clave.rut?normRut(x.rut)===normRut(clave.rut):x.nombre===clave.nombre):((clave.correo&&x.correo===clave.correo)||x.nombre===clave.nombre)):-1;
+      if(i>=0)L[i]=Object.assign({},L[i],nuevo);else L.push(nuevo);
+      n.archivos=n.archivos||{};const a=n.archivos[tipo]||{nombre:(n.archivos.colab&&n.archivos.colab.nombre)||"Colaboradores_y_Aprobaciones_Rendiciones.xlsx"};
+      n.archivos[tipo]=Object.assign({},a,{filas:L.length,hora:new Date().toISOString(),por:ME&&ME.nombre});rdColHist(n,quien,que)})}
+  catch(e){toast("No se pudo guardar: "+errMsg(e));return false}
+  CORREOS_DE.clear();try{rdCompletarRut();rdSinJefaturaADirecto()}catch(e){}
+  const ok=await rdColExcel([{tipo,clave:clave||(tipo==="colab"?{rut:nuevo.rut,nombre:nuevo.nombre}:{correo:nuevo.correo,nombre:nuevo.nombre}),datos}]);
+  render();toast(ok?"Guardado en la app y en el Excel.":"Guardado en la app. El Excel queda pendiente: se reintenta al volver a esta pantalla.");return true}
+async function rdColClick(A,b){
+  if(A==="rdCol"){if(!esContab())return true;go("rdcol");window.scrollTo(0,0);if(rdColPend().length)rdColExcel([]).then(()=>{if(view==="rdcol")render()});return true}
+  if(A==="rdColReint"){const ok=await rdColExcel([]);render();toast(ok?"Excel al día.":"Todavía no se pudo actualizar el Excel.");return true}
+  if(A==="rdColNuevo"){if(!esContab())return true;const c={nombre:b.dataset.n||"",correo:b.dataset.c||""};const v=await rdColForm(c,true);if(!v)return true;
+    await rdColGuardar("colab",null,v,{rut:v.rut,nombre:v.nombre,centro:v.centro,fondo:v.fondo,cuenta:v.cuenta,jefe:v.jefe,obs:v.obs,correo:v.correo},v.nombre,"agregado a la lista");return true}
+  if(A==="rdColEd"){if(!esContab())return true;const c=rdColBuscar(b.dataset.k);if(!c)return true;const v=await rdColForm(c,false);if(!v)return true;
+    const dif=rdColDif(c,v);if(!dif){toast("Sin cambios.");return true}
+    const datos={};Object.keys(RDCOL_ETQ).forEach(k=>{if(String(c[k]==null?"":c[k])!==String(v[k]==null?"":v[k]))datos[k]=v[k]});
+    await rdColGuardar("colab",{rut:c.rut,nombre:c.nombre},v,datos,v.nombre,dif);return true}
+  if(A==="rdAprNuevo"||A==="rdAprEd"){if(!esContab())return true;const a=A==="rdAprEd"?aprobadores().find(x=>(x.correo||"")===b.dataset.c&&x.nombre===b.dataset.n):null;
+    let v={nombre:a?a.nombre:"",correo:a?a.correo:"",rol:a?a.rol:"jef"},err="";
+    while(true){const o=await askVal(a?"Editar aprobador":"Agregar aprobador",a?"El nombre no se cambia aquí porque las personas a cargo lo usan como referencia.":"",a?"Guardar":"Agregar",
+      `${err?`<div class="info" style="border-left:5px solid var(--r-ink);margin:0 0 10px">${esc(err)}</div>`:""}${a?`<p class="note" style="margin:0 0 8px"><b>${esc(a.nombre)}</b></p>`:`<div class="f"><label for="raN">Nombre</label><input id="raN" data-v="nombre" value="${esc(v.nombre)}" autocomplete="off"></div>`}
+       <div class="f"><label for="raM">Correo</label><input id="raM" data-v="correo" type="email" value="${esc(v.correo)}" autocomplete="off"></div>
+       <div class="f"><label for="raR">Rol</label><select id="raR" data-v="rol"><option value="jef"${v.rol==="jef"?" selected":""}>Jefatura: aprueba a su equipo</option><option value="cont"${v.rol==="cont"?" selected":""}>Contabilidad: revisión contable</option></select></div>`);
+      if(!o)return true;v=Object.assign(v,o);if(a)v.nombre=a.nombre;v.nombre=String(v.nombre||"").trim().replace(/\s+/g," ");const co=correosDe({correo:v.correo})[0]||"";
+      err=!v.nombre?"Escribe el nombre.":!co?"Escribe un correo válido.":(!a&&aprobadores().some(x=>normTxt(x.nombre)===normTxt(v.nombre)))?"Ya hay un aprobador con ese nombre.":"";if(err)continue;v.correo=co;break}
+    const nuevo={nombre:v.nombre,correo:v.correo,rol:v.rol};
+    if(a){const datos={};if(a.correo!==nuevo.correo)datos.correo=nuevo.correo;if(a.rol!==nuevo.rol)datos.rol=nuevo.rol;if(!Object.keys(datos).length){toast("Sin cambios.");return true}
+      await rdColGuardar("aprob",{correo:a.correo,nombre:a.nombre},nuevo,datos,a.nombre,[datos.correo?`Correo: ${a.correo} → ${nuevo.correo}`:"",datos.rol?`Rol: ${a.rol==="cont"?"Contabilidad":"Jefatura"} → ${nuevo.rol==="cont"?"Contabilidad":"Jefatura"}`:""].filter(Boolean).join("; "))}
+    else await rdColGuardar("aprob",null,nuevo,{nombre:nuevo.nombre,correo:nuevo.correo,rol:nuevo.rol},nuevo.nombre,"agregado como aprobador");
+    return true}
+  return false}
+
 function askVal(title,msg,ok,html){return new Promise(res=>{
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet" role="alertdialog" aria-modal="true" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${msg?`<p>${esc(msg)}</p>`:""}${html||""}<div class="btns"><button class="btn" data-m="no">Cancelar</button><button class="btn pri" data-m="yes" style="flex:1">${esc(ok)}</button></div></div>`;
@@ -1617,6 +1756,7 @@ function askVal(title,msg,ok,html){return new Promise(res=>{
   m.addEventListener("click",e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(a==="yes"){const o={};m.querySelectorAll("[data-v]").forEach(x=>{o[x.dataset.v]=x.value});done(o)}else if(a==="no"||e.target===m)done(null)});
   const f=m.querySelector("[data-v]")||m.querySelector('[data-m="yes"]');if(f)f.focus()})}
 async function rdClick(A,b){
+  if(/^rd(Col|Apr(Nuevo|Ed)$)/.test(A)&&await rdColClick(A,b))return true; /* v117: colaboradores y aprobadores */
   if(A==="rdRecVer"){rdRecVer();return true}
   if(A==="rdRecProbar"){rdRecProbar();return true}
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
