@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=108">
+<link rel="stylesheet" href="estilos.css?v=109">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="108";
+const APP_VER="109";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -54,6 +54,7 @@ const REPS=["Benjamín Barrientos","Jennifer Aguila"];
 /* Firmas: el trabajador y quien firma por la empresa. Entrega: empresa entrega, trabajador recibe. Devolución: al revés. */
 function rolesDe(a){
   if(a.tipo==="vehiculo")return a.mov==="devolucion"?[["conductor","Devuelve el vehículo","Conductor(a)"],["empresa","Recibe el vehículo","Por CAPAC SpA · Administración"]]:[["conductor","Recibe el vehículo","Conductor(a)"],["empresa","Entrega el vehículo","Por CAPAC SpA · Administración"]];
+  if(a.tipo==="capacitacion")return[["relator","Firma del relator",a.realizadaPor||"Relator(a)"]].concat((a.participantes||[]).map(p=>["p_"+p.id,"Firma del participante",p.nombre||"Participante"]));
   if(a.tipo==="activo")return a.mov==="devolucion"?[["recibe","Devuelve","Responsable del activo"],["entrega","Recibe","Administración"]]:[["entrega","Entrega","Administración"],["recibe","Recibe","Responsable del activo"]];
   const dev=a.tipo==="devolucion",fm=a.firmas||{};
   const r=[["trabajador",dev?"Entrega la vivienda":"Recibe la vivienda","Trabajador(a)"],["empresa",dev?"Recibe la vivienda":"Entrega la vivienda","En representación de la empresa"]];
@@ -207,6 +208,7 @@ async function asegurarCarpetas(){
 /* Carpeta de un acta: Actas de vivienda/{Predio}/{fecha Tipo Trabajador} */
 const limpiaNombre=t=>String(t||"").normalize("NFC").replace(/[\\/:*?"<>|#%&{}~]/g," ").replace(/\s+/g," ").trim().slice(0,80);
 const carpetaActa=a=>a.tipo==="vehiculo"?["Vehículos",limpiaNombre((a.veh||{}).patente)||"Sin patente",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${a.conductor||"Sin nombre"}`)]
+  :a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a.fecha} ${a.tema||"Sin tema"}`)]
   :a.tipo==="activo"?["Activos fijos",limpiaNombre(a.recibe)||"Sin nombre",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${((a.activos||[])[0]||{}).tipo||"activos"}`)]
   :[limpiaNombre(predioDe(a))||"Sin predio",limpiaNombre(`${a.fecha} ${a.tipo==="entrega"?"Entrega":"Devolución"} ${a.trabajador||"Sin nombre"}`)];
 const ACTPATH={};
@@ -219,7 +221,7 @@ async function actaCarpeta(segs){
   return parent;
 }
 async function actaSubir(a,sub,name,blob,type){const folder=await actaCarpeta(carpetaActa(a).concat(sub?[sub]:[]));const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
-const nombreFoto=(a,k,ref)=>{if(a.tipo==="vehiculo"||a.tipo==="activo"){const fs=((a.items||{})[k]||{}).fotos||[];const lb=a.tipo==="vehiculo"?(k==="v_km"?"Kilometraje":"Estado_general"):"Activo_"+(((a.activos||[]).find(x=>"a_"+x.id===k)||{}).tipo||"").replace(/\s+/g,"_");return limpiaNombre(lb).replace(/[(),.]/g,"")+`_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}const it=ITEMS.find(i=>i.k===k);const fs=((a.items||{})[k]||{}).fotos||[];const idx=Math.max(0,fs.indexOf(ref))+1;return limpiaNombre(`${it?SECC[it.s].t:"Item"}_${it?it.n:k}`).replace(/\s+/g,"_").replace(/[(),.]/g,"")+`_${idx}_${uid().slice(-4)}.jpg`};
+const nombreFoto=(a,k,ref)=>{if(a.tipo==="capacitacion"){const fs=((a.items||{})[k]||{}).fotos||[];return `Capacitacion_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}if(a.tipo==="vehiculo"||a.tipo==="activo"){const fs=((a.items||{})[k]||{}).fotos||[];const lb=a.tipo==="vehiculo"?(k==="v_km"?"Kilometraje":"Estado_general"):"Activo_"+(((a.activos||[]).find(x=>"a_"+x.id===k)||{}).tipo||"").replace(/\s+/g,"_");return limpiaNombre(lb).replace(/[(),.]/g,"")+`_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}const it=ITEMS.find(i=>i.k===k);const fs=((a.items||{})[k]||{}).fotos||[];const idx=Math.max(0,fs.indexOf(ref))+1;return limpiaNombre(`${it?SECC[it.s].t:"Item"}_${it?it.n:k}`).replace(/\s+/g,"_").replace(/[(),.]/g,"")+`_${idx}_${uid().slice(-4)}.jpg`};
 /* --- Base de actas: un archivo JSON por acta en OneDrive/actas --- */
 const REMOTE={actas:{},visitas:{},conteos:{},rendiciones:{}},SNAP={};let pullT=null,pulling=false;
 const rkey=(col,id)=>col==="actas"?id:col+"/"+id; /* las actas quedaron guardadas sin prefijo */
@@ -498,7 +500,7 @@ const TB_ICO_ACTA=`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" s
 const TB_MODS=[
   {k:"rd",a:"rd",t:"Rendiciones",tl:"Rendiciones",s:"Facturas y boletas",i:()=>ICO.receipt,ok:()=>true},
   {k:"cl",a:"cl",t:"Check list",tl:"Check list de visitas",s:"Visitas de Control y Gestión",i:()=>ICO.check,ok:()=>true},
-  {k:"ax",a:"axHub",t:"Actas",tl:"Actas de entrega",s:"Viviendas, vehículos y activos",i:()=>TB_ICO_ACTA,ok:()=>true},
+  {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>true},
   {k:"cb",a:"cb",t:"Bodega",tl:"Control de bodega",s:"Conteo contra el stock del sistema",i:()=>ICO.clip,ok:()=>puedeContar()},
   {k:"stock",a:"stock",t:"Stock",tl:"Stock",s:"Existencias desde Finnegans",i:()=>ICO.box,ok:()=>puedeVerStock()},
   {k:"clb",a:"clb",t:"CL bodega",tl:"Check list de bodega",s:"Orden, aseo y seguridad",i:()=>ICO.bodega,ok:()=>true}];
@@ -605,7 +607,7 @@ function mnViv(a){if(!a)return;const c=a.estado==="cerrada",an=!!a.anulada;
   mnHoja(`${a.tipo==="devolucion"?"Recepción":"Entrega"} · ${a.trabajador||"Sin nombre"}`,[fmtD(a.fecha),predioDe(a),a.vivienda].filter(Boolean).join(" · "),ops)}
 function mnAx(a){if(!a)return;const c=a.estado==="cerrada",an=!!a.anulada;
   const ops=[{a:"axPdf",id:a.id,t:"Acta (PDF)"}];
-  if(c&&!esDev(a)&&!an)ops.push(a.devolucionId&&ACTAS[a.devolucionId]?{a:"axOpen",id:a.devolucionId,t:"Ver devolución"}:{a:"axDev",id:a.id,t:"Registrar devolución"});
+  if(c&&!esDev(a)&&!an&&a.tipo!=="capacitacion")ops.push(a.devolucionId&&ACTAS[a.devolucionId]?{a:"axOpen",id:a.devolucionId,t:"Ver devolución"}:{a:"axDev",id:a.id,t:"Registrar devolución"});
   if(!c)ops.push({a:"axDel",id:a.id,t:"Eliminar borrador",d:1});
   if(c&&esAdmin())ops.push(an?{a:"axRest",id:a.id,t:"Restaurar acta"}:{a:"axAnular",id:a.id,t:"Anular acta",d:1});
   mnHoja(`${axTitulo(a)} · ${axQuien(a)}`,[fmtD(a.fecha),axDonde(a)].filter(Boolean).join(" · "),ops)}
@@ -772,7 +774,7 @@ function disBusResultados(q){
   const actas=Object.values(ACTAS).filter(a=>a&&!a.anulada);
   grupo("Actas de vivienda",actas.filter(a=>!esAx(a)&&hit(a.trabajador,a.rut,predioDe(a),a.vivienda,a.tipo==="devolucion"?"devolucion recepcion":"entrega",fmtD(a.fecha))).sort(rec),
     a=>disBusIt(`data-a="open" data-id="${esc(a.id)}"`,ICO.home,`${a.tipo==="devolucion"?"Recepción":"Entrega"} · ${esc(a.trabajador||"Sin nombre")}`,esc([[predioDe(a),a.vivienda].filter(Boolean).join(", "),fmtD(a.fecha)].filter(Boolean).join(" · ")),a.estado==="cerrada"?"":`<span class="xp neu">Borrador</span>`));
-  grupo("Vehículos y activos",actas.filter(a=>esAx(a)&&hit(axTitulo(a),axQuien(a),axDonde(a),fmtD(a.fecha))).sort(rec),
+  grupo("Vehículos, activos y capacitaciones",actas.filter(a=>esAx(a)&&hit(axTitulo(a),axQuien(a),axDonde(a),fmtD(a.fecha))).sort(rec),
     a=>disBusIt(`data-a="axOpen" data-id="${esc(a.id)}"`,TB_ICO_ACTA,`${esc(axTitulo(a))} · ${esc(axQuien(a))}`,esc([axDonde(a),fmtD(a.fecha)].filter(Boolean).join(" · ")),a.estado==="cerrada"?"":`<span class="xp neu">Borrador</span>`));
   grupo("Visitas",Object.values(VIS).filter(v=>v&&!v.anulada&&hit(v.predio,"visita "+v.n,v.revisor,CLK[tipoDe(v)]&&CLK[tipoDe(v)].titulo,fmtD(v.fecha))).sort(rec),
     v=>{const sc=puntaje(v);return disBusIt(`data-a="clAbrir" data-id="${esc(v.id)}"`,tipoDe(v)==="bodega"?ICO.bodega:ICO.check,`Visita ${v.n} · ${esc(v.predio)}`,esc([CLK[tipoDe(v)].titulo,fmtD(v.fecha),v.revisor].filter(Boolean).join(" · ")),v.estado!=="cerrada"?`<span class="xp neu">En curso</span>`:sc.pct!==null?`<b>${sc.pct} %</b>`:"")});
@@ -1041,7 +1043,7 @@ function renderHome(){
   const grp=(tipo,titulo,vacio)=>{const g=L.filter(a=>a.tipo===tipo);return `<h2>${titulo}<span class="cnt">${g.length}</span></h2><div class="list">${g.map(card).join("")||`<div class="empty">${vacio}</div>`}</div>`};
   const hay=Object.keys(ACTAS).length,t=q.trim();
   const rows=grp("entrega","Viviendas entregadas",t?"Ninguna entrega coincide con la búsqueda.":"Todavía no hay entregas.")+grp("devolucion","Viviendas recibidas",t?"Ninguna devolución coincide con la búsqueda.":"Todavía no hay devoluciones.");
-  return band("Actas de vivienda","axHub","Actas de entrega")+`<main class="wrap">
+  return band("Actas de vivienda","axHub","Actas")+`<main class="wrap">
     <h1>Actas de vivienda</h1>
     <p class="lead">Registra el estado de la vivienda al entregarla y al recibirla de vuelta, firma el acta y descarga el informe general (check list + fotos) y el acta por separado.</p>
     <div class="start">
@@ -1804,7 +1806,7 @@ function renderLaunch(){
   return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${cont}
     <h2 class="lx-h2 lx-modh">Módulos</h2>
     <div class="lx-modes lx-mods lx-lista">
-      <button class="lx-mode off" data-a="axHub"><span class="lx-mi">${ICO.home}</span><span class="lx-mt">Actas de entrega</span><span class="lx-md">Viviendas, vehículos y activos fijos: check list, fotos, firmas y PDF.</span><span class="lx-ma">${todasAx.length?`${todasAx.length} ${todasAx.length===1?"acta":"actas"}${nbAx?` · ${nbAx} en borrador`:""}`:"Abrir"} ${ICO.arrow}</span></button>
+      <button class="lx-mode off" data-a="axHub"><span class="lx-mi">${ICO.home}</span><span class="lx-mt">Actas</span><span class="lx-md">Viviendas, vehículos, activos fijos y capacitaciones: fotos, firmas y PDF.</span><span class="lx-ma">${todasAx.length?`${todasAx.length} ${todasAx.length===1?"acta":"actas"}${nbAx?` · ${nbAx} en borrador`:""}`:"Abrir"} ${ICO.arrow}</span></button>
       <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
       ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
       ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
@@ -2617,10 +2619,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=108"></script>
-<script src="modulos/bodega.js?v=108"></script>
-<script src="modulos/rendiciones.js?v=108"></script>
-<script src="modulos/actas-entrega.js?v=108"></script>
+<script src="modulos/checklist.js?v=109"></script>
+<script src="modulos/bodega.js?v=109"></script>
+<script src="modulos/rendiciones.js?v=109"></script>
+<script src="modulos/actas-entrega.js?v=109"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

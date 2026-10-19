@@ -1236,3 +1236,6 @@ html.letra-gr .modal.bsq .bsqs{height:calc(100vh/var(--letra,1));height:calc(100
 .tbnot .lnk{display:inline-block;margin-top:2px;padding:6px 0 2px;font-size:14px}
 .tbnot .sw-t{margin-left:8px}
 .tbnot .sw-t[aria-busy="true"]{opacity:.7}
+
+/* v109: registro de capacitaciones (firma dentro de la fila de cada participante) */
+.sig.cpsig{padding:0;margin:8px 0 0;border:0;background:none;box-shadow:none}
