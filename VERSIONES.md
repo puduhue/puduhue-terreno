@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 117 | 2026-10-19 | [0fa95b3](https://github.com/puduhue/puduhue-terreno/tree/0fa95b3) | colaboradores y aprobadores se editan desde la app (Maestros contables), con el Excel de _maestros al día |
 | 116 | 2026-10-19 | [97a553b](https://github.com/puduhue/puduhue-terreno/tree/97a553b) | la app responde mejor al tocar: los toques ya no se pierden cuando llega la sincronización, botones chicos con más área de toque, «Revisando la foto…» al rendir y visitas más rápidas |
 | 115 | 2026-10-19 | [e21bd39](https://github.com/puduhue/puduhue-terreno/tree/e21bd39) | Rendiciones: «Devolver» siempre activo (sin documentos observados devuelve la rendición completa) y con comentario obligatorio para la persona |
 | 114 | 2026-10-19 | [2a8239e](https://github.com/puduhue/puduhue-terreno/tree/2a8239e) | Rendiciones: agregar varios documentos juntos sin quedarse sin memoria (las lecturas van de a una) y, si falta espacio para una foto, se libera la copia local de fotos ya subidas |
