@@ -12,7 +12,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
   - `checklist.js` (~95 KB): catálogo y MÓDULO: Check list de visitas (con el check list de bodega v58 y los predios v91).
   - `bodega.js` (~55 KB): MÓDULO: Stock y MÓDULO: Control de bodega.
   - `rendiciones.js` (~220 KB): Rendiciones completo, con el fondo por rendir y la lectura de boletas.
-  - `actas-entrega.js` (~80 KB): Actas de entrega de vehículos y activos fijos (v72).
+  - `actas-entrega.js` (~100 KB): Actas de entrega de vehículos y activos fijos (v72) y registro de capacitaciones (v109).
 - `sw.js`: service worker. Guarda la app para abrir sin señal (index.html, estilos.css y los módulos, en la caché de la versión),
   separa las bibliotecas en cachés propias y muestra las notificaciones.
 - `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.18.5 mini (Excel),
@@ -61,7 +61,7 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
 - `rendiciones.js`: 7 fondo por rendir (v94) · 192 botón «Rendir» y tarjeta (v96) · 270 lectura de boletas (v98) · 496 `MÓDULO:
   Rendiciones` (tipos de gasto, maestros, roles) · 665 avisos por correo (v78) y agenda (v84) · 823 link ?rd=, motor contable, lectura
   con IA · 1052 pantallas (v92) · 1580 acciones y PDF (v81) · 1780 OneDrive y Excel mensual.
-- `actas-entrega.js`: 18 textos del acta · 82 devoluciones (v77) · 98 datos comunes · 152 pantallas · 364 eventos · 437 PDF · 625 Excel.
+- `actas-entrega.js` (v109): 18 textos del acta · 68 capacitaciones (v109) · 97 devoluciones (v77) · 113 datos comunes · 181 pantallas · 441 eventos · 536 PDF · 779 Excel.
 
 Funcionamiento general: el estado vive en variables globales (`view`, `cur`, `ACTAS`, `VIS`, `REND`, `MAE`…); `go(vista)` cambia
 de pantalla y `render()` dibuja; los botones llevan `data-a="acción"` y cada módulo los atiende en su sección «Acciones».
