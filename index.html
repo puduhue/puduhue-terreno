@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=112">
+<link rel="stylesheet" href="estilos.css?v=113">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="112";
+const APP_VER="113";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -34,7 +34,7 @@ window.addEventListener("unhandledrejection",e=>{try{const r=e.reason;if(r&&(r.c
 const PREDIOS=["Bellavista","Cadenasso","Casa Anita","Ciruelillo","Coipomó","Mi Tierra","Radales","San Francisco","San Miguel","Tradicional","Tronador"];
 /* v105: Valle Verde salió de la lista (es una planta lechera que recibe leche, no un predio). Un registro antiguo con un predio
    que ya no está en la lista lo sigue mostrando: en las actas, como opción elegida; en el Check list, mientras tenga visitas. */
-const prediosCL=()=>{const x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&!PREDIOS.includes(v.predio))x.add(v.predio)});return PREDIOS.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
+const prediosCL=()=>{const x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&v.tipo!=="camionetas"&&!PREDIOS.includes(v.predio))x.add(v.predio)});return PREDIOS.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
 const optPredioAntiguo=(p,lista)=>p&&p!=="Otro"&&!lista.includes(p)?`<option selected>${esc(p)}</option>`:"";
 /* Cada ítem tiene una clave fija (k) para que las actas guardadas no cambien si se reordena el check list */
 const SECC=[
@@ -499,17 +499,17 @@ const TB_USO_K="actas-uso-mod";
 const TB_ICO_ACTA=`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15.5" r="4"/><path d="M10.9 12.6L19 4.5"/><path d="M15.5 8l2.5 2.5"/><path d="M13.5 10l1.8 1.8"/></svg>`;
 const TB_MODS=[
   {k:"rd",a:"rd",t:"Rendiciones",tl:"Rendiciones",s:"Facturas y boletas",i:()=>ICO.receipt,ok:()=>true},
-  {k:"cl",a:"cl",t:"Check list",tl:"Check list de visitas",s:"Visitas de Control y Gestión",i:()=>ICO.check,ok:()=>true},
+  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas y camionetas",i:()=>ICO.check,ok:()=>true},
   {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>true},
   {k:"cb",a:"cb",t:"Bodega",tl:"Control de bodega",s:"Conteo contra el stock del sistema",i:()=>ICO.clip,ok:()=>puedeContar()},
   {k:"stock",a:"stock",t:"Stock",tl:"Stock",s:"Existencias desde Finnegans",i:()=>ICO.box,ok:()=>puedeVerStock()},
-  {k:"clb",a:"clb",t:"CL bodega",tl:"Check list de bodega",s:"Orden, aseo y seguridad",i:()=>ICO.bodega,ok:()=>true}];
-const TB_RAIZ={launch:1,rd:1,cl:1,axhub:1,cb:1,stock:1};
+  /* v113: los check list de bodega y de camionetas están dentro de «Check list de cumplimiento» */];
+const TB_RAIZ={launch:1,rd:1,clhub:1,cl:1,axhub:1,cb:1,stock:1};
 let TB_ULT=null;
 function tbModDe(v){
   if(v==="launch")return"inicio";
   if(["rd","rdv","rdd","rdm","fdl"].includes(v))return"rd";
-  if(["cl","clp","clv","clcat"].includes(v))return clTipo==="bodega"?"clb":"cl";
+  if(["clhub","cl","clp","clv","clcat"].includes(v))return"cl";
   if(["axhub","axl","axe","home","edit"].includes(v))return"ax";
   if(["cb","cbb","cbv"].includes(v))return"cb";
   if(v==="stock")return"stock";
@@ -521,8 +521,7 @@ function tbContar(k){try{const u=tbUso();u[k]=(u[k]||0)+1;localStorage.setItem(T
 const tbMio=x=>!!(x&&ME&&x.creadoPor&&x.creadoPor.id&&x.creadoPor.id===ME.id);
 const TB_DATOS={
   rd:()=>misRend().length>0||rdParaMi().length>0,
-  cl:()=>Object.values(VIS).some(v=>!v.anulada&&tipoDe(v)==="visitas"&&tbMio(v)),
-  clb:()=>Object.values(VIS).some(v=>!v.anulada&&tipoDe(v)==="bodega"&&tbMio(v)),
+  cl:()=>Object.values(VIS).some(v=>!v.anulada&&tbMio(v)),
   ax:()=>Object.values(ACTAS).some(tbMio),
   cb:()=>Object.values(CONT).some(tbMio)};
 function tbElegidos(){
@@ -648,7 +647,7 @@ function renderADM(){
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       ${lecAdminHTML(lect)}`)}
-    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de visitas / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button></div></div>`)}
+    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de visitas / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
@@ -656,7 +655,7 @@ function renderADM(){
 async function admClick(A,b){
   if(A==="adm"){go("adm");window.scrollTo(0,0);return true}
   if(A==="admSalud"){ADM.salud=null;await admSalud();return true}
-  if(A==="admCat"){clTipo=b.dataset.t==="bodega"?"bodega":"visitas";await clClick("clCat",b);return true}
+  if(A==="admCat"){clTipo=["bodega","camionetas"].includes(b.dataset.t)?b.dataset.t:"visitas";await clClick("clCat",b);return true}
   return false;
 }
 async function mnClick(A,b){
@@ -777,7 +776,7 @@ function disBusResultados(q){
   grupo("Vehículos, activos y capacitaciones",actas.filter(a=>esAx(a)&&hit(axTitulo(a),axQuien(a),axDonde(a),fmtD(a.fecha))).sort(rec),
     a=>disBusIt(`data-a="axOpen" data-id="${esc(a.id)}"`,TB_ICO_ACTA,`${esc(axTitulo(a))} · ${esc(axQuien(a))}`,esc([axDonde(a),fmtD(a.fecha)].filter(Boolean).join(" · ")),a.estado==="cerrada"?"":`<span class="xp neu">Borrador</span>`));
   grupo("Visitas",Object.values(VIS).filter(v=>v&&!v.anulada&&hit(v.predio,"visita "+v.n,v.revisor,CLK[tipoDe(v)]&&CLK[tipoDe(v)].titulo,fmtD(v.fecha))).sort(rec),
-    v=>{const sc=puntaje(v);return disBusIt(`data-a="clAbrir" data-id="${esc(v.id)}"`,tipoDe(v)==="bodega"?ICO.bodega:ICO.check,`Visita ${v.n} · ${esc(v.predio)}`,esc([CLK[tipoDe(v)].titulo,fmtD(v.fecha),v.revisor].filter(Boolean).join(" · ")),v.estado!=="cerrada"?`<span class="xp neu">En curso</span>`:sc.pct!==null?`<b>${sc.pct} %</b>`:"")});
+    v=>{const sc=puntaje(v);return disBusIt(`data-a="clAbrir" data-id="${esc(v.id)}"`,tipoDe(v)==="bodega"?ICO.bodega:tipoDe(v)==="camionetas"?ICO.camioneta:ICO.check,`Visita ${v.n} · ${esc(v.predio)}`,esc([CLK[tipoDe(v)].titulo,fmtD(v.fecha),v.revisor].filter(Boolean).join(" · ")),v.estado!=="cerrada"?`<span class="xp neu">En curso</span>`:sc.pct!==null?`<b>${sc.pct} %</b>`:"")});
   const RV=disRendVisibles();
   grupo("Rendiciones",RV.filter(r=>hit(rdTitulo(r),r.persona&&r.persona.nombre,RD_ESTADO[r.estado])).sort(rec),
     r=>{const n=docsDe(r).length;return disBusIt(`data-a="rdAbrir" data-id="${esc(r.id)}"`,ICO.receipt,`${esc(rdTitulo(r))}${esPropia(r)?"":` · ${esc(r.persona?r.persona.nombre:"")}`}`,`${n} ${n===1?"documento":"documentos"} · ${esc(RD_ESTADO[r.estado]||r.estado)}`,`<b>${fmtP(totalRend(r))}</b>`)});
@@ -996,6 +995,7 @@ function render(){
   const app=$("#app");
   if(!loaded){app.innerHTML=band("Cargando actas…");return}
   if(view==="launch")app.innerHTML=renderLaunch();
+  else if(view==="clhub")app.innerHTML=renderCLHub();
   else if(view==="cl")app.innerHTML=renderCL();
   else if(view==="clp")app.innerHTML=renderCLPredio();
   else if(view==="clcat")app.innerHTML=renderCLCat();
@@ -1043,8 +1043,8 @@ function renderHome(){
   const grp=(tipo,titulo,vacio)=>{const g=L.filter(a=>a.tipo===tipo);return `<h2>${titulo}<span class="cnt">${g.length}</span></h2><div class="list">${g.map(card).join("")||`<div class="empty">${vacio}</div>`}</div>`};
   const hay=Object.keys(ACTAS).length,t=q.trim();
   const rows=grp("entrega","Viviendas entregadas",t?"Ninguna entrega coincide con la búsqueda.":"Todavía no hay entregas.")+grp("devolucion","Viviendas recibidas",t?"Ninguna devolución coincide con la búsqueda.":"Todavía no hay devoluciones.");
-  return band("Actas de vivienda","axHub","Actas")+`<main class="wrap">
-    <h1>Actas de vivienda</h1>
+  return band("Entrega y devolución de viviendas","axHub","Actas")+`<main class="wrap">
+    <h1>Entrega y devolución de viviendas</h1>
     <p class="lead">Registra el estado de la vivienda al entregarla y al recibirla de vuelta, firma el acta y descarga el informe general (check list + fotos) y el acta por separado.</p>
     <div class="start">
       <button class="big ent" data-a="newEnt"><strong>Entregar vivienda</strong><span>La empresa entrega la vivienda al trabajador</span></button>
@@ -1752,6 +1752,7 @@ const ICO={
   phone:`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/><path d="M9.5 10.5l1.8 1.8L15 8.6"/></svg>`,
   cloud:`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1 .5 9H7z"/><path d="M12 13v5"/><path d="M9.5 15.5L12 13l2.5 2.5"/></svg>`,
   bodega:`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5L12 4l9 5.5"/><path d="M5 8.5V20h14V8.5"/><path d="M8.5 20v-7h7v7"/><path d="M8.5 16.5h7"/></svg>`,
+  camioneta:`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16V8a1 1 0 0 1 1-1h9v9"/><path d="M13 10h4l3 3v3h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M9 17h6"/></svg>`,
   arrow:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>`
 };
 function saludo(){const h=new Date().getHours();return h<12?"Buenos días":h<20?"Buenas tardes":"Buenas noches"}
@@ -1762,7 +1763,7 @@ function renderLaunch(){
   const todas=todasAx.filter(a=>!esAx(a));
   const borr=todas.filter(a=>a.estado!=="cerrada").sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
   const visAbL=Object.values(VIS).filter(v=>v.estado!=="cerrada"&&!v.anulada).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
-  const visAbs=["visitas","bodega"].map(t=>visAbL.find(v=>tipoDe(v)===t)).filter(Boolean);
+  const visAbs=["visitas","bodega","camionetas"].map(t=>visAbL.find(v=>tipoDe(v)===t)).filter(Boolean);
   const on=RED==="ok",chk=RED==="checking";
   const sig=chk?`<span class="lx-sig chk">${ICO.wifi}<span>Comprobando señal<i class="dots"></i></span></span>`
            :on?`<span class="lx-sig ok">${ICO.wifi}<span>Con señal</span></span>`
@@ -1797,7 +1798,7 @@ function renderLaunch(){
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${a.id}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
   cont=`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy${ph.length?`<span class="cnt">${ph.length}</span>`:""}</h2>${ph.length?`<div class="lx-conts">${disPh(ph)}</div>`:`<div class="ph-aldia">${EST_ICO.ok}<span>No tienes nada pendiente.</span></div>`}</section>`;
-  const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=prediosCL().reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length,0);
+  const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=prediosCL().reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length,0)+unidadesCL("camionetas").reduce((n,p)=>n+abiertos(p,"camionetas").length,0);
   const resumen=`<section class="lx-sec"><h2 class="lx-h2">Resumen</h2><div class="lx-stats">
     <div><b>${todasAx.length}</b><span>${todasAx.length===1?"acta de entrega":"actas de entrega"}</span></div>
     <div><b>${nv}</b><span>${nv===1?"visita":"visitas"} de check list</span></div>
@@ -1810,7 +1811,7 @@ function renderLaunch(){
       <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
       ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
       ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      ${[["visitas","cl",ICO.check,"Visitas de Control y Gestión por predio, con seguimiento de hallazgos."],["bodega","clb",ICO.bodega,"Orden, aseo y seguridad de la bodega de cada predio, con seguimiento de hallazgos."]].map(([t,act,ico,desc])=>`<button class="lx-mode on" data-a="${act}"><span class="lx-mi">${ico}</span><span class="lx-mt">${CLK[t].titulo}</span><span class="lx-md">${desc}</span><span class="lx-ma">${(()=>{const vs=Object.values(VIS).filter(v=>!v.anulada&&tipoDe(v)===t);const ab=vs.filter(v=>v.estado!=="cerrada").length;const ha=prediosCL().reduce((n,p)=>n+abiertos(p,t).length,0);return vs.length?`${vs.length} ${vs.length===1?"visita":"visitas"}${ab?` · ${ab} en curso`:""}${ha?` · ${ha} hallazgos`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`).join("")}
+      <button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios, bodegas y camionetas, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>
     </div>
   </main>`;
 }
@@ -2594,7 +2595,7 @@ let SWREG=null,UPD_READY=false,UPD_CHECKING=false,UPD_APLICANDO=false,FOTO_T=0;
 function aplicarUpdate(){if(UPD_APLICANDO)return;UPD_APLICANDO=true;flush().then(()=>{try{sessionStorage.setItem("actas-actualizado","1")}catch(e){}location.reload()})}
 /* v104: la app se recarga sola solo en una pantalla de lista, sin diálogos abiertos, sin una foto por elegir (cámara o galería)
    y sin texto a medio escribir. Si no, avisa con la barra y se actualiza al volver a una lista (ver render()). */
-const UPD_VISTAS=["launch","home","cl","clp","rd","cb","cbb","stock","axl","axhub","fdl"];
+const UPD_VISTAS=["launch","home","clhub","cl","clp","rd","cb","cbb","stock","axl","axhub","fdl"];
 document.addEventListener("click",e=>{const t=e.target;if(t&&t.matches&&t.matches('input[type="file"]'))FOTO_T=Date.now()},true);
 document.addEventListener("change",e=>{const t=e.target;if(t&&t.type==="file")FOTO_T=0},true);
 function updSegura(){
@@ -2619,10 +2620,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=112"></script>
-<script src="modulos/bodega.js?v=112"></script>
-<script src="modulos/rendiciones.js?v=112"></script>
-<script src="modulos/actas-entrega.js?v=112"></script>
+<script src="modulos/checklist.js?v=113"></script>
+<script src="modulos/bodega.js?v=113"></script>
+<script src="modulos/rendiciones.js?v=113"></script>
+<script src="modulos/actas-entrega.js?v=113"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

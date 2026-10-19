@@ -1246,3 +1246,7 @@ html.letra-gr .modal.bsq .bsqs{height:calc(100vh/var(--letra,1));height:calc(100
 /* v110: Tipo de documento con cuatro botones (Peaje); en pantallas angostas, dos filas */
 .seg.segtd{grid-template-columns:repeat(4,1fr)}
 @media (max-width:380px){.seg.segtd{grid-template-columns:repeat(2,1fr)}}
+
+/* v113: Check list de camionetas: lo que dice el acta junto al ítem */
+.cment{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 10px}
+.cminfo{margin-top:0}

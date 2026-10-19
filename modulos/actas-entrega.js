@@ -112,11 +112,11 @@ const axTitulo=a=>a.tipo==="capacitacion"?AX.capacitacion.uno:esDev(a)?(a.tipo==
 
 /* ---------- Datos comunes ---------- */
 const AX={
-  vehiculo:{t:"Vehículos",uno:"Acta de entrega de vehículo",corto:"Vehículo",steps:["Datos","Accesorios","Firmas"],excel:"Actas_de_vehiculos.xlsx",pdf:"Acta de entrega de vehículo.pdf",carpeta:"Vehículos",
+  vehiculo:{t:"Vehículos",nom:"Entrega y devolución de vehículos",uno:"Acta de entrega de vehículo",corto:"Vehículo",steps:["Datos","Accesorios","Firmas"],excel:"Actas_de_vehiculos.xlsx",pdf:"Acta de entrega de vehículo.pdf",carpeta:"Vehículos",
     desc:"Acta de entrega y responsabilidad de vehículo de la flota Salfa Rent: identificación, accesorios, documentos, responsabilidades del conductor y firmas."},
-  activo:{t:"Activos fijos",uno:"Registro de entrega de activos",corto:"Activo fijo",steps:["Datos","Activos","Firmas"],excel:"Entregas_de_activos.xlsx",pdf:"Registro de entrega de activos.pdf",carpeta:"Activos fijos",
+  activo:{t:"Activos fijos",nom:"Entrega y devolución de activos fijos",uno:"Registro de entrega de activos",corto:"Activo fijo",steps:["Datos","Activos","Firmas"],excel:"Entregas_de_activos.xlsx",pdf:"Registro de entrega de activos.pdf",carpeta:"Activos fijos",
     desc:"Entrega formal de activos fijos (computadores, celulares, herramientas, equipos) a la persona responsable, con firmas de quien entrega y quien recibe."},
-  capacitacion:{t:"Capacitaciones",uno:"Registro de capacitación",corto:"Capacitación",steps:["Datos","Participantes","Firma y cierre"],excel:"Registro_de_capacitaciones.xlsx",pdf:"Registro de capacitación.pdf",carpeta:"Capacitaciones",
+  capacitacion:{t:"Capacitaciones",nom:"Registro de capacitaciones",uno:"Registro de capacitación",corto:"Capacitación",steps:["Datos","Participantes","Firma y cierre"],excel:"Registro_de_capacitaciones.xlsx",pdf:"Registro de capacitación.pdf",carpeta:"Capacitaciones",
     desc:"Registro de capacitaciones y charlas: tema, relator, predios, horario y la firma de cada participante en el teléfono."}
 };
 let axTipo="vehiculo";
@@ -193,10 +193,10 @@ function renderAxHub(){
     <h1>Actas</h1>
     <p class="lead">Elige qué vas a registrar. Cada acta queda con fotos, firmas en el teléfono y su PDF guardado en OneDrive.</p>
     <div class="start" style="grid-template-columns:1fr">
-      <button class="big ent" data-a="home"><strong>Viviendas</strong><span>Entrega y devolución de casas: check list por ambiente, fotos y firmas.</span><span><b>${cnt(esViv,"acta","actas")}</b></span></button>
-      <button class="big dev" data-a="axList" data-t="vehiculo"><strong>Vehículos</strong><span>${esc(AX.vehiculo.desc)}</span><span><b>${cnt(a=>a.tipo==="vehiculo","acta","actas")}</b></span></button>
-      <button class="big dev" data-a="axList" data-t="activo" style="border-left-color:var(--r-ink)"><strong>Activos fijos</strong><span>${esc(AX.activo.desc)}</span><span><b>${cnt(a=>a.tipo==="activo","entrega","entregas")}</b></span></button>
-      <button class="big ent" data-a="axList" data-t="capacitacion"><strong>Capacitaciones</strong><span>${esc(AX.capacitacion.desc)}</span><span><b>${cnt(a=>a.tipo==="capacitacion","registro","registros")}</b></span></button>
+      <button class="big ent" data-a="home"><strong>Entrega y devolución de viviendas</strong><span>Entrega y devolución de casas: check list por ambiente, fotos y firmas.</span><span><b>${cnt(esViv,"acta","actas")}</b></span></button>
+      <button class="big dev" data-a="axList" data-t="vehiculo"><strong>${AX.vehiculo.nom}</strong><span>${esc(AX.vehiculo.desc)}</span><span><b>${cnt(a=>a.tipo==="vehiculo","acta","actas")}</b></span></button>
+      <button class="big dev" data-a="axList" data-t="activo" style="border-left-color:var(--r-ink)"><strong>${AX.activo.nom}</strong><span>${esc(AX.activo.desc)}</span><span><b>${cnt(a=>a.tipo==="activo","entrega","entregas")}</b></span></button>
+      <button class="big ent" data-a="axList" data-t="capacitacion"><strong>${AX.capacitacion.nom}</strong><span>${esc(AX.capacitacion.desc)}</span><span><b>${cnt(a=>a.tipo==="capacitacion","registro","registros")}</b></span></button>
     </div>
     <div class="pendslot">${slotHTML()}</div>
     <p class="note">Versión ${APP_VER}</p>
@@ -215,8 +215,8 @@ function renderAxList(){
       ${mnBtn("mnAx",a.id,"Opciones del acta de "+axQuien(a))}</div>`};
   const abiertas=L.filter(a=>a.estado!=="cerrada"),cerradas=L.filter(a=>a.estado==="cerrada");
   const CAP=axTipo==="capacitacion";
-  return band(T.t,"axHub","Actas")+`<main class="wrap">
-    <h1>${esc(T.t)}</h1>
+  return band(T.nom,"axHub","Actas")+`<main class="wrap">
+    <h1>${esc(T.nom)}</h1>
     <p class="lead">${esc(T.desc)}</p>
     ${CAP?"":`<p class="note" style="margin:0 0 8px">Para registrar una <b>devolución</b>, abre el acta de entrega cerrada y toca «Registrar devolución».</p>`}
     <div class="start" style="grid-template-columns:1fr"><button class="big ent" data-a="axNew"><strong>${CAP?"Nueva capacitación":axTipo==="vehiculo"?"Entregar vehículo":"Entregar activos"}</strong><span>${CAP?"Registra el tema, el relator y los participantes; cada uno firma en el teléfono.":axTipo==="vehiculo"?"Completa el acta junto al conductor y firmen en el teléfono.":"Registra los activos, quién entrega (Administración) y quién recibe."}</span></button></div>
