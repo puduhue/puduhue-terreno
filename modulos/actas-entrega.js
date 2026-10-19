@@ -4,8 +4,8 @@
    index.html, en su lugar de siempre. El service worker lo guarda junto con index.html. Ver el mapa en CLAUDE.md. */
 /* ============================================================
    Actas de entrega (v72): vehículos y activos fijos, junto a las de vivienda.
-   Se guardan en la misma base de actas (OneDrive: Actas de vivienda/_datos) con tipo "vehiculo" o "activo";
-   sus PDF y fotos van en Actas de vivienda/Vehículos/... y Actas de vivienda/Activos fijos/...
+   Se guardan en la misma base de actas (OneDrive: Actas/_datos) con tipo "vehiculo" o "activo";
+   sus PDF y fotos van en Actas/Vehículos/... y Actas/Activos fijos/... (y desde la v109 Actas/Capacitaciones/...)
    ============================================================ */
 const esViv=a=>!!a&&(a.tipo==="entrega"||a.tipo==="devolucion");
 const esAx=a=>!!a&&(a.tipo==="vehiculo"||a.tipo==="activo"||a.tipo==="capacitacion");

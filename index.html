@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=111">
+<link rel="stylesheet" href="estilos.css?v=112">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="111";
+const APP_VER="112";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -137,7 +137,7 @@ const M365={
   tenant:"8812d491-c151-4cf4-ad03-7671f57a4a23",
   client:"7dbe6da2-d0de-49f1-a4a5-76fe822ce9d0",
   drive:"b!nCeXkUkQakyXzjNEG02DFgw2I-0bYBdJhlmDvTiBzBSTkCzagsNQTbjlr-nZSEjm",
-  root:"01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC",   /* carpeta "Actas de vivienda" */
+  root:"01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC",   /* carpeta "Actas" (hasta el 19-10-2026 «Actas de vivienda»; se ubica por id) */
   cols:{actas:{root:"01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC",sub:"_datos"},visitas:{root:"01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS",sub:"_datos"},conteos:{root:"01RAJ2KQFXDFLPDNY2IJCIZ3BGSVPF74IH",sub:"_datos"},rendiciones:{root:"01RAJ2KQBLDIZGFMASZVCIDO2PGKXQW5VY",sub:"_datos"}},
   scopes:["User.Read","Files.ReadWrite.All"],
   graph:"https://graph.microsoft.com/v1.0"
@@ -205,7 +205,7 @@ async function asegurarCarpetas(){
   if(!out.fotos)throw{code:"not_found"};
   CARPETAS=out;try{localStorage.setItem(CK,JSON.stringify(out))}catch(e){}return out;
 }
-/* Carpeta de un acta: Actas de vivienda/{Predio}/{fecha Tipo Trabajador} */
+/* Carpeta de un acta: Actas/{Predio}/{fecha Tipo Trabajador} */
 const limpiaNombre=t=>String(t||"").normalize("NFC").replace(/[\\/:*?"<>|#%&{}~]/g," ").replace(/\s+/g," ").trim().slice(0,80);
 const carpetaActa=a=>a.tipo==="vehiculo"?["Vehículos",limpiaNombre((a.veh||{}).patente)||"Sin patente",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${a.conductor||"Sin nombre"}`)]
   :a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a.fecha} ${a.tema||"Sin tema"}`)]
@@ -2619,10 +2619,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=111"></script>
-<script src="modulos/bodega.js?v=111"></script>
-<script src="modulos/rendiciones.js?v=111"></script>
-<script src="modulos/actas-entrega.js?v=111"></script>
+<script src="modulos/checklist.js?v=112"></script>
+<script src="modulos/bodega.js?v=112"></script>
+<script src="modulos/rendiciones.js?v=112"></script>
+<script src="modulos/actas-entrega.js?v=112"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
