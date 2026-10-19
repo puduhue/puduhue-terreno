@@ -254,7 +254,7 @@ function disConfHTML(r,d,P,modo){
 }
 function disTipoHTML(d,dis){
   const ok=TIPOS_RENDIR.includes(d.tipo);
-  return `<div class="f"><label id="rdTdL">Tipo de documento</label><div class="seg segtd" id="rdTd" role="radiogroup" aria-labelledby="rdTdL">${TIPOS_RENDIR.map(k=>`<button type="button" role="radio" data-a="disTipo" data-v="${k}" aria-checked="${d.tipo===k}" aria-pressed="${d.tipo===k}" ${dis}>${k==="boleta_honorarios"?"Honorarios":esc(TIPO_DOC[k])}</button>`).join("")}</div>${ok?"":`<span class="hint" style="color:var(--m-ink)">${lecTipoAviso(d)}</span>`}</div>`;
+  return `<div class="f"><label id="rdTdL">Tipo de documento</label><div class="seg segtd" id="rdTd" role="radiogroup" aria-labelledby="rdTdL">${TIPOS_RENDIR.map(k=>`<button type="button" role="radio" data-a="disTipo" data-v="${k}" aria-checked="${d.tipo===k}" aria-pressed="${d.tipo===k}" ${dis}>${k==="boleta_honorarios"?"Honorarios":k==="peaje"?"Peaje":esc(TIPO_DOC[k])}</button>`).join("")}</div>${ok?"":`<span class="hint" style="color:var(--m-ink)">${lecTipoAviso(d)}</span>`}</div>`;
 }
 
 /* ---- 4) rendiciones: ícono del estado a la izquierda y monto a la derecha ---- */
@@ -351,7 +351,7 @@ function timbreDiferencias(d){
 }
 function lecTipoAviso(d){
   if(d.timbre&&!TD_TIPO98[d.timbre.td])return `El timbre del SII dice «${esc(TD_NOMBRE98[d.timbre.td]||"otro documento")}», que no sirve para rendir.`;
-  return `La lectura dice «${esc(TIPO_DOC[d.tipo]||"sin tipo")}», que no sirve para rendir: elige uno o elimina el documento.`;
+  return `La lectura dice «${esc(TIPO_DOC[d.tipo]||"sin tipo")}», que no sirve para rendir: elige uno${d.tipo==="vale"||d.tipo==="otro"?" (si es el ticket de un peaje, «Peaje»)":""} o elimina el documento.`;
 }
 /* factura sin neto ni IVA (p. ej. si se escaneó solo el código: el timbre trae el total, no el desglose). La exenta no lleva IVA. */
 const lecFacturaSinNeto=d=>d.tipo==="factura"&&!(d.timbre&&+d.timbre.td===34)&&!(num(d.neto)>0)&&!(num(d.iva)>0);
@@ -559,9 +559,13 @@ const CATALOGO_DEF=[
 ];
 /* tipos de gasto de las versiones anteriores a la v62 */
 const GASTO_ANT={"Combustible":"combustible","Peajes y estacionamiento":"peajes","Alimentación":"colacion","Alojamiento":"alojamiento","Repuestos y mantención":"mant_maquina","Insumos veterinarios":"otro","Insumos agrícolas":"otro","Ferretería y materiales":"ferreteria","Oficina":"oficina","Otros":"otro"};
-const TIPO_DOC={boleta:"Boleta",factura:"Factura",boleta_honorarios:"Boleta de honorarios",vale:"Ticket / vale / comprobante",otro:"Otro"};
+const TIPO_DOC={boleta:"Boleta",factura:"Factura",boleta_honorarios:"Boleta de honorarios",peaje:"Comprobante de peaje",vale:"Ticket / vale / comprobante",otro:"Otro"};
 /* v79: para rendir solo sirven facturas y boletas; «vale» y «otro» quedan solo para mostrar documentos antiguos */
-const TIPOS_RENDIR=["boleta","factura","boleta_honorarios"];
+const TIPOS_RENDIR=["boleta","factura","boleta_honorarios","peaje"];
+/* v110: el comprobante de peaje solo vale con el tipo de gasto «Peajes / barcaza» */
+const GASTO_PEAJE="peajes";
+const esGastoPeaje=d=>{const c=gastoDe(d);return !!c&&c.id===GASTO_PEAJE};
+const pareceePeaje=t=>/peaje|autopista|autov[ií]a|concesionari|barcaza|transbordador|ruta\s*(5|68|78)|tag\b|p[oó]rtico/i.test(String(t||""));
 const DOCABR={boleta:["BOLETA","BOLETAS"],factura:["FACT","FACTS"],boleta_honorarios:["BH","BH"],vale:["TICKET","TICKETS"],otro:["DOCUMENTO","DOCUMENTOS"]};
 const RD_ESTADO={borrador:"Borrador",enviada:"En revisión de jefatura",revcont:"En revisión contable",aprobada:"Aprobada, por contabilizar",contabilizada:"Contabilizada",observada:"Con observaciones"};
 let REND={},rdv=null,rdd=null,rdTab="mias",MAE=null,MAE_ETAG="";
@@ -848,7 +852,8 @@ function problemasDoc2(r,d){
   const b=[],a=[];
   if(!d.foto)b.push("Falta la foto del documento.");
   if(!(num(d.total)>0))b.push("Falta el total.");
-  if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas y boletas. Cambia el tipo o elimina el documento.`);
+  if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
+  if(d.tipo==="peaje"&&gastoDe(d)&&!esGastoPeaje(d))b.push("Un comprobante de peaje solo se rinde con el tipo de gasto «Peajes / barcaza». Cambia el tipo de gasto o el tipo de documento.");
   /* en facturas y boletas de honorarios el RUT viene impreso y Finnegans lo exige; en boletas es opcional */
   const rutObl=d.tipo==="factura"||d.tipo==="boleta_honorarios";
   if(d.rut&&!rutValido(d.rut)){const c=String(d.rut).replace(/[^0-9kK]/g,"");
@@ -858,11 +863,14 @@ function problemasDoc2(r,d){
   if(d.fecha&&d.fecha>today())b.push("La fecha es futura.");
   if(!centroDoc(r,d))b.push("Falta el centro de costo.");
   if(!gastoDe(d))b.push("Falta el tipo de gasto.");
-  if(d.rut&&d.folio){const igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&String(y.folio).trim()===String(d.folio).trim();const dup=Object.values(REND).some(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual))||Object.values(r.docs||{}).some(igual);if(dup)b.push("Ya existe otro documento con este RUT y número (duplicado).")}
+  if(d.rut&&d.folio){const igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&String(y.folio).trim()===String(d.folio).trim();const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
+    if(otra){const quien_=otra.persona&&otra.persona.nombre||quien(otra.creadoPor)||"otra persona",mia=esMiaR(otra);
+      b.push(`Documento duplicado: esta boleta o factura (mismo RUT y número) ya está en ${mia?"tu rendición":"la rendición de "+quien_} de ${periodoTxt(otra.periodo).toLowerCase()} (${(RD_ESTADO[otra.estado]||otra.estado||"").toLowerCase()}). Debe quedar en una sola rendición: elimínala de una de las dos.`)}
+    else if(Object.values(r.docs||{}).some(igual))b.push("Documento duplicado: esta boleta o factura (mismo RUT y número) está dos veces en esta misma rendición. Elimina una.")}
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
   if(d.lectura&&d.lectura.estado==="error")a.push("La lectura automática falló; los datos quedan como los escribas.");
   if(!d.emisor)a.push("Sin nombre del emisor.");
-  if(d.tipo!=="vale"&&d.tipo!=="otro"){if(!d.rut&&!rutObl)a.push("Sin RUT del emisor.");if(!d.folio)a.push("Sin número de boleta o factura.")}
+  if(d.tipo!=="vale"&&d.tipo!=="otro"&&d.tipo!=="peaje"){if(!d.rut&&!rutObl)a.push("Sin RUT del emisor.");if(!d.folio)a.push("Sin número de boleta o factura.")}
   if(!d.fecha)a.push("Sin fecha.");else{const per=r.periodo;const f=String(d.fecha).slice(0,7);const [y,m]=per.split("-").map(Number);const ant=new Date(y,m-2,1);const antP=`${ant.getFullYear()}-${String(ant.getMonth()+1).padStart(2,"0")}`;if(f!==per&&f!==antP)a.push(`La fecha ${fmtD(d.fecha)} no corresponde al período (${periodoTxt(per)} o el mes anterior).`)}
   if(num(d.neto)>0&&num(d.iva)>0&&Math.abs(num(d.neto)+num(d.iva)-num(d.total))>2)a.push("Neto más IVA no cuadra con el total.");
   timbreDiferencias(d).forEach(x=>a.push(x));
@@ -1041,6 +1049,7 @@ async function leerDoc(r,d){
     if(d.timbre&&!d.revisadoManual)timbreAplicar(d,d.timbre);
     if(d.rut&&!d.gasto){const gh=gastoHistorial(d.rut,d.k);if(gh){d.gasto=gh;d.gastoHist=true}}
     if(x.tipo_gasto&&!d.gasto&&tipos.some(t=>t.id===x.tipo_gasto)){d.gasto=x.tipo_gasto;d.gastoIA=true}
+    if(!d.revisadoManual&&(d.tipo==="vale"||d.tipo==="otro")&&(esGastoPeaje(d)||pareceePeaje([d.emisor,x.glosa].join(" ")))){d.tipo="peaje";if(!d.gasto&&catalogo().some(t=>t.id===GASTO_PEAJE)){d.gasto=GASTO_PEAJE;d.gastoIA=true}}
     lecturaGuardar(d);
     try{const k="rd-lecturas-"+periodoActual();localStorage.setItem(k,String((+localStorage.getItem(k)||0)+1))}catch(e){}
   }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento."};console.warn("lectura",e)}
@@ -1435,7 +1444,7 @@ function rdPick(f){
 function rdSetCampo(f,v){
   if(!rdv||!rdd||rdRO(rdv))return;const contab=puedeContab(rdv);const antes=f==="centro"?centroDoc(rdv,rdd):rdd[f];
   rdd[f]=v;if(f==="centro"){delete rdd.predio;delete rdd.centroSug}
-  if(f==="gasto"){delete rdd.gastoIA;delete rdd.gastoHist;const c=gastoDe(rdd);if(!c||!c.dist)delete rdd.dist}
+  if(f==="gasto"){delete rdd.gastoIA;delete rdd.gastoHist;const c=gastoDe(rdd);if(!c||!c.dist)delete rdd.dist;if((rdd.tipo==="vale"||rdd.tipo==="otro")&&esGastoPeaje(rdd))rdd.tipo="peaje"}
   if(contab&&String(antes||"")!==String(v||"")){rdd.orig=rdd.orig||{};if(!(f in rdd.orig))rdd.orig[f]=antes||""}
   rdd.revisadoManual=true;rdTouch();render();
 }
@@ -1653,8 +1662,9 @@ function rdInput(ev){const t=ev.target;if(!rdv||!rdd)return false;const f=t.data
   const antes=rdd[f];
   if(["total","neto","iva"].includes(f)){const v=t.value.replace(/[^\d]/g,"");rdd[f]=v?+v:0}else rdd[f]=t.value;if(f==="glosa")delete rdd.glosaTimbre;
   if(f==="centro")delete rdd.predio;
-  if(f==="gasto"){delete rdd.gastoIA;delete rdd.gastoHist;const c=gastoDe(rdd);if(!c||!c.dist)delete rdd.dist}
+  if(f==="gasto"){delete rdd.gastoIA;delete rdd.gastoHist;const c=gastoDe(rdd);if(!c||!c.dist)delete rdd.dist;if((rdd.tipo==="vale"||rdd.tipo==="otro")&&esGastoPeaje(rdd))rdd.tipo="peaje"}
   if(contab&&String(antes==null?"":antes)!==String(rdd[f]==null?"":rdd[f])){rdd.orig=rdd.orig||{};if(!(f in rdd.orig))rdd.orig[f]=antes==null?"":antes}
+  if(f==="tipo"&&rdd.tipo==="peaje"&&!rdd.gasto&&catalogo().some(c=>c.id===GASTO_PEAJE))rdd.gasto=GASTO_PEAJE;
   rdd.revisadoManual=true;rdTouch();
   if(f==="fecha"){rdFechaLuego(t);return true}
   if(ev.type==="change")sinPerderFoco(render);else if(["tipo","centro","gasto","bu","dist"].includes(f))render();return true}

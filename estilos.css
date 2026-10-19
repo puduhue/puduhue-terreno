@@ -1242,3 +1242,7 @@ html.letra-gr .modal.bsq .bsqs{height:calc(100vh/var(--letra,1));height:calc(100
 .it.cpc{display:flex;align-items:center;gap:12px}
 .it.cpc .cpf{width:84px;height:38px;object-fit:contain;background:#FFFFFF;border:1px solid var(--line);border-radius:8px;flex:none}
 .it.cpc .cpt{flex:1;min-width:0}.it.cpc .cpt b{display:block;overflow-wrap:anywhere}.it.cpc .cpt span{color:var(--muted);font-size:14px}
+
+/* v110: Tipo de documento con cuatro botones (Peaje); en pantallas angostas, dos filas */
+.seg.segtd{grid-template-columns:repeat(4,1fr)}
+@media (max-width:380px){.seg.segtd{grid-template-columns:repeat(2,1fr)}}
