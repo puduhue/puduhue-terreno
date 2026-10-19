@@ -1656,7 +1656,13 @@ function rdInput(ev){const t=ev.target;if(!rdv||!rdd)return false;const f=t.data
   if(f==="gasto"){delete rdd.gastoIA;delete rdd.gastoHist;const c=gastoDe(rdd);if(!c||!c.dist)delete rdd.dist}
   if(contab&&String(antes==null?"":antes)!==String(rdd[f]==null?"":rdd[f])){rdd.orig=rdd.orig||{};if(!(f in rdd.orig))rdd.orig[f]=antes==null?"":antes}
   rdd.revisadoManual=true;rdTouch();
-  if(ev.type==="change"||["tipo","centro","gasto","fecha","bu","dist"].includes(f))render();return true}
+  if(f==="fecha"){rdFechaLuego(t);return true}
+  if(ev.type==="change")sinPerderFoco(render);else if(["tipo","centro","gasto","bu","dist"].includes(f))render();return true}
+/* v108: la fecha se redibuja al salir del campo. Al escribirla con el teclado (computador), Chrome dispara input/change
+   en cuanto el valor es válido y, entre un número y otro, document.activeElement pasa a <body> sin blur: redibujar ahí
+   devolvía el cursor al mes y la fecha quedaba mal. Respaldo: si en 3 s ya no está en el campo, se redibuja igual. */
+function rdFechaLuego(t){if(t._rdF)return;const fin=()=>{if(!t._rdF)return;clearInterval(t._rdF);t._rdF=0;t.removeEventListener("blur",fin);if(view==="rdd")sinPerderFoco(render)};
+  t._rdF=setInterval(()=>{if(!t.isConnected){clearInterval(t._rdF);t._rdF=0;return}if(document.activeElement!==t&&!t.matches(":focus"))fin()},3000);t.addEventListener("blur",fin)}
 async function rdChange(ev){const t=ev.target;
   if(t.dataset.rdmae){const files=[...t.files];t.value="";if(files.length)await rdMaeCargar(files);return true}
   if(t.dataset.rdr){if(!puedeContab(rdv))return true;const f=t.dataset.rdr;
