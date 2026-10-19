@@ -1250,3 +1250,25 @@ html.letra-gr .modal.bsq .bsqs{height:calc(100vh/var(--letra,1));height:calc(100
 /* v113: Check list de camionetas: lo que dice el acta junto al ítem */
 .cment{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 10px}
 .cminfo{margin-top:0}
+
+/* v116: área de toque más grande en los controles chicos, sin cambiar cómo se ven */
+.lnk,.fb,.hzf,.smsc,.tipx,.lx-tema,.lx-sig{position:relative}
+.lnk::after,.fb::after,.hzf::after,.smsc::after,.tipx::after,.lx-tema::after,.lx-sig::after,.sw-t::after{content:"";position:absolute;inset:-8px 0}
+/* v116: en una visita, el navegador acomoda solo los ítems que están a la vista (los demás cuando se llega a ellos):
+   abrir la visita y cambiar de área era lo más lento de la app. «auto» recuerda el alto real de cada ítem ya visto.
+   Solo donde el navegador corrige solo los saltos al cambiar de alto lo de arriba (overflow-anchor: Chrome/Android; Safari no),
+   y no en los ítems achicados (se reemplazan al pasar al siguiente y la pantalla se corrige con su alto real). */
+@supports (overflow-anchor:auto){.cli{content-visibility:auto;contain-intrinsic-size:auto 220px}.cli.cli-corto{content-visibility:visible}}
+/* v116: en botones y campos el navegador no espera a ver si es un doble toque para hacer zoom (el zoom con dos dedos sigue) */
+button,a,label,select,input,textarea,[data-a],[role="button"]{touch-action:manipulation}
+/* v116: en el teléfono, el botón se aclara al apretarlo (se nota que tomó el toque) */
+@media (hover:none){.btn:active,.big:active,.fb:active,.hzf:active,.smsc:active,.back:active,.seg button:active,.tbop:active,.lx-cont:active,.row:active,#tabbar button:active,.vmenu:active{opacity:.7}}
+
+/* v116: «Revisando la foto…» al rendir, a la vista enseguida */
+.proc{position:fixed;inset:0;z-index:25;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(10,20,30,.45);animation:fabIn .15s ease-out}
+.procc{background:var(--card);color:var(--ink);border-radius:18px;padding:20px 22px;width:min(300px,100%);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.procc img{width:120px;height:150px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--soft)}
+.procc .procpdf{display:flex;align-items:center;justify-content:center;width:96px;height:120px;border-radius:10px;border:1px solid var(--line);background:var(--soft);font-weight:700;color:var(--muted)}
+.procc b{display:flex;align-items:center;gap:8px;font-size:17px}
+.procc .procs{font-size:14px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.proc{animation:none}}

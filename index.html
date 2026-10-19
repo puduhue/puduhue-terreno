@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=115">
+<link rel="stylesheet" href="estilos.css?v=116">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="115";
+const APP_VER="116";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -102,6 +102,16 @@ const isoLocal=x=>{if(typeof x==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(x))return 
    (se cerraba el teclado y lo escrito se perdía) o el toque del botón no llegaba. sinPerderFoco(fn) espera a que termine
    el toque, corre fn y devuelve el cursor al campo activo (por id o por sus atributos data-*). */
 let PTR_ABAJO=0;document.addEventListener("pointerdown",()=>{PTR_ABAJO=Date.now()},true);
+/* v116: lo que se redibuja solo (llegan datos de la sincronización) espera a que se levante el dedo: si la pantalla se redibuja
+   mientras se aprieta un botón, ese toque se pierde */
+let TOQUE_ON=false,TOQUE_FIN=0,RF_T=0;
+document.addEventListener("pointerdown",()=>{TOQUE_ON=true},true);
+["pointerup","pointercancel"].forEach(t=>document.addEventListener(t,()=>{TOQUE_ON=false;TOQUE_FIN=Date.now()},true));
+function renderFondo(){clearTimeout(RF_T);const ahora=Date.now();
+  const esp=TOQUE_ON&&ahora-PTR_ABAJO<4000?150:Math.max(0,TOQUE_FIN+450-ahora);
+  if(esp>0){RF_T=setTimeout(renderFondo,esp);return}render()}
+/* v116: cálculos que se repiten mucho al dibujar: los hallazgos de un predio se calculan una vez por dibujo */
+let RENDER_MEMO=null;
 ["pointerup","pointercancel"].forEach(e=>document.addEventListener(e,()=>setTimeout(()=>{PTR_ABAJO=0},0),true));
 function selCampo(a){if(!a||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return null;if(a.id)return"#"+CSS.escape(a.id);
   const d=Object.keys(a.dataset);if(!d.length)return null;return a.tagName.toLowerCase()+d.map(k=>`[data-${k.replace(/[A-Z]/g,m=>"-"+m.toLowerCase())}="${CSS.escape(a.dataset[k])}"]`).join("")}
@@ -252,9 +262,9 @@ async function pull(manual){
   try{
     while(syncing)await new Promise(r=>setTimeout(r,200)); /* v106 (M-02): un solo candado para bajar y subir */
     let cambios=0;for(const col of Object.keys(M365.cols)){const c=await pullCol(col);cambios+=c;if(c||manual)emitir(col)}
-    try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")render()}}catch(e){console.warn("catálogo",e)}
-    try{if(await stockPull()&&(view==="stock"||view==="launch"))render()}catch(e){console.warn("stock",e)}
-    try{if(await rdMaePull()&&/^rd/.test(view))render()}catch(e){console.warn("maestros rendiciones",e)}
+    try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")renderFondo()}}catch(e){console.warn("catálogo",e)}
+    try{if(await stockPull()&&(view==="stock"||view==="launch"))renderFondo()}catch(e){console.warn("stock",e)}
+    try{if(await rdMaePull()&&/^rd/.test(view))renderFondo()}catch(e){console.warn("maestros rendiciones",e)}
     if(CAT_PEND&&esAdmin())await guardarCatalogo(false);
     guardarEtags();SYNC_INFO.ultima=new Date().toISOString();SYNC_INFO.error="";if(noWrite){noWrite=false;schedSync(1000)} /* v106 (A-03) */try{localStorage.setItem(LK,SYNC_INFO.ultima)}catch(e){}
     if(manual)toast(cambios?`Actualizado: ${cambios} ${cambios===1?"registro":"registros"} con cambios.`:"Todo al día.");
@@ -993,7 +1003,8 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}">${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${MARCA}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
-function render(){
+function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null}}
+function renderPantalla(){
   if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
   const app=$("#app");
   if(!loaded){app.innerHTML=band("Cargando actas…");return}
@@ -2552,21 +2563,21 @@ async function init(){
       for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="rendiciones")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==rdv){delete LOCAL[id];localDel(id)}}
       DELQ.forEach(id=>{if(id.startsWith("rendiciones/"))delete n[id.slice(12)]});
       if(rdv){if(editaPersona(rdv))n[rdv.id]=rdv;else if(n[rdv.id]){rdv=n[rdv.id];if(rdd)rdd=rdv.docs&&rdv.docs[rdd.k]||null}}REND=n;
-      if(loaded){if(view==="rd"||view==="launch"||view==="rdv"||view==="rdd"||view==="rdm")render();else status();abrirEnlace()}
+      if(loaded){if(view==="rd"||view==="launch"||view==="rdv"||view==="rdd"||view==="rdm")renderFondo();else status();abrirEnlace()}
     },e=>{});
     DB.collection("conteos").onSnapshot(sn=>{
       const n={};sn.docs.forEach(x=>{n[x.id]=Object.assign(JSON.parse(JSON.stringify(x.data()||{})),{id:x.id,_col:"conteos"})});
       for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="conteos")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==cbv){delete LOCAL[id];localDel(id)}}
       DELQ.forEach(id=>{if(id.startsWith("conteos/"))delete n[id.slice(8)]});
       if(cbv)n[cbv.id]=cbv;CONT=n;
-      if(loaded){if(view==="cb"||view==="cbb"||view==="launch")render();else status()}
+      if(loaded){if(view==="cb"||view==="cbb"||view==="launch")renderFondo();else status()}
     },e=>{});
     DB.collection("visitas").onSnapshot(sn=>{
       const n={};sn.docs.forEach(x=>{n[x.id]=Object.assign(JSON.parse(JSON.stringify(x.data()||{})),{id:x.id,_col:"visitas"})});
       for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="visitas")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==clv){delete LOCAL[id];localDel(id)}}
       DELQ.forEach(id=>{if(id.startsWith("visitas/"))delete n[id.slice(8)]});
       if(clv)n[clv.id]=clv;VIS=n;
-      if(loaded){if(view==="cl"||view==="clp"||view==="launch")render();else status()}
+      if(loaded){if(view==="cl"||view==="clp"||view==="launch")renderFondo();else status()}
     },e=>{});
     await new Promise(res=>{let first=true;const done=()=>{if(first){first=false;res()}};
       DB.collection("actas").onSnapshot(sn=>{
@@ -2574,7 +2585,7 @@ async function init(){
         for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col==="visitas"||l._col==="conteos"||l._col==="rendiciones")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==cur){delete LOCAL[id];localDel(id)}}
         DELQ.forEach(id=>{if(!id.includes("/"))delete n[id]});
         if(cur)n[cur.id]=cur;ACTAS=n;
-        if(first)done();else if(view!=="edit"&&view!=="axe")render();else status();
+        if(first)done();else if(["launch","home","axhub","axl","cl"].includes(view))renderFondo();else status(); /* v116: solo las pantallas que muestran actas */
       },e=>{done()});
       setTimeout(done,8000);
     });
@@ -2623,10 +2634,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=115"></script>
-<script src="modulos/bodega.js?v=115"></script>
-<script src="modulos/rendiciones.js?v=115"></script>
-<script src="modulos/actas-entrega.js?v=115"></script>
+<script src="modulos/checklist.js?v=116"></script>
+<script src="modulos/bodega.js?v=116"></script>
+<script src="modulos/rendiciones.js?v=116"></script>
+<script src="modulos/actas-entrega.js?v=116"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
