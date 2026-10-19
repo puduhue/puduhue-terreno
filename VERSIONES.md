@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 114 | 2026-10-19 | [2a8239e](https://github.com/puduhue/puduhue-terreno/tree/2a8239e) | Rendiciones: agregar varios documentos juntos sin quedarse sin memoria (las lecturas van de a una) y, si falta espacio para una foto, se libera la copia local de fotos ya subidas |
 | 113 | 2026-10-19 | [1f6a654](https://github.com/puduhue/puduhue-terreno/tree/1f6a654) | módulo «Check list de cumplimiento» (visitas a predios, bodegas y camionetas) con el check list de camionetas aparte, una revisión por patente con los puntos del acta de entrega; nombres más específicos en Actas |
 | 112 | 2026-10-19 | [6bf5a0c](https://github.com/puduhue/puduhue-terreno/tree/6bf5a0c) | estado de las camionetas en el check list de visitas, con botones para marcar las patentes con problemas |
 | 111 | 2026-10-19 | [45c6c5b](https://github.com/puduhue/puduhue-terreno/tree/45c6c5b) | una rendición nueva sin documentos ya no queda como borrador; las vacías que ya había se borran al volver a la lista |
