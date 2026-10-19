@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 112 | 2026-10-19 | [6bf5a0c](https://github.com/puduhue/puduhue-terreno/tree/6bf5a0c) | estado de las camionetas en el check list de visitas, con botones para marcar las patentes con problemas |
 | 111 | 2026-10-19 | [45c6c5b](https://github.com/puduhue/puduhue-terreno/tree/45c6c5b) | una rendición nueva sin documentos ya no queda como borrador; las vacías que ya había se borran al volver a la lista |
 | 110 | 2026-10-19 | [1d0a092](https://github.com/puduhue/puduhue-terreno/tree/1d0a092) | peajes en Rendiciones (tipo «Peaje», solo con el gasto «Peajes / barcaza») y el aviso de documento duplicado dice con qué rendición choca |
 | 109 | 2026-10-19 | [bccecee](https://github.com/puduhue/puduhue-terreno/tree/bccecee) | registro de capacitaciones en Actas (la pantalla «Actas de entrega» pasa a «Actas»): participantes con RUT y firma en el teléfono, PDF con el formato de Control de Gestión y Excel consolidado |
