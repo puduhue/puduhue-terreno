@@ -1,4 +1,4 @@
-/* Puduhue Terreno: módulo Actas de entrega (vehículos y activos fijos) (desde la v103 vive en este archivo, aparte de index.html).
+/* Puduhue Terreno: módulo Actas de entrega (vehículos y activos fijos; desde la v109 también el registro de capacitaciones) (desde la v103 vive en este archivo, aparte de index.html).
    Se carga como script normal después del código general de index.html y antes del arranque (init()), así que comparte
    las mismas variables y funciones globales. Sus escuchadores globales (document/window.addEventListener) quedaron en
    index.html, en su lugar de siempre. El service worker lo guarda junto con index.html. Ver el mapa en CLAUDE.md. */
@@ -8,7 +8,7 @@
    sus PDF y fotos van en Actas de vivienda/Vehículos/... y Actas de vivienda/Activos fijos/...
    ============================================================ */
 const esViv=a=>!!a&&(a.tipo==="entrega"||a.tipo==="devolucion");
-const esAx=a=>!!a&&(a.tipo==="vehiculo"||a.tipo==="activo");
+const esAx=a=>!!a&&(a.tipo==="vehiculo"||a.tipo==="activo"||a.tipo==="capacitacion");
 /* Quien entrega por la empresa: cualquier persona de Administración (colaboradores de Rendiciones con centro Indirectos Administración) */
 const ADM_CENTRO="9-0-8-90";
 function personasAdm(){try{return colabs().filter(c=>c&&c.activo!==false&&c.centro===ADM_CENTRO&&c.nombre).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es"))}catch(e){return[]}}
@@ -65,6 +65,21 @@ function actCompromiso(a){
   return `A: ${a.recibe||"______________________________"}, quien ocupa el cargo de: ${a.cargo||"____________________"}, quien como responsable adquiere el compromiso de informar cualquier tipo de novedad que suceda con dicho (s) activo (s), como daño, necesidad de mantenimiento preventivo, movimiento importante a otro lugar o persona; a quien corresponda del proceso de Activos Fijos.`;
 }
 
+/* ---------- Registro de capacitaciones (v109): formato en papel de Control de Gestión ---------- */
+const CAP_VER=[["Versión","01","Fecha","01-07-2026"],["Revisión","02","Fecha","01-07-2026"]];
+const capPredios=a=>(a.predios||[]).map(p=>p==="Otro"?(String(a.predioOtro||"").trim()||"Otro"):p).filter(Boolean);
+const capMin=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?(+m[1])*60+(+m[2]):null};
+const capMinutos=a=>{const i=capMin(a.inicio),f=capMin(a.fin);return i==null||f==null||f<=i?0:f-i};
+const capDur=a=>{const d=capMinutos(a);return !d?"":d<60?d+" min":Math.floor(d/60)+" h"+(d%60?" "+d%60+" min":"")};
+const capFirma=(a,p)=>((a.firmas||{})["p_"+p.id]||{});
+/* participantes con algún dato (una fila vacía no cuenta) */
+const capUsados=a=>(a.participantes||[]).filter(p=>p.nombre||p.rut||p.cargo||capFirma(a,p).img);
+/* nombres que se sugieren: colaboradores de Rendiciones y participantes de capacitaciones anteriores, con su RUT y cargo */
+function capConocidos(){const M={};try{colabs().forEach(c=>{if(c&&c.nombre&&c.activo!==false)M[c.nombre.trim().toLowerCase()]={nombre:c.nombre.trim(),rut:c.rut||"",cargo:""}})}catch(e){}
+  Object.values(ACTAS).filter(a=>a.tipo==="capacitacion"&&!a.anulada&&a!==cur).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).forEach(a=>(a.participantes||[]).forEach(p=>{if(!p.nombre)return;
+    const k=p.nombre.trim().toLowerCase(),o=M[k]||{nombre:p.nombre.trim(),rut:"",cargo:""};if(p.rut&&rutOk(p.rut))o.rut=p.rut;if(p.cargo)o.cargo=p.cargo;M[k]=o}));
+  return M}
+
 /* v77: en el check list de visitas, las actas de vehículo del predio junto al grupo «Camionetas» */
 function camionetasPanel(v){
   const pre=v&&v.predio;if(!pre)return"";
@@ -93,27 +108,41 @@ function nuevaAxDev(e){
     antes:{acc:Object.assign({},e.acc),docs:Object.assign({},e.docs),llavesN:e.llavesN||"",estadoDesc:e.estadoDesc||"",km:(e.veh||{}).km||""},firmas:{conductor:{nombre:e.conductor||""}}});
   return Object.assign(base,{recibe:e.recibe||"",rutRecibe:e.rutRecibe||"",cargo:e.cargo||"",activos:(e.activos||[]).filter(x=>x.tipo||x.marca||x.ref).map(x=>Object.assign({},x,{devuelto:"",estadoDev:"",obsDev:""})),obs:"",firmas:{recibe:{nombre:e.recibe||""}}});
 }
-const axTitulo=a=>esDev(a)?(a.tipo==="vehiculo"?"Acta de devolución de vehículo":"Registro de devolución de activos"):AX[a.tipo].uno;
+const axTitulo=a=>a.tipo==="capacitacion"?AX.capacitacion.uno:esDev(a)?(a.tipo==="vehiculo"?"Acta de devolución de vehículo":"Registro de devolución de activos"):AX[a.tipo].uno;
 
 /* ---------- Datos comunes ---------- */
 const AX={
   vehiculo:{t:"Vehículos",uno:"Acta de entrega de vehículo",corto:"Vehículo",steps:["Datos","Accesorios","Firmas"],excel:"Actas_de_vehiculos.xlsx",pdf:"Acta de entrega de vehículo.pdf",carpeta:"Vehículos",
     desc:"Acta de entrega y responsabilidad de vehículo de la flota Salfa Rent: identificación, accesorios, documentos, responsabilidades del conductor y firmas."},
   activo:{t:"Activos fijos",uno:"Registro de entrega de activos",corto:"Activo fijo",steps:["Datos","Activos","Firmas"],excel:"Entregas_de_activos.xlsx",pdf:"Registro de entrega de activos.pdf",carpeta:"Activos fijos",
-    desc:"Entrega formal de activos fijos (computadores, celulares, herramientas, equipos) a la persona responsable, con firmas de quien entrega y quien recibe."}
+    desc:"Entrega formal de activos fijos (computadores, celulares, herramientas, equipos) a la persona responsable, con firmas de quien entrega y quien recibe."},
+  capacitacion:{t:"Capacitaciones",uno:"Registro de capacitación",corto:"Capacitación",steps:["Datos","Participantes","Firma y cierre"],excel:"Registro_de_capacitaciones.xlsx",pdf:"Registro de capacitación.pdf",carpeta:"Capacitaciones",
+    desc:"Registro de capacitaciones y charlas: tema, relator, predios, horario y la firma de cada participante en el teléfono."}
 };
 let axTipo="vehiculo";
 function nuevaAx(tipo){
   const base={id:uid(),tipo,creadoPor:yo(),fecha:today(),predio:"",predioOtro:"",items:{},firmas:{},estado:"borrador",creado:new Date().toISOString(),actualizado:new Date().toISOString()};
   if(tipo==="vehiculo")return Object.assign(base,{ciudad:"",conductor:"",rut:"",veh:{tipoVeh:"Camioneta"},acc:{},llavesN:"",docs:{},estadoDesc:"",observaciones:""});
+  if(tipo==="capacitacion"){const d=new Date(),hh=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"),yo_=ME?ME.nombre||"":"";
+    return Object.assign(base,{realizadaPor:yo_,inicio:hh,fin:"",predios:[],predioOtro:"",tema:"",detalle:"",participantes:[{id:uid().slice(-6)}],firmas:{relator:{nombre:yo_}}})}
   return Object.assign(base,{recibe:"",rutRecibe:"",cargo:"",activos:[{id:uid().slice(-6),estado:""}],obs:""});
 }
-function prepAx(a){if(!a.items)a.items={};if(!a.firmas)a.firmas={};if(a.tipo==="vehiculo"){a.veh=a.veh||{};a.acc=a.acc||{};a.docs=a.docs||{}}else{a.activos=a.activos||[]}return a}
-const axQuien=a=>a.tipo==="vehiculo"?(a.conductor||"Sin conductor"):(a.recibe||"Sin nombre");
-const axDonde=a=>a.tipo==="vehiculo"?[(a.veh||{}).patente,[(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "),predioDe(a)].filter(Boolean).join(" · "):[(a.activos||[]).filter(x=>x.tipo).map(x=>x.tipo).join(", "),predioDe(a)].filter(Boolean).join(" · ");
-const axEntrega=a=>{const f=(a.firmas||{})[a.tipo==="vehiculo"?"empresa":"entrega"]||{};return f.nombre||""};
+function prepAx(a){if(!a.items)a.items={};if(!a.firmas)a.firmas={};if(a.tipo==="vehiculo"){a.veh=a.veh||{};a.acc=a.acc||{};a.docs=a.docs||{}}else if(a.tipo==="capacitacion"){a.predios=a.predios||[];a.participantes=a.participantes||[]}else{a.activos=a.activos||[]}return a}
+const axQuien=a=>a.tipo==="capacitacion"?(String(a.tema||"").trim()||"Sin tema"):a.tipo==="vehiculo"?(a.conductor||"Sin conductor"):(a.recibe||"Sin nombre");
+const axDonde=a=>a.tipo==="capacitacion"?[capPredios(a).join(", "),(n=>n?n+(n===1?" participante":" participantes"):"")(capUsados(a).length)].filter(Boolean).join(" · "):a.tipo==="vehiculo"?[(a.veh||{}).patente,[(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "),predioDe(a)].filter(Boolean).join(" · "):[(a.activos||[]).filter(x=>x.tipo).map(x=>x.tipo).join(", "),predioDe(a)].filter(Boolean).join(" · ");
+const axEntrega=a=>{const f=(a.firmas||{})[a.tipo==="vehiculo"?"empresa":a.tipo==="capacitacion"?"relator":"entrega"]||{};return f.nombre||""};
 function axFaltantes(a){
   const m=[];prepAx(a);
+  if(a.tipo==="capacitacion"){
+    if(!a.fecha)m.push("Fecha");if(!String(a.realizadaPor||"").trim())m.push("Realizada por (relator)");
+    if(!a.inicio)m.push("Hora de inicio");if(!a.fin)m.push("Hora de término");else if(a.inicio&&!capMinutos(a))m.push("Hora de término posterior al inicio");
+    if(!capPredios(a).length)m.push("Predios");if(!String(a.tema||"").trim())m.push("Tema de la capacitación");
+    const P=capUsados(a);if(!P.length)m.push("Al menos un participante");
+    P.forEach((p,i)=>{const n=String(p.nombre||"").trim()||`Participante ${i+1}`;if(!String(p.nombre||"").trim())m.push(`Participante ${i+1}: nombre`);
+      if(!p.rut||!rutOk(p.rut))m.push(`${n}: RUT válido`);if(!capFirma(a,p).img)m.push(`${n}: firma`)});
+    if(!((a.firmas||{}).relator||{}).img)m.push("Firma del relator");
+    return m;
+  }
   if(esDev(a)){
     if(!a.fecha)m.push("Fecha");
     if(a.tipo==="vehiculo"){if(!a.ciudad)m.push("Lugar (ciudad) de la devolución");const kd=+String(a.kmDev||"").replace(/[^0-9]/g,""),ke=+String((a.antes||{}).km||"").replace(/[^0-9]/g,"");
@@ -160,13 +189,14 @@ function renderAxHub(){
   const todas=Object.values(ACTAS).filter(a=>!a.anulada);
   const n=f=>todas.filter(f).length,nb=f=>todas.filter(a=>f(a)&&a.estado!=="cerrada").length;
   const cnt=(f,uno,varios)=>{const t=n(f),b=nb(f);return t?`${t} ${t===1?uno:varios}${b?` · ${b} en borrador`:""}`:"Sin registros todavía"};
-  return band("Actas de entrega")+`<main class="wrap">
-    <h1>Actas de entrega</h1>
-    <p class="lead">Elige qué vas a entregar. Cada acta queda con fotos, firmas en el teléfono y su PDF guardado en OneDrive.</p>
+  return band("Actas")+`<main class="wrap">
+    <h1>Actas</h1>
+    <p class="lead">Elige qué vas a registrar. Cada acta queda con fotos, firmas en el teléfono y su PDF guardado en OneDrive.</p>
     <div class="start" style="grid-template-columns:1fr">
       <button class="big ent" data-a="home"><strong>Viviendas</strong><span>Entrega y devolución de casas: check list por ambiente, fotos y firmas.</span><span><b>${cnt(esViv,"acta","actas")}</b></span></button>
       <button class="big dev" data-a="axList" data-t="vehiculo"><strong>Vehículos</strong><span>${esc(AX.vehiculo.desc)}</span><span><b>${cnt(a=>a.tipo==="vehiculo","acta","actas")}</b></span></button>
       <button class="big dev" data-a="axList" data-t="activo" style="border-left-color:var(--r-ink)"><strong>Activos fijos</strong><span>${esc(AX.activo.desc)}</span><span><b>${cnt(a=>a.tipo==="activo","entrega","entregas")}</b></span></button>
+      <button class="big ent" data-a="axList" data-t="capacitacion"><strong>Capacitaciones</strong><span>${esc(AX.capacitacion.desc)}</span><span><b>${cnt(a=>a.tipo==="capacitacion","registro","registros")}</b></span></button>
     </div>
     <div class="pendslot">${slotHTML()}</div>
     <p class="note">Versión ${APP_VER}</p>
@@ -175,26 +205,27 @@ function renderAxHub(){
 let axQ="";
 function renderAxList(){
   const T=AX[axTipo],t=axQ.trim().toLowerCase();
-  const L=Object.values(ACTAS).filter(a=>a.tipo===axTipo).filter(a=>!t||[axQuien(a),axDonde(a),a.rut,a.rutRecibe,axEntrega(a)].join(" ").toLowerCase().includes(t)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
+  const L=Object.values(ACTAS).filter(a=>a.tipo===axTipo).filter(a=>!t||[axQuien(a),axDonde(a),a.rut,a.rutRecibe,axEntrega(a),a.tipo==="capacitacion"?(a.participantes||[]).map(p=>p.nombre).join(" "):""].join(" ").toLowerCase().includes(t)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
   const card=a=>{const c=a.estado==="cerrada",an=!!a.anulada,f=axFaltantes(a).length;
     return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="axOpen" data-id="${a.id}">
       <span class="tag ${an?"none":c?"cerrada":"borrador"}">${an?"Anulada":c?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(axQuien(a))}</span><span class="when">${fmtD(a.fecha)}</span>
-      <span class="where">${esDev(a)?"<b>Devolución</b> · ":""}${esc(axDonde(a)||"Sin datos")}</span><span class="st">${c?(esDev(a)?(axEntrega(a)?"Recibió "+esc(axEntrega(a)):""):a.devolucionId&&ACTAS[a.devolucionId]?(ACTAS[a.devolucionId].estado==="cerrada"?"Devuelto el "+fmtD(ACTAS[a.devolucionId].fecha):"Devolución en borrador"):axEntrega(a)?"Entregó "+esc(axEntrega(a)):""):`${f} ${f===1?"dato pendiente":"datos pendientes"}`}</span>
+      <span class="where">${esDev(a)?"<b>Devolución</b> · ":""}${esc(axDonde(a)||"Sin datos")}</span><span class="st">${c&&a.tipo==="capacitacion"?(axEntrega(a)?"Relator: "+esc(axEntrega(a)):""):c?(esDev(a)?(axEntrega(a)?"Recibió "+esc(axEntrega(a)):""):a.devolucionId&&ACTAS[a.devolucionId]?(ACTAS[a.devolucionId].estado==="cerrada"?"Devuelto el "+fmtD(ACTAS[a.devolucionId].fecha):"Devolución en borrador"):axEntrega(a)?"Entregó "+esc(axEntrega(a)):""):`${f} ${f===1?"dato pendiente":"datos pendientes"}`}</span>
       <span class="by">${chipSync(a)}${an?` <span class="aut">Anulada el ${fmtD(a.anulada.fecha)} por ${esc(quien(a.anulada.por))}${a.anulada.motivo?`: ${esc(a.anulada.motivo)}`:""}</span>`:autoriaTxt(a)?` <span class="aut">${autoriaHTML(a)}</span>`:""}</span></button>
       ${mnBtn("mnAx",a.id,"Opciones del acta de "+axQuien(a))}</div>`};
   const abiertas=L.filter(a=>a.estado!=="cerrada"),cerradas=L.filter(a=>a.estado==="cerrada");
-  return band(T.t,"axHub","Actas de entrega")+`<main class="wrap">
+  const CAP=axTipo==="capacitacion";
+  return band(T.t,"axHub","Actas")+`<main class="wrap">
     <h1>${esc(T.t)}</h1>
     <p class="lead">${esc(T.desc)}</p>
-    <p class="note" style="margin:0 0 8px">Para registrar una <b>devolución</b>, abre el acta de entrega cerrada y toca «Registrar devolución».</p>
-    <div class="start" style="grid-template-columns:1fr"><button class="big ent" data-a="axNew"><strong>${axTipo==="vehiculo"?"Entregar vehículo":"Entregar activos"}</strong><span>${axTipo==="vehiculo"?"Completa el acta junto al conductor y firmen en el teléfono.":"Registra los activos, quién entrega (Administración) y quién recibe."}</span></button></div>
+    ${CAP?"":`<p class="note" style="margin:0 0 8px">Para registrar una <b>devolución</b>, abre el acta de entrega cerrada y toca «Registrar devolución».</p>`}
+    <div class="start" style="grid-template-columns:1fr"><button class="big ent" data-a="axNew"><strong>${CAP?"Nueva capacitación":axTipo==="vehiculo"?"Entregar vehículo":"Entregar activos"}</strong><span>${CAP?"Registra el tema, el relator y los participantes; cada uno firma en el teléfono.":axTipo==="vehiculo"?"Completa el acta junto al conductor y firmen en el teléfono.":"Registra los activos, quién entrega (Administración) y quién recibe."}</span></button></div>
     <div class="pendslot">${slotHTML()}</div>
-    ${L.length?`<input class="search" id="axq" type="search" placeholder="${axTipo==="vehiculo"?"Buscar conductor, patente o predio":"Buscar persona, activo o predio"}" value="${esc(axQ)}" style="margin-top:22px">`:""}
+    ${L.length?`<input class="search" id="axq" type="search" placeholder="${CAP?"Buscar tema, relator o predio":axTipo==="vehiculo"?"Buscar conductor, patente o predio":"Buscar persona, activo o predio"}" value="${esc(axQ)}" style="margin-top:22px">`:""}
     <div id="axlists"><h2>En borrador<span class="cnt">${abiertas.length}</span></h2><div class="list">${abiertas.map(card).join("")||`<div class="empty">No hay borradores.</div>`}</div>
-    <h2>Cerradas<span class="cnt">${cerradas.length}</span></h2><div class="list">${cerradas.map(card).join("")||`<div class="empty">${t?"Ninguna coincide con la búsqueda.":"Todavía no hay actas cerradas."}</div>`}</div></div>
+    <h2>Cerradas<span class="cnt">${cerradas.length}</span></h2><div class="list">${cerradas.map(card).join("")||`<div class="empty">${t?"Ninguna coincide con la búsqueda.":CAP?"Todavía no hay registros cerrados.":"Todavía no hay actas cerradas."}</div>`}</div></div>
     ${L.length?`<div class="btns"><button class="btn" data-a="axXlsx">Actualizar Excel en OneDrive</button></div>`:""}
-    ${disTip("mnax",`En el «⋯» de cada acta están el PDF, la devolución${esAdmin()?", anular y restaurar":" y eliminar los borradores"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}
+    ${disTip("mnax",`En el «⋯» de cada acta están el PDF${CAP?"":", la devolución"}${esAdmin()?", anular y restaurar":" y eliminar los borradores"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}
     <p class="note">Versión ${APP_VER}</p>
   </main>`;
 }
@@ -229,12 +260,58 @@ function axCloseBox(){
 let axStep=0;
 function renderAxEdit(){
   const a=prepAx(cur),T=AX[a.tipo];
-  const body=esDev(a)?(a.tipo==="vehiculo"?[vehDevDatos,vehAcc,vehDevFirmas][axStep]():[actDevDatos,actDevActivos,actDevFirmas][axStep]()):a.tipo==="vehiculo"?[vehDatos,vehAcc,vehFirmas][axStep]():[actDatos,actActivos,actFirmas][axStep]();
+  const body=a.tipo==="capacitacion"?[capDatos,capParticipantes,capFirmas][axStep]():esDev(a)?(a.tipo==="vehiculo"?[vehDevDatos,vehAcc,vehDevFirmas][axStep]():[actDevDatos,actDevActivos,actDevFirmas][axStep]()):a.tipo==="vehiculo"?[vehDatos,vehAcc,vehFirmas][axStep]():[actDatos,actActivos,actFirmas][axStep]();
   const nav=axStep<2?`<button class="btn" data-a="axStep" data-s="${axStep-1}" ${axStep===0?"disabled":""}>Atrás</button><button class="btn pri" data-a="axStep" data-s="${axStep+1}">Siguiente</button>`
     :`<button class="btn" data-a="axStep" data-s="1">Atrás</button>${ro()?`<button class="btn pri" data-a="axBack">Volver</button>`:`<button class="btn pri" data-a="axClose">Finalizar y cerrar acta</button>`}`;
   return topBar(axTitulo(a),"axBack",T.t,esDev(a)?["Datos",a.tipo==="vehiculo"?"Accesorios":"Activos","Firmas"]:T.steps,axStep)+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>${autoriaTxt(a)?`<p class="note autoria">${autoriaHTML(a)}</p>`:""}${a.anulada?`<div class="info netbox"><b>Acta anulada</b> el ${fmtD(a.anulada.fecha)} por ${esc(quien(a.anulada.por))}${a.anulada.motivo?`: ${esc(a.anulada.motivo)}`:""}.</div>`:""}${ro()?`<div class="info lock">Acta cerrada el ${fmtD(a.cerrada)}. Ya no se puede modificar.</div>`:""}
   ${body}
   </main><div class="foot"><div class="in">${nav}</div></div><p class="note" style="text-align:center">Versión ${APP_VER}</p>`;
+}
+/* Capacitación · paso 1 */
+function capDatos(){
+  const a=cur,P=AX_PREDIOS.concat(["Otro"]);
+  return `<div class="grid2">${axInp("fecha","Fecha",{type:"date"})}${axInp("realizadaPor","Realizada por (relator)",{ph:"Quien dicta la capacitación"})}</div>
+  <div class="grid2">${axInp("inicio","Inicio",{type:"time"})}${axInp("fin","Fin",{type:"time"})}</div>
+  <p class="note" id="capDur" style="margin-top:-4px">${capDur(a)?`Duración: <b>${capDur(a)}</b>`:""}</p>
+  <div class="f"><label>Predios</label><div class="filt" style="margin:4px 0 0">${P.map(p=>`<button type="button" class="fb" data-a="axCapPred" data-v="${esc(p)}" aria-pressed="${(a.predios||[]).includes(p)}" ${axDis()}>${esc(p)}</button>`).join("")}</div><span class="hint">Marca todos los predios de los participantes.</span></div>
+  ${(a.predios||[]).includes("Otro")?axInp("predioOtro","Otro predio o área"):""}
+  ${axInp("tema","Tema de la capacitación",{ph:"Ej.: Capacitación módulo de rendiciones"})}
+  <div class="f"><label for="x_detalle">Contenidos (opcional)</label><textarea id="x_detalle" data-x="detalle" rows="3" placeholder="Puntos que se trataron, material entregado" ${axDis()}>${esc(a.detalle)}</textarea></div>
+  ${axFotos("c_fotos","Fotos de la capacitación (opcional)")}
+  ${!ro()?`<div class="btns"><button class="btn danger" data-a="axDel">Eliminar borrador</button></div>`:""}`;
+}
+/* Capacitación · paso 2 */
+/* quien ya firmó, con nombre y RUT válido, se muestra en una línea con «Editar» (Benja, 19-10-2026: con muchos participantes la lista queda larga) */
+let capEdit=null;
+const capListo=(a,p)=>!!(capFirma(a,p).img&&String(p.nombre||"").trim()&&p.rut&&rutOk(p.rut));
+function capPart(p,i){
+  const a=cur,f=capFirma(a,p),rutE=p.rut&&!rutOk(p.rut);
+  if(capListo(a,p)&&(ro()||capEdit!==p.id))return `<div class="it cpc" id="cpp-${p.id}"><img class="cpf" src="${f.img}" alt="Firma de ${esc(p.nombre)}"><div class="cpt"><b>${i+1}. ${esc(p.nombre)}</b><span>${esc([rutFmt(p.rut),p.cargo].filter(Boolean).join(" · "))}</span></div>${ro()?"":`<button class="mini" data-a="axCapEdit" data-r="${p.id}" aria-label="Editar a ${esc(p.nombre)}">Editar</button>`}</div>`;
+  return `<div class="it" id="cpp-${p.id}"><div class="nm"><span>${i+1}. <span class="cpn">${esc(p.nombre||"Participante")}</span></span>${f.img?'<span class="chip B">Firmó</span>':""}${!ro()?`${capEdit===p.id?`<button class="mini" data-a="axCapEdit" data-r="">Listo</button>`:""}<button class="mini danger" data-a="axCapQuitar" data-r="${p.id}">Quitar</button>`:""}</div>
+    <div class="f"><label for="x_${p.id}_nombre">Nombre</label><input id="x_${p.id}_nombre" data-xp="${p.id}" data-k="nombre" list="capPers" value="${esc(p.nombre)}" placeholder="Nombre y apellido" autocomplete="off" ${axDis()}></div>
+    <div class="grid2"><div class="f"><label for="x_${p.id}_rut">RUT</label><input id="x_${p.id}_rut" data-xp="${p.id}" data-k="rut" value="${esc(p.rut)}" placeholder="12.345.678-9" autocomplete="off" ${axDis()}><span class="err" id="cpe-${p.id}">${rutE?"El RUT no es válido. Revisa el dígito verificador.":""}</span></div>
+      <div class="f"><label for="x_${p.id}_cargo">Cargo</label><input id="x_${p.id}_cargo" data-xp="${p.id}" data-k="cargo" value="${esc(p.cargo)}" placeholder="Ej.: Ordeñador" autocomplete="off" ${axDis()}></div></div>
+    <div class="sig cpsig"><button class="pad" data-a="sign" data-r="p_${p.id}" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${f.img}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div></div>`;
+}
+function capParticipantes(){
+  const a=cur,U=capUsados(a),nf=U.filter(p=>capFirma(a,p).img).length,pct=U.length?Math.round(nf/U.length*100):0;
+  const K=Object.values(capConocidos()).sort((x,y)=>x.nombre.localeCompare(y.nombre,"es"));
+  return `<h1 style="font-size:22px">Participantes</h1><p class="lead" style="margin-top:0">Cada participante revisa su nombre, RUT y cargo, y firma en el teléfono.</p>
+  <div class="prog"><span>${nf} de ${U.length} ${U.length===1?"firmado":"firmados"}</span><span class="meter"><i style="width:${pct}%"></i></span><span>${pct}%</span></div>
+  <datalist id="capPers">${K.map(o=>`<option value="${esc(o.nombre)}"></option>`).join("")}</datalist>
+  ${(a.participantes||[]).map(capPart).join("")||`<div class="empty">Todavía no hay participantes.</div>`}
+  ${ro()?"":`<div class="btns"><button class="btn" data-a="axCapAdd">Agregar participante</button></div>`}`;
+}
+/* Capacitación · paso 3 */
+function capFirmas(){
+  const a=cur,f=(a.firmas||{}).relator||{},U=capUsados(a);
+  return `<h1 style="font-size:22px">Registro de capacitación</h1>
+  <div class="acta"><p><b>${esc(String(a.tema||"").trim()||"Sin tema")}</b>${a.detalle?`<br>${esc(a.detalle)}`:""}</p>
+    <p>${fmtD(a.fecha)}${a.inicio?` · de ${esc(a.inicio)}${a.fin?" a "+esc(a.fin):""}`:""}${capDur(a)?` (${capDur(a)})`:""}<br>${esc(capPredios(a).join(", ")||"Sin predios")} · ${U.length} ${U.length===1?"participante":"participantes"}, ${U.filter(p=>capFirma(a,p).img).length} con firma</p></div>
+  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae el registro con la firma de cada participante y las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
+  <h2>Firma del relator</h2><div class="sigs"><div class="sig"><div class="lb">Relator(a)</div><div class="sub">${esc(a.realizadaPor||"Escribe quién la realiza en el paso 1")}</div>
+    <button class="pad" data-a="sign" data-r="relator" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${f.img}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div></div>
+  <div id="closeBox">${axCloseBox()}</div>`;
 }
 /* Vehículo · paso 1 */
 function vehDatos(){
@@ -374,6 +451,13 @@ async function axClick(A,b){
     const d=nuevaAxDev(e);await saveActa(d);e.devolucionId=d.id;e.actualizado=new Date().toISOString();await saveActa(e);cur=d;axTipo=d.tipo;axStep=0;go("axe");return true}
   if(A==="axDevA"){if(ro())return true;const x=(cur.activos||[]).find(y=>y.id===b.dataset.r);if(!x)return true;x.devuelto=x.devuelto===b.dataset.v?"":b.dataset.v;if(x.devuelto!=="si"){x.estadoDev=""}touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
   if(A==="axYN"){if(ro())return true;const g=b.dataset.g,k=b.dataset.k,v=b.dataset.v;cur[g]=cur[g]||{};cur[g][k]=cur[g][k]===v?undefined:v;if(!cur[g][k])delete cur[g][k];touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
+  if(A==="axCapPred"){if(ro()||!cur)return true;const v=b.dataset.v,P=cur.predios=cur.predios||[];const i=P.indexOf(v);if(i>=0){P.splice(i,1);if(v==="Otro")cur.predioOtro=""}else P.push(v);
+    cur.predio=capPredios(cur).join(", ");touch();const keep=window.scrollY;render();window.scrollTo(0,keep);if(v==="Otro"&&i<0){const el=$("#x_predioOtro");if(el)el.focus({preventScroll:true})}return true}
+  if(A==="axCapEdit"){if(ro()||!cur)return true;capEdit=b.dataset.r||null;const keep=window.scrollY;render();window.scrollTo(0,keep);if(capEdit){const el=$("#x_"+capEdit+"_nombre");if(el)el.focus({preventScroll:true})}return true}
+  if(A==="axCapAdd"){if(ro()||!cur)return true;capEdit=null;const p={id:uid().slice(-6)};cur.participantes.push(p);touch();render();const el=$("#x_"+p.id+"_nombre");if(el){el.scrollIntoView({block:"center"});el.focus()}return true}
+  if(A==="axCapQuitar"){if(ro()||!cur)return true;const r=b.dataset.r,p=cur.participantes.find(y=>y.id===r);if(!p)return true;
+    if((p.nombre||p.rut||p.cargo||capFirma(cur,p).img)&&!(await ask("¿Quitar este participante?",[p.nombre,p.rut?rutFmt(p.rut):""].filter(Boolean).join(" · ")+(capFirma(cur,p).img?". Se borra también su firma.":""),"Quitar",true)))return true;
+    cur.participantes=cur.participantes.filter(y=>y.id!==r);delete cur.firmas["p_"+r];touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
   if(A==="axAddAct"){if(ro())return true;cur.activos.push({id:uid().slice(-6),estado:""});touch();render();const l=cur.activos[cur.activos.length-1];const el=$("#x_"+l.id+"_tipo");if(el){el.scrollIntoView({block:"center"});el.focus()}return true}
   if(A==="axDelAct"){if(ro())return true;const r=b.dataset.r,x=cur.activos.find(y=>y.id===r);if(!x)return true;
     if((x.tipo||x.marca||x.ref)&&!(await ask("¿Quitar este activo?",[x.tipo,x.marca,x.ref].filter(Boolean).join(" · "),"Quitar",true)))return true;
@@ -389,6 +473,7 @@ async function axClick(A,b){
   if(A==="axXlsx"){await axXlsx(axTipo,true);return true}
   if(A==="axClose"){if(!cur||ro())return true;const m=axFaltantes(cur);
     if(m.length){const g=await ask("Faltan datos para cerrar el acta","Completa lo siguiente. Mientras tanto queda guardada como borrador.","Ir a completar",false,`<ul class="miss" style="margin:0 0 12px">${m.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`);
+      if(g&&cur.tipo==="capacitacion"){axStep=m.some(x=>/^(Fecha|Realizada|Hora|Predios|Tema)/.test(x))?0:m.some(x=>/participante|: RUT|: firma/i.test(x))?1:2;window.scrollTo(0,0);render();return true}
       if(g){const datos=/^(Fecha|Lugar|Predio|Nombre|RUT|Cargo|Quién entrega \(Admin|Tipo Vehículo|Marca|Modelo|Año|Patente|Combustible|Km)/;axStep=m.some(x=>datos.test(x)&&!/firma/i.test(x))?0:m.some(x=>/accesorio|llaves|Descripción|activo/i.test(x))?1:2;window.scrollTo(0,0);render()}return true}
     if(!(await ask("¿Finalizar y cerrar el acta?","Quedará cerrada, su PDF se guardará en OneDrive y ya no se podrá modificar.","Cerrar acta")))return true;
     cur.estado="cerrada";cur.cerrada=today();cur.actualizado=new Date().toISOString();if(ME)cur.cerradoPor=yo();await saveActa(cur);
@@ -407,6 +492,13 @@ function axInput(ev){
   if(t.dataset.x){axSet(cur,t.dataset.x,t.value);
     if(t.dataset.x==="conductor"||t.dataset.x==="recibe"){const role=t.dataset.x==="conductor"?"conductor":"recibe";const f=cur.firmas[role]||{};if(!f.nombre||f.nombre===cur._lastN){cur.firmas[role]=Object.assign(f,{nombre:t.value})}cur._lastN=t.value}
     if(t.dataset.x==="rut"||t.dataset.x==="rutRecibe"){const e=$("#axRutErr");if(e)e.textContent=""}
+    if(t.dataset.x==="realizadaPor")cur.firmas.relator=Object.assign(cur.firmas.relator||{},{nombre:t.value});
+    if(t.dataset.x==="predioOtro"&&cur.tipo==="capacitacion")cur.predio=capPredios(cur).join(", ");
+    if(t.dataset.x==="inicio"||t.dataset.x==="fin"){const n=$("#capDur");if(n)n.innerHTML=capDur(cur)?`Duración: <b>${capDur(cur)}</b>`:""}
+    axTouch();return}
+  if(t.dataset.xp){const p=(cur.participantes||[]).find(y=>y.id===t.dataset.xp);if(!p)return;const k=t.dataset.k;p[k]=t.value;
+    if(k==="nombre"){cur.firmas["p_"+p.id]=Object.assign(cur.firmas["p_"+p.id]||{},{nombre:t.value});const h=$("#cpp-"+p.id+" .cpn");if(h)h.textContent=t.value||"Participante"}
+    if(k==="rut"){const e=$("#cpe-"+p.id);if(e)e.textContent=""}
     axTouch();return}
   if(t.dataset.xa){const x=cur.activos.find(y=>y.id===t.dataset.xa);if(x){x[t.dataset.k]=t.value;axTouch()}return}
   if(t.dataset.xsn){cur.firmas[t.dataset.xsn]=Object.assign(cur.firmas[t.dataset.xsn]||{},{nombre:t.value});axTouch();return}
@@ -417,6 +509,13 @@ function axChange(ev){
   if(t.dataset.xfoto){const files=[...t.files];t.value="";const k=t.dataset.xfoto;addFotos(cur,k,files).then(()=>{if(view==="axe"){const keep=window.scrollY;render();window.scrollTo(0,keep)}});return}
   if(t.dataset.xs){cur[t.dataset.xs]=t.value;touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return}
   if(t.dataset.xa){const x=cur.activos.find(y=>y.id===t.dataset.xa);if(x){x[t.dataset.k]=t.value;axTouch()}return}
+  if(t.dataset.xp){const p=(cur.participantes||[]).find(y=>y.id===t.dataset.xp);if(!p)return;const k=t.dataset.k;
+    if(k==="rut"){p.rut=rutFmt(t.value);t.value=p.rut;const e=$("#cpe-"+p.id);if(e)e.textContent=p.rut&&!rutOk(p.rut)?"El RUT no es válido. Revisa el dígito verificador.":""}
+    if(k==="nombre"){p.nombre=String(t.value).replace(/\s+/g," ").trim();t.value=p.nombre;const o=capConocidos()[p.nombre.toLowerCase()];
+      if(o){if(o.nombre!==p.nombre){p.nombre=o.nombre;t.value=o.nombre}if(!p.rut&&o.rut){p.rut=rutFmt(o.rut);const i=$("#x_"+p.id+"_rut");if(i)i.value=p.rut}if(!p.cargo&&o.cargo){p.cargo=o.cargo;const i=$("#x_"+p.id+"_cargo");if(i)i.value=p.cargo}}
+      cur.firmas["p_"+p.id]=Object.assign(cur.firmas["p_"+p.id]||{},{nombre:p.nombre});const h=$("#cpp-"+p.id+" .cpn");if(h)h.textContent=p.nombre||"Participante"}
+    if(k==="cargo"){p.cargo=String(t.value).trim();t.value=p.cargo}
+    touch();axUpdClose();return}
   if(t.dataset.xadm){const role=t.dataset.xadm,v=t.value,f=cur.firmas[role]||{};const prev=f.sel||f.nombre||"";
     if(f.img&&prev&&prev!==v){delete f.img;delete f.fechaFirma;toast("Cambió la persona de Administración: la firma anterior se borró.")}
     f.sel=v;if(v==="otro"){if(personasAdm().some(p=>p.nombre===f.nombre))f.nombre=""}else{f.nombre=v;if(!f.cargo)f.cargo="Administración"}
@@ -450,8 +549,53 @@ function axHeaderAct(d,tit){
   d.setFontSize(7.5);d.text("Versión",180,y+4,{align:"center"});d.text("Revisión",180,y+h/2+4,{align:"center"});
   d.setFont("helvetica","normal");d.text("01",180,y+8.5,{align:"center"});d.text("01",180,y+h/2+8.5,{align:"center"});
 }
+/* Capacitación: encabezado del formato en papel (logo · título sobre fondo azul · versión y revisión) */
+function capHeader(d){
+  const L=15,W=180,y=10,h=22,xT=60,xV=147,wV=24;d.setLineWidth(0.2);d.setDrawColor(0);d.setTextColor(0);
+  d.setFillColor(49,133,155);d.rect(xT,y,xV-xT,h,"F");d.rect(L,y,W,h);d.line(xT,y,xT,y+h);d.line(xV,y,xV,y+h);d.line(xV+wV,y,xV+wV,y+h);d.line(xV,y+h/2,L+W,y+h/2);
+  {const lh=h-6,lw=Math.min(40,lh*LOGO_R);try{d.addImage(LOGO,"JPEG",(L+xT)/2-lw/2,y+3,lw,lh,"logo")}catch(e){}}
+  const xc=(xT+xV)/2;d.setTextColor(255);d.setFont("helvetica","bold");d.setFontSize(8.5);d.text("Departamento de Administración y Finanzas",xc,y+6,{align:"center"});
+  d.text("Área Control y gestión",xc,y+10.5,{align:"center"});d.setFontSize(11);d.text("Registro de capacitaciones",xc,y+17.5,{align:"center"});d.setTextColor(0);
+  CAP_VER.forEach(([t1,v1,t2,v2],i)=>{const yy=y+i*h/2;d.setFont("helvetica","bold");d.setFontSize(7);d.text(t1,xV+wV/2,yy+4,{align:"center"});d.text(t2,xV+wV+wV/2,yy+4,{align:"center"});
+    d.setFont("helvetica","normal");d.text(v1,xV+wV/2,yy+8.5,{align:"center"});d.text(v2,xV+wV+wV/2,yy+8.5,{align:"center"})});
+}
+function buildCap(a,IM){
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=axPDFkit(d,a);const {L,W}=K;prepAx(a);
+  K.header();K.y=K.TOP;
+  /* datos (izquierda) y tema (derecha), como en el formato */
+  const wl=90,xr=L+wl,wr=W-wl,y0=K.y;d.setFontSize(9);
+  const celda=(lab,val,h)=>{d.rect(L,K.y,wl,h);d.setFont("helvetica","bold");d.text(lab,L+1.8,K.y+4.6);const lw=d.getTextWidth(lab)+3;d.setFont("helvetica","normal");
+    const ls=d.splitTextToSize(String(val||""),wl-lw-2.5);if(ls.length)d.text(ls.slice(0,Math.max(1,Math.floor((h-1.5)/4))),L+1.8+lw,K.y+4.6,{lineHeightFactor:1.25});K.y+=h};
+  d.setFont("helvetica","normal");const lpr=d.splitTextToSize(capPredios(a).join(", "),wl-20).length;
+  celda("Realizada por:",a.realizadaPor,11);
+  {d.rect(L,K.y,wl,7);d.setFont("helvetica","bold");d.text("Inicio:",L+1.8,K.y+4.6);d.text("Fin:",L+46,K.y+4.6);d.setFont("helvetica","normal");d.text(a.inicio||"",L+13,K.y+4.6);d.text(a.fin||"",L+53,K.y+4.6);
+    if(capDur(a)){d.setTextColor(90);d.setFontSize(7.5);d.text("("+capDur(a)+")",L+wl-1.8,K.y+4.6,{align:"right"});d.setFontSize(9);d.setTextColor(0)}K.y+=7}
+  celda("Predios:",capPredios(a).join(", "),Math.max(7,lpr*4+3));
+  celda("Fecha:",fmtD(a.fecha),7);
+  {const h=17,fr=(a.firmas||{}).relator||{};d.rect(L,K.y,wl/2,h);d.rect(L+wl/2,K.y,wl/2,h);d.setFont("helvetica","bold");d.text("Firma relator:",L+1.8,K.y+4.6);
+    const fi=IM["firma:relator"]||fr.img;if(fi){try{const p=d.getImageProperties(fi);let iw=wl/2-4,ih=iw*p.height/p.width;if(ih>h-3){ih=h-3;iw=ih*p.width/p.height}d.addImage(fi,"PNG",L+wl*0.75-iw/2,K.y+h/2-ih/2,iw,ih,undefined,"FAST")}catch(e){}}K.y+=h}
+  {const h=K.y-y0;d.rect(xr,y0,wr,h);let yy=y0+5;d.setFont("helvetica","bold");d.setFontSize(7.5);d.setTextColor(90);d.text("TEMA DE LA CAPACITACIÓN",xr+2,yy);d.setTextColor(0);yy+=5.5;
+    d.setFontSize(10.5);const lt=d.splitTextToSize(String(a.tema||"").trim(),wr-4);d.text(lt.slice(0,4),xr+2,yy,{lineHeightFactor:1.2});yy+=Math.min(lt.length,4)*4.6+2;
+    if(a.detalle){d.setFont("helvetica","normal");d.setFontSize(8.5);const ld=d.splitTextToSize(String(a.detalle),wr-4);const n=Math.max(0,Math.floor((y0+h-yy-1)/3.6));if(n)d.text(ld.slice(0,n),xr+2,yy,{lineHeightFactor:1.2})}}
+  K.y+=6;
+  /* participantes */
+  const cols=[["NOMBRE",80],["RUT",30],["CARGO",40],["FIRMA",30]],xs=[];let xx=L;cols.forEach(c=>{xs.push(xx);xx+=c[1]});
+  const head=()=>{d.setFont("helvetica","normal");d.setFontSize(8.5);cols.forEach((c,i)=>{d.setFillColor(180,198,231);d.rect(xs[i],K.y,c[1],7,"FD");d.text(c[0],xs[i]+c[1]/2,K.y+4.7,{align:"center"})});K.y+=7};
+  head();
+  const P=capUsados(a),rh=11;
+  P.forEach(p=>{if(K.y+rh>K.BOT){d.addPage();K.header();K.y=K.TOP;head()}
+    cols.forEach((c,j)=>d.rect(xs[j],K.y,c[1],rh));d.setFont("helvetica","normal");d.setFontSize(8.5);
+    const ln=d.splitTextToSize(String(p.nombre||""),cols[0][1]-3).slice(0,2);d.text(ln,xs[0]+1.8,K.y+(ln.length>1?4.3:6.6),{lineHeightFactor:1.2});
+    d.text(p.rut?rutFmt(p.rut):"",xs[1]+cols[1][1]/2,K.y+6.6,{align:"center"});
+    const lc=d.splitTextToSize(String(p.cargo||""),cols[2][1]-3).slice(0,2);d.text(lc,xs[2]+1.8,K.y+(lc.length>1?4.3:6.6),{lineHeightFactor:1.2});
+    const fi=IM["firma:p_"+p.id]||capFirma(a,p).img;if(fi){try{const q=d.getImageProperties(fi);let iw=cols[3][1]-3,ih=iw*q.height/q.width;if(ih>rh-1.5){ih=rh-1.5;iw=ih*q.width/q.height}d.addImage(fi,"PNG",xs[3]+cols[3][1]/2-iw/2,K.y+rh/2-ih/2,iw,ih,undefined,"FAST")}catch(e){}}
+    K.y+=rh});
+  K.y+=4;K.para(`${P.length} ${P.length===1?"participante":"participantes"}.`,{s:8.5,c:[90,90,90]});
+  anexoFotos(d,a,IM,K,[["c_fotos","Fotos de la capacitación"]]);
+  return finPDF(d,axPie(d,a));
+}
 function axPDFkit(d,a){
-  const L=15,W=180,TOP=38,BOT=280;const header=()=>a.tipo==="vehiculo"?axHeaderVeh(d):axHeaderAct(d);
+  const L=15,W=180,TOP=38,BOT=280;const header=()=>a.tipo==="vehiculo"?axHeaderVeh(d):a.tipo==="capacitacion"?capHeader(d):axHeaderAct(d);
   const K={L,W,TOP,BOT,y:TOP,header,
     nb(h){if(K.y+h>BOT){d.addPage();header();K.y=TOP}},
     para(t,o){o=o||{};d.setFont("helvetica",o.f||"normal");d.setFontSize(o.s||9);const lh=(o.s||9)*0.42*1.3;const ls=d.splitTextToSize(t,o.w||W-(o.ind||0));
@@ -554,7 +698,7 @@ function buildAct(a,IM){
   anexoFotos(d,a,IM,K,(a.activos||[]).map((x,i)=>["a_"+x.id,`Activo ${i+1}: ${[x.tipo,x.marca,x.ref].filter(Boolean).join(" · ")||"sin datos"}`]));
   return finPDF(d,{footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}});
 }
-const buildAx=(a,IM)=>esDev(a)?(a.tipo==="vehiculo"?buildVehDev(a,IM):buildActDev(a,IM)):a.tipo==="vehiculo"?buildVeh(a,IM):buildAct(a,IM);
+const buildAx=(a,IM)=>a.tipo==="capacitacion"?buildCap(a,IM):esDev(a)?(a.tipo==="vehiculo"?buildVehDev(a,IM):buildActDev(a,IM)):a.tipo==="vehiculo"?buildVeh(a,IM):buildAct(a,IM);
 const axPie=(d,a)=>({footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}});
 function buildVehDev(a,IM){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=axPDFkit(d,a);const {L,W}=K;prepAx(a);const ant=a.antes||{};
@@ -604,9 +748,19 @@ function buildActDev(a,IM){
 }
 function axNombre(a){
   const s=x=>String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"");
+  if(a.tipo==="capacitacion")return ["Capacitacion",s(a.tema).slice(0,60),fmtD(a.fecha)].filter(Boolean).join("_")+".pdf";
   return (a.tipo==="vehiculo"?[esDev(a)?"Acta_Devolucion_Vehiculo":"Acta_Vehiculo",s((a.veh||{}).patente),s(a.conductor)]:["Entrega_Activos",s(a.recibe),s(((a.activos||[])[0]||{}).tipo)].map((x,i)=>i===0&&esDev(a)?"Devolucion_Activos":x)).concat([fmtD(a.fecha)]).filter(Boolean).join("_")+".pdf";
 }
-async function axImgs(a){const IM={};for(const r of Object.values(a.items||{}))for(const f of (r.fotos||[]))if(!String(f).startsWith("p:"))IM[f]=await pdfImg(f);return IM}
+async function axImgs(a){const IM={};for(const r of Object.values(a.items||{}))for(const f of (r.fotos||[]))if(!String(f).startsWith("p:"))IM[f]=await pdfImg(f);
+  if(a.tipo==="capacitacion")for(const [k,f] of Object.entries(a.firmas||{}))if(f&&f.img)IM["firma:"+k]=await capFirmaChica(f.img);return IM}
+/* v109: en el registro de capacitaciones van muchas firmas; para el PDF se recortan los márgenes vacíos (la firma se ve más
+   grande en su celda) y se achican a 360 × 120 px como máximo: 30 firmas a 600 px pesaban más de 20 MB */
+async function capFirmaChica(src){try{const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=src});
+  const c=document.createElement("canvas");c.width=im.width;c.height=im.height;const x=c.getContext("2d");x.drawImage(im,0,0);const D=x.getImageData(0,0,c.width,c.height).data;
+  let x0=c.width,y0=c.height,x1=-1,y1=-1;for(let y=0;y<c.height;y+=2)for(let i=0;i<c.width;i+=2){const o=(y*c.width+i)*4;if(D[o+3]>20&&D[o]+D[o+1]+D[o+2]<720){if(i<x0)x0=i;if(i>x1)x1=i;if(y<y0)y0=y;if(y>y1)y1=y}}
+  if(x1<0)return src;x0=Math.max(0,x0-8);y0=Math.max(0,y0-8);x1=Math.min(c.width-1,x1+8);y1=Math.min(c.height-1,y1+8);
+  const w=x1-x0+1,h=y1-y0+1,s=Math.min(1,360/w,120/h),o=document.createElement("canvas");o.width=Math.max(1,Math.round(w*s));o.height=Math.max(1,Math.round(h*s));
+  o.getContext("2d").drawImage(c,x0,y0,w,h,0,0,o.width,o.height);return o.toDataURL("image/png")}catch(e){return src}}
 async function axDescargar(a){
   if(!window.jspdf){toast("No se pudo cargar el generador de PDF.");return}
   prepAx(a);toast("Preparando el PDF…");await flush();
@@ -633,6 +787,14 @@ function axXlsxBuild(tipo){
     const h=["Movimiento","Estado","Fecha","Lugar","Predio o área","Conductor(a)","RUT"].concat(VEH_ID1.concat(VEH_ID2).map(x=>x[1])).concat(VEH_ACC.map(x=>x[1])).concat(["N° de llaves"]).concat(VEH_DOC.map(x=>x[1])).concat(["Estado general (daños visibles)","Observaciones","Administración (entregó o recibió)","Km devolución","Acta vinculada","Fotos","Registrada por","Cerrada por","Fecha cierre","Anulada"]);
     const r=[h];L.forEach(a=>{const fe=a.firmas.empresa||{};r.push([mov(a),est(a),fmtD(a.fecha),a.ciudad||"",predioDe(a),a.conductor||"",a.rut?rutFmt(a.rut):""].concat(VEH_ID1.concat(VEH_ID2).map(([k])=>a.veh[k]||"")).concat(VEH_ACC.map(([k])=>sn(a.acc[k]))).concat([a.llavesN||""]).concat(VEH_DOC.map(([k])=>sn(a.docs[k]))).concat([a.estadoDesc||"",a.observaciones||"",fe.nombre||"",a.kmDev||"",vinc(a),nF(a),quien(a.creadoPor),quien(a.cerradoPor),a.cerrada?fmtD(a.cerrada):"",a.anulada?`${fmtD(a.anulada.fecha)} ${quien(a.anulada.por)}${a.anulada.motivo?": "+a.anulada.motivo:""}`:""]))});
     add(r,"Actas",[11,10,11,12,16,26,13].concat(VEH_ID1.concat(VEH_ID2).map(()=>12)).concat(VEH_ACC.map(()=>9)).concat([8]).concat(VEH_DOC.map(()=>9)).concat([40,40,26,10,20,6,22,22,11,30]));
+  }else if(tipo==="capacitacion"){
+    const anu=a=>a.anulada?`${fmtD(a.anulada.fecha)} ${quien(a.anulada.por)}${a.anulada.motivo?": "+a.anulada.motivo:""}`:"";
+    const r=[["Estado","Fecha","Inicio","Fin","Duración (min)","Predios","Tema","Contenidos","Realizada por (relator)","Participantes","Con firma","Fotos","Registrada por","Cerrada por","Fecha cierre","Anulada"]];
+    L.forEach(a=>{const U=capUsados(a);r.push([est(a),fmtD(a.fecha),a.inicio||"",a.fin||"",capMinutos(a)||"",capPredios(a).join(", "),a.tema||"",a.detalle||"",a.realizadaPor||"",U.length,U.filter(p=>capFirma(a,p).img).length,nF(a),quien(a.creadoPor),quien(a.cerradoPor),a.cerrada?fmtD(a.cerrada):"",anu(a)])});
+    add(r,"Capacitaciones",[10,11,7,7,9,30,40,40,26,11,9,6,22,22,11,30]);
+    const r2=[["Estado","Fecha","Tema","Predios","Realizada por (relator)","Nombre","RUT","Cargo","Firmó"]];
+    L.filter(a=>!a.anulada).forEach(a=>capUsados(a).forEach(p=>r2.push([est(a),fmtD(a.fecha),a.tema||"",capPredios(a).join(", "),a.realizadaPor||"",p.nombre||"",p.rut?rutFmt(p.rut):"",p.cargo||"",capFirma(a,p).img?"Sí":"No"])));
+    add(r2,"Participantes",[10,11,40,30,26,30,13,24,7]);
   }else{
     const mov=a=>esDev(a)?"Devolución":"Entrega";
     const h1=["Movimiento","Estado","Fecha","Predio o área","Responsable del activo","RUT","Cargo","Administración (entregó o recibió)","N° de activos","Valor referencial total","Observaciones generales","Fotos","Registrada por","Cerrada por","Fecha cierre","Anulada"];
