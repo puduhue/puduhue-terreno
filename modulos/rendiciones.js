@@ -313,12 +313,15 @@ function timbreParse(x){
   return t;
 }
 /* busca el timbre en una foto, un PDF convertido a imagen o un cuadro de la cámara; prueba algunos ángulos por si la boleta quedó chueca */
+/* v114: suelta la imagen decodificada y el canvas (con varias fotos seguidas, el teléfono se quedaba sin memoria) */
+function liberarImg(bm,fuente,c){try{if(bm&&bm!==fuente&&bm.close)bm.close()}catch(e){}if(c){c.width=c.height=0}}
 async function timbreLeer(fuente){
+  let bm=null,c=null;
   try{
     const Z=await Promise.race([zxCargar(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("tiempo")),6000))]);
-    const bm=fuente instanceof HTMLCanvasElement?fuente:await createImageBitmap(fuente);
+    bm=fuente instanceof HTMLCanvasElement?fuente:await createImageBitmap(fuente);
     const W0=bm.width,H0=bm.height,k=Math.min(1,2200/Math.max(W0,H0)),W=Math.round(W0*k),H=Math.round(H0*k);
-    const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});const t0=Date.now();
+    c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});const t0=Date.now();
     for(const a of [0,1.5,-1.5,3,-3,4.5,-4.5,6,-6]){
       if(Date.now()-t0>3500)break;
       g.setTransform(1,0,0,1,0,0);g.fillStyle="#fff";g.fillRect(0,0,W,H);g.translate(W/2,H/2);g.rotate(a*Math.PI/180);g.drawImage(bm,-W/2,-H/2,W,H);
@@ -327,6 +330,7 @@ async function timbreLeer(fuente){
     }
     return null;
   }catch(e){console.warn("timbre",e&&e.message||e);return null}
+  finally{liberarImg(bm,fuente,c)}
 }
 const fmtRut98=r=>{const c=String(r||"").replace(/[^0-9kK]/g,"").toUpperCase();if(c.length<2)return r||"";const n=c.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,".");return n+"-"+c.slice(-1)};
 /* los datos del timbre pasan al documento; el nombre del comercio y la glosa los pone la IA.
@@ -373,8 +377,9 @@ function lecTarjetaHTML(d,P){
 /* ---- foto borrosa u oscura: se avisa antes de guardarla (solo si no tiene timbre legible) ---- */
 async function fotoCalidad(file){
   try{
-    const bm=await createImageBitmap(file);const W=720,H=Math.max(1,Math.round(bm.height*W/bm.width));
-    const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});g.drawImage(bm,0,0,W,H);
+    let bm;try{bm=await createImageBitmap(file,{resizeWidth:720,resizeQuality:"medium"})}catch(e){bm=await createImageBitmap(file)}
+    const W=720,H=Math.max(1,Math.round(bm.height*W/bm.width));
+    const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});g.drawImage(bm,0,0,W,H);liberarImg(bm,null,null);
     const px=g.getImageData(0,0,W,H).data,L=new Float32Array(W*H);let sum=0;
     for(let i=0,j=0;i<px.length;i+=4,j++){const y=.299*px[i]+.587*px[i+1]+.114*px[i+2];L[j]=y;sum+=y}
     const media=sum/(W*H),B=24,vs=[];
@@ -1038,10 +1043,13 @@ async function rdExportar(RS,marcar){
 
 /* ---------- Lectura con IA (vía servidor) ---------- */
 let LEYENDO={};const LEYENDO_ALGUNO=()=>Object.keys(LEYENDO).length>0;
+/* v114: las lecturas van de a una: con varias fotos juntas, subirlas todas a la vez llenaba la memoria del teléfono */
+let LEER_COLA=Promise.resolve();
 async function leerDoc(r,d){
   if(!d.foto||LEYENDO[d.k])return;if(navigator.onLine===false){d.lectura={estado:"pendiente"};return}
   LEYENDO[d.k]=true;d.lectura={estado:"leyendo"};rdRefreshDoc(d.k);
-  try{
+  const turno=LEER_COLA;let listo;LEER_COLA=new Promise(o=>listo=o);
+  try{await turno;
     let dataURL=FOTO[d.foto];
     if(!dataURL||!dataURL.startsWith("data:")){let blob=null;if(IDB.db){const rec=await IDB.get("fotos",d.foto).catch(()=>null)||await IDB.get("cache",d.foto).catch(()=>null);blob=await recBlob(rec)}
       if(!blob&&dataURL){const rr=await fetch(dataURL);blob=await rr.blob()}
@@ -1062,7 +1070,7 @@ async function leerDoc(r,d){
     lecturaGuardar(d);
     try{const k="rd-lecturas-"+periodoActual();localStorage.setItem(k,String((+localStorage.getItem(k)||0)+1))}catch(e){}
   }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento."};console.warn("lectura",e)}
-  finally{delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
+  finally{listo();delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
 }
 async function leerPendientes(){if(navigator.onLine===false)return;for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{})){if(d.foto&&d.lectura&&(d.lectura.estado==="pendiente")&&!QF[d.foto])await leerDoc(r,d)}}}
 
