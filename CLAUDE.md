@@ -9,7 +9,8 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
   y el arranque. ~250 KB desde la v103.
 - `estilos.css`: todo el CSS (desde la v103), ~105 KB. El de cada versión se agregó al final.
 - `modulos/`: un archivo por módulo (desde la v102-v103). Cada uno termina con `window.MOD_…=true` (no quitar):
-  - `checklist.js` (~95 KB): catálogo y MÓDULO: Check list de visitas (con el check list de bodega v58 y los predios v91).
+  - `checklist.js` (~110 KB): catálogo y MÓDULO: Check list de cumplimiento (v113): visitas a predios, bodegas (v58) y camionetas
+    (v113), con los predios (v91). Los tres usan el mismo motor (`CLK`, `tipoDe`, `enTipo`).
   - `bodega.js` (~55 KB): MÓDULO: Stock y MÓDULO: Control de bodega.
   - `rendiciones.js` (~220 KB): Rendiciones completo, con el fondo por rendir y la lectura de boletas.
   - `actas-entrega.js` (~100 KB): Actas de entrega de vehículos y activos fijos (v72) y registro de capacitaciones (v109).
@@ -55,8 +56,10 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
 | 2499-fin | `Actualización automática` | Aviso de versión nueva |
 
 ## Mapa de los módulos (líneas aproximadas en la v103)
-- `checklist.js`: 1 catálogo inicial · 147 catálogo en OneDrive · 243 `MÓDULO: Check list de visitas` · 284 traspaso al check list de
-  bodega (v58) · 323 predios (v91) · 483 la visita · 567 administración del catálogo · 628 acciones · 742 informe PDF y Excel.
+- `checklist.js` (v113): 5 catálogo inicial (con `CM_ITEMS`, los ítems de camionetas) · 182 catálogo en OneDrive · 293 `MÓDULO: Check list de
+  visitas` · 315 camionetas desde las actas de vehículo (v113) · 363 traspaso al check list de bodega (v58) · 402 predios (v91) ·
+  457 pantalla «Check list de cumplimiento» (v113) · 580 la visita · 674 administración del catálogo · 735 acciones · 815 OneDrive ·
+  867 informe PDF.
 - `bodega.js`: 6 `MÓDULO: Stock` · 122 `MÓDULO: Control de bodega` · 171 pantallas · 269 acciones · 345 OneDrive, Excel e informe.
 - `rendiciones.js`: 7 fondo por rendir (v94) · 192 botón «Rendir» y tarjeta (v96) · 270 lectura de boletas (v98) · 496 `MÓDULO:
   Rendiciones` (tipos de gasto, maestros, roles) · 665 avisos por correo (v78) y agenda (v84) · 823 link ?rd=, motor contable, lectura
