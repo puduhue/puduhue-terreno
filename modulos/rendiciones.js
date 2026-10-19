@@ -665,6 +665,15 @@ const rdAbiertaDe=(p,c)=>misRend().find(r=>r.periodo===p&&rdMismaPersona(r,c)&&r
 const rdSiguienteN=(p,c)=>1+Math.max(0,...Object.values(REND).filter(r=>!r.anulada&&r.periodo===p&&(c?normRut(r.persona&&r.persona.rut)===normRut(c.rut):(r.persona&&ME&&r.persona.id===ME.id))).map(r=>r.n||1));
 function nuevaRend(p,c){const per=c?{id:"rut:"+normRut(c.rut),nombre:c.nombre,correo:meCorreo(),rut:c.rut}:{id:ME.id,nombre:ME.nombre,correo:ME.correo,rut:""};
   return{id:uid(),_col:"rendiciones",persona:per,cuenta:meCorreo(),periodo:p,estado:"borrador",docs:{},hist:[],creadoPor:yo(),creado:new Date().toISOString(),actualizado:new Date().toISOString()}}
+/* v111: rendiciones propias en borrador, sin documentos y nunca enviadas (sin historial): se borran al volver a la lista.
+   Antes «Nueva rendición» las guardaba vacías y no se pueden eliminar a mano. */
+const rdVacia=r=>!!r&&!r.anulada&&r.estado==="borrador"&&!Object.keys(r.docs||{}).length&&!(r.hist||[]).length&&esMiaR(r);
+async function rdPurgarVacias(){
+  for(const r of Object.values(REND)){if(!rdVacia(r)||(rdv&&rdv.id===r.id))continue;
+    clearTimeout(LT[r.id]);delete LT[r.id];delete REND[r.id];delete LOCAL[r.id];try{await localDel(r.id)}catch(e){}
+    try{if(REMOTE.rendiciones&&REMOTE.rendiciones[r.id]){delete REMOTE.rendiciones[r.id];delete ETAGS[rkey("rendiciones",r.id)];if(IDB.db)IDB.del("remote",rkey("rendiciones",r.id)).catch(()=>{})}}catch(e){}
+    if(DB){DELQ.add("rendiciones/"+r.id);saveDQ()}}
+  if(DB&&DELQ.size)schedSync(500);status()}
 const rdHist=(r,a,nota)=>{(r.hist=r.hist||[]).push({a,por:yo(),fecha:new Date().toISOString(),nota:nota||""})};
 /* ---------- Avisos por correo (v78) ----------
    Salen desde la cuenta Microsoft de quien hace la acción (permiso delegado Mail.Send).
@@ -1598,7 +1607,7 @@ async function rdClick(A,b){
   if(A==="rdRecVer"){rdRecVer();return true}
   if(A==="rdRecProbar"){rdRecProbar();return true}
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
-  if(A==="rd"){await flush();rdv=null;rdd=null;go("rd");return true}
+  if(A==="rd"){await flush();rdv=null;rdd=null;await rdPurgarVacias();go("rd");return true}
   if(A==="rdTab"){rdTab=b.dataset.t;render();return true}
   if(A==="rdMae"){go("rdm");return true}
   if(A==="rdPick"){if(rdv&&rdd&&!rdRO(rdv))rdPick(b.dataset.f);return true}
@@ -1610,7 +1619,9 @@ async function rdClick(A,b){
   if(A==="rdNueva"){const p=b.dataset.p,cs=colabsDeCuenta();let c=null;
     if(cs.length>1){const libres=cs.filter(x=>!rdAbiertaDe(p,x));const o=await askVal("¿Quién rinde?","Esta cuenta la usan varias personas. Cada una tiene su propia rendición del mes.","Empezar",`<div class="f"><label for="rdQuien">Persona</label><select id="rdQuien" data-v="rut">${(libres.length?libres:cs).map(x=>`<option value="${esc(x.rut)}">${esc(x.nombre)}</option>`).join("")}</select></div>`);if(!o)return true;c=colabPorRut(o.rut)||cs[0]}
     else if(cs.length===1)c=cs[0];
-    let r=rdAbiertaDe(p,c);if(!r){const n=rdSiguienteN(p,c);r=nuevaRend(p,c);if(n>1)r.n=n;await saveRend(r);if(n>1)toast(`Rendición N°${n} de ${periodoTxt(p).toLowerCase()} creada.`)}rdv=r;go("rdv");return true}
+    await rdPurgarVacias();
+    /* v111: la rendición nueva se guarda al agregar el primer documento (rdAgregarDoc); si se sale antes, no queda nada */
+    let r=rdAbiertaDe(p,c);if(!r){const n=rdSiguienteN(p,c);r=nuevaRend(p,c);if(n>1)r.n=n;if(n>1)toast(`Rendición N°${n} de ${periodoTxt(p).toLowerCase()} creada.`)}rdv=r;go("rdv");return true}
   if(A==="rdAbrir"){await flush();const r=REND[b.dataset.id];if(!r)return true;rdv=r;RD_COLA=null;if(!rdv.docs)rdv.docs={};rdd=null;go("rdv");return true}
   if(A==="rdDoc"){const d=rdv&&rdv.docs[b.dataset.k];if(!d)return true;rdd=d;go("rdd");return true}
   if(A==="rdIrDoc"){await rdIrDoc(b.dataset.k);return true}
