@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 110 | 2026-10-19 | [1d0a092](https://github.com/puduhue/puduhue-terreno/tree/1d0a092) | peajes en Rendiciones (tipo «Peaje», solo con el gasto «Peajes / barcaza») y el aviso de documento duplicado dice con qué rendición choca |
 | 109 | 2026-10-19 | [bccecee](https://github.com/puduhue/puduhue-terreno/tree/bccecee) | registro de capacitaciones en Actas (la pantalla «Actas de entrega» pasa a «Actas»): participantes con RUT y firma en el teléfono, PDF con el formato de Control de Gestión y Excel consolidado |
 | 108 | 2026-10-19 | [e05b042](https://github.com/puduhue/puduhue-terreno/tree/e05b042) | escribir sin que se borre lo escrito: cantidad y comentario en Control de bodega, pasar de un campo a otro en bodega y Rendiciones, fecha escrita con el teclado en el computador, buscador del catálogo del check list |
 | 107 | 2026-10-19 | [542f176](https://github.com/puduhue/puduhue-terreno/tree/542f176) | el ícono en Android dice «Puduhue Terreno» (nombre corto del manifiesto); sin cambios de código |
