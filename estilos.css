@@ -1272,3 +1272,16 @@ button,a,label,select,input,textarea,[data-a],[role="button"]{touch-action:manip
 .procc b{display:flex;align-items:center;gap:8px;font-size:17px}
 .procc .procs{font-size:14px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.proc{animation:none}}
+
+/* v117: historial de cambios de la lista de colaboradores */
+.rdcc{display:flex;flex-direction:column;align-items:stretch;gap:3px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:0 0 8px;color:var(--ink);font:inherit;cursor:pointer}
+div.rdcc{cursor:default}
+.rdcc-t{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.rdcc-t b{font-size:17px;line-height:1.3}
+.rdcc-t .tag{flex:none}
+.rdcc-l{color:var(--muted);font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.rdcc-f{color:var(--r-ink);font-size:14px;font-weight:600}
+.rdcc.inact{opacity:.65}
+.rdcolh{list-style:none;margin:0 0 18px;padding:0}
+.rdcolh li{padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.rdcolh li span{display:block;color:var(--muted);font-size:13px;margin-top:2px}

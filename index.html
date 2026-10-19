@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=116">
+<link rel="stylesheet" href="estilos.css?v=117">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="116";
+const APP_VER="117";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -521,7 +521,7 @@ const TB_RAIZ={launch:1,rd:1,clhub:1,cl:1,axhub:1,cb:1,stock:1};
 let TB_ULT=null;
 function tbModDe(v){
   if(v==="launch")return"inicio";
-  if(["rd","rdv","rdd","rdm","fdl"].includes(v))return"rd";
+  if(["rd","rdv","rdd","rdm","rdcol","fdl"].includes(v))return"rd";
   if(["clhub","cl","clp","clv","clcat"].includes(v))return"cl";
   if(["axhub","axl","axe","home","edit"].includes(v))return"ax";
   if(["cb","cbb","cbv"].includes(v))return"cb";
@@ -1021,6 +1021,7 @@ function renderPantalla(){
   else if(view==="rdv"){if(!rdv){view="rd";app.innerHTML=renderRD()}else app.innerHTML=renderRDV()}
   else if(view==="rdd"){if(!rdv||!rdd){view="rdv";app.innerHTML=rdv?renderRDV():renderRD()}else app.innerHTML=renderRDD()}
   else if(view==="rdm")app.innerHTML=renderRDM();
+  else if(view==="rdcol")app.innerHTML=renderRDCol();
   else if(view==="cb")app.innerHTML=renderCB();
   else if(view==="cbb")app.innerHTML=renderCBBod();
   else if(view==="cbv"){if(!cbv){view="cbb";app.innerHTML=renderCBBod()}else app.innerHTML=renderCBV()}
@@ -1331,7 +1332,7 @@ async function onClickAccion(ev,b,A){
   if(A==="quitarLost"){const L=lostRefs();if(!(await ask(`¿Quitar ${L.length} fotos no recuperables?`,"","Quitar",true)))return;L.forEach(([k,f])=>{const r=cur.items[k];r.fotos=r.fotos.filter(x=>x!==f);delete LOST[f];IDB.del("fotos",f).catch(()=>{})});touch();render();toast("Fotos quitadas. Ya puedes tomarlas de nuevo.");return}
 }
 document.addEventListener("input",ev=>{
-  const t=ev.target;if(view==="axl"||view==="axe"){axInput(ev);return}if(view==="rdd"){rdInput(ev);return}if(view==="cbv"){cbInput(ev);return}if(view==="stock"&&t.dataset.sk==="q"){stkInput(ev);return}if(view==="finn"&&t.dataset.ft){FT[t.dataset.ft]=t.value;return}if(view==="clcat"){catInput(ev);return}if(view==="clv"){clInput(ev);return}
+  const t=ev.target;if(view==="rdcol"&&t.id==="rdColQ"){rdColQ=t.value;rdColPintar();return} /* v117 */if(view==="axl"||view==="axe"){axInput(ev);return}if(view==="rdd"){rdInput(ev);return}if(view==="cbv"){cbInput(ev);return}if(view==="stock"&&t.dataset.sk==="q"){stkInput(ev);return}if(view==="finn"&&t.dataset.ft){FT[t.dataset.ft]=t.value;return}if(view==="clcat"){catInput(ev);return}if(view==="clv"){clInput(ev);return}
   if(t.id==="q"){q=t.value;const L=$("#lists");if(L){const tmp=document.createElement("div");tmp.innerHTML=renderHome();L.innerHTML=tmp.querySelector("#lists").innerHTML}return}
   if(!cur||ro())return;
   if(t.dataset.f){cur[t.dataset.f]=t.value;
@@ -2634,10 +2635,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=116"></script>
-<script src="modulos/bodega.js?v=116"></script>
-<script src="modulos/rendiciones.js?v=116"></script>
-<script src="modulos/actas-entrega.js?v=116"></script>
+<script src="modulos/checklist.js?v=117"></script>
+<script src="modulos/bodega.js?v=117"></script>
+<script src="modulos/rendiciones.js?v=117"></script>
+<script src="modulos/actas-entrega.js?v=117"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
