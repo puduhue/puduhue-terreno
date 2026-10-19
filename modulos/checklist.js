@@ -597,10 +597,10 @@ function renderCLCat(){
     <div class="btns"><button class="btn pri" data-a="clCatGuardar" style="flex:1">Guardar en OneDrive</button></div>
   </main>`;
 }
-let catSaveT=null;
+let catSaveT=null,catqT=null;
 function catTocado(){CAT_PEND=true;const s=$(".saved");if(s)s.textContent="Sin guardar";clearTimeout(catSaveT);catSaveT=setTimeout(()=>{guardarCatalogo(false).then(ok=>{const s2=$(".saved");if(s2)s2.textContent=ok?"Guardado":"Sin guardar"})},2500)}
 function catInput(ev){const t=ev.target;
-  if(t.dataset.catq!==undefined){catQ=t.value;clearTimeout(catSaveT);render();const i=$("[data-catq]");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}return true}
+  if(t.dataset.catq!==undefined){catQ=t.value;clearTimeout(catqT);catqT=setTimeout(()=>{render();const i=$("[data-catq]");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250);return true}
   if(t.dataset.nuevo){catNuevo=catNuevo||{};catNuevo[t.dataset.nuevo]=t.type==="checkbox"?t.checked:t.value;return true}
   if(t.dataset.cat){const it=CL_BYKEY[t.dataset.k];if(!it)return true;const f=t.dataset.cat;
     if(f==="star")it.star=t.checked;else if(f==="area"){it.area=t.value;it.areaName=AREA_NAME[t.value];if(it.sheet!=="cl")it.sheet="oa-"+OA_CODE[t.value]}else it[f]=t.value;

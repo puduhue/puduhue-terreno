@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=107">
+<link rel="stylesheet" href="estilos.css?v=108">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="107";
+const APP_VER="108";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -96,6 +96,18 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 /* v106 (B-01): fecha local (AAAA-MM-DD) de un instante; una fecha sola se deja igual */
 const isoLocal=x=>{if(typeof x==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(x))return x;const d=x instanceof Date?x:new Date(x==null?Date.now():x);if(isNaN(d))return String(x||"").slice(0,10);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+/* v108: redibujar sin perder el campo ni el toque en curso. Al tocar otro campo (o un botón) justo después de escribir,
+   el "change" del anterior redibujaba la pantalla entre que se apoya y se levanta el dedo: el campo nuevo se reemplazaba
+   (se cerraba el teclado y lo escrito se perdía) o el toque del botón no llegaba. sinPerderFoco(fn) espera a que termine
+   el toque, corre fn y devuelve el cursor al campo activo (por id o por sus atributos data-*). */
+let PTR_ABAJO=0;document.addEventListener("pointerdown",()=>{PTR_ABAJO=Date.now()},true);
+["pointerup","pointercancel"].forEach(e=>document.addEventListener(e,()=>setTimeout(()=>{PTR_ABAJO=0},0),true));
+function selCampo(a){if(!a||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return null;if(a.id)return"#"+CSS.escape(a.id);
+  const d=Object.keys(a.dataset);if(!d.length)return null;return a.tagName.toLowerCase()+d.map(k=>`[data-${k.replace(/[A-Z]/g,m=>"-"+m.toLowerCase())}="${CSS.escape(a.dataset[k])}"]`).join("")}
+function sinPerderFoco(fn){const run=()=>{if(PTR_ABAJO&&Date.now()-PTR_ABAJO<1500){setTimeout(run,40);return}
+  const a=document.activeElement,s=selCampo(a);let i0=null,i1=null;try{i0=a.selectionStart;i1=a.selectionEnd}catch(e){}
+  fn();if(!s)return;const n=document.querySelector(s);if(!n||n===a||n.disabled)return;n.focus({preventScroll:true});try{if(i0!=null)n.setSelectionRange(i0,i1)}catch(e){}};
+  setTimeout(run,0)}
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const fmtD=s=>{if(!s)return"";const p=String(s).slice(0,10).split("-");return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:s};
 function rutClean(s){return String(s||"").replace(/[^0-9kK]/g,"").toUpperCase()}
@@ -2605,10 +2617,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=107"></script>
-<script src="modulos/bodega.js?v=107"></script>
-<script src="modulos/rendiciones.js?v=107"></script>
-<script src="modulos/actas-entrega.js?v=107"></script>
+<script src="modulos/checklist.js?v=108"></script>
+<script src="modulos/bodega.js?v=108"></script>
+<script src="modulos/rendiciones.js?v=108"></script>
+<script src="modulos/actas-entrega.js?v=108"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

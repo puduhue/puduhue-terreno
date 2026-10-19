@@ -264,7 +264,7 @@ function renderCBV(){
 }
 let cbNuevoProd=null;
 const CB_OPTS={fams:null,tol:2,part:false,ciego:false};
-function cbRefresh(k){setTimeout(()=>{if(view!=="cbv"||!cbv)return;const l=(cbv.lineas||{})[k];const el=$("#cbl-"+CSS.escape(k));try{if(el&&l&&el.isConnected)el.outerHTML=cbLineaHTML(l)}catch(e){}const p=$("#cbprog");try{if(p&&p.isConnected)p.outerHTML=cbProgHTML()}catch(e){}},0)}
+function cbRefresh(k){sinPerderFoco(()=>{if(view!=="cbv"||!cbv)return;const l=(cbv.lineas||{})[k];const el=$("#cbl-"+CSS.escape(k));try{if(el&&l&&el.isConnected)el.outerHTML=cbLineaHTML(l)}catch(e){}const p=$("#cbprog");try{if(p&&p.isConnected)p.outerHTML=cbProgHTML()}catch(e){}})}
 
 /* ---------- Acciones ---------- */
 async function cbClick(A,b){
@@ -317,7 +317,8 @@ async function cbClick(A,b){
 }
 let cbqT=null;
 function cbInput(ev){const t=ev.target;
-  if(t.dataset.cbf){if(t.dataset.cbf==="fam"){if(cbFam===t.value)return true;cbFam=t.value;cbSub=""}else{if(cbSub===t.value)return true;cbSub=t.value}cbLim=120;render();return true}
+  /* v108: solo los filtros; "obs" y "com" (campos del producto) se atienden más abajo */
+  if(t.dataset.cbf==="fam"||t.dataset.cbf==="sub"){if(t.dataset.cbf==="fam"){if(cbFam===t.value)return true;cbFam=t.value;cbSub=""}else{if(cbSub===t.value)return true;cbSub=t.value}cbLim=120;render();return true}
   if(t.dataset.cbq!==undefined){cbQ=t.value;clearTimeout(cbqT);cbqT=setTimeout(()=>{cbLim=120;render();const i=$("[data-cbq]");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250);return true}
   if(t.dataset.cbn){cbNuevoProd=cbNuevoProd||{};cbNuevoProd[t.dataset.cbn]=t.value;return true}
   if(!cbv||cbRO())return true;
