@@ -224,10 +224,11 @@ const compactar=i=>[i.key,i.area,i.sheet,i.fam,i.group,i.n,i.txt,i.prot||"",i.ev
 const expandir=r=>({key:r[0],area:r[1],areaName:AREA_NAME[r[1]]||r[1],sheet:r[2],fam:r[3],group:r[4],n:r[5],txt:r[6],prot:r[7],evid:r[8],star:!!r[9]});
 /* Dos check list con el mismo motor (desde la v58): "visitas" (Control y Gestión, todas las áreas menos Bodega) y "bodega" */
 const CLK={
-  visitas:{tipo:"visitas",act:"cl",titulo:"Check list de visitas",root:"01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS",carpeta:"Check list de visitas",acomp:"Administrador(a) del campo",acompPh:"Quien acompaña la visita",acompX:"Administrador",pdf:"Check list de visitas · Control y Gestión",archivo:"visita",excel:"Check_list_"},
-  bodega:{tipo:"bodega",act:"clb",titulo:"Check list de bodega",root:"01RAJ2KQCDFWQKAL4FGVGIAV7CDLCSWXQW",carpeta:"Check list de bodega",acomp:"Encargado(a) de bodega",acompPh:"Quien acompaña la revisión",acompX:"Encargado de bodega",pdf:"Check list de bodega · Orden, aseo y seguridad",archivo:"bodega",excel:"Check_list_bodega_"},
-  /* v113: la carpeta de OneDrive se busca (o se crea) junto a «Check list de visitas» la primera vez (root:null) */
-  camionetas:{tipo:"camionetas",act:"clc",titulo:"Check list de camionetas",root:null,carpeta:"Check list de camionetas",acomp:"Conductor(a)",acompPh:"Quien usa la camioneta",acompX:"Conductor",pdf:"Check list de camioneta · Acta de entrega de vehículo",archivo:"camioneta",excel:"Check_list_camioneta_",
+  visitas:{tipo:"visitas",act:"cl",titulo:"Check list de visitas",root:"01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS",carpeta:"Visitas a predios",acomp:"Administrador(a) del campo",acompPh:"Quien acompaña la visita",acompX:"Administrador",pdf:"Check list de visitas · Control y Gestión",archivo:"visita",excel:"Check_list_"},
+  bodega:{tipo:"bodega",act:"clb",titulo:"Check list de bodega",root:"01RAJ2KQCDFWQKAL4FGVGIAV7CDLCSWXQW",carpeta:"Bodegas",acomp:"Encargado(a) de bodega",acompPh:"Quien acompaña la revisión",acompX:"Encargado de bodega",pdf:"Check list de bodega · Orden, aseo y seguridad",archivo:"bodega",excel:"Check_list_bodega_"},
+  /* v113: la carpeta de OneDrive se busca (o se crea) junto a la de visitas la primera vez (root:null).
+     v118: las tres están en «Check list de cumplimiento» y se llaman como en la app (Visitas a predios, Bodegas, Camionetas) */
+  camionetas:{tipo:"camionetas",act:"clc",titulo:"Check list de camionetas",root:null,carpeta:"Camionetas",acomp:"Conductor(a)",acompPh:"Quien usa la camioneta",acompX:"Conductor",pdf:"Check list de camioneta · Acta de entrega de vehículo",archivo:"camioneta",excel:"Check_list_camioneta_",
     uni:"camioneta",unis:"camionetas",Unis:"Camionetas"}
 };
 ["visitas","bodega"].forEach(t=>Object.assign(CLK[t],{uni:"predio",unis:"predios",Unis:"Predios"}));
@@ -566,7 +567,7 @@ function renderCLPredio(){
     :`<div class="empty">${vv.filter(v=>v.estado==="cerrada").length?`No hay hallazgos abiertos.${cerr?` Se han corregido ${cerr}.`:""}`:"Aún no hay visitas cerradas."}</div>`;
   const panelVis=`${evolHTML(vv)}${visitasListaHTML(p,vs)}
     <h2>Archivos en OneDrive</h2>
-    <p class="note" style="margin-top:0">Carpeta <b>${KC().carpeta} / ${esc(p)}</b>: un Excel con todas las visitas (una columna por visita, hoja de hallazgos y hoja de fotos con enlaces) y una carpeta por visita con sus fotos y el informe PDF. El Excel se actualiza solo al cerrar una visita.</p>
+    <p class="note" style="margin-top:0">Carpeta <b>Check list de cumplimiento / ${KC().carpeta} / ${esc(p)}</b>: un Excel con todas las visitas (una columna por visita, hoja de hallazgos y hoja de fotos con enlaces) y una carpeta por visita con sus fotos y el informe PDF. El Excel se actualiza solo al cerrar una visita.</p>
     <div class="btns" style="margin-top:8px"><button class="btn" data-a="clXlsx" data-p="${esc(p)}" ${vv.some(v=>v.estado==="cerrada")&&DB?"":"disabled"}>Actualizar Excel ahora</button></div>
     ${esAdmin()?`${disTip("mnvis","En el «⋯» de una visita cerrada puedes <b>anularla</b>: deja de contar para los hallazgos y el porcentaje, pero queda registrada. Se puede restaurar.")}`:""}`;
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="${KC().act}">${KC().Unis}</button><div class="ttl">${clTipo==="bodega"?"Bodega · ":clTipo==="camionetas"?"Camioneta · ":""}${esc(p)}</div>${estadoChip()}</div></div></div>
@@ -819,7 +820,7 @@ async function clTrasCierre(p,v){try{await new Promise(r=>setTimeout(r,2500));aw
 /* ---------- OneDrive: carpetas y Excel ---------- */
 const CLPATH={};
 /* v113: carpeta raíz de un check list sin id fijo (camionetas): se busca por nombre en la carpeta que contiene
-   «Check list de visitas» (Apps de terreno) y, si no está, se crea; el id queda guardado en el teléfono */
+   la de visitas (desde la v118, «Check list de cumplimiento») y, si no está, se crea; el id queda guardado en el teléfono */
 async function clRaiz(tipo){const K=CLK[tipo],LK="actas-cl-raiz-"+tipo;if(K.root)return K.root;
   try{const g=localStorage.getItem(LK);if(g){K.root=g;return g}}catch(e){}
   const pv=await gjson(`/drives/${M365.drive}/items/${CLK.visitas.root}?$select=id,parentReference`);const padre=pv&&pv.parentReference&&pv.parentReference.id;if(!padre)throw new Error("No se encontró la carpeta de los check list.");
@@ -865,7 +866,9 @@ function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   XLSX.utils.book_append_sheet(wb,wf,"Fotos");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
-async function clXlsxUpload(p,tipo){tipo=tipo||"visitas";const buf=clXlsxBuild(p,tipo);await clSubir([p],`${CLK[tipo].excel}${p.replace(/\s+/g,"_")}.xlsx`,new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",tipo)}
+async function clXlsxUpload(p,tipo){tipo=tipo||"visitas";
+  await urlsAlDia(visitasDe(p,tipo),()=>"/Check%20list%20de%20cumplimiento/",saveVis); /* v118 */
+  const buf=clXlsxBuild(p,tipo);await clSubir([p],`${CLK[tipo].excel}${p.replace(/\s+/g,"_")}.xlsx`,new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",tipo)}
 function clXlsx(p,manual,tipo){tipo=tipo||"visitas";return subirExcel(tipo+":"+p,manual,()=>clXlsxUpload(p,tipo))}
 
 /* ---------- Informe PDF de la visita ---------- */

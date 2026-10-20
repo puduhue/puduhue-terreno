@@ -67,6 +67,14 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
   (vista rdcol, rdColClick; escribe celda por celda en el Excel de _maestros con la API de Excel).
 - `actas-entrega.js` (v109): 18 textos del acta · 68 capacitaciones (v109) · 97 devoluciones (v77) · 113 datos comunes · 181 pantallas · 441 eventos · 536 PDF · 779 Excel.
 
+## Carpetas de OneDrive (desde la v118, como en la app)
+En «Apps de terreno»: `Actas/` con `Viviendas`, `Vehículos` y `Activos fijos` (cada una: {Predio}/Entregas|Devoluciones/{fecha …}
+con Fotos y PDF, más su Excel consolidado) y `Capacitaciones/{fecha tema}`; `Check list de cumplimiento/` con `Visitas a predios`,
+`Bodegas` y `Camionetas` ({predio o patente}/{fecha Visita N}). Cada una guarda sus datos en `_datos` (un JSON por registro).
+La raíz de Actas y las de visitas y bodegas se ubican por id (`M365.root`, `CLK…root`): se pueden mover o renombrar sin tocar el código;
+la de camionetas se busca por nombre junto a la de visitas. Carpeta de un acta: `carpetaActa` (index.html). Si se mueven carpetas,
+`urlsAlDia` corrige los enlaces de fotos guardados (fotoUrl) al escribir el Excel siguiente.
+
 Funcionamiento general: el estado vive en variables globales (`view`, `cur`, `ACTAS`, `VIS`, `REND`, `MAE`…); `go(vista)` cambia
 de pantalla y `render()` dibuja; los botones llevan `data-a="acción"` y cada módulo los atiende en su sección «Acciones».
 Ojo: `saludo` y `fechaLarga` están definidas dos veces (cerca de «Pantalla de inicio: elegir versión»); vale la segunda.

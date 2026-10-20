@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=117">
+<link rel="stylesheet" href="estilos.css?v=118">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="117";
+const APP_VER="118";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -215,12 +215,14 @@ async function asegurarCarpetas(){
   if(!out.fotos)throw{code:"not_found"};
   CARPETAS=out;try{localStorage.setItem(CK,JSON.stringify(out))}catch(e){}return out;
 }
-/* Carpeta de un acta: Actas/{Predio}/{fecha Tipo Trabajador} */
+/* Carpeta de un acta (v118, como en la app): Actas/{Viviendas|Vehículos|Activos fijos}/{Predio}/{Entregas|Devoluciones}/{fecha …};
+   Actas/Capacitaciones/{fecha tema} */
 const limpiaNombre=t=>String(t||"").normalize("NFC").replace(/[\\/:*?"<>|#%&{}~]/g," ").replace(/\s+/g," ").trim().slice(0,80);
-const carpetaActa=a=>a.tipo==="vehiculo"?["Vehículos",limpiaNombre((a.veh||{}).patente)||"Sin patente",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${a.conductor||"Sin nombre"}`)]
-  :a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a.fecha} ${a.tema||"Sin tema"}`)]
-  :a.tipo==="activo"?["Activos fijos",limpiaNombre(a.recibe)||"Sin nombre",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${((a.activos||[])[0]||{}).tipo||"activos"}`)]
-  :[limpiaNombre(predioDe(a))||"Sin predio",limpiaNombre(`${a.fecha} ${a.tipo==="entrega"?"Entrega":"Devolución"} ${a.trabajador||"Sin nombre"}`)];
+const carpetaMov=dev=>dev?"Devoluciones":"Entregas";
+const carpetaActa=a=>a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a.fecha} ${a.tema||"Sin tema"}`)]
+  :a.tipo==="vehiculo"?["Vehículos",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.mov==="devolucion"),limpiaNombre(`${a.fecha} ${(a.veh||{}).patente||"Sin patente"} ${a.conductor||"Sin nombre"}`)]
+  :a.tipo==="activo"?["Activos fijos",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.mov==="devolucion"),limpiaNombre(`${a.fecha} ${a.recibe||"Sin nombre"} ${((a.activos||[])[0]||{}).tipo||"activos"}`)]
+  :["Viviendas",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.tipo==="devolucion"),limpiaNombre(`${a.fecha} ${a.trabajador||"Sin nombre"}`)];
 const ACTPATH={};
 async function actaCarpeta(segs){
   let parent=M365.root,path="";
@@ -660,7 +662,7 @@ function renderADM(){
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       ${lecAdminHTML(lect)}`)}
-    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de visitas / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
+    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
@@ -1839,7 +1841,7 @@ function traspasoHTML(){
   const inst=(window.navigator.standalone===true||matchMedia("(display-mode: standalone)").matches)?"":(ESCRITORIO()?`<div class="info"><b>En el computador</b> la app se usa desde el navegador. Si quieres tenerla como programa, en Chrome o Edge usa el ícono <b>Instalar</b> de la barra de direcciones.</div>`:`<div class="info netbox"><b>Instala la app antes de salir a terreno:</b> en Safari toca Compartir y luego <b>Agregar a pantalla de inicio</b> (en Android, menú ⋮ → Instalar app). Ábrela siempre desde ese ícono: así funciona sin señal y las actas quedan guardadas.</div>`);
   return `${inst}${diag}<h2>Sincronización</h2><p class="note" style="margin-top:0">Las actas se guardan en este teléfono y se suben solas a la carpeta compartida de Puduhue cuando hay señal. Cada acta muestra si está <b>sincronizada</b> o <b>pendiente de subir</b>.${SYNC_INFO.ultima?` Última sincronización: ${fmtD(isoLocal(SYNC_INFO.ultima))}.`:""}</p>
   <div class="btns" style="margin-top:8px"><button class="btn pri" data-a="pull">Sincronizar ahora</button><button class="btn" data-a="actasXlsx" ${DB?"":"disabled"}>Actualizar Excel</button><button class="btn" data-a="exportar">Exportar respaldo</button>${imp}</div>
-  <p class="note">En OneDrive, cada acta tiene su carpeta <b>Actas de vivienda / Predio / fecha Tipo Trabajador</b> con sus fotos, el Acta.pdf y el Informe general.pdf, que se guardan al cerrarla. El Excel <b>Actas_de_vivienda.xlsx</b> consolida todas las actas, el detalle ítem por ítem, los hallazgos de las devoluciones y las fotos con enlace; se actualiza solo al cerrar un acta.</p>
+  <p class="note">En OneDrive, cada acta tiene su carpeta <b>Actas / Viviendas / Predio / Entregas o Devoluciones / fecha Trabajador</b> con sus fotos, el Acta.pdf y el Informe general.pdf, que se guardan al cerrarla. El Excel <b>Actas / Viviendas / Actas_de_vivienda.xlsx</b> consolida todas las actas, el detalle ítem por ítem, los hallazgos de las devoluciones y las fotos con enlace; se actualiza solo al cerrar un acta.</p>
   
   <p class="note">Importar sirve para cargar archivos exportados por versiones anteriores de la app; nunca duplica.</p>`;
 }
@@ -1999,7 +2001,18 @@ function actasXlsxBuild(){
   const w4=XLSX.utils.aoa_to_sheet(r4);w4["!cols"]=[12,14,16,24,11,24,40,9,22].map(w=>({wch:w}));links.forEach(([r,u])=>{const c=w4[XLSX.utils.encode_cell({r,c:8})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});XLSX.utils.book_append_sheet(wb,w4,"Fotos");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
-async function actasXlsxUpload(){const buf=actasXlsxBuild();const r=await gfetch(`/drives/${M365.drive}/items/${M365.root}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
+/* v118: las carpetas se ordenaron de nuevo y los enlaces guardados (fotoUrl) apuntaban a la carpeta antigua. Antes de escribir
+   un Excel se piden a OneDrive, por el id de la foto (no cambia al mover), los que no están en la carpeta nueva (marca(doc));
+   las actas o visitas cerradas o anuladas se guardan con el enlace nuevo, así se corrigen una sola vez. */
+async function urlsAlDia(docs,marca,guardar){
+  for(const a of docs){const U=a.fotoUrl;if(!U)continue;const m=marca(a);
+    const malos=Object.keys(U).filter(r=>r.startsWith("a:")&&esItemId(r.slice(2))&&!String(U[r]).includes(m));if(!malos.length)continue;
+    let n=0;for(const r of malos){try{const it=await gjson(`/drives/${M365.drive}/items/${r.slice(2)}?$select=webUrl`);if(it&&it.webUrl&&it.webUrl!==U[r]){U[r]=it.webUrl;n++}}catch(e){console.warn("enlace foto",r,e)}}
+    if(n&&(a.estado==="cerrada"||a.anulada)&&!LOCAL[a.id]){a.actualizado=new Date().toISOString();await guardar(a)}}
+}
+const marcaActa=a=>"/Actas/"+encodeURIComponent(carpetaActa(a)[0])+"/";
+async function actasXlsxUpload(){await urlsAlDia(Object.values(ACTAS).filter(a=>a._col!=="visitas"&&!esAx(a)),marcaActa,saveActa);
+  const buf=actasXlsxBuild();const dir=await actaCarpeta(["Viviendas"]);const r=await gfetch(`/drives/${M365.drive}/items/${dir}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
 function actasXlsx(manual){return subirExcel("actas",manual,actasXlsxUpload)}
 /* Al cerrar un acta: guardar Acta.pdf e Informe general.pdf en su carpeta de OneDrive */
 async function subirPDFsActa(a){
@@ -2635,10 +2648,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=117"></script>
-<script src="modulos/bodega.js?v=117"></script>
-<script src="modulos/rendiciones.js?v=117"></script>
-<script src="modulos/actas-entrega.js?v=117"></script>
+<script src="modulos/checklist.js?v=118"></script>
+<script src="modulos/bodega.js?v=118"></script>
+<script src="modulos/rendiciones.js?v=118"></script>
+<script src="modulos/actas-entrega.js?v=118"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
