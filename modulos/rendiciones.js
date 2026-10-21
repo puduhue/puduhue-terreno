@@ -684,6 +684,12 @@ async function rdPurgarVacias(){
     try{if(REMOTE.rendiciones&&REMOTE.rendiciones[r.id]){delete REMOTE.rendiciones[r.id];delete ETAGS[rkey("rendiciones",r.id)];if(IDB.db)IDB.del("remote",rkey("rendiciones",r.id)).catch(()=>{})}}catch(e){}
     if(DB){DELQ.add("rendiciones/"+r.id);saveDQ()}}
   if(DB&&DELQ.size)schedSync(500);status()}
+/* v119: quien rinde elimina su rendición en borrador o devuelta; Contabilidad anula la que no esté contabilizada.
+   El registro no se borra: queda anulada (motivo y quién) y fuera de las listas, del fondo por rendir y del Excel. */
+const rdPuedeEliminar=r=>!!r&&!r.anulada&&editaPersona(r);
+const rdPuedeAnular=r=>!!r&&!r.anulada&&esContab()&&r.estado!=="contabilizada"&&!editaPersona(r);
+function rdElimHTML(r){return rdPuedeEliminar(r)?`<div class="btns"><button class="btn danger" data-a="rdEliminar">Eliminar rendición</button></div>`
+  :rdPuedeAnular(r)?`<div class="btns"><button class="btn danger" data-a="rdAnular">Anular rendición</button></div>`:""}
 const rdHist=(r,a,nota)=>{(r.hist=r.hist||[]).push({a,por:yo(),fecha:new Date().toISOString(),nota:nota||""})};
 /* ---------- Avisos por correo (v78) ----------
    Salen desde la cuenta Microsoft de quien hace la acción (permiso delegado Mail.Send).
@@ -1363,6 +1369,7 @@ function renderRDV(){
     <div class="list">${D.map(d=>rdDocCard(r,d)).join("")||`<div class="empty">Todavía no hay documentos. Toca <b>Agregar documento</b> y saca la foto de la factura o boleta.</div>`}</div>
     ${asi}
     <div class="btns">${r.estado!=="borrador"||esContab()?`<button class="btn" data-a="rdPdf" data-id="${r.id}" ${D.length?"":"disabled"}>Resumen PDF</button>`:""}<button class="btn" data-a="rdXlsx" data-id="${r.id}" ${D.length?"":"disabled"}>Excel de documentos</button></div>
+    ${rdElimHTML(r)}
     <p class="note">En OneDrive: <b>Rendiciones / ${esc(r.periodo)} / ${esc(r.persona?r.persona.nombre:"")}</b> con las fotos y el resumen.</p>
   </main>${barra}`;
 }
@@ -1791,6 +1798,19 @@ async function rdClick(A,b){
     /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
     const directo=!vuelveCont&&!(j&&j.correo);
     delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
+  if(A==="rdEliminar"||A==="rdAnular"){const r=rdv,el=A==="rdEliminar";if(!(el?rdPuedeEliminar(r):rdPuedeAnular(r)))return true;
+    const D=docsDe(r),nd=`${D.length} ${D.length===1?"documento":"documentos"}`;
+    let mot="";const leer=()=>{const x=document.querySelector("#motAn");if(x)mot=x.value.trim()};document.addEventListener("input",leer,true);
+    let ok;try{ok=await ask(el?"¿Eliminar esta rendición?":"¿Anular esta rendición?",
+      el?`${D.length?`Se quita con ${D.length===1?"su documento":`sus ${nd}`} (${fmtP(totalRend(r))}). `:""}Deja de aparecer en tus rendiciones y en el fondo por rendir. No se puede deshacer.`
+        :`La rendición de ${r.persona&&r.persona.nombre||"sin nombre"} (${nd}, ${fmtP(totalRend(r))}) sale de las listas, del fondo por rendir y del Excel. Queda registrada con el motivo y tu nombre.`,
+      el?"Eliminar":"Anular",true,`<div class="f"><label for="motAn">Motivo${el?" (opcional)":""}</label><input id="motAn" placeholder="Ej.: rendición de prueba"></div>`)}
+    finally{leer();document.removeEventListener("input",leer,true)}
+    if(!ok)return true;const enExcel=r.estado!=="borrador";
+    r.anulada=Object.assign({por:yo(),fecha:today(),motivo:mot},el?{eliminada:true}:{});rdHist(r,el?"eliminada por quien rinde":"anulada",mot);
+    r.actualizado=new Date().toISOString();await saveRend(r);go("rd");toast(el?"Rendición eliminada.":"Rendición anulada.");
+    if(enExcel&&DB&&navigator.onLine!==false)subirExcel("rend:"+r.periodo,false,()=>rdXlsxUpload(r.periodo)).catch(e=>console.warn("excel rendición",e));
+    return true}
   if(A==="rdRev"){if(!rdd||!(puedeJefatura(rdv)||puedeContab(rdv)))return true;rdd.estadoRev=b.dataset.v;if(rdd.estadoRev==="ok")rdd.obsRev="";rdTouch();render();return true}
   /* v115: siempre activo y siempre con comentario para la persona (lo ve en su rendición, en «Para hoy» y en el correo) */
   if(A==="rdDevolver"){if(!(puedeJefatura(rdv)||puedeContab(rdv)))return true;const D=docsDe(rdv);const obs=D.filter(d=>d.estadoRev==="obs");

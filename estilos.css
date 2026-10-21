@@ -1285,3 +1285,8 @@ div.rdcc{cursor:default}
 .rdcolh{list-style:none;margin:0 0 18px;padding:0}
 .rdcolh li{padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
 .rdcolh li span{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+
+/* v119: el fondo de la app llega hasta abajo en teléfonos altos (S23, app instalada): html con el fondo y, en el teléfono,
+   la barra inferior se prolonga hacia abajo con su color, para que no se vea una franja clara bajo ella */
+html{background:var(--bg)}
+@media (max-width:759px){.tabbar::after{content:"";position:absolute;left:0;right:0;top:100%;height:200px;background:var(--card);pointer-events:none}}
