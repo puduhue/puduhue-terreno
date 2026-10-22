@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=119">
+<link rel="stylesheet" href="estilos.css?v=118">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="119";
+const APP_VER="118";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -206,6 +206,13 @@ async function gfetch(path,opts,reintento){
   return res;
 }
 const gjson=async(path,opts)=>{const r=await gfetch(path,opts);return r.status===204?null:r.json()};
+/* v118: crea una carpeta en OneDrive. Si dos subidas a la vez piden la misma, se crea una sola vez; si ya existía (409), se usa
+   la que está. Lo usan los 4 módulos (las fotos se suben de a 3). */
+const CARP_EN_CURSO={};
+function crearCarpeta(parent,name){const k=parent+"/"+name;if(CARP_EN_CURSO[k])return CARP_EN_CURSO[k];
+  const p=(async()=>{try{return await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,folder:{},"@microsoft.graph.conflictBehavior":"fail"})})}
+    catch(e){if(e&&e.code==="graph"&&e.status===409)return await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(name)}`);throw e}})();
+  CARP_EN_CURSO[k]=p;p.then(()=>{delete CARP_EN_CURSO[k]},()=>{delete CARP_EN_CURSO[k]});return p}
 const encName=n=>encodeURIComponent(n).replace(/'/g,"%27");
 async function asegurarCarpetas(){
   /* carpeta "fotos" heredada de las primeras versiones: solo para leer fotos antiguas */
@@ -215,20 +222,18 @@ async function asegurarCarpetas(){
   if(!out.fotos)throw{code:"not_found"};
   CARPETAS=out;try{localStorage.setItem(CK,JSON.stringify(out))}catch(e){}return out;
 }
-/* Carpeta de un acta (v118, como en la app): Actas/{Viviendas|Vehículos|Activos fijos}/{Predio}/{Entregas|Devoluciones}/{fecha …};
-   Actas/Capacitaciones/{fecha tema} */
+/* Carpeta de un acta: Actas/{Predio}/{fecha Tipo Trabajador} */
 const limpiaNombre=t=>String(t||"").normalize("NFC").replace(/[\\/:*?"<>|#%&{}~]/g," ").replace(/\s+/g," ").trim().slice(0,80);
-const carpetaMov=dev=>dev?"Devoluciones":"Entregas";
-const carpetaActa=a=>a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a.fecha} ${a.tema||"Sin tema"}`)]
-  :a.tipo==="vehiculo"?["Vehículos",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.mov==="devolucion"),limpiaNombre(`${a.fecha} ${(a.veh||{}).patente||"Sin patente"} ${a.conductor||"Sin nombre"}`)]
-  :a.tipo==="activo"?["Activos fijos",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.mov==="devolucion"),limpiaNombre(`${a.fecha} ${a.recibe||"Sin nombre"} ${((a.activos||[])[0]||{}).tipo||"activos"}`)]
-  :["Viviendas",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.tipo==="devolucion"),limpiaNombre(`${a.fecha} ${a.trabajador||"Sin nombre"}`)];
+const carpetaActa=a=>a.tipo==="vehiculo"?["Vehículos",limpiaNombre((a.veh||{}).patente)||"Sin patente",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${a.conductor||"Sin nombre"}`)]
+  :a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a.fecha} ${a.tema||"Sin tema"}`)]
+  :a.tipo==="activo"?["Activos fijos",limpiaNombre(a.recibe)||"Sin nombre",limpiaNombre(`${a.fecha} ${a.mov==="devolucion"?"Devolución":"Entrega"} ${((a.activos||[])[0]||{}).tipo||"activos"}`)]
+  :[limpiaNombre(predioDe(a))||"Sin predio",limpiaNombre(`${a.fecha} ${a.tipo==="entrega"?"Entrega":"Devolución"} ${a.trabajador||"Sin nombre"}`)];
 const ACTPATH={};
 async function actaCarpeta(segs){
   let parent=M365.root,path="";
   for(const seg of segs){path+="/"+seg;if(ACTPATH[path]){parent=ACTPATH[path];continue}
     let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const c=await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:seg,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=c.id}
+    if(!id){const c=await crearCarpeta(parent,seg);id=c.id}
     ACTPATH[path]=id;parent=id}
   return parent;
 }
@@ -243,7 +248,7 @@ let FOLDERS={};try{FOLDERS=JSON.parse(localStorage.getItem("actas-m365-folders")
 async function carpetaCol(col){
   if(FOLDERS[col])return FOLDERS[col];const c=M365.cols[col];
   {let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${c.root}:/${encName(c.sub)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const r=await gjson(`/drives/${M365.drive}/items/${c.root}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:c.sub,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=r.id}
+    if(!id){const r=await crearCarpeta(c.root,c.sub);id=r.id}
     FOLDERS[col]=id}
   try{localStorage.setItem("actas-m365-folders",JSON.stringify(FOLDERS))}catch(e){}return FOLDERS[col];
 }
@@ -380,13 +385,18 @@ let DELQ=new Set();try{DELQ=new Set(JSON.parse(localStorage.getItem(DQK)||"[]"))
 function saveDQ(){try{localStorage.setItem(DQK,JSON.stringify([...DELQ]))}catch(e){}}
 function pend(){return (DB?Object.keys(LOCAL).length+DELQ.size:0)+(AS?Object.keys(QF).length+NSUELTAS:0)}
 let syncing=false,syncT=null,again=false,NSUELTAS=0;
+/* v118: fotos (y PDF) guardados en el teléfono que faltan por subir */
+const fotosPend=()=>AS?Object.keys(QF).length+NSUELTAS:0;
+const fotosTxt=n=>{const np=AS?Object.values(QF).filter(m=>m&&m.pdf).length:0;return `${n} ${np?(n===1?"archivo":"archivos"):(n===1?"foto":"fotos")}`};
 function pendHTML(){
   const n=pend();if(!n||!DB)return"";
-  if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite)return"";
+  /* v118: con señal, mientras suben las fotos se ve el avance y se pide dejar la app abierta */
+  if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite){const nf=fotosPend(),S=SYNC_INFO.subida;if(!nf)return"";
+    return `<div class="info pendbox subiendo"><span class="spin" aria-hidden="true"></span> <b>${S&&S.total?`Subiendo fotos: ${Math.min(S.hechas+1,S.total)} de ${S.total}.`:`${fotosTxt(nf)} por subir.`}</b> Deja la app abierta hasta que termine.</div>`}
   const qs=AS?Object.values(QF):[],np=qs.filter(m=>m&&m.pdf).length,nf=qs.length-np+NSUELTAS,na=Object.keys(LOCAL).length,nd=DELQ.size;
   const L=[na?`${na} ${na===1?"registro con cambios":"registros con cambios"}`:"",nf?`${nf} ${nf===1?"foto":"fotos"}`:"",np?`${np} PDF`:"",nd?`${nd} ${nd===1?"borrador eliminado":"borradores eliminados"}`:""].filter(Boolean);
   const det=L.length>1?L.slice(0,-1).join(", ")+" y "+L[L.length-1]:L.join("");
-  return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal; no cierres sesión ni borres los datos de la app mientras tanto.${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
+  return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal y la app esté abierta: al tener señal, ábrela y déjala abierta un momento. No cierres sesión ni borres los datos de la app mientras tanto.${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
 }
 function netHTML(){
   if(navigator.onLine!==false)return"";
@@ -439,16 +449,21 @@ async function sync(){
   if(syncing)return;
   syncing=true;status();
   try{
-    if(AS){for(const ref of Object.keys(QF)){
-      const meta=QF[ref];let rec=null;try{rec=await IDB.get("fotos",ref)}catch(e){}
-      const blob=await recBlob(rec);
-      if(!blob){LOST[ref]=true;delete QF[ref];refrescarFotoItem(meta);continue}
-      if(!objetoDeFoto(meta)){delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}continue}
-      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];continue}if(errSubida(e))break;continue}
-      noWrite=false;await fotoSubida(ref,meta,u);
-      delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}
-      status();
-    }
+    if(AS){
+      /* v118: de a 3 fotos a la vez (antes de a una); un error de toda la cola (sin red, sesión, permiso) detiene a los 3 */
+      const refs=Object.keys(QF);let parar=false;SYNC_INFO.subida={total:refs.length+NSUELTAS,hechas:0};status();
+      const una=async ref=>{
+        const meta=QF[ref];if(!meta)return;let rec=null;try{rec=await IDB.get("fotos",ref)}catch(e){}
+        const blob=await recBlob(rec);
+        if(!blob){LOST[ref]=true;delete QF[ref];refrescarFotoItem(meta);return}
+        if(!objetoDeFoto(meta)){delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}return}
+        let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];return}if(errSubida(e))parar=true;return}
+        noWrite=false;await fotoSubida(ref,meta,u);
+        delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}
+        SYNC_INFO.subida.hechas++;status()};
+      const trabajador=async()=>{while(!parar&&refs.length)await una(refs.shift())};
+      await Promise.all([trabajador(),trabajador(),trabajador()]);
+      if(!parar){
     for(const {ref,meta} of fotosSueltas()){
       let src="";try{src=ref.startsWith("l:")?localStorage.getItem("actas-foto-"+ref)||"":FOTO[ref]||""}catch(e){}
       if(!src||!objetoDeFoto(meta))continue;
@@ -456,9 +471,9 @@ async function sync(){
       let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone")continue;if(errSubida(e))break;continue}
       noWrite=false;FOTO[ref]=FOTO[ref]||src;await fotoSubida(ref,meta,u);
       if(ref.startsWith("l:")){try{localStorage.removeItem("actas-foto-"+ref)}catch(e){}}
-      contarSueltas();status();
-    }
-    contarSueltas()}
+      SYNC_INFO.subida.hechas++;contarSueltas();status();
+    }}
+    SYNC_INFO.subida=null;contarSueltas()}
     if(DB&&!noWrite){for(const id of [...DELQ]){
       try{await TO(DB.doc(id.includes("/")?id:"actas/"+id).delete(),20000)}catch(e){if(errSubida(e))break;continue}
       DELQ.delete(id);saveDQ();status();
@@ -662,7 +677,7 @@ function renderADM(){
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       ${lecAdminHTML(lect)}`)}
-    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
+    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de visitas / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
@@ -1841,7 +1856,7 @@ function traspasoHTML(){
   const inst=(window.navigator.standalone===true||matchMedia("(display-mode: standalone)").matches)?"":(ESCRITORIO()?`<div class="info"><b>En el computador</b> la app se usa desde el navegador. Si quieres tenerla como programa, en Chrome o Edge usa el ícono <b>Instalar</b> de la barra de direcciones.</div>`:`<div class="info netbox"><b>Instala la app antes de salir a terreno:</b> en Safari toca Compartir y luego <b>Agregar a pantalla de inicio</b> (en Android, menú ⋮ → Instalar app). Ábrela siempre desde ese ícono: así funciona sin señal y las actas quedan guardadas.</div>`);
   return `${inst}${diag}<h2>Sincronización</h2><p class="note" style="margin-top:0">Las actas se guardan en este teléfono y se suben solas a la carpeta compartida de Puduhue cuando hay señal. Cada acta muestra si está <b>sincronizada</b> o <b>pendiente de subir</b>.${SYNC_INFO.ultima?` Última sincronización: ${fmtD(isoLocal(SYNC_INFO.ultima))}.`:""}</p>
   <div class="btns" style="margin-top:8px"><button class="btn pri" data-a="pull">Sincronizar ahora</button><button class="btn" data-a="actasXlsx" ${DB?"":"disabled"}>Actualizar Excel</button><button class="btn" data-a="exportar">Exportar respaldo</button>${imp}</div>
-  <p class="note">En OneDrive, cada acta tiene su carpeta <b>Actas / Viviendas / Predio / Entregas o Devoluciones / fecha Trabajador</b> con sus fotos, el Acta.pdf y el Informe general.pdf, que se guardan al cerrarla. El Excel <b>Actas / Viviendas / Actas_de_vivienda.xlsx</b> consolida todas las actas, el detalle ítem por ítem, los hallazgos de las devoluciones y las fotos con enlace; se actualiza solo al cerrar un acta.</p>
+  <p class="note">En OneDrive, cada acta tiene su carpeta <b>Actas de vivienda / Predio / fecha Tipo Trabajador</b> con sus fotos, el Acta.pdf y el Informe general.pdf, que se guardan al cerrarla. El Excel <b>Actas_de_vivienda.xlsx</b> consolida todas las actas, el detalle ítem por ítem, los hallazgos de las devoluciones y las fotos con enlace; se actualiza solo al cerrar un acta.</p>
   
   <p class="note">Importar sirve para cargar archivos exportados por versiones anteriores de la app; nunca duplica.</p>`;
 }
@@ -2001,18 +2016,7 @@ function actasXlsxBuild(){
   const w4=XLSX.utils.aoa_to_sheet(r4);w4["!cols"]=[12,14,16,24,11,24,40,9,22].map(w=>({wch:w}));links.forEach(([r,u])=>{const c=w4[XLSX.utils.encode_cell({r,c:8})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});XLSX.utils.book_append_sheet(wb,w4,"Fotos");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
-/* v118: las carpetas se ordenaron de nuevo y los enlaces guardados (fotoUrl) apuntaban a la carpeta antigua. Antes de escribir
-   un Excel se piden a OneDrive, por el id de la foto (no cambia al mover), los que no están en la carpeta nueva (marca(doc));
-   las actas o visitas cerradas o anuladas se guardan con el enlace nuevo, así se corrigen una sola vez. */
-async function urlsAlDia(docs,marca,guardar){
-  for(const a of docs){const U=a.fotoUrl;if(!U)continue;const m=marca(a);
-    const malos=Object.keys(U).filter(r=>r.startsWith("a:")&&esItemId(r.slice(2))&&!String(U[r]).includes(m));if(!malos.length)continue;
-    let n=0;for(const r of malos){try{const it=await gjson(`/drives/${M365.drive}/items/${r.slice(2)}?$select=webUrl`);if(it&&it.webUrl&&it.webUrl!==U[r]){U[r]=it.webUrl;n++}}catch(e){console.warn("enlace foto",r,e)}}
-    if(n&&(a.estado==="cerrada"||a.anulada)&&!LOCAL[a.id]){a.actualizado=new Date().toISOString();await guardar(a)}}
-}
-const marcaActa=a=>"/Actas/"+encodeURIComponent(carpetaActa(a)[0])+"/";
-async function actasXlsxUpload(){await urlsAlDia(Object.values(ACTAS).filter(a=>a._col!=="visitas"&&!esAx(a)),marcaActa,saveActa);
-  const buf=actasXlsxBuild();const dir=await actaCarpeta(["Viviendas"]);const r=await gfetch(`/drives/${M365.drive}/items/${dir}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
+async function actasXlsxUpload(){const buf=actasXlsxBuild();const r=await gfetch(`/drives/${M365.drive}/items/${M365.root}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
 function actasXlsx(manual){return subirExcel("actas",manual,actasXlsxUpload)}
 /* Al cerrar un acta: guardar Acta.pdf e Informe general.pdf en su carpeta de OneDrive */
 async function subirPDFsActa(a){
@@ -2396,6 +2400,8 @@ function estadoSync(){
 const phItem=(ico,tit,sub,attrs,tono)=>`<button class="lx-cont ph${tono?" ph-"+tono:""}" ${attrs}><span class="ph-ico" aria-hidden="true">${ico}</span><span class="lx-ctx"><span class="lx-ct">${tit}</span>${sub?`<span class="lx-cw">${sub}</span>`:""}</span>${ICO.arrow}</button>`;
 function paraHoyItems(){
   const L=[];
+  /* v118: fotos sin subir: una app web no puede subirlas con la app cerrada (en iPhone no existe esa opción) */
+  try{const nf=fotosPend();if(nf&&DB)L.push(phItem(ICO.cloud,`${fotosTxt(nf)} sin subir`,navigator.onLine===false?"Sin señal. Al tener señal, ábrela y déjala abierta.":"Subiendo: deja la app abierta un momento.",`data-a="estadoSync"`,"urg"))}catch(e){}
   try{
     const ap=rdParaMi(),apJ=ap.filter(r=>puedeJefatura(r)),apC=ap.filter(r=>!puedeJefatura(r)&&puedeContab(r));
     const quienes=a=>esc(a.slice(0,3).map(r=>r.persona&&r.persona.nombre).filter(Boolean).join(", ")+(a.length>3?"…":""));
@@ -2648,10 +2654,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=119"></script>
-<script src="modulos/bodega.js?v=119"></script>
-<script src="modulos/rendiciones.js?v=119"></script>
-<script src="modulos/actas-entrega.js?v=119"></script>
+<script src="modulos/checklist.js?v=118"></script>
+<script src="modulos/bodega.js?v=118"></script>
+<script src="modulos/rendiciones.js?v=118"></script>
+<script src="modulos/actas-entrega.js?v=118"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
