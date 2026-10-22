@@ -351,7 +351,7 @@ const CBPATH={};
 async function cbCarpeta(segs){let parent=CB.root,path="";
   for(const seg of segs){path+="/"+seg;if(CBPATH[path]){parent=CBPATH[path];continue}
     let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const r=await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:seg,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=r.id}
+    if(!id){const r=await crearCarpeta(parent,seg);id=r.id}
     CBPATH[path]=id;parent=id}return parent}
 const carpetaConteo=c=>[limpiaNombre(c.bodega),`${c.fecha} Conteo ${c.n}`];
 async function cbSubir(segs,name,blob,type){const f=await cbCarpeta(segs);const r=await gfetch(`/drives/${M365.drive}/items/${f}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}

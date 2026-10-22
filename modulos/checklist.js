@@ -825,14 +825,14 @@ async function clRaiz(tipo){const K=CLK[tipo],LK="actas-cl-raiz-"+tipo;if(K.root
   try{const g=localStorage.getItem(LK);if(g){K.root=g;return g}}catch(e){}
   const pv=await gjson(`/drives/${M365.drive}/items/${CLK.visitas.root}?$select=id,parentReference`);const padre=pv&&pv.parentReference&&pv.parentReference.id;if(!padre)throw new Error("No se encontró la carpeta de los check list.");
   let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${padre}:/${encName(K.carpeta)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-  if(!id){const c=await gjson(`/drives/${M365.drive}/items/${padre}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:K.carpeta,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=c.id}
+  if(!id){const c=await crearCarpeta(padre,K.carpeta);id=c.id}
   K.root=id;try{localStorage.setItem(LK,id)}catch(e){}return id}
 async function clCarpeta(segs,tipo){
   /* asegura Check list de visitas (o de bodega)/{seg1}/{seg2}... y devuelve el id de la última */
   tipo=tipo||"visitas";let parent=CLK[tipo].root||await clRaiz(tipo),path=tipo+":";
   for(const seg of segs){path+="/"+seg;if(CLPATH[path]){parent=CLPATH[path];continue}
     let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const c=await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:seg,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=c.id}
+    if(!id){const c=await crearCarpeta(parent,seg);id=c.id}
     CLPATH[path]=id;parent=id}
   return parent;
 }

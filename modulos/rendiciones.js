@@ -2000,7 +2000,7 @@ const RDPATH={};
 async function rdCarpeta(segs){let parent=RD.root,path="";
   for(const seg of segs){path+="/"+seg;if(RDPATH[path]){parent=RDPATH[path];continue}
     let id=null;try{const x=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=x.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const x=await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:seg,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=x.id}
+    if(!id){const x=await crearCarpeta(parent,seg);id=x.id}
     RDPATH[path]=id;parent=id}return parent}
 const carpetaRend=r=>[r.periodo,limpiaNombre(r.persona?r.persona.nombre:"Sin nombre")];
 async function rdSubir(segs,name,blob,type){const f=await rdCarpeta(segs);const x=await gfetch(`/drives/${M365.drive}/items/${f}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return x.json()}
