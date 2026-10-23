@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=119">
+<link rel="stylesheet" href="estilos.css?v=121">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="119";
+const APP_VER="121";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -206,6 +206,13 @@ async function gfetch(path,opts,reintento){
   return res;
 }
 const gjson=async(path,opts)=>{const r=await gfetch(path,opts);return r.status===204?null:r.json()};
+/* v120: crea una carpeta en OneDrive. Si dos subidas a la vez piden la misma, se crea una sola vez; si ya existía (409), se usa
+   la que está. Lo usan los 4 módulos (las fotos se suben de a 3). */
+const CARP_EN_CURSO={};
+function crearCarpeta(parent,name){const k=parent+"/"+name;if(CARP_EN_CURSO[k])return CARP_EN_CURSO[k];
+  const p=(async()=>{try{return await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,folder:{},"@microsoft.graph.conflictBehavior":"fail"})})}
+    catch(e){if(e&&e.code==="graph"&&e.status===409)return await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(name)}`);throw e}})();
+  CARP_EN_CURSO[k]=p;p.then(()=>{delete CARP_EN_CURSO[k]},()=>{delete CARP_EN_CURSO[k]});return p}
 const encName=n=>encodeURIComponent(n).replace(/'/g,"%27");
 async function asegurarCarpetas(){
   /* carpeta "fotos" heredada de las primeras versiones: solo para leer fotos antiguas */
@@ -228,7 +235,7 @@ async function actaCarpeta(segs){
   let parent=M365.root,path="";
   for(const seg of segs){path+="/"+seg;if(ACTPATH[path]){parent=ACTPATH[path];continue}
     let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const c=await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:seg,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=c.id}
+    if(!id){const c=await crearCarpeta(parent,seg);id=c.id}
     ACTPATH[path]=id;parent=id}
   return parent;
 }
@@ -243,7 +250,7 @@ let FOLDERS={};try{FOLDERS=JSON.parse(localStorage.getItem("actas-m365-folders")
 async function carpetaCol(col){
   if(FOLDERS[col])return FOLDERS[col];const c=M365.cols[col];
   {let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${c.root}:/${encName(c.sub)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const r=await gjson(`/drives/${M365.drive}/items/${c.root}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:c.sub,folder:{},"@microsoft.graph.conflictBehavior":"fail"})});id=r.id}
+    if(!id){const r=await crearCarpeta(c.root,c.sub);id=r.id}
     FOLDERS[col]=id}
   try{localStorage.setItem("actas-m365-folders",JSON.stringify(FOLDERS))}catch(e){}return FOLDERS[col];
 }
@@ -267,6 +274,7 @@ async function pull(manual){
     try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")renderFondo()}}catch(e){console.warn("catálogo",e)}
     try{if(await stockPull()&&(view==="stock"||view==="launch"))renderFondo()}catch(e){console.warn("stock",e)}
     try{if(await rdMaePull()&&/^rd/.test(view))renderFondo()}catch(e){console.warn("maestros rendiciones",e)}
+    try{if(await permPull())renderFondo()}catch(e){console.warn("permisos",e)}
     if(CAT_PEND&&esAdmin())await guardarCatalogo(false);
     guardarEtags();SYNC_INFO.ultima=new Date().toISOString();SYNC_INFO.error="";if(noWrite){noWrite=false;schedSync(1000)} /* v106 (A-03) */try{localStorage.setItem(LK,SYNC_INFO.ultima)}catch(e){}
     if(manual)toast(cambios?`Actualizado: ${cambios} ${cambios===1?"registro":"registros"} con cambios.`:"Todo al día.");
@@ -380,13 +388,18 @@ let DELQ=new Set();try{DELQ=new Set(JSON.parse(localStorage.getItem(DQK)||"[]"))
 function saveDQ(){try{localStorage.setItem(DQK,JSON.stringify([...DELQ]))}catch(e){}}
 function pend(){return (DB?Object.keys(LOCAL).length+DELQ.size:0)+(AS?Object.keys(QF).length+NSUELTAS:0)}
 let syncing=false,syncT=null,again=false,NSUELTAS=0;
+/* v120: fotos (y PDF) guardados en el teléfono que faltan por subir */
+const fotosPend=()=>AS?Object.keys(QF).length+NSUELTAS:0;
+const fotosTxt=n=>{const np=AS?Object.values(QF).filter(m=>m&&m.pdf).length:0;return `${n} ${np?(n===1?"archivo":"archivos"):(n===1?"foto":"fotos")}`};
 function pendHTML(){
   const n=pend();if(!n||!DB)return"";
-  if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite)return"";
+  /* v120: con señal, mientras suben las fotos se ve el avance y se pide dejar la app abierta */
+  if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite){const nf=fotosPend(),S=SYNC_INFO.subida;if(!nf)return"";
+    return `<div class="info pendbox subiendo"><span class="spin" aria-hidden="true"></span> <b>${S&&S.total?`Subiendo fotos: ${Math.min(S.hechas+1,S.total)} de ${S.total}.`:`${fotosTxt(nf)} por subir.`}</b> Deja la app abierta hasta que termine.</div>`}
   const qs=AS?Object.values(QF):[],np=qs.filter(m=>m&&m.pdf).length,nf=qs.length-np+NSUELTAS,na=Object.keys(LOCAL).length,nd=DELQ.size;
   const L=[na?`${na} ${na===1?"registro con cambios":"registros con cambios"}`:"",nf?`${nf} ${nf===1?"foto":"fotos"}`:"",np?`${np} PDF`:"",nd?`${nd} ${nd===1?"borrador eliminado":"borradores eliminados"}`:""].filter(Boolean);
   const det=L.length>1?L.slice(0,-1).join(", ")+" y "+L[L.length-1]:L.join("");
-  return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal; no cierres sesión ni borres los datos de la app mientras tanto.${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
+  return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal y la app esté abierta: al tener señal, ábrela y déjala abierta un momento. No cierres sesión ni borres los datos de la app mientras tanto.${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
 }
 function netHTML(){
   if(navigator.onLine!==false)return"";
@@ -439,16 +452,21 @@ async function sync(){
   if(syncing)return;
   syncing=true;status();
   try{
-    if(AS){for(const ref of Object.keys(QF)){
-      const meta=QF[ref];let rec=null;try{rec=await IDB.get("fotos",ref)}catch(e){}
-      const blob=await recBlob(rec);
-      if(!blob){LOST[ref]=true;delete QF[ref];refrescarFotoItem(meta);continue}
-      if(!objetoDeFoto(meta)){delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}continue}
-      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];continue}if(errSubida(e))break;continue}
-      noWrite=false;await fotoSubida(ref,meta,u);
-      delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}
-      status();
-    }
+    if(AS){
+      /* v120: de a 3 fotos a la vez (antes de a una); un error de toda la cola (sin red, sesión, permiso) detiene a los 3 */
+      const refs=Object.keys(QF);let parar=false;SYNC_INFO.subida={total:refs.length+NSUELTAS,hechas:0};status();
+      const una=async ref=>{
+        const meta=QF[ref];if(!meta)return;let rec=null;try{rec=await IDB.get("fotos",ref)}catch(e){}
+        const blob=await recBlob(rec);
+        if(!blob){LOST[ref]=true;delete QF[ref];refrescarFotoItem(meta);return}
+        if(!objetoDeFoto(meta)){delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}return}
+        let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];return}if(errSubida(e))parar=true;return}
+        noWrite=false;await fotoSubida(ref,meta,u);
+        delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}
+        SYNC_INFO.subida.hechas++;status()};
+      const trabajador=async()=>{while(!parar&&refs.length)await una(refs.shift())};
+      await Promise.all([trabajador(),trabajador(),trabajador()]);
+      if(!parar){
     for(const {ref,meta} of fotosSueltas()){
       let src="";try{src=ref.startsWith("l:")?localStorage.getItem("actas-foto-"+ref)||"":FOTO[ref]||""}catch(e){}
       if(!src||!objetoDeFoto(meta))continue;
@@ -456,9 +474,9 @@ async function sync(){
       let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone")continue;if(errSubida(e))break;continue}
       noWrite=false;FOTO[ref]=FOTO[ref]||src;await fotoSubida(ref,meta,u);
       if(ref.startsWith("l:")){try{localStorage.removeItem("actas-foto-"+ref)}catch(e){}}
-      contarSueltas();status();
-    }
-    contarSueltas()}
+      SYNC_INFO.subida.hechas++;contarSueltas();status();
+    }}
+    SYNC_INFO.subida=null;contarSueltas()}
     if(DB&&!noWrite){for(const id of [...DELQ]){
       try{await TO(DB.doc(id.includes("/")?id:"actas/"+id).delete(),20000)}catch(e){if(errSubida(e))break;continue}
       DELQ.delete(id);saveDQ();status();
@@ -514,8 +532,8 @@ const TB_USO_K="actas-uso-mod";
 const TB_ICO_ACTA=`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15.5" r="4"/><path d="M10.9 12.6L19 4.5"/><path d="M15.5 8l2.5 2.5"/><path d="M13.5 10l1.8 1.8"/></svg>`;
 const TB_MODS=[
   {k:"rd",a:"rd",t:"Rendiciones",tl:"Rendiciones",s:"Facturas y boletas",i:()=>ICO.receipt,ok:()=>true},
-  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas y camionetas",i:()=>ICO.check,ok:()=>true},
-  {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>true},
+  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas y camionetas",i:()=>ICO.check,ok:()=>permVe("cl")},
+  {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>permVe("ax")},
   {k:"cb",a:"cb",t:"Bodega",tl:"Control de bodega",s:"Conteo contra el stock del sistema",i:()=>ICO.clip,ok:()=>puedeContar()},
   {k:"stock",a:"stock",t:"Stock",tl:"Stock",s:"Existencias desde Finnegans",i:()=>ICO.box,ok:()=>puedeVerStock()},
   /* v113: los check list de bodega y de camionetas están dentro de «Check list de cumplimiento» */];
@@ -658,6 +676,7 @@ function renderADM(){
   const fa=typeof fotosAntiguas==="function"?fotosAntiguas():0;
   return head+`<main class="wrap"><h1>Administración</h1>
     <p class="lead">Herramientas que solo ve el administrador de la app.</p>
+    ${sec("Permisos",`<div class="admit"><b>Permisos por persona</b><p>Qué módulos ve cada persona y si puede editarlos o solo verlos.${(()=>{const n=permPersonas().filter(p=>permCon(p.c)).length;return n?` Hoy ${n} ${n===1?"persona tiene":"personas tienen"} restricciones.`:" Hoy todos ven y editan en todo."})()}</p><div class="btns"><button class="btn" data-a="admPerm">Abrir permisos</button></div></div>`)}
     ${sec("Servidor y Finnegans",`${admSaludHTML()}<div class="btns"><button class="btn" data-a="admSalud" ${ADM.saludCarg?"disabled":""}>Revisar de nuevo</button><button class="btn" data-a="finn">Conexión con Finnegans</button></div>`)}
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
@@ -670,6 +689,7 @@ function renderADM(){
 async function admClick(A,b){
   if(A==="adm"){go("adm");window.scrollTo(0,0);return true}
   if(A==="admSalud"){ADM.salud=null;await admSalud();return true}
+  if(A==="admPerm"){permQ="";permSolo=false;go("perm");return true}
   if(A==="admCat"){clTipo=["bodega","camionetas"].includes(b.dataset.t)?b.dataset.t:"visitas";await clClick("clCat",b);return true}
   return false;
 }
@@ -679,6 +699,141 @@ async function mnClick(A,b){
   if(A==="mnCb"){mnCb(CONT[b.dataset.id]);return true}
   return false;
 }
+/* ---------- v121: permisos por persona y módulo ----------
+   El administrador elige, para cada persona, qué módulos ve y si puede editarlos (agregar o modificar registros) o solo verlos (Administración › Permisos por persona).
+   Niveles: "agregar" (ve y agrega, el valor de siempre), "ver" (solo ve: no crea, no edita ni elimina borradores) y "no" (no ve
+   el módulo). Stock solo tiene "agregar" (= ve) y "no". Rendiciones es para todos. Quien no está en la lista ve y agrega en todo
+   y el administrador siempre ve y edita en todo.
+   Se guarda en OneDrive: Apps de terreno / _config / Permisos_app.json (los correos no van en el código, que es público), con una
+   copia en el teléfono para que valga sin señal. */
+const PERM_MODS=[{k:"cl",t:"Check list de cumplimiento",c:"Check list"},{k:"ax",t:"Actas",c:"Actas"},{k:"cb",t:"Control de bodega",c:"Bodega"},{k:"stock",t:"Stock",c:"Stock",soloVer:true}];
+const PERM_MOD=Object.fromEntries(PERM_MODS.map(m=>[m.k,m]));
+/* acciones que crean, cierran o eliminan registros: con «Solo ve» no se muestran ni se ejecutan */
+const PERM_ACC={newEnt:"ax",newDev:"ax",axNew:"ax",axDev:"ax",close:"ax",axClose:"ax",del:"ax",delId:"ax",axDel:"ax",clNueva:"cl",clCerrar:"cl",clDel:"cl",cbNuevo:"cb",cbCerrar:"cb",cbDel:"cb"};
+const PERM_K="actas-permisos",PERM_DIR_K="actas-permisos-dir",PERM_FILE="Permisos_app.json";
+const permVacio=()=>({personas:{},nombres:{},actualizado:"",por:""});
+let PERM=(()=>{try{const x=JSON.parse(localStorage.getItem(PERM_K)||"null");return x&&x.personas&&typeof x.personas==="object"?x:permVacio()}catch(e){return permVacio()}})();
+let PERM_ETAG=PERM._etag||"",PERM_PEND=!!PERM._pend,PERM_ERR="",PERM_T=null,permQ="",permSolo=false;
+if(!PERM.nombres||typeof PERM.nombres!=="object")PERM.nombres={};
+function permLocal(){try{localStorage.setItem(PERM_K,JSON.stringify(Object.assign({},PERM,{_etag:PERM_ETAG,_pend:PERM_PEND})))}catch(e){}}
+const permNorm=c=>String(c||"").trim().toLowerCase();
+function permDe(m,c){const p=PERM.personas[permNorm(c)],v=p&&p[m];return v==="no"||(v==="ver"&&!(PERM_MOD[m]&&PERM_MOD[m].soloVer))?v:"agregar"}
+/* lo que puede hacer quien usa la app: se busca su correo y, si no está, los otros correos de su ficha en Colaboradores */
+function permMio(m){
+  if(!ME||esAdmin())return"agregar";
+  const L=[meCorreo()];try{colabsDeCuenta().forEach(c=>correosDe(c).forEach(x=>{if(!L.includes(x))L.push(x)}))}catch(e){}
+  const c=L.find(x=>x&&PERM.personas[x]);return c?permDe(m,c):"agregar"}
+const permVe=m=>permMio(m)!=="no";
+const permAgrega=m=>permMio(m)==="agregar";
+function permFuera(v){const m=tbModDe(v==="pickDev"?"axl":v);return !!(m&&PERM_MOD[m]&&!permVe(m))}
+function permSinAccesoHTML(v){const m=PERM_MOD[tbModDe(v==="pickDev"?"axl":v)];
+  return band(m.t)+`<main class="wrap"><h1>${esc(m.t)}</h1><div class="empty">No tienes acceso a este módulo. Si lo necesitas, pídeselo al administrador de la app.</div></main>`}
+function permBloquea(A){const m=PERM_ACC[A];if(!m||permAgrega(m))return false;
+  toast(permVe(m)?`En ${PERM_MOD[m].t} tienes acceso solo para ver: no puedes agregar ni modificar registros.`:`No tienes acceso a ${PERM_MOD[m].t}.`);return true}
+/* después de dibujar: con «Solo ve» se quitan los botones de crear, cerrar y eliminar, y se avisa arriba */
+function permTrasRender(app){
+  if(!ME||esAdmin()||!app)return;
+  Object.keys(PERM_ACC).forEach(A=>{if(!permAgrega(PERM_ACC[A]))app.querySelectorAll(`[data-a="${A}"]`).forEach(e=>e.remove())});
+  const m=tbModDe(view==="pickDev"?"axl":view);
+  if(m&&PERM_MOD[m]&&permMio(m)==="ver"){const mn=app.querySelector("main");
+    if(mn&&!mn.querySelector(".permro"))mn.insertAdjacentHTML("afterbegin",`<div class="info permro">Tienes acceso solo para ver ${esc(PERM_MOD[m].t)}: no puedes agregar ni modificar registros.</div>`)}
+}
+/* OneDrive: la carpeta _config va junto a Actas, en Apps de terreno */
+async function permCarpeta(crear){
+  let id=null;try{id=localStorage.getItem(PERM_DIR_K)}catch(e){}
+  if(id)return id;
+  const a=await gjson(`/drives/${M365.drive}/items/${M365.root}?$select=id,parentReference`);const padre=a&&a.parentReference&&a.parentReference.id;
+  if(!padre)throw new Error("No se encontró la carpeta Apps de terreno.");
+  try{const r=await gjson(`/drives/${M365.drive}/items/${padre}:/_config?$select=id`);id=r&&r.id}catch(e){if(e.code!=="not_found")throw e}
+  if(!id){if(!crear)return null;id=(await crearCarpeta(padre,"_config")).id}
+  try{localStorage.setItem(PERM_DIR_K,id)}catch(e){}
+  return id}
+async function permPull(){
+  if(!DB||navigator.onLine===false||!ME)return false;
+  if(PERM_PEND&&esAdmin())return await permSubir();
+  const leer=async()=>{const d=await permCarpeta(false);if(!d)return null;
+    try{return await gjson(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}?$select=id,eTag`)}catch(e){if(e.code==="not_found")return null;throw e}};
+  let usaba=false;try{usaba=!!localStorage.getItem(PERM_DIR_K)}catch(e){}
+  let meta=await leer();
+  if(!meta&&usaba){try{localStorage.removeItem(PERM_DIR_K)}catch(e){}meta=await leer()}
+  if(!meta){if(!Object.keys(PERM.personas).length)return false;PERM=permVacio();PERM_ETAG="";permLocal();return true}
+  if(meta.eTag===PERM_ETAG)return false;
+  const r=await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const x=await r.json();
+  if(!x||!x.personas||typeof x.personas!=="object")throw new Error("El archivo de permisos no se pudo leer.");
+  PERM={personas:x.personas,nombres:x.nombres&&typeof x.nombres==="object"?x.nombres:{},actualizado:x.actualizado||"",por:x.por||""};PERM_ETAG=meta.eTag||"";permLocal();return true}
+async function permSubir(){
+  if(!esAdmin())return false;
+  if(!DB||navigator.onLine===false){PERM_PEND=true;PERM_ERR="";permLocal();return false}
+  const body=JSON.stringify({v:1,personas:PERM.personas,nombres:PERM.nombres,actualizado:PERM.actualizado,por:PERM.por},null,1);
+  const put=async()=>{const d=await permCarpeta(true);const r=await gfetch(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body});return r.json()};
+  try{let it;try{it=await put()}catch(e){if(e.code!=="not_found")throw e;try{localStorage.removeItem(PERM_DIR_K)}catch(x){}it=await put()}
+    PERM_ETAG=(it&&it.eTag)||"";PERM_PEND=false;PERM_ERR="";permLocal();return true}
+  catch(e){console.error(e);PERM_PEND=true;PERM_ERR=errMsg(e);permLocal();return false}}
+function permCambio(){
+  PERM.actualizado=new Date().toISOString();PERM.por=(ME&&ME.nombre)||"";PERM_PEND=true;permLocal();
+  if(view==="perm")render();
+  clearTimeout(PERM_T);PERM_T=setTimeout(async()=>{await permSubir();if(view==="perm")render()},700)}
+/* pantalla del administrador */
+function permPersonas(){
+  const M=new Map(),todos=new Set();
+  try{colabs().filter(c=>c.activo!==false).forEach(c=>{const L=correosDe(c);L.forEach(x=>todos.add(x));if(L.length&&!M.has(L[0]))M.set(L[0],{c:L[0],n:String(c.nombre||L[0]),col:true})})}catch(e){}
+  Object.keys(PERM.personas).concat(Object.keys(PERM.nombres||{})).forEach(c=>{if(!M.has(c)&&!todos.has(c))M.set(c,{c,n:String((PERM.nombres||{})[c]||c),col:false})});
+  return [...M.values()]}
+const permCon=c=>PERM_MODS.some(m=>permDe(m.k,c)!=="agregar");
+function permLista(){const t=normTxt(permQ.trim());
+  return permPersonas().filter(p=>(!t||normTxt(p.n+" "+p.c).includes(t))&&(!permSolo||permCon(p.c))).sort((a,b)=>(permCon(b.c)-permCon(a.c))||a.n.localeCompare(b.n,"es"))}
+function permFilasHTML(){
+  const L=permLista();
+  if(!L.length)return `<p class="note permvac">${permQ.trim()?"Nadie coincide con la búsqueda.":permSolo?"Nadie tiene restricciones: todos ven y editan en todo.":"No hay personas en Colaboradores. Agrega a alguien por su correo."}</p>`;
+  const cel=(m,c)=>{const v=permDe(m.k,c);return `<span class="permc p${v}" role="cell" aria-label="${esc(m.c)}: ${v==="no"?"no ve":v==="ver"?"solo ve":m.soloVer?"ve":"ve y edita"}">${v==="no"?"No ve":v==="ver"?"Solo ve":m.soloVer?"Ve":"Edita"}</span>`};
+  return L.map(p=>`<button class="permfila" role="row" data-a="permAbrir" data-c="${esc(p.c)}"><span class="permn" role="cell"><b>${esc(p.n)}</b><small>${esc(p.c)}</small></span>${PERM_MODS.map(m=>cel(m,p.c)).join("")}</button>`).join("")}
+function renderPerm(){
+  const head=band("Permisos","adm","Volver");
+  if(!esAdmin())return head+`<main class="wrap"><h1>Permisos por persona</h1><div class="empty">Solo el administrador de la app ve esta pantalla.</div></main>`;
+  const P=permPersonas(),nr=P.filter(p=>permCon(p.c)).length;
+  const est=PERM_PEND?`<div class="info">Hay cambios sin guardar en OneDrive${PERM_ERR?`: ${esc(PERM_ERR)}`:navigator.onLine===false?" (sin señal)":""}. Se guardan solos cuando haya conexión.</div>`
+    :PERM.actualizado?`<p class="note">Guardado en OneDrive. Último cambio el ${fmtD(isoLocal(PERM.actualizado))}${PERM.por?` por ${esc(PERM.por)}`:""}.</p>`:"";
+  return head+`<main class="wrap"><h1>Permisos por persona</h1>
+    <p class="lead">Qué módulos ve cada persona y si puede editarlos (agregar o modificar registros) o solo verlos. Toca a una persona para cambiarlo.</p>
+    ${est}
+    <div class="f permbus"><input id="permbus" type="search" placeholder="Buscar persona o correo" value="${esc(permQ)}" autocomplete="off" aria-label="Buscar persona"></div>
+    <div class="filt"><button class="fb" data-a="permFil" data-v="" aria-pressed="${!permSolo}">Todas (${P.length})</button><button class="fb" data-a="permFil" data-v="1" aria-pressed="${permSolo}">Con restricciones (${nr})</button></div>
+    <div class="permtab" role="table" aria-label="Permisos por persona"><div class="permfila permcab" role="row"><span role="columnheader">Persona</span>${PERM_MODS.map(m=>`<span role="columnheader">${esc(m.c)}</span>`).join("")}</div>
+    <div id="permfilas" role="rowgroup">${permFilasHTML()}</div></div>
+    <p class="note"><b>Edita:</b> ve, agrega y modifica registros. <b>Solo ve:</b> ve los registros, pero no agrega, no modifica ni elimina. <b>No ve:</b> el módulo no le aparece. Rendiciones es para todos. Quien no tiene cambios ve y edita en todo; el administrador, siempre.</p>
+    <section class="admit"><b>Agregar a alguien que no está en Colaboradores</b><p>Escribe su correo de Puduhue.</p><div class="permadd"><div class="f"><input id="permnuevo" type="email" placeholder="nombre@puduhue.cl" autocomplete="off" aria-label="Correo"></div><button class="btn" data-a="permAgregar">Agregar</button></div></section>
+    <p class="note">Se guarda en OneDrive (Apps de terreno / _config / ${PERM_FILE}) y llega a cada teléfono al sincronizar.</p>
+  </main>`}
+function permHoja(c){
+  const p=permPersonas().find(x=>x.c===c)||{c,n:c,col:false};
+  const html=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Permisos de ${esc(p.n)}"><h3>${esc(p.n)}</h3><p class="note" style="margin-top:0">${esc(c)}</p>
+    ${ADMINS.includes(c)?`<div class="info">Es el administrador de la app: siempre ve y edita en todo, aunque aquí se cambie.</div>`:""}
+    ${PERM_MODS.map(m=>{const v=permDe(m.k,c),op=m.soloVer?[["agregar","Ve","C"],["no","No ve","N"]]:[["agregar","Ve y edita","C"],["ver","Solo ve","P"],["no","No ve","N"]];
+      return `<div class="f permmod"><label>${esc(m.t)}</label><div class="seg" style="grid-template-columns:repeat(${op.length},1fr)" role="group" aria-label="${esc(m.t)}">${op.map(([k,t,e])=>`<button data-a="permSet" data-c="${esc(c)}" data-mod="${m.k}" data-v="${k}" data-e="${e}" aria-pressed="${v===k}">${t}</button>`).join("")}</div></div>`}).join("")}
+    <p class="note">Rendiciones: todas las personas. Los cambios se guardan solos.</p>
+    <div class="btns">${permCon(c)||!p.col?`<button class="btn" data-a="permTodo" data-c="${esc(c)}">${p.col?"Dar acceso a todo":"Quitar de la lista"}</button>`:""}<button class="btn pri" data-a="permCerrar" style="flex:1">Listo</button></div></div>`;
+  let m=document.querySelector(".permsheet");
+  if(m){m.innerHTML=html;return}
+  m=document.createElement("div");m.className="modal permsheet";m.innerHTML=html;document.body.appendChild(m);
+  m.addEventListener("click",e=>{if(e.target===m)m.remove()});
+}
+async function permClick(A,b){
+  if(A==="permFil"){permSolo=!!b.dataset.v;render();return true}
+  if(A==="permAbrir"){permHoja(b.dataset.c);return true}
+  if(A==="permCerrar"){document.querySelectorAll(".permsheet").forEach(x=>x.remove());return true}
+  if(!esAdmin())return true;
+  if(A==="permSet"){const c=permNorm(b.dataset.c),m=b.dataset.mod,v=b.dataset.v;if(!PERM_MOD[m])return true;
+    const p=Object.assign({},PERM.personas[c]||{});if(v==="no"||v==="ver")p[m]=v;else delete p[m];
+    if(Object.keys(p).length)PERM.personas[c]=p;else delete PERM.personas[c];
+    permCambio();permHoja(c);return true}
+  if(A==="permTodo"){const c=permNorm(b.dataset.c);delete PERM.personas[c];delete PERM.nombres[c];permCambio();document.querySelectorAll(".permsheet").forEach(x=>x.remove());return true}
+  if(A==="permAgregar"){const i=$("#permnuevo");let c=permNorm(i&&i.value);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)){toast("Escribe un correo válido.");return true}
+    try{const col=colabs().find(x=>x.activo!==false&&correosDe(x).includes(c));if(col)c=correosDe(col)[0]}catch(e){}
+    if(!permPersonas().some(p=>p.c===c))PERM.nombres[c]=c;
+    permQ="";permCambio();permHoja(c);return true}
+  return false}
+document.addEventListener("input",ev=>{if(ev.target&&ev.target.id==="permbus"){permQ=ev.target.value;const f=$("#permfilas");if(f)f.innerHTML=permFilasHTML()}});
 /* v102: «v95: «Para hoy» del fondo» está en modulos/rendiciones.js */
 /* ---------- v96: la app se siente más nativa ----------
    1) Rendir en tres toques: botón flotante «Rendir» en el Inicio y en «Mis rendiciones» (Cámara o Galería/PDF). La foto va
@@ -785,12 +940,12 @@ function disBusResultados(q){
   const hit=(...xs)=>{const n=normTxt(xs.filter(x=>x!=null&&x!=="").join(" "));return W.every(w=>n.includes(w))};
   const rec=(a,b)=>String(b.actualizado||b.fecha||b.creado||"").localeCompare(String(a.actualizado||a.fecha||a.creado||""));
   const G=[],grupo=(tit,L,f)=>{if(L.length)G.push({t:tit,n:L.length,it:L.slice(0,6).map(f)})};
-  const actas=Object.values(ACTAS).filter(a=>a&&!a.anulada);
+  const actas=permVe("ax")?Object.values(ACTAS).filter(a=>a&&!a.anulada):[];
   grupo("Actas de vivienda",actas.filter(a=>!esAx(a)&&hit(a.trabajador,a.rut,predioDe(a),a.vivienda,a.tipo==="devolucion"?"devolucion recepcion":"entrega",fmtD(a.fecha))).sort(rec),
     a=>disBusIt(`data-a="open" data-id="${esc(a.id)}"`,ICO.home,`${a.tipo==="devolucion"?"Recepción":"Entrega"} · ${esc(a.trabajador||"Sin nombre")}`,esc([[predioDe(a),a.vivienda].filter(Boolean).join(", "),fmtD(a.fecha)].filter(Boolean).join(" · ")),a.estado==="cerrada"?"":`<span class="xp neu">Borrador</span>`));
   grupo("Vehículos, activos y capacitaciones",actas.filter(a=>esAx(a)&&hit(axTitulo(a),axQuien(a),axDonde(a),fmtD(a.fecha))).sort(rec),
     a=>disBusIt(`data-a="axOpen" data-id="${esc(a.id)}"`,TB_ICO_ACTA,`${esc(axTitulo(a))} · ${esc(axQuien(a))}`,esc([axDonde(a),fmtD(a.fecha)].filter(Boolean).join(" · ")),a.estado==="cerrada"?"":`<span class="xp neu">Borrador</span>`));
-  grupo("Visitas",Object.values(VIS).filter(v=>v&&!v.anulada&&hit(v.predio,"visita "+v.n,v.revisor,CLK[tipoDe(v)]&&CLK[tipoDe(v)].titulo,fmtD(v.fecha))).sort(rec),
+  grupo("Visitas",(permVe("cl")?Object.values(VIS):[]).filter(v=>v&&!v.anulada&&hit(v.predio,"visita "+v.n,v.revisor,CLK[tipoDe(v)]&&CLK[tipoDe(v)].titulo,fmtD(v.fecha))).sort(rec),
     v=>{const sc=puntaje(v);return disBusIt(`data-a="clAbrir" data-id="${esc(v.id)}"`,tipoDe(v)==="bodega"?ICO.bodega:tipoDe(v)==="camionetas"?ICO.camioneta:ICO.check,`Visita ${v.n} · ${esc(v.predio)}`,esc([CLK[tipoDe(v)].titulo,fmtD(v.fecha),v.revisor].filter(Boolean).join(" · ")),v.estado!=="cerrada"?`<span class="xp neu">En curso</span>`:sc.pct!==null?`<b>${sc.pct} %</b>`:"")});
   const RV=disRendVisibles();
   grupo("Rendiciones",RV.filter(r=>hit(rdTitulo(r),r.persona&&r.persona.nombre,RD_ESTADO[r.estado])).sort(rec),
@@ -1010,13 +1165,15 @@ function renderPantalla(){
   if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
   const app=$("#app");
   if(!loaded){app.innerHTML=band("Cargando actas…");return}
-  if(view==="launch")app.innerHTML=renderLaunch();
+  if(permFuera(view))app.innerHTML=permSinAccesoHTML(view); /* v121 */
+  else if(view==="launch")app.innerHTML=renderLaunch();
   else if(view==="clhub")app.innerHTML=renderCLHub();
   else if(view==="cl")app.innerHTML=renderCL();
   else if(view==="clp")app.innerHTML=renderCLPredio();
   else if(view==="clcat")app.innerHTML=renderCLCat();
   else if(view==="finn")app.innerHTML=renderFinn();
   else if(view==="adm")app.innerHTML=renderADM();
+  else if(view==="perm")app.innerHTML=renderPerm();
   else if(view==="fdl")app.innerHTML=renderFDL();
   else if(view==="stock")app.innerHTML=renderStock();
   else if(view==="rd")app.innerHTML=renderRD();
@@ -1035,6 +1192,7 @@ function renderPantalla(){
   else if(view==="pickDev")app.innerHTML=renderPick();
   else if(view==="edit")app.innerHTML=renderEdit();
   if(view==="clv")setTimeout(clTabsAjustar,0);
+  try{permTrasRender(app)}catch(e){console.warn("permisos",e)}
   try{tbSync()}catch(e){console.warn("barra",e)}
   try{disTrasRender()}catch(e){console.warn("v96",e)}
   try{if(/^(launch|rd|rdv|rdd)$/.test(view))zxPrecargar()}catch(e){}
@@ -1090,7 +1248,7 @@ function renderPick(){
   <div class="list">${rows||`<div class="empty">No hay entregas pendientes de devolución en la app.</div>`}</div>
   <div class="btns"><button class="btn" data-a="devManual">Registrar sin acta de entrega</button></div></main>`;
 }
-function ro(){return cur&&cur.estado==="cerrada"}
+function ro(){return !!cur&&(cur.estado==="cerrada"||!permAgrega("ax"))} /* v121: con «Solo ve», como cerrada */
 function dis(){return ro()?"disabled":""}
 function renderEdit(){
   const a=cur,dev=a.tipo==="devolucion";
@@ -1249,6 +1407,7 @@ async function onClick(ev){
   try{return await onClickAccion(ev,b,A)}finally{OCUPADO.delete(A)}
 }
 async function onClickAccion(ev,b,A){
+  if(PERM_ACC[A]&&permBloquea(A))return; /* v121 */
   if(A==="fabRd"||A.startsWith("dis")){if(await disClick(A,b))return}
   if(A.startsWith("lec")){if(await lecClick(A,b))return}
   if(A==="pushOn"){pushSwVer(true);pushActivar().finally(pushPintar);return}
@@ -1263,6 +1422,7 @@ async function onClickAccion(ev,b,A){
   if(A==="pushProbar"){pushProbar();return}
   if(A==="pushAyuda"){pushAyuda();return}
   if(A==="pushNo"){try{localStorage.setItem(PUSH_NO_K,"1")}catch(e){}pushPintar();return}
+  if(A.startsWith("perm")){if(await permClick(A,b))return}
   if(A==="adm"||A.startsWith("adm")){if(await admClick(A,b))return}
   if(A.startsWith("mn")){if(await mnClick(A,b))return}
   if(A.startsWith("ax")){if(await axClick(A,b))return}
@@ -1805,13 +1965,13 @@ function renderLaunch(){
   const estado=SYNC_INFO.estado==="bajando"||syncing?["chk","Sincronizando<i class='dots'></i>"]:SYNC_INFO.error?["no",esc(SYNC_INFO.error)]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
   const sync=`<section class="lx-sec"><div class="lx-sync ${estado[0]}"><div class="lx-syncl"><span class="lx-synct">${estado[1]}</span><span class="lx-syncs">Última sincronización: ${ult}</span></div><button class="btn" data-a="pull" ${on?"":"disabled"}>${on?"Sincronizar":"Sin señal"}</button></div></section>`;
   let cont="";const conts=[];
-  if(borr){const done=ITEMS.filter(i=>(borr.items&&borr.items[i.k]||{}).v).length,pct=Math.round(done/ITEMS.length*100);
+  if(borr&&permAgrega("ax")){const done=ITEMS.filter(i=>(borr.items&&borr.items[i.k]||{}).v).length,pct=Math.round(done/ITEMS.length*100);
     conts.push(`<button class="lx-cont" data-a="open" data-id="${borr.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Acta de ${borr.tipo==="entrega"?"entrega":"devolución"} · ${esc(borr.trabajador||"Sin nombre")}</span><span class="lx-cw">${esc([predioDe(borr),borr.vivienda].filter(Boolean).join(", ")||"Sin predio")}</span><span class="lx-cn">${done} de ${ITEMS.length} ítems revisados</span></span>${ICO.arrow}</button>`)}
-  visAbs.forEach(visAb=>{const sc=puntaje(visAb),TV=itemsDe(visAb).length,pct=TV?Math.round(sc.rev/TV*100):0;
+  (permAgrega("cl")?visAbs:[]).forEach(visAb=>{const sc=puntaje(visAb),TV=itemsDe(visAb).length,pct=TV?Math.round(sc.rev/TV*100):0;
     conts.push(`<button class="lx-cont" data-a="clAbrir" data-id="${visAb.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Visita ${visAb.n} · ${esc(visAb.predio)}</span><span class="lx-cw">${CLK[tipoDe(visAb)].titulo} · ${fmtD(visAb.fecha)}</span><span class="lx-cn">${sc.rev} de ${TV} ítems revisados</span></span>${ICO.arrow}</button>`)});
   const cbAb=Object.values(CONT).filter(c=>c.estado!=="cerrado"&&!c.anulado).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
-  if(cbAb){const R=resumenConteo(cbAb),pct=R.total?Math.round(R.cont/R.total*100):0;conts.push(`<button class="lx-cont" data-a="cbAbrir" data-id="${cbAb.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Conteo ${cbAb.n} · ${esc(cbAb.bodega)}</span><span class="lx-cw">Control de bodega · ${fmtD(cbAb.fecha)}</span><span class="lx-cn">${R.cont} de ${R.total} productos contados</span></span>${ICO.arrow}</button>`)}
-  Object.values(ACTAS).filter(a=>esAx(a)&&!a.anulada&&a.estado!=="cerrada"&&a.creadoPor&&ME&&a.creadoPor.id===ME.id).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||""))).slice(0,1).forEach(a=>{const T=AX[a.tipo],m=axFaltantes(a).length;
+  if(cbAb&&permAgrega("cb")){const R=resumenConteo(cbAb),pct=R.total?Math.round(R.cont/R.total*100):0;conts.push(`<button class="lx-cont" data-a="cbAbrir" data-id="${cbAb.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Conteo ${cbAb.n} · ${esc(cbAb.bodega)}</span><span class="lx-cw">Control de bodega · ${fmtD(cbAb.fecha)}</span><span class="lx-cn">${R.cont} de ${R.total} productos contados</span></span>${ICO.arrow}</button>`)}
+  (permAgrega("ax")?Object.values(ACTAS):[]).filter(a=>esAx(a)&&!a.anulada&&a.estado!=="cerrada"&&a.creadoPor&&ME&&a.creadoPor.id===ME.id).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||""))).slice(0,1).forEach(a=>{const T=AX[a.tipo],m=axFaltantes(a).length;
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${a.id}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
   cont=`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy${ph.length?`<span class="cnt">${ph.length}</span>`:""}</h2>${ph.length?`<div class="lx-conts">${disPh(ph)}</div>`:`<div class="ph-aldia">${EST_ICO.ok}<span>No tienes nada pendiente.</span></div>`}</section>`;
@@ -1824,11 +1984,11 @@ function renderLaunch(){
   return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${cont}
     <h2 class="lx-h2 lx-modh">Módulos</h2>
     <div class="lx-modes lx-mods lx-lista">
-      <button class="lx-mode off" data-a="axHub"><span class="lx-mi">${ICO.home}</span><span class="lx-mt">Actas</span><span class="lx-md">Viviendas, vehículos, activos fijos y capacitaciones: fotos, firmas y PDF.</span><span class="lx-ma">${todasAx.length?`${todasAx.length} ${todasAx.length===1?"acta":"actas"}${nbAx?` · ${nbAx} en borrador`:""}`:"Abrir"} ${ICO.arrow}</span></button>
+      ${permVe("ax")?`<button class="lx-mode off" data-a="axHub"><span class="lx-mi">${ICO.home}</span><span class="lx-mt">Actas</span><span class="lx-md">Viviendas, vehículos, activos fijos y capacitaciones: fotos, firmas y PDF.</span><span class="lx-ma">${todasAx.length?`${todasAx.length} ${todasAx.length===1?"acta":"actas"}${nbAx?` · ${nbAx} en borrador`:""}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
       <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
       ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
       ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      <button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios, bodegas y camionetas, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>
+      ${permVe("cl")?`<button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios, bodegas y camionetas, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>`:""}
     </div>
   </main>`;
 }
@@ -2396,6 +2556,8 @@ function estadoSync(){
 const phItem=(ico,tit,sub,attrs,tono)=>`<button class="lx-cont ph${tono?" ph-"+tono:""}" ${attrs}><span class="ph-ico" aria-hidden="true">${ico}</span><span class="lx-ctx"><span class="lx-ct">${tit}</span>${sub?`<span class="lx-cw">${sub}</span>`:""}</span>${ICO.arrow}</button>`;
 function paraHoyItems(){
   const L=[];
+  /* v120: fotos sin subir: una app web no puede subirlas con la app cerrada (en iPhone no existe esa opción) */
+  try{const nf=fotosPend();if(nf&&DB)L.push(phItem(ICO.cloud,`${fotosTxt(nf)} sin subir`,navigator.onLine===false?"Sin señal. Al tener señal, ábrela y déjala abierta.":"Subiendo: deja la app abierta un momento.",`data-a="estadoSync"`,"urg"))}catch(e){}
   try{
     const ap=rdParaMi(),apJ=ap.filter(r=>puedeJefatura(r)),apC=ap.filter(r=>!puedeJefatura(r)&&puedeContab(r));
     const quienes=a=>esc(a.slice(0,3).map(r=>r.persona&&r.persona.nombre).filter(Boolean).join(", ")+(a.length>3?"…":""));
@@ -2648,10 +2810,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=119"></script>
-<script src="modulos/bodega.js?v=119"></script>
-<script src="modulos/rendiciones.js?v=119"></script>
-<script src="modulos/actas-entrega.js?v=119"></script>
+<script src="modulos/checklist.js?v=121"></script>
+<script src="modulos/bodega.js?v=121"></script>
+<script src="modulos/rendiciones.js?v=121"></script>
+<script src="modulos/actas-entrega.js?v=121"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

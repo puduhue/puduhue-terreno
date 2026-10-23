@@ -52,6 +52,8 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
 | 1844-1972 | `Excel: reintentos`, `Excel consolidado de actas de vivienda`, `Servidor Puduhue (Cloudflare)` | Reintentos de Excel (todos los módulos), Excel de actas de vivienda, servidor |
 | 1973-1979 | (escuchadores de Stock y Control de bodega) | |
 | 1981-2421 | `v83: notificaciones`, `v85`, `v86: instalar`, `v87`, `v88: diseño`, `v89`, `v90` | Transversal |
+| (v121, tras Administración) | `v121: permisos por persona y módulo` | Permisos por persona (Administración › Permisos): PERM, permVe/permAgrega, vista perm; se guarda en OneDrive en Apps de terreno/_config/Permisos_app.json |
+| (v121, tras Administración) | `v121: permisos por persona y módulo` | Permisos por persona (Administración › Permisos): PERM, permVe/permAgrega, vista perm; se guarda en OneDrive en Apps de terreno/_config/Permisos_app.json |
 | 2423-2498 | `---------- Inicio ----------` | Pantalla de inicio |
 | 2499-fin | `Actualización automática` | Aviso de versión nueva |
 
