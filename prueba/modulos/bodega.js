@@ -8,7 +8,7 @@
    la foto del stock queda en OneDrive y en el teléfono para consultarla sin señal.
    ============================================================ */
 const STK={root:"01RAJ2KQF2KBOXTJBS5VAJHLQZVCLBOCZ6",datos:"01RAJ2KQEA4AYAJGRSLVBI4JELXKHFCDUH",file:"stock.json"};
-const puedeVerStock=()=>!!ME; /* desde la v59 todo el equipo ve el stock */
+const puedeVerStock=()=>!!ME&&permVe("stock"); /* desde la v59 todo el equipo ve el stock; v121: salvo a quien el administrador se lo quite */
 const puedeActStock=()=>!!ME; /* desde la v61 todo el equipo puede traer el stock desde Finnegans */
 /* Familias y subfamilias de Finnegans vienen a veces con espacios al final: se comparan sin ellos */
 const nfam=t=>String(t||"").trim();
@@ -124,13 +124,13 @@ function stkInput(ev){const t=ev.target;if(!t.dataset.sk)return false;
    MÓDULO: Control de bodega (conteo físico contra el stock de Finnegans)
    ============================================================ */
 const CB={root:"01RAJ2KQFXDFLPDNY2IJCIZ3BGSVPF74IH"};
-const puedeContar=()=>!!ME; /* desde la v59 todo el equipo puede hacer conteos */
+const puedeContar=()=>!!ME&&permVe("cb"); /* desde la v59 todo el equipo ve Control de bodega; v121: salvo a quien se le quite (agregar: permAgrega("cb")) */
 let CONT={},cbv=null,cbQ="",cbFiltro="pend",cbLim=120,cbFam="",cbSub="";
 /* Subfamilia de una línea: los conteos anteriores a la v61 no la guardaban, se toma del stock por código */
 let SUBMAP={},SUBMAP_T=null;
 function subDeLinea(l){if(l.sub!=null)return nfam(l.sub);const t=STOCK?STOCK.hora:"";if(SUBMAP_T!==t){SUBMAP={};filas().forEach(o=>{if(o.PRODUCTOCODIGO&&!SUBMAP[o.PRODUCTOCODIGO])SUBMAP[o.PRODUCTOCODIGO]=nfam(o.SUBFAMILIA)});SUBMAP_T=t}return SUBMAP[l.cod]||""}
 const famDeLinea=l=>nfam(l.fam)||"Sin familia";
-const cbRO=()=>cbv&&cbv.estado==="cerrado";
+const cbRO=()=>!!cbv&&(cbv.estado==="cerrado"||!permAgrega("cb")); /* v121: con «Solo ve», como cerrado */
 function conteosDe(dep){return Object.values(CONT).filter(c=>c.bodega===dep).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||(b.n-a.n))}
 function conteoAbierto(dep){return conteosDe(dep).find(c=>c.estado!=="cerrado"&&!c.anulado)||null}
 function saveCont(c,deb){

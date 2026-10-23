@@ -402,7 +402,7 @@ function saveVis(v,deb){
   return run();
 }
 function clTouch(){if(!clv)return;clv.actualizado=new Date().toISOString();if(ME)clv.modificadoPor=yo();saveVis(clv,true)}
-const clRO=()=>clv&&clv.estado==="cerrada";
+const clRO=()=>!!clv&&(clv.estado==="cerrada"||!permAgrega("cl")); /* v121: con «Solo ve», como cerrada */
 
 /* ---------- v91: lista de predios con semáforo y orden a elección ----------
    - Cada predio muestra el % de su última visita cerrada en un anillo de color: verde 90 % o más, ámbar 80 a 89 %,
