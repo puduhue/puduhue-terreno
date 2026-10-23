@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 121 | 2026-10-23 | [8786c31](https://github.com/puduhue/puduhue-terreno/tree/8786c31) | permisos por persona en Administración: en Check list, Actas, Control de bodega y Stock cada persona puede quedar con «Ve y edita», «Solo ve» o «No ve»; incluye la v120 (fotos pendientes más visibles y subida de a 3) |
 | 119 | 2026-10-21 | [d25b84c](https://github.com/puduhue/puduhue-terreno/tree/d25b84c) | quien rinde puede eliminar su rendición en borrador o devuelta; Contabilidad puede anular la que no esté contabilizada; el fondo llega hasta abajo en teléfonos altos |
 | 118 | 2026-10-20 | [57750a8](https://github.com/puduhue/puduhue-terreno/tree/57750a8) | carpetas de OneDrive ordenadas como la app: Actas › Viviendas, Vehículos, Activos fijos › predio › Entregas o Devoluciones; check list en «Check list de cumplimiento»; los enlaces de fotos del Excel se corrigen solos |
 | 117 | 2026-10-19 | [0fa95b3](https://github.com/puduhue/puduhue-terreno/tree/0fa95b3) | colaboradores y aprobadores se editan desde la app (Maestros contables), con el Excel de _maestros al día |
