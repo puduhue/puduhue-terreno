@@ -1290,3 +1290,23 @@ div.rdcc{cursor:default}
    la barra inferior se prolonga hacia abajo con su color, para que no se vea una franja clara bajo ella */
 html{background:var(--bg)}
 @media (max-width:759px){.tabbar::after{content:"";position:absolute;left:0;right:0;top:100%;height:200px;background:var(--card);pointer-events:none}}
+
+/* v121: permisos por persona */
+.permbus{margin:12px 0 0}
+.permtab{border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;margin:6px 0 12px}
+.permfila{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(4,minmax(0,1fr));gap:3px;align-items:center;width:100%;padding:10px;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;color:inherit;font:inherit;cursor:pointer;min-height:54px;border-radius:0}
+.permcab{border-top:0;font-size:12px;font-weight:700;color:var(--muted);cursor:default;min-height:0;padding:9px 10px;background:var(--soft)}
+.permcab span{text-align:center}.permcab span:first-child{text-align:left}
+#permfilas .permfila:first-child{border-top:0}
+.permn{min-width:0}.permn b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:14.5px;line-height:1.25;overflow:hidden;overflow-wrap:anywhere}
+.permn small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.permc{justify-self:center;font-size:11.5px;font-weight:700;padding:3px 6px;white-space:nowrap;border-radius:999px;text-align:center;line-height:1.25}
+.permc.pagregar{color:var(--b-ink);background:var(--b-bg)}
+.permc.pver{color:var(--r-ink);background:var(--r-bg)}
+.permc.pno{color:var(--m-ink);background:var(--m-bg)}
+@media (hover:hover){.permfila:not(.permcab):hover{background:var(--soft)}}
+.permvac{padding:14px;margin:0}
+.permadd{display:flex;gap:8px;align-items:center;margin-top:10px}.permadd .f{flex:1;min-width:0;margin:0}
+.permmod{margin-top:12px}
+.permro{margin:14px 0 12px}
+@media (min-width:760px){.permfila{grid-template-columns:minmax(0,2.4fr) repeat(4,minmax(0,1fr));padding:10px 14px}.permc{font-size:12.5px;padding:4px 10px}}
