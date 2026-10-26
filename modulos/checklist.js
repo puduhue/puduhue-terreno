@@ -775,7 +775,7 @@ async function clClick(A,b){
     const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, los ítems en Parcial o No cumple quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
     if(!(await ask("¿Cerrar la visita?",msg,"Cerrar visita")))return true;
     clv.estado="cerrada";clv.cerrada=today();clv.actualizado=new Date().toISOString();if(ME)clv.cerradoPor=yo();await saveVis(clv);
-    const vv=clv,p=clv.predio;exito("Visita cerrada","Los hallazgos quedaron en seguimiento.");clv=null;clPredio=p;go("clp");
+    const vv=clv,p=clv.predio;exito("Visita cerrada","Los hallazgos quedaron en seguimiento.");esperarFotos(vv.id);clv=null;clPredio=p;go("clp");
     if(DB&&navigator.onLine!==false)clTrasCierre(p,vv);return true}
   if(A==="clAnular"){const v=VIS[b.dataset.id];if(!v||!esAdmin()||v.estado!=="cerrada")return true;
     const ok=await ask(`¿Anular la visita ${v.n} a ${v.predio}?`,"Dejará de contar para los hallazgos y el porcentaje. Queda registrada como anulada con el motivo y tu nombre; se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: visita de prueba"></div>`);

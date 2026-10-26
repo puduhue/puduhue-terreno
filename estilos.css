@@ -1310,3 +1310,11 @@ html{background:var(--bg)}
 .permmod{margin-top:12px}
 .permro{margin:14px 0 12px}
 @media (min-width:760px){.permfila{grid-template-columns:minmax(0,2.4fr) repeat(4,minmax(0,1fr));padding:10px 14px}.permc{font-size:12.5px;padding:4px 10px}}
+
+/* v122: hoja «Subiendo fotos» al cerrar un registro */
+.esf h3{margin-bottom:10px}
+.esf-barra{height:8px;border-radius:999px;background:var(--soft);overflow:hidden;margin:4px 0 12px}
+.esf-barra i{display:block;height:100%;background:var(--act);border-radius:999px;transition:width .3s}
+.esf-nota{font-size:13px;color:var(--muted);margin:8px 0 0;text-align:center}
+.esf-ok{display:block;width:52px;height:52px;margin:4px auto 8px;fill:none;stroke:var(--b-ink);stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.esf .esf-ok+h3,.esf .esf-ok~p{text-align:center}

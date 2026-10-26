@@ -762,11 +762,12 @@ function correosPend(){try{const L=JSON.parse(localStorage.getItem(CORREO_K)||"[
 function guardarCorreosPend(L){try{L.length?localStorage.setItem(CORREO_K,JSON.stringify(L)):localStorage.removeItem(CORREO_K)}catch(e){}}
 /* aviso de una acción: msg es el mensaje de la acción, al que se le suma a quién se avisó */
 async function rdAvisar(r,ev,msg,op){
-  setTimeout(()=>rdAgendaPublicar(true).catch(()=>{}),1500); /* v84: el servidor queda al día para los recordatorios */
+  /* v84: el servidor queda al día para los recordatorios; v122: antes de la notificación, para que lleve el número del ícono al día */
+  const ag=Promise.resolve().then(()=>rdAgendaPublicar(true)).catch(()=>{});
   let m=null;try{m=rdCorreo(r,ev,op)}catch(e){console.warn("correo",e)}
   if(!m){if(msg)disAviso(ev,msg);return}
   if(msg)disAviso(ev,msg);
-  const pp=pushAviso(m); /* v83: la notificación sale en paralelo al correo */
+  const pp=ag.then(()=>pushAviso(m)); /* v83: la notificación sale en paralelo al correo */
   try{await enviarCorreo(m);const pr=await Promise.race([pp,new Promise(res=>setTimeout(()=>res(null),4000))]);toast(`${msg?msg+" ":""}Se avisó por correo${pr&&pr.enviadas?" y con una notificación":""} a ${m.nombres}.`)}
   catch(e){
     if(e&&e.code==="network"){await pp;guardarCorreosPend(correosPend().concat([m]));toast(`${msg?msg+" ":""}El aviso por correo a ${m.nombres} sale cuando vuelva la señal.`);return}
@@ -1797,7 +1798,7 @@ async function rdClick(A,b){
     if(!vuelveCont){rdv.jefatura=j;delete rdv.aprobJef}
     /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
     const directo=!vuelveCont&&!(j&&j.correo);
-    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
+    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();esperarFotos(rdv.id);rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
   if(A==="rdEliminar"||A==="rdAnular"){const r=rdv,el=A==="rdEliminar";if(!(el?rdPuedeEliminar(r):rdPuedeAnular(r)))return true;
     const D=docsDe(r),nd=`${D.length} ${D.length===1?"documento":"documentos"}`;
     let mot="";const leer=()=>{const x=document.querySelector("#motAn");if(x)mot=x.value.trim()};document.addEventListener("input",leer,true);
