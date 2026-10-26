@@ -800,7 +800,9 @@ svg.ic{width:20px;height:20px;flex:none}
 .tabbar button.on{color:var(--act)}.tabbar button.on .tbi{background:var(--soft)}
 .tabbar .tbb{position:absolute;top:-1px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#C62828;color:#fff;font:700 11px/18px system-ui,sans-serif;text-align:center}
 body.contab .wrap{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
-body.contab .top .bar .back[data-a="launch"]{visibility:hidden}
+/* v123: en las pantallas con barra abajo, «‹» para volver al inicio (solo la flecha: la casita ya está abajo) */
+body.contab .top .bar .back[data-a="launch"]{font-size:0;gap:0;justify-content:center;width:44px;height:44px;padding:0;margin-left:-12px}
+body.contab .top .bar .back[data-a="launch"]::before{width:26px;height:26px}
 html.sin-zoom body.escribiendo .tabbar{display:none}
 @media (max-width:389px){.tabbar button{font-size:10.5px}.tabbar .tbt{padding:0}}
 @media (max-width:349px){.tabbar button{font-size:10px;letter-spacing:-.2px}.tabbar .tbi{width:48px}}
