@@ -54,6 +54,7 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
 | 1981-2421 | `v83: notificaciones`, `v85`, `v86: instalar`, `v87`, `v88: diseño`, `v89`, `v90` | Transversal |
 | (v121, tras Administración) | `v121: permisos por persona y módulo` | Permisos por persona (Administración › Permisos): PERM, permVe/permAgrega, vista perm; se guarda en OneDrive en Apps de terreno/_config/Permisos_app.json |
 | (v121, tras Administración) | `v121: permisos por persona y módulo` | Permisos por persona (Administración › Permisos): PERM, permVe/permAgrega, vista perm; se guarda en OneDrive en Apps de terreno/_config/Permisos_app.json |
+| (v122, tras `function status()`) | `v122: número en el ícono de la app` | Número en el ícono (insignia, setAppBadge; base «puduhue-insignia» que lee sw.js) y hoja «Subiendo fotos» al cerrar (esperarFotos, llamada en los 5 cierres) |
 | 2423-2498 | `---------- Inicio ----------` | Pantalla de inicio |
 | 2499-fin | `Actualización automática` | Aviso de versión nueva |
 

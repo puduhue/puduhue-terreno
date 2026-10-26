@@ -308,7 +308,7 @@ async function cbClick(A,b){
     const msg=`${R.cont} de ${R.total} productos contados${R.total-R.cont?`; ${R.total-R.cont} quedan sin contar y saldrán así en el informe`:""}. ${R.dif?`${R.dif} con discrepancia (faltante ${fmtP(Math.abs(R.vf))}, sobrante ${fmtP(R.vs)})`:"Sin discrepancias"}${R.tol?`, ${R.tol} dentro de tolerancia`:""}. Al cerrar ya no se podrá modificar.`;
     if(!(await ask("¿Cerrar el conteo?",msg,"Cerrar conteo")))return true;
     cbv.estado="cerrado";cbv.cerrado=today();cbv.actualizado=new Date().toISOString();if(ME)cbv.cerradoPor=yo();await saveCont(cbv);
-    const cc=cbv;cbv=null;go("cbb");exito("Conteo cerrado","El informe se guarda en OneDrive.");
+    const cc=cbv;cbv=null;go("cbb");exito("Conteo cerrado","El informe se guarda en OneDrive.");esperarFotos(cc.id);
     if(DB&&navigator.onLine!==false)setTimeout(()=>cbSubirArchivos(cc),2500);return true}
   if(A==="cbAnular"){const c=CONT[b.dataset.id];if(!c||!esAdmin()||c.estado!=="cerrado")return true;
     const ok=await ask(`¿Anular el conteo ${c.n} de ${c.bodega}?`,"Quedará tachado, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: conteo de prueba"></div>`);if(!ok)return true;

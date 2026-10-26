@@ -477,7 +477,7 @@ async function axClick(A,b){
       if(g){const datos=/^(Fecha|Lugar|Predio|Nombre|RUT|Cargo|Quién entrega \(Admin|Tipo Vehículo|Marca|Modelo|Año|Patente|Combustible|Km)/;axStep=m.some(x=>datos.test(x)&&!/firma/i.test(x))?0:m.some(x=>/accesorio|llaves|Descripción|activo/i.test(x))?1:2;window.scrollTo(0,0);render()}return true}
     if(!(await ask("¿Finalizar y cerrar el acta?","Quedará cerrada, su PDF se guardará en OneDrive y ya no se podrá modificar.","Cerrar acta")))return true;
     cur.estado="cerrada";cur.cerrada=today();cur.actualizado=new Date().toISOString();if(ME)cur.cerradoPor=yo();await saveActa(cur);
-    const t=cur.tipo;cur=null;axTipo=t;go("axl");exito("Acta cerrada","");if(DB&&navigator.onLine!==false)setTimeout(()=>{axXlsx(t,false);pdfsPendientes()},3000);return true}
+    const t=cur.tipo;esperarFotos(cur.id);cur=null;axTipo=t;go("axl");exito("Acta cerrada","");if(DB&&navigator.onLine!==false)setTimeout(()=>{axXlsx(t,false);pdfsPendientes()},3000);return true}
   if(A==="axAnular"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin()||a.estado!=="cerrada")return true;
     if(!(await ask(`¿Anular el acta de ${axQuien(a)}?`,"Quedará tachada, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: acta de prueba"></div>`)))return true;
     const mot=(document.querySelector("#motAn")||{}).value||"";a.anulada={por:yo(),fecha:today(),motivo:mot.trim()};a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta anulada.");if(DB&&navigator.onLine!==false)axXlsx(a.tipo,false);return true}

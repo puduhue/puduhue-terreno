@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=121">
+<link rel="stylesheet" href="estilos.css?v=122">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="121";
+const APP_VER="122";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -412,6 +412,55 @@ function status(){
   if(e&&e.id==="saved"&&e.classList.contains("est"))e.outerHTML=estadoChip();
   const lc=$("#lxChip");if(lc)lc.outerHTML=disChip();
   document.querySelectorAll(".pendslot").forEach(x=>{x.innerHTML=slotHTML()});
+  insignia(); /* v122 */
+}
+/* ---------- v122: número en el ícono de la app ----------
+   Suma lo pendiente de la persona: rendiciones por aprobar, por revisar o devueltas (tbPendRd, el número rojo de Rendiciones)
+   y lo que quedó en este teléfono sin subir (pend()). Lo sin subir queda guardado en la base «puduhue-insignia» para que el
+   service worker lo sume al número que manda el servidor con cada notificación, con la app cerrada. */
+const INS_DB="puduhue-insignia";
+let INS_T=0,INS_N=-1,INS_LOC=-1;
+function insLocalGuardar(n){
+  try{const q=indexedDB.open(INS_DB,1);q.onupgradeneeded=()=>q.result.createObjectStore("v");
+    q.onsuccess=()=>{try{const db=q.result,t=db.transaction("v","readwrite");t.objectStore("v").put(n,"local");t.oncomplete=t.onerror=()=>db.close()}catch(e){}}}catch(e){}
+}
+function insigniaYa(){
+  clearTimeout(INS_T);INS_T=0;
+  let loc=0,rd=0;try{loc=pend()}catch(e){}
+  try{rd=CUENTA&&typeof tbPendRd==="function"?tbPendRd():0}catch(e){}
+  if(loc!==INS_LOC){INS_LOC=loc;insLocalGuardar(loc)}
+  const n=loc+rd;if(n===INS_N||!("setAppBadge" in navigator))return;INS_N=n;
+  try{(n>0?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{})}catch(e){}
+}
+function insignia(){if(!INS_T)INS_T=setTimeout(insigniaYa,400)}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")insigniaYa()});
+/* v122: al cerrar un acta, visita o conteo, o al enviar una rendición, si quedan fotos de ese registro por subir, una hoja muestra
+   el avance para que la persona no cierre la app antes de tiempo. «Seguir trabajando» la cierra (las fotos se siguen subiendo
+   mientras la app esté abierta). Sin señal, avisa que quedaron guardadas en el teléfono. Aparece después de la confirmación
+   animada (1,9 s) y solo si todavía falta algo. */
+const fotosDe=id=>Object.values(QF).filter(m=>m&&m.actaId===id).length;
+function esperarFotos(id){
+  const total=fotosDe(id);if(!total||!DB)return;
+  schedSync(50);
+  setTimeout(()=>{
+    if(!fotosDe(id))return;
+    document.querySelectorAll(".esfm").forEach(x=>x.remove());
+    const m=document.createElement("div");m.className="modal esfm";
+    m.innerHTML=`<div class="sheet esf" role="dialog" aria-modal="true" aria-label="Subiendo fotos" aria-live="polite"></div>`;
+    const sh=m.firstChild;document.body.appendChild(m);
+    let t=0,ant="";
+    const cerrar=()=>{clearInterval(t);m.remove()};
+    const pintar=()=>{
+      if(!m.isConnected){clearInterval(t);return}
+      const q=fotosDe(id),hechas=Math.max(0,total-q),sin=navigator.onLine===false||RED==="no",k=q?(sin?"s"+q:"o"+q):"ok";
+      if(k===ant)return;ant=k;
+      if(!q){sh.innerHTML=`<svg class="esf-ok" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23"/><path d="M15.5 27l7.2 7.2L37 19.6"/></svg><h3>Listo</h3><p>${total===1?"La foto quedó":"Todas las fotos quedaron"} en OneDrive.</p>`;clearInterval(t);setTimeout(cerrar,1400);return}
+      sh.innerHTML=sin?`<h3>Fotos guardadas en el teléfono</h3><p>No hay señal. ${q===1?"La foto se sube":`Las ${fotosTxt(q)} se suben`} cuando abras la app con señal; el número en el ícono te lo recuerda.</p><div class="btns"><button class="btn pri" data-m="ok" style="flex:1">Entendido</button></div>`
+        :`<h3>Subiendo fotos… ${hechas} de ${total}</h3><div class="esf-barra"><i style="width:${Math.round(hechas/total*100)}%"></i></div><p><b>No cierres la app:</b> falta poco.</p><div class="btns"><button class="btn" data-m="ok" style="flex:1">Seguir trabajando</button></div><p class="esf-nota">Las fotos se siguen subiendo mientras la app esté abierta.</p>`;
+    };
+    m.addEventListener("click",e=>{if(e.target.dataset&&e.target.dataset.m==="ok")cerrar()});
+    pintar();t=setInterval(pintar,500);
+  },1900);
 }
 function saveActa(a,deb){
   ACTAS[a.id]=a;LOCAL[a.id]=a;status();clearTimeout(LT[a.id]);
@@ -1160,7 +1209,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}">${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${MARCA}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
-function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null}}
+function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia()}}
 function renderPantalla(){
   if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
   const app=$("#app");
@@ -1484,7 +1533,7 @@ async function onClickAccion(ev,b,A){
       if(go2){const s=m.some(x=>/check list/.test(x))?1:m.some(x=>/Fecha|Predio|RUT|Nombre del trabajador/.test(x)&&!/firma/i.test(x))?0:2;step=s;window.scrollTo(0,0);render()}return}
     if(!(await ask("¿Finalizar y cerrar el acta?",`Quedará guardada en ${cur.tipo==="entrega"?"Viviendas entregadas":"Viviendas recibidas"} y ya no se podrá modificar.`,"Cerrar acta")))return;
     cur.estado="cerrada";cur.cerrada=today();cur.actualizado=new Date().toISOString();if(ME)cur.cerradoPor=yo();await saveActa(cur);
-    const t=cur.tipo;cur=null;go("home");exito("Acta cerrada",`Guardada en ${t==="entrega"?"Viviendas entregadas":"Viviendas recibidas"}.`);if(DB&&navigator.onLine!==false)setTimeout(()=>{actasXlsx(false);pdfsPendientes()},3000);return}
+    const t=cur.tipo;esperarFotos(cur.id);cur=null;go("home");exito("Acta cerrada",`Guardada en ${t==="entrega"?"Viviendas entregadas":"Viviendas recibidas"}.`);if(DB&&navigator.onLine!==false)setTimeout(()=>{actasXlsx(false);pdfsPendientes()},3000);return}
   if(A==="pdf"||A==="dlActa"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await descargarActa(a);return}
   if(A==="informe"||A==="dlInf"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await descargarGeneral(a);return}
   if(A==="delFoto"){await quitarFoto(b.dataset.k,b.dataset.ref);return}
@@ -2810,10 +2859,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=121"></script>
-<script src="modulos/bodega.js?v=121"></script>
-<script src="modulos/rendiciones.js?v=121"></script>
-<script src="modulos/actas-entrega.js?v=121"></script>
+<script src="modulos/checklist.js?v=122"></script>
+<script src="modulos/bodega.js?v=122"></script>
+<script src="modulos/rendiciones.js?v=122"></script>
+<script src="modulos/actas-entrega.js?v=122"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
