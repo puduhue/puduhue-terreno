@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=121">
+<link rel="stylesheet" href="estilos.css?v=122">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="121";
+const APP_VER="122";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -1159,7 +1159,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
   const sm=f.querySelector("small");if(sm)sm.textContent=on?"Activando…":"Desactivando…";const l=f.querySelector(".lnk");if(l)l.hidden=true}
 
 /* ---------- Render ---------- */
-function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}">${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${MARCA}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
+function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}"${back?"":` aria-label="Volver al inicio" title="Volver al inicio"`}>${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${MARCA}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
 function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null}}
 function renderPantalla(){
   if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
@@ -2810,10 +2810,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=121"></script>
-<script src="modulos/bodega.js?v=121"></script>
-<script src="modulos/rendiciones.js?v=121"></script>
-<script src="modulos/actas-entrega.js?v=121"></script>
+<script src="modulos/checklist.js?v=122"></script>
+<script src="modulos/bodega.js?v=122"></script>
+<script src="modulos/rendiciones.js?v=122"></script>
+<script src="modulos/actas-entrega.js?v=122"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
