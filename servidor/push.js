@@ -59,6 +59,14 @@ export async function enviarUno(claves, sub, datos, sujeto) {
 const MAX_EQUIPOS = 8;
 const okEndpoint = u => { try { const x = new URL(u); return x.protocol === "https:"; } catch (e) { return false; } };
 
+/* v122: número del ícono de la app: rendiciones que la persona debe aprobar o revisar, más las suyas devueltas.
+   Sale de la agenda que deja la app (v84); sin agenda o con una de más de 7 días no se manda (null). */
+export function insigniaDe(ag, correo) {
+  if (!ag || !(Date.now() - Date.parse(ag.generado) <= 7 * 864e5)) return null;
+  const c = String(correo || "").toLowerCase(), es = x => Array.isArray(x.para) && x.para.includes(c);
+  return (ag.aprobar || []).filter(es).length + (ag.enviar || []).filter(x => x.estado === "observada" && es(x)).length;
+}
+
 /* Almacenamiento: un solo objeto para toda la empresa (el volumen es bajo) */
 export class Avisos extends DurableObject {
   async claves() {
@@ -86,11 +94,12 @@ export class Avisos extends DurableObject {
   }
   async enviar(correos, datos, sujeto) {
     const c = await this.claves(); const res = { enviadas: 0, sinEquipos: [], fallas: [] };
+    const ag = await this.leerAgenda(); /* v122: cada notificación lleva el número del ícono de esa persona */
     for (const correo of correos) {
       const l = await this.equipos(correo); if (!l.length) { res.sinEquipos.push(correo); continue; }
-      const quedan = [];
+      const quedan = [], n = insigniaDe(ag, correo), d = n === null ? datos : { ...datos, insignia: n };
       for (const s of l) {
-        let r; try { r = await enviarUno(c, s, datos, sujeto); } catch (e) { r = { estado: 0, detalle: String(e && e.message || e) }; }
+        let r; try { r = await enviarUno(c, s, d, sujeto); } catch (e) { r = { estado: 0, detalle: String(e && e.message || e) }; }
         if (r.estado === 404 || r.estado === 410) continue;           // el equipo ya no existe: se borra
         quedan.push(s);
         if (r.estado >= 200 && r.estado < 300) res.enviadas++; else res.fallas.push({ correo, estado: r.estado, detalle: r.detalle });

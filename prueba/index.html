@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=121">
+<link rel="stylesheet" href="estilos.css?v=122">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="121";
+const APP_VER="122";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -412,7 +412,28 @@ function status(){
   if(e&&e.id==="saved"&&e.classList.contains("est"))e.outerHTML=estadoChip();
   const lc=$("#lxChip");if(lc)lc.outerHTML=disChip();
   document.querySelectorAll(".pendslot").forEach(x=>{x.innerHTML=slotHTML()});
+  insignia(); /* v122 */
 }
+/* ---------- v122: número en el ícono de la app ----------
+   Suma lo pendiente de la persona: rendiciones por aprobar, por revisar o devueltas (tbPendRd, el número rojo de Rendiciones)
+   y lo que quedó en este teléfono sin subir (pend()). Lo sin subir queda guardado en la base «puduhue-insignia» para que el
+   service worker lo sume al número que manda el servidor con cada notificación, con la app cerrada. */
+const INS_DB="puduhue-insignia";
+let INS_T=0,INS_N=-1,INS_LOC=-1;
+function insLocalGuardar(n){
+  try{const q=indexedDB.open(INS_DB,1);q.onupgradeneeded=()=>q.result.createObjectStore("v");
+    q.onsuccess=()=>{try{const db=q.result,t=db.transaction("v","readwrite");t.objectStore("v").put(n,"local");t.oncomplete=t.onerror=()=>db.close()}catch(e){}}}catch(e){}
+}
+function insigniaYa(){
+  clearTimeout(INS_T);INS_T=0;
+  let loc=0,rd=0;try{loc=pend()}catch(e){}
+  try{rd=CUENTA&&typeof tbPendRd==="function"?tbPendRd():0}catch(e){}
+  if(loc!==INS_LOC){INS_LOC=loc;insLocalGuardar(loc)}
+  const n=loc+rd;if(n===INS_N||!("setAppBadge" in navigator))return;INS_N=n;
+  try{(n>0?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{})}catch(e){}
+}
+function insignia(){if(!INS_T)INS_T=setTimeout(insigniaYa,400)}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")insigniaYa()});
 function saveActa(a,deb){
   ACTAS[a.id]=a;LOCAL[a.id]=a;status();clearTimeout(LT[a.id]);
   const run=()=>{delete LT[a.id];return localPut(a).then(ok=>{if(!ok&&STORE_OK!==false)toast("No queda espacio en el teléfono para guardar. Libera espacio.");schedSync(1000);status()})};
@@ -1160,7 +1181,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}">${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${MARCA}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
-function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null}}
+function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia()}}
 function renderPantalla(){
   if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
   const app=$("#app");
@@ -2810,10 +2831,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=121"></script>
-<script src="modulos/bodega.js?v=121"></script>
-<script src="modulos/rendiciones.js?v=121"></script>
-<script src="modulos/actas-entrega.js?v=121"></script>
+<script src="modulos/checklist.js?v=122"></script>
+<script src="modulos/bodega.js?v=122"></script>
+<script src="modulos/rendiciones.js?v=122"></script>
+<script src="modulos/actas-entrega.js?v=122"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

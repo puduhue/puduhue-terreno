@@ -762,11 +762,12 @@ function correosPend(){try{const L=JSON.parse(localStorage.getItem(CORREO_K)||"[
 function guardarCorreosPend(L){try{L.length?localStorage.setItem(CORREO_K,JSON.stringify(L)):localStorage.removeItem(CORREO_K)}catch(e){}}
 /* aviso de una acción: msg es el mensaje de la acción, al que se le suma a quién se avisó */
 async function rdAvisar(r,ev,msg,op){
-  setTimeout(()=>rdAgendaPublicar(true).catch(()=>{}),1500); /* v84: el servidor queda al día para los recordatorios */
+  /* v84: el servidor queda al día para los recordatorios; v122: antes de la notificación, para que lleve el número del ícono al día */
+  const ag=Promise.resolve().then(()=>rdAgendaPublicar(true)).catch(()=>{});
   let m=null;try{m=rdCorreo(r,ev,op)}catch(e){console.warn("correo",e)}
   if(!m){if(msg)disAviso(ev,msg);return}
   if(msg)disAviso(ev,msg);
-  const pp=pushAviso(m); /* v83: la notificación sale en paralelo al correo */
+  const pp=ag.then(()=>pushAviso(m)); /* v83: la notificación sale en paralelo al correo */
   try{await enviarCorreo(m);const pr=await Promise.race([pp,new Promise(res=>setTimeout(()=>res(null),4000))]);toast(`${msg?msg+" ":""}Se avisó por correo${pr&&pr.enviadas?" y con una notificación":""} a ${m.nombres}.`)}
   catch(e){
     if(e&&e.code==="network"){await pp;guardarCorreosPend(correosPend().concat([m]));toast(`${msg?msg+" ":""}El aviso por correo a ${m.nombres} sale cuando vuelva la señal.`);return}
