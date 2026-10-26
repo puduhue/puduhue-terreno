@@ -1310,3 +1310,17 @@ html{background:var(--bg)}
 .permmod{margin-top:12px}
 .permro{margin:14px 0 12px}
 @media (min-width:760px){.permfila{grid-template-columns:minmax(0,2.4fr) repeat(4,minmax(0,1fr));padding:10px 14px}.permc{font-size:12.5px;padding:4px 10px}}
+
+/* v122: casa de familia o de huéspedes; reglamento de convivencia en el acta */
+.reps.r2{grid-template-columns:1fr 1fr}
+.f .lbl{display:block;font-weight:700;font-size:15px;margin-bottom:6px}
+.acta details.regl p.rgb{position:relative;padding-left:16px}
+.acta details.regl p.rgb::before{content:"•";position:absolute;left:3px}
+.acta details.regl p.rgbb{position:relative;padding-left:32px;margin:4px 0}
+.acta details.regl p.rgbb::before{content:"–";position:absolute;left:18px}
+.acta .rgplan{overflow-x:auto;margin:8px 0 12px;-webkit-overflow-scrolling:touch}
+.acta .rgplan table{border-collapse:collapse;font-size:13px;min-width:560px;width:100%}
+.acta .rgplan th,.acta .rgplan td{border:1px solid var(--line);padding:4px 6px;text-align:left}
+.acta .rgplan th{background:var(--soft)}
+.acta .rgplan td.d{text-align:center;color:var(--b-ink);font-weight:700;width:22px;padding:4px 2px}
+.acta .rgnota{color:var(--muted);font-size:14px}
