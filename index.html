@@ -71,6 +71,87 @@ function normFirmas(a){
 const COMPROMISO="Compromiso: Me comprometo a mantener la vivienda en las condiciones entregadas, dando cumplimiento a cabalidad al detalle de condiciones expresado en el punto N°7 y notificando a la brevedad sobre las condiciones de riesgo que sean posibles observar por cuenta propia.";
 const INGRESO="Cada vez que representantes de la empresa Capac SpA., soliciten ingreso a la vivienda, será programado y no representará inconvenientes de parte de la persona que habita la vivienda.";
 const CONSTANCIA="Constancia: El estado de cada ítem al momento de la devolución, y su comparación con el estado registrado en el acta de entrega, queda detallado en el check list del Anexo 1.";
+/* v122: casa de familia o casa de huéspedes. En la casa de huéspedes, el acta de entrega incluye el reglamento de convivencia
+   (documento de RR.HH. «Reglamento casa huésped», versión 01 del 2024-12-01). Bloques: h1/h2/h3 títulos, p párrafo, b viñeta, bb sub-viñeta. */
+const CASAS={familia:"Casa de familia",huespedes:"Casa de huéspedes"};
+const esHuesp=a=>!!a&&a.casa==="huespedes";
+const casaTxt=a=>a&&CASAS[a.casa]||"";
+const REGL_TIT="Reglamento de convivencia de la casa de huéspedes";
+const REGL=[
+ ["p","El presente Reglamento de Convivencia tiene como objetivo establecer normas claras y equitativas que permitan garantizar un ambiente armonioso, ordenado y respetuoso en la Casa de Huéspedes. Al compartir espacios comunes como el baño, cocina, comedor y living, es fundamental fomentar la responsabilidad individual y colectiva, promoviendo valores de respeto, cooperación y compromiso mutuo."],
+ ["p","Este reglamento busca prevenir conflictos, asegurar condiciones de limpieza e higiene adecuadas y fortalecer la convivencia entre hombres y mujeres en un entorno compartido. Además, establece pautas para el cuidado de las instalaciones, la organización de tareas y el uso ordenado de los recursos comunes."],
+ ["p","El cumplimiento de estas normas es obligatorio para todos los residentes de la Casa de Huéspedes, quienes se comprometen a respetarlas y actuar de manera responsable en beneficio del bienestar general. El incumplimiento reiterado o grave de este reglamento podrá derivar en sanciones o medidas correctivas, según lo estipulado en el mismo."],
+ ["p","La colaboración y el compromiso de cada trabajador son esenciales para lograr un ambiente de convivencia positivo y funcional para todos."],
+ ["h1","1. Principios generales"],
+ ["b","El respeto, la cordialidad y la colaboración son la base de la convivencia."],
+ ["b","Se debe fomentar un ambiente libre de discriminación, acoso o violencia en cualquier forma."],
+ ["b","La limpieza, orden y cuidado de los espacios comunes son responsabilidad de todos."],
+ ["b","Ingresar con calzado limpio a la casa."],
+ ["h1","2. Normas de uso de espacios comunes"],
+ ["h2","2.1 Cocina compartida"],
+ ["b","Se establecerá un horario flexible para el uso de la cocina, priorizando la organización y convivencia."],
+ ["b","Cada trabajador es responsable de limpiar inmediatamente después de cocinar:"],
+ ["bb","Lavar platos, utensilios y ollas."],
+ ["bb","Secar y guardar platos, utensilios y ollas utilizadas."],
+ ["bb","Limpiar mesones, cocina y electrodomésticos."],
+ ["bb","Recoger desperdicios y botar la basura."],
+ ["b","Los alimentos y pertenencias personales deben ser identificados con nombre. No se deben tomar productos ajenos sin permiso."],
+ ["b","El uso de refrigeradores debe ser ordenado y respetuoso. Se eliminarán periódicamente productos en mal estado."],
+ ["h2","Comedor y living"],
+ ["b","Los espacios compartidos son de uso común; se debe respetar el derecho de todos a utilizarlos."],
+ ["b","Mantener el orden después de cada uso (no dejar platos, vasos o pertenencias personales)."],
+ ["b","El volumen de televisores, radios u otros dispositivos debe ser moderado, especialmente en horarios de descanso."],
+ ["b","Se deben respetar los horarios de descanso:"],
+ ["bb","De 22:00 a 7:00 hrs.: evitar ruidos innecesarios o reuniones que puedan molestar."],
+ ["h2","2.2 Baño compartido"],
+ ["p","El baño es un espacio de uso común y su limpieza y cuidado son fundamentales para una convivencia armoniosa. Por ello, se deben seguir estrictamente las siguientes normas:"],
+ ["h3","2.2.1 Uso y limpieza del WC"],
+ ["b","ES OBLIGATORIO DEJAR EL INODORO LIMPIO DESPUÉS DE CADA USO. Utilizar la escobilla o implementos de limpieza disponibles si es necesario."],
+ ["b","No arrojar papeles, toallas higiénicas, tampones u otros objetos al inodoro. Todo residuo debe ser depositado en el basurero habilitado."],
+ ["b","Si se presenta alguna obstrucción o problema con el WC, informar de inmediato para evitar inconvenientes mayores."],
+ ["h3","2.2.2 Orden e higiene general"],
+ ["b","Secar el piso y superficies después de ducharse o utilizar el lavamanos."],
+ ["b","Retirar cabellos del desagüe de la ducha y lavamanos."],
+ ["b","No dejar productos personales (jabones, shampoo, toallas, etc.) ocupando espacios comunes; deben guardarse en los lugares asignados."],
+ ["b","Los artículos de higiene íntima deben ser guardados o eliminados discretamente para evitar incomodar a otros."],
+ ["h1","3. Respeto y comportamiento adecuado"],
+ ["b","Se debe respetar la privacidad y pertenencias personales de cada trabajador."],
+ ["b","Evitar lenguaje ofensivo, comentarios inadecuados o cualquier comportamiento que pueda incomodar a otros."],
+ ["b","SE PROHÍBE EL CONSUMO DE ALCOHOL O CUALQUIER TIPO DE SUSTANCIAS ILÍCITAS dentro de la vivienda."],
+ ["b","Las discusiones o problemas deben resolverse de forma calmada y con respeto. Si es necesario, se podrá solicitar mediación a administración."],
+ ["h1","4. Visitas y permanencia de externos"],
+ ["b","Las visitas deben ser autorizadas por los residentes y notificadas a jefatura previamente para evitar inconvenientes."],
+ ["b","No se permite la permanencia de visitas en horarios de descanso (22:00 a 8:00 hrs.)."],
+ ["b","Las visitas no podrán hacer uso de los espacios personales o comunes sin la debida autorización."],
+ ["h1","5. Resolución de conflictos"],
+ ["b","Ante cualquier inconveniente o conflicto, los residentes deberán buscar un diálogo constructivo."],
+ ["b","Si no se resuelve, se deberá recurrir a un encargado designado por la administración para mediar y buscar soluciones."],
+ ["h1","6. Sanciones"],
+ ["b","El cumplimiento de este reglamento será supervisado por un inspector de aseo, el cual dejará las observaciones en cada visita."],
+ ["b","El incumplimiento reiterado de las normas del reglamento podrá implicar amonestaciones verbales o escritas."],
+ ["b","En casos graves (falta de respeto, acoso, violencia o robo), se evaluarán medidas más estrictas, como el término de contrato del trabajador."],
+ ["h1","7. Periodicidad de limpieza"]
+];
+/* Plan de limpieza y orden: área, acción, frecuencia, días (L M M J V S D; X = ese día) y responsables */
+const REGL_PLAN=[
+ ["Cocina","Lavar platos y utensilios","Diaria","XXXXXXX","Todos"],["Cocina","Limpiar encimera y mesa","Diaria","XXXXXXX","Todos"],
+ ["Cocina","Barrer el piso","Diaria","XXXXXXX","Todos"],["Cocina","Trapear el piso","Día por medio","X.X.X.X","Todos"],
+ ["Cocina","Sacar la basura","Día por medio","X.X.X.X","Todos"],["Cocina","Limpiar y revisar el refrigerador","Dos veces a la semana","..X..X.","Todos"],
+ ["Baño","Barrer el piso","Diaria","XXXXXXX","Todos"],["Baño","Trapear el piso","Día por medio","X.X.X.X","Todos"],
+ ["Baño","Limpiar WC","Diaria","XXXXXXX","Todos"],["Baño","Limpiar ducha y lavamanos","Día por medio","X.X.X.X","Todos"],
+ ["Baño","Sacar la basura","Día por medio","X.X.X.X","Todos"],["Dormitorio","Ventilar dormitorios","Diaria","XXXXXXX","Individual"],
+ ["Dormitorio","Ordenar","Diaria","XXXXXXX","Individual"],["Dormitorio","Limpiar pisos","Diaria","XXXXXXX","Individual"],
+ ["Dormitorio","Recambio de sábanas","Semanal","....X..","Individual"],["Sala de estar","Barrer el piso","Diaria","XXXXXXX","Todos"],
+ ["Sala de estar","Trapear el piso","Día por medio",".X.X.X.","Todos"],["Sala de estar","Ordenar y ventilar","Día por medio",".X.X.X.","Todos"],
+ ["Sala de estar","Limpiar sillones","Día por medio",".X.X.X.","Todos"]
+];
+const REGL_DECL="Por medio del presente documento, declaro haber leído, comprendido y aceptado en su totalidad el Reglamento de Convivencia de la Casa de Huéspedes. Entiendo que el objetivo de este reglamento es garantizar el respeto mutuo, la organización y la armonía en los espacios comunes, tales como: baño, cocina, comedor y living, los cuales son compartidos.";
+const REGL_ACTA="El trabajador declara haber leído, comprendido y aceptado en su totalidad el Reglamento de Convivencia de la Casa de Huéspedes, que se adjunta como Anexo 4 y forma parte de esta acta.";
+function reglHTML(){
+  const dias=["L","M","M","J","V","S","D"];
+  return REGL.map(([t,x])=>t==="p"?`<p>${esc(x)}</p>`:t==="h1"?`<p class="k">${esc(x)}</p>`:t==="h2"||t==="h3"?`<p><b>${esc(x)}</b></p>`:`<p class="${t==="bb"?"rgbb":"rgb"}">${esc(x)}</p>`).join("")
+   +`<div class="rgplan"><table><tr><th>Área</th><th>Acción</th><th>Frecuencia</th>${dias.map(d=>`<th>${d}</th>`).join("")}<th>Responsables</th></tr>${REGL_PLAN.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2])}</td>${[...r[3]].map(c=>`<td class="d">${c==="X"?"✓":""}</td>`).join("")}<td>${esc(r[4])}</td></tr>`).join("")}</table></div>`;
+}
 
 /* ---------- Texto que describe lo que se ve en la foto ---------- */
 const SUJ={s1i1:"las paredes",s1i2:"las ventanas",s1i3:"las puertas",s2i1:"el techo",s3i1:"la instalación eléctrica (enchufes, interruptores y luces)",s3i2:"el suministro de agua potable",s3i3:"las llaves y la grifería",s4i1:"el baño",s4i2:"la taza del WC",s4i3:"el lavamanos",s4i4:"la ducha",s4i5:"la ventilación del baño",s5i1:"la cocina",s5i2:"el lavaplatos",s5i3:"la ventilación de la cocina",s6i1:"el calefactor o estufa",s6i2:"la chimenea o salida de gases",s7i1:"los accesos a la vivienda"};
@@ -1200,7 +1281,7 @@ function renderPantalla(){
 }
 function lista(){
   const t=q.trim().toLowerCase();
-  return Object.values(ACTAS).filter(a=>a._col!=="visitas"&&!esAx(a)).filter(a=>!t||[a.trabajador,predioDe(a),a.vivienda,a.rut].join(" ").toLowerCase().includes(t))
+  return Object.values(ACTAS).filter(a=>a._col!=="visitas"&&!esAx(a)).filter(a=>!t||[a.trabajador,predioDe(a),a.vivienda,casaTxt(a),a.rut].join(" ").toLowerCase().includes(t))
     .sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
 }
 function renderHome(){
@@ -1212,7 +1293,7 @@ function renderHome(){
       <span class="tag ${an?"none":c?"cerrada":"borrador"}">${an?"Anulada":c?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(a.trabajador||"Sin nombre")}</span>
       <span class="when">${fmtD(a.fecha)}</span>
-      <span class="where">${esc([predioDe(a),a.vivienda].filter(Boolean).join(", ")||"Sin predio")}</span>
+      <span class="where">${esc([predioDe(a),a.vivienda,esHuesp(a)?casaTxt(a):""].filter(Boolean).join(", ")||"Sin predio")}</span>
       <span class="st">${esc(st)}</span><span class="by">${chipSync(a)}${an?` <span class="aut">Anulada el ${fmtD(a.anulada.fecha)} por ${esc(quien(a.anulada.por))}${a.anulada.motivo?`: ${esc(a.anulada.motivo)}`:""}</span>`:autoriaTxt(a)?` <span class="aut">${autoriaHTML(a)}</span>`:""}</span></button>
       ${mnBtn("mnViv",a.id,"Opciones del acta de "+(a.trabajador||"sin nombre"))}</div>`};
   const grp=(tipo,titulo,vacio)=>{const g=L.filter(a=>a.tipo===tipo);return `<h2>${titulo}<span class="cnt">${g.length}</span></h2><div class="list">${g.map(card).join("")||`<div class="empty">${vacio}</div>`}</div>`};
@@ -1241,7 +1322,7 @@ function renderPick(){
       <span class="tag entrega">${a.estado==="cerrada"?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(a.trabajador||"Sin nombre")}</span>
       <span class="when">${fmtD(a.fecha)}</span>
-      <span class="where">${esc([predioDe(a),a.vivienda].filter(Boolean).join(", ")||"Sin predio")}</span><span class="st"></span></button>`).join("");
+      <span class="where">${esc([predioDe(a),a.vivienda,esHuesp(a)?casaTxt(a):""].filter(Boolean).join(", ")||"Sin predio")}</span><span class="st"></span></button>`).join("");
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="home">Actas</button><div class="ttl">Recibir vivienda</div>${estadoChip()}</div></div></div>
   <main class="wrap"><h1>¿Qué vivienda se devuelve?</h1>
   <p class="lead">Elige el acta de entrega para comparar el antes y el después ítem por ítem.</p>
@@ -1275,8 +1356,10 @@ function stepDatos(){
   </div>
   ${a.predio==="Otro"?`<div class="f"><label for="predioOtro">Nombre del predio</label><input id="predioOtro" data-f="predioOtro" value="${esc(a.predioOtro)}" ${dis()}></div>`:""}
   <div class="f"><label for="vivienda">Vivienda</label><input id="vivienda" data-f="vivienda" value="${esc(a.vivienda)}" placeholder="Ej.: Casa 2, sector lechería" ${dis()}><span class="hint">Identifica la casa dentro del predio.</span></div>
+  <div class="f"><span class="lbl" id="casaLbl">Tipo de vivienda</span><div class="reps r2" role="group" aria-labelledby="casaLbl">${Object.entries(CASAS).map(([k,t])=>`<button data-a="casa" data-v="${k}" aria-pressed="${a.casa===k}" ${dis()}>${t}</button>`).join("")}</div>${esHuesp(a)?`<span class="hint">${dev?"Casa de huéspedes: habitación en una casa compartida.":"El acta de entrega incluye el reglamento de convivencia de la casa de huéspedes, para leerlo y firmarlo con el trabajador."}</span>`:""}</div>
   <div class="f"><label for="trabajador">Trabajador(a)</label><input id="trabajador" data-f="trabajador" value="${esc(a.trabajador)}" autocomplete="off" placeholder="Nombre completo" ${dis()}></div>
   <div class="f"><label for="rut">RUT</label><input id="rut" data-f="rut" value="${esc(a.rut)}" inputmode="text" autocomplete="off" placeholder="12.345.678-9" ${dis()}>${rutMsg}</div>
+  ${esHuesp(a)?`<div class="f"><label for="cargo">Cargo o área de trabajo</label><input id="cargo" data-f="cargo" value="${esc(a.cargo)}" placeholder="Ej.: Ordeñador, lechería" ${dis()}></div>`:""}
   ${!ro()&&a.estado!=="cerrada"?`<div class="btns"><button class="btn danger" data-a="del">Eliminar borrador</button></div>`:""}
   ${ro()&&a.tipo==="entrega"&&!a.devolucionId?`<div class="btns"><button class="btn" data-a="devFrom">Registrar la devolución de esta vivienda</button></div>`:""}
   ${a.tipo==="entrega"&&a.devolucionId&&ACTAS[a.devolucionId]?`<div class="btns"><button class="btn" data-a="open" data-id="${a.devolucionId}">Ver acta de devolución</button></div>`:""}
@@ -1315,12 +1398,14 @@ function stepCheck(){
 }
 function actaParrafo(a){
   const p=predioDe(a)||"[predio]",v=a.vivienda?` (${a.vivienda})`:"",t=a.trabajador||"[trabajador]",r=a.rut?rutFmt(a.rut):"[RUT]",f=fmtD(a.fecha)||"[fecha]";
-  if(a.tipo==="entrega")return `En la fecha ${f} se hace entrega formal de la vivienda ubicada en el predio ${p}${v} al trabajador ${t} RUT ${r}, quien declara haber recibido la propiedad en las siguientes condiciones:`;
-  return `En la fecha ${f} el trabajador ${t} RUT ${r} hace devolución a Capac SpA. de la vivienda ubicada en el predio ${p}${v}${a.entregaFecha?`, recibida mediante acta de entrega del ${fmtD(a.entregaFecha)}`:""}. La vivienda se recibe en las siguientes condiciones:`;
+  const ch=esHuesp(a)?" (casa de huéspedes)":"";
+  if(a.tipo==="entrega")return `En la fecha ${f} se hace entrega formal de la vivienda${ch} ubicada en el predio ${p}${v} al trabajador ${t} RUT ${r}, quien declara haber recibido la propiedad en las siguientes condiciones:`;
+  return `En la fecha ${f} el trabajador ${t} RUT ${r} hace devolución a Capac SpA. de la vivienda${ch} ubicada en el predio ${p}${v}${a.entregaFecha?`, recibida mediante acta de entrega del ${fmtD(a.entregaFecha)}`:""}. La vivienda se recibe en las siguientes condiciones:`;
 }
 function faltantes(){
   const a=cur,m=[];
-  if(!a.fecha)m.push("Fecha");if(!predioDe(a))m.push("Predio");if(!a.trabajador)m.push("Nombre del trabajador(a)");
+  if(!a.fecha)m.push("Fecha");if(!predioDe(a))m.push("Predio");if(!CASAS[a.casa])m.push("Tipo de vivienda (casa de familia o de huéspedes)");
+  if(esHuesp(a)&&a.tipo==="entrega"&&!(a.cargo||"").trim())m.push("Cargo o área de trabajo del trabajador(a)");if(!a.trabajador)m.push("Nombre del trabajador(a)");
   if(!a.rut||!rutOk(a.rut))m.push("RUT válido");
   const n=ITEMS.filter(i=>!(a.items[i.k]||{}).v).length;if(n)m.push(`${n} ítems del check list sin evaluar`);
   if(!(a.firmas.trabajador||{}).img&&!(a.firmas.trabajador||{}).noFirmo)m.push("Firma del trabajador(a) (o marcar que se retiró sin firmar)");
@@ -1349,7 +1434,7 @@ function stepActa(){
   <div class="acta"><p>${esc(actaParrafo(a))}</p><p class="k">Observaciones generales sobre el estado de la vivienda:</p>
   ${obs}
   ${ro()?"":`<button class="link" data-a="fillObs">Traer los ítems Regular y Mala del check list</button><br><button class="link" data-a="addObs">Agregar otra observación</button>`}
-  <p style="margin-top:12px">${esc(dev?CONSTANCIA:COMPROMISO)}</p>${dev?"":`<p>${esc(INGRESO)}</p>`}</div>
+  <p style="margin-top:12px">${esc(dev?CONSTANCIA:COMPROMISO)}</p>${dev?"":`<p>${esc(INGRESO)}</p>`}${!dev&&esHuesp(a)?`<p>${esc(REGL_ACTA)}</p><details class="resp regl"${ro()?"":" open"}><summary><b>Anexo 4. ${esc(REGL_TIT)}</b> (leer junto al trabajador)</summary>${reglHTML()}<p class="k">Firma y compromiso</p><p>${esc(REGL_DECL)}</p><p class="rgnota">Con su firma en esta acta, el trabajador firma también el reglamento (en el PDF va como Anexo 4, con su nombre, RUT y cargo).</p></details>`:""}</div>
   ${dlBox(a)}
   <h2>Firmas</h2><div class="sigs">${sigs}</div>
   <div class="f"><label for="fc">Fecha de toma de conocimiento</label><input id="fc" type="date" data-f="fechaConoc" value="${esc(a.fechaConoc)}" ${dis()}></div>
@@ -1364,11 +1449,11 @@ function dlBox(a){
 
 /* ---------- Acciones ---------- */
 function nueva(tipo,extra){
-  return Object.assign({id:uid(),tipo,creadoPor:yo(),fecha:today(),predio:"",predioOtro:"",vivienda:"",trabajador:"",rut:"",items:{},obs:["","",""],firmas:{},fechaConoc:today(),estado:"borrador",creado:new Date().toISOString(),actualizado:new Date().toISOString()},extra||{});
+  return Object.assign({id:uid(),tipo,creadoPor:yo(),fecha:today(),predio:"",predioOtro:"",vivienda:"",trabajador:"",rut:"",items:{},obs:["","",""],firmas:{},fechaConoc:today(),casa:"",estado:"borrador",creado:new Date().toISOString(),actualizado:new Date().toISOString()},extra||{});
 }
 function devDesde(e){
   const antes={};ITEMS.forEach(i=>{const v=(e.items[i.k]||{}).v;if(v)antes[i.k]=v});
-  const d=nueva("devolucion",{entregaId:e.id,entregaFecha:e.fecha,antes,predio:e.predio,predioOtro:e.predioOtro,vivienda:e.vivienda,trabajador:e.trabajador,rut:e.rut});
+  const d=nueva("devolucion",{entregaId:e.id,entregaFecha:e.fecha,antes,predio:e.predio,predioOtro:e.predioOtro,vivienda:e.vivienda,casa:e.casa||"",cargo:e.cargo||"",trabajador:e.trabajador,rut:e.rut});
   d.firmas.trabajador={nombre:e.trabajador||""};
   return d;
 }
@@ -1466,6 +1551,7 @@ async function onClickAccion(ev,b,A){
     f.sel=v;if(v==="otro"){if(REPS.includes(f.nombre))f.nombre="";}else{f.nombre=v;f.cargo=""}
     cur.firmas.empresa=f;touch();const keep=window.scrollY;render();window.scrollTo(0,keep);
     if(v==="otro"){const i=document.querySelector('[data-sn="empresa"]');if(i)i.focus({preventScroll:true})}return}
+  if(A==="casa"){if(ro()||!cur)return;cur.casa=b.dataset.v;touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return} /* v122 */
   if(A==="sign"){if(ro())return;openSign(b.dataset.r);return}
   if(A==="del"){await eliminarActa(cur);return}
   if(A==="delId"){await eliminarActa(ACTAS[b.dataset.id]);return}
@@ -1481,7 +1567,7 @@ async function onClickAccion(ev,b,A){
   if(A==="close"){if(ro())return;
     const m=faltantes();
     if(m.length){const go2=await ask("Faltan datos para cerrar el acta","Completa lo siguiente. Mientras tanto el acta queda guardada como borrador.","Ir a completar",false,`<ul class="miss" style="margin:0 0 12px">${m.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`);
-      if(go2){const s=m.some(x=>/check list/.test(x))?1:m.some(x=>/Fecha|Predio|RUT|Nombre del trabajador/.test(x)&&!/firma/i.test(x))?0:2;step=s;window.scrollTo(0,0);render()}return}
+      if(go2){const s=m.some(x=>/check list/.test(x))?1:m.some(x=>/Fecha|Predio|RUT|Nombre del trabajador|Tipo de vivienda|Cargo/.test(x)&&!/firma/i.test(x))?0:2;step=s;window.scrollTo(0,0);render()}return}
     if(!(await ask("¿Finalizar y cerrar el acta?",`Quedará guardada en ${cur.tipo==="entrega"?"Viviendas entregadas":"Viviendas recibidas"} y ya no se podrá modificar.`,"Cerrar acta")))return;
     cur.estado="cerrada";cur.cerrada=today();cur.actualizado=new Date().toISOString();if(ME)cur.cerradoPor=yo();await saveActa(cur);
     const t=cur.tipo;cur=null;go("home");exito("Acta cerrada",`Guardada en ${t==="entrega"?"Viviendas entregadas":"Viviendas recibidas"}.`);if(DB&&navigator.onLine!==false)setTimeout(()=>{actasXlsx(false);pdfsPendientes()},3000);return}
@@ -1651,16 +1737,16 @@ async function pdfImg(ref){
 /* ---------- PDF ---------- */
 function pdfKit(d){
   const L=15,W=180,C={band:[141,179,226],head:[221,235,247]};
-  function header(){
-    const y=10,h=21;d.setDrawColor(0);d.setLineWidth(0.2);d.setTextColor(0);
+  function header(o){
+    o=o||{};const y=10,h=21;d.setDrawColor(0);d.setLineWidth(0.2);d.setTextColor(0);
     d.setFillColor(...C.band);d.rect(60,y,95,h,"F");d.rect(L,y,W,h);d.line(60,y,60,y+h);d.line(155,y,155,y+h);d.line(172,y,172,y+h);d.line(155,y+h/2,195,y+h/2);
     {const lh=h-2,lw=lh*LOGO_R;try{d.addImage(LOGO,"JPEG",37.5-lw/2,y+1,lw,lh,"logo")}catch(e){d.setFont("helvetica","bold");d.setFontSize(13);d.setTextColor(46,84,52);d.text("PUDUHUE",37.5,y+12.6,{align:"center"});d.setTextColor(0)}}
     d.setFont("helvetica","bold");
     d.setFontSize(8.5);d.text("Departamento de Administración y Finanzas",107.5,y+6,{align:"center"});
-    d.setFontSize(7.5);d.text("Administración / Seguridad",107.5,y+10.5,{align:"center"});
-    d.setFontSize(8.5);d.text("Protocolo de Entrega de Viviendas",107.5,y+15.5,{align:"center"});
+    d.setFontSize(7.5);d.text(o.sub||"Administración / Seguridad",107.5,y+10.5,{align:"center"});
+    d.setFontSize(8.5);d.text(o.tit||"Protocolo de Entrega de Viviendas",107.5,y+15.5,{align:"center"});
     d.setFontSize(6.5);d.text("Versión",163.5,y+3.8,{align:"center"});d.text("Fecha",183.5,y+3.8,{align:"center"});d.text("Revisión",163.5,y+h/2+3.8,{align:"center"});d.text("Fecha",183.5,y+h/2+3.8,{align:"center"});
-    d.setFont("helvetica","normal");d.text("01",163.5,y+8.3,{align:"center"});d.text("2025-06-18",183.5,y+8.3,{align:"center"});d.text("01",163.5,y+h/2+8.3,{align:"center"});
+    d.setFont("helvetica","normal");d.text("01",163.5,y+8.3,{align:"center"});d.text(o.fecha||"2025-06-18",183.5,y+8.3,{align:"center"});d.text("01",163.5,y+h/2+8.3,{align:"center"});
   }
   let pie="";
   function setPie(t){pie=t||""}
@@ -1670,7 +1756,7 @@ function pdfKit(d){
   const val=s=>s||"-";
   function datos(a,y){
     const dev=a.tipo==="devolucion";
-  const dat=[["Predio",predioDe(a)],["Vivienda",a.vivienda],["Trabajador(a)",a.trabajador],["RUT",a.rut?rutFmt(a.rut):""],[dev?"Fecha devolución":"Fecha entrega",fmtD(a.fecha)],dev?["Fecha entrega",a.entregaFecha?fmtD(a.entregaFecha):"Sin acta en la app"]:["Estado",a.estado==="cerrada"?"Cerrada":"Borrador"]];
+  const dat=[["Predio",predioDe(a)],["Vivienda",[a.vivienda,esHuesp(a)?casaTxt(a):""].filter(Boolean).join(" · ")],["Trabajador(a)",a.trabajador],["RUT",a.rut?rutFmt(a.rut):""],[dev?"Fecha devolución":"Fecha entrega",fmtD(a.fecha)],dev?["Fecha entrega",a.entregaFecha?fmtD(a.entregaFecha):"Sin acta en la app"]:["Estado",a.estado==="cerrada"?"Cerrada":"Borrador"]];
   d.setFontSize(7.5);
   for(let i=0;i<dat.length;i+=2){
     [dat[i],dat[i+1]].forEach((c,j)=>{const x=L+j*90;d.setFillColor(...C.head);d.rect(x,y,27,5.2,"FD");d.rect(x+27,y,63,5.2);d.setFont("helvetica","bold");d.text(c[0],x+1.5,y+3.6);d.setFont("helvetica","normal");d.text(d.splitTextToSize(val(c[1]),60)[0],x+28.5,y+3.6)});
@@ -1811,7 +1897,7 @@ function secActa(d,a,K){
   const obs=(a.obs||[]).map(o=>o.trim()).filter(Boolean);
   (obs.length?obs:["Sin observaciones."]).forEach(o=>{const ls=d.splitTextToSize(o,W-8);if(y+ls.length*4.5>BOT){d.addPage();header();y=TOP}d.text("•",L+2,y);d.text(ls,L+7,y,{lineHeightFactor:1.35});y+=ls.length*4.5+1.5});
   y+=3;
-  para(dev?CONSTANCIA:COMPROMISO,1);if(!dev)para(INGRESO,4);else y+=3;
+  para(dev?CONSTANCIA:COMPROMISO,1);if(!dev)para(INGRESO,esHuesp(a)?1:4);else y+=3;if(!dev&&esHuesp(a))para(REGL_ACTA,4); /* v122 */
   const ft=(a.firmas||{}).trabajador||{};
   if(ft.noFirmo){d.setFont("helvetica","bold");para(`Constancia: El trabajador(a) ${a.trabajador||""} se retiró y no firmó el acta ${dev?"de devolución":"de entrega"} de la vivienda. La empresa deja constancia del estado de la vivienda registrado en el check list del Anexo 1.`+(ft.motivo&&ft.motivo.trim()?` Detalle: ${ft.motivo.trim()}${/[.!?]$/.test(ft.motivo.trim())?"":"."}`:""),3);d.setFont("helvetica","normal")}
   rolesDe(a).forEach(([k,l,sub])=>{
@@ -1829,6 +1915,47 @@ function secActa(d,a,K){
   y+=4;d.setFontSize(9.5);d.text("Fecha de toma de conocimiento: "+(fmtD(a.fechaConoc)||"__________________"),L,y);y+=14;
   d.setFont("helvetica","italic");d.setFontSize(8);d.text("Cc: Trabajador - Administración predial - Recursos Humanos",L,y);
 }
+/* v122: Anexo 4, reglamento de convivencia de la casa de huéspedes (solo en el acta de entrega) */
+function secReglamento(d,a,K){
+  const {L,W,TOP,BOT}=PDF;
+  const hd=()=>K.header({sub:"Área de Recursos Humanos · Procedimientos internos",tit:"Reglamento de Convivencia Casa de Huéspedes",fecha:"2024-12-01"});
+  hd();let y=TOP+2;
+  const nb=h=>{if(y+h>BOT){d.addPage();hd();y=TOP}};
+  d.setFont("helvetica","bolditalic");d.setFontSize(10);d.text("Anexo 4",L,y);y+=10;
+  d.setFont("helvetica","bold");d.text("REGLAMENTO DE CONVIVENCIA CASA DE HUÉSPEDES",105,y,{align:"center"});y+=9;
+  const txt=(t,x,w,font,size,gap)=>{d.setFont("helvetica",font);d.setFontSize(size);const ls=d.splitTextToSize(t,w),lh=size*0.42*1.25;nb(ls.length*lh+1);d.text(ls,x,y+size*0.3,{lineHeightFactor:1.25});y+=ls.length*lh+gap;return ls};
+  REGL.forEach(([t,x])=>{
+    if(t==="p")txt(x,L,W,"normal",9,2);
+    else if(t==="h1"){y+=2;nb(14);txt(x,L,W,"bold",9.5,1.5)}
+    else if(t==="h2"){y+=1;nb(12);txt(x,L+4,W-4,"bold",9,1.2)}
+    else if(t==="h3"){nb(12);txt(x,L+8,W-8,"bold",9,1)}
+    else{const ind=t==="bb"?16:8;d.setFont("helvetica","normal");d.setFontSize(9);nb(5);d.text(t==="bb"?"-":"•",L+ind-3.5,y+2.7);txt(x,L+ind,W-ind,"normal",9,1)}
+  });
+  /* plan de limpieza */
+  y+=2;nb(14);d.setFont("helvetica","bold");d.setFontSize(8.5);d.text("PLAN DE LIMPIEZA Y ORDEN CASA DE HUÉSPEDES",105,y+3,{align:"center"});y+=5.5;
+  const cw=[24,52,30,6,6,6,6,6,6,6,32],xs=[];let xx=L;cw.forEach(w=>{xs.push(xx);xx+=w});
+  const th=()=>{const hs=["Área","Acción","Frecuencia","L","M","M","J","V","S","D","Responsables"];d.setFont("helvetica","bold");d.setFontSize(7.5);d.setDrawColor(0);d.setLineWidth(0.2);
+    hs.forEach((h,i)=>{d.setFillColor(...PC.head);d.rect(xs[i],y,cw[i],5,"FD");d.text(h,xs[i]+cw[i]/2,y+3.5,{align:"center"})});y+=5};
+  th();
+  REGL_PLAN.forEach(r=>{if(y+4.6>BOT){d.addPage();hd();y=TOP;th()}
+    d.setFont("helvetica","normal");d.setFontSize(7.5);
+    const cel=[r[0],r[1],r[2]].concat([...r[3]].map(c=>c==="X"?"X":""),[r[4]]);
+    cel.forEach((c,i)=>{if(i>=3&&i<=9&&c){d.setFillColor(...PC.B);d.rect(xs[i],y,cw[i],4.6,"F")}d.rect(xs[i],y,cw[i],4.6);
+      if(c)d.text(i===1?d.splitTextToSize(c,cw[i]-2)[0]:c,i===1||i===0?xs[i]+1.2:xs[i]+cw[i]/2,y+3.2,i===1||i===0?{}:{align:"center"})});
+    y+=4.6});
+  /* 8. Firma y compromiso */
+  y+=6;nb(82);
+  d.setFont("helvetica","bold");d.setFontSize(9.5);d.text("8. Firma y compromiso",L,y);y+=7;
+  const ft=(a.firmas||{}).trabajador||{};
+  const fila=(k,v)=>{d.setFont("helvetica","bold");d.setFontSize(9);d.text(k,L,y);d.setFont("helvetica","normal");d.text(v||"________________________________",L+46,y);y+=6};
+  fila("Nombre del trabajador:",a.trabajador);fila("RUT:",a.rut?rutFmt(a.rut):"");fila("Cargo o área de trabajo:",a.cargo);fila("Fecha:",fmtD(a.fecha));
+  y+=2;txt(REGL_DECL,L,W,"normal",9,4);
+  nb(30);const lineY=y+18;
+  if(ft.noFirmo){d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(155,49,49);d.text("SE RETIRÓ SIN FIRMAR EL ACTA",105,lineY-2,{align:"center"});d.setTextColor(0)}
+  else if(ft.img){try{const p=d.getImageProperties(ft.img);let w=58,h=w*p.height/p.width;if(h>17){h=17;w=h*p.width/p.height}d.addImage(ft.img,"PNG",105-w/2,lineY-h+0.5,w,h)}catch(e){}}
+  d.setLineWidth(0.25);d.line(65,lineY+0.8,145,lineY+0.8);d.setLineWidth(0.2);
+  d.setFont("helvetica","normal");d.setFontSize(8.5);d.text("Firma del trabajador",105,lineY+5,{align:"center"});
+}
 function finPDF(d,K){const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);K.footer(i,n)}return d}
 function pieAutoria(a){const t=autoriaTxt(a);const an=a.anulada?`ACTA ANULADA el ${fmtD(a.anulada.fecha)} por ${quien(a.anulada.por)}${a.anulada.motivo?" ("+a.anulada.motivo+")":""}. `:"";return an+(t?"Registro en la app: "+t.charAt(0).toLowerCase()+t.slice(1):"")}
 function buildGeneral(a,IM){
@@ -1837,7 +1964,7 @@ function buildGeneral(a,IM){
 }
 function buildActa(a){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=pdfKit(d);K.setPie(pieAutoria(a));
-  secActa(d,a,K);return finPDF(d,K);
+  secActa(d,a,K);if(a.tipo==="entrega"&&esHuesp(a)){d.addPage();secReglamento(d,a,K)}return finPDF(d,K);
 }
 function nombreArchivo(a){
   const s=x=>String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"");
@@ -2140,10 +2267,10 @@ function actasXlsxBuild(){
   const nF=a=>Object.values(a.items||{}).reduce((n,r)=>n+((r.fotos||[]).length),0);
   const obsDe=a=>(a.obs||[]).filter(o=>o&&o.trim()).join(" | ");
   const vinc=a=>{const o=a.tipo==="entrega"?ACTAS[a.devolucionId]:ACTAS[a.entregaId];return o?`${o.tipo==="entrega"?"Entrega":"Devolución"} ${fmtD(o.fecha)}`:(a.tipo==="devolucion"&&a.entregaFecha?`Entrega ${fmtD(a.entregaFecha)} (sin acta)`:"")};
-  const h1=["Tipo","Estado","Predio","Vivienda","Trabajador(a)","RUT","Fecha","Fecha cierre","Registrada por","Cerrada por","Acta vinculada","Ítems Bueno","Ítems Regular","Ítems Mala","Ítems evaluados","Fotos","Observaciones","Firma trabajador","Anulada"];
+  const h1=["Tipo","Estado","Predio","Vivienda","Tipo de casa","Trabajador(a)","RUT","Fecha","Fecha cierre","Registrada por","Cerrada por","Acta vinculada","Ítems Bueno","Ítems Regular","Ítems Mala","Ítems evaluados","Fotos","Observaciones","Firma trabajador","Anulada"];
   const r1=[h1];L.forEach(a=>{const ev=cnt(a,"B")+cnt(a,"R")+cnt(a,"M");const ft=(a.firmas||{}).trabajador||{};
-    r1.push([a.tipo==="entrega"?"Entrega":"Devolución",a.anulada?"Anulada":a.estado==="cerrada"?"Cerrada":"Borrador",predioDe(a),a.vivienda||"",a.trabajador||"",a.rut?rutFmt(a.rut):"",fmtD(a.fecha),a.cerrada?fmtD(a.cerrada):"",quien(a.creadoPor)||(a.origen==="offline"?"Sin conexión":""),quien(a.cerradoPor),vinc(a),cnt(a,"B"),cnt(a,"R"),cnt(a,"M"),ev,nF(a),obsDe(a),ft.img?"Sí":ft.noFirmo?`No firmó${ft.motivo?": "+ft.motivo:""}`:"",a.anulada?`${fmtD(a.anulada.fecha)} · ${quien(a.anulada.por)}${a.anulada.motivo?": "+a.anulada.motivo:""}`:""])});
-  const w1=XLSX.utils.aoa_to_sheet(r1);w1["!cols"]=[12,10,14,18,26,14,11,11,22,22,22,8,8,8,8,6,50,18,30].map(w=>({wch:w}));w1["!freeze"]={xSplit:0,ySplit:1};XLSX.utils.book_append_sheet(wb,w1,"Actas");
+    r1.push([a.tipo==="entrega"?"Entrega":"Devolución",a.anulada?"Anulada":a.estado==="cerrada"?"Cerrada":"Borrador",predioDe(a),a.vivienda||"",casaTxt(a),a.trabajador||"",a.rut?rutFmt(a.rut):"",fmtD(a.fecha),a.cerrada?fmtD(a.cerrada):"",quien(a.creadoPor)||(a.origen==="offline"?"Sin conexión":""),quien(a.cerradoPor),vinc(a),cnt(a,"B"),cnt(a,"R"),cnt(a,"M"),ev,nF(a),obsDe(a),ft.img?"Sí":ft.noFirmo?`No firmó${ft.motivo?": "+ft.motivo:""}`:"",a.anulada?`${fmtD(a.anulada.fecha)} · ${quien(a.anulada.por)}${a.anulada.motivo?": "+a.anulada.motivo:""}`:""])});
+  const w1=XLSX.utils.aoa_to_sheet(r1);w1["!cols"]=[12,10,14,18,16,26,14,11,11,22,22,22,8,8,8,8,6,50,18,30].map(w=>({wch:w}));w1["!freeze"]={xSplit:0,ySplit:1};XLSX.utils.book_append_sheet(wb,w1,"Actas");
   /* Detalle ítem por ítem */
   const r2=[["Tipo","Predio","Vivienda","Trabajador(a)","Fecha","Sección","Ítem","Estado","Observación","Estado en la entrega","Cambio","Fotos"]];
   L.filter(a=>!a.anulada).forEach(a=>ITEMS.forEach(it=>{const r=(a.items||{})[it.k]||{};if(!r.v&&!r.obs&&!(r.fotos||[]).length)return;
