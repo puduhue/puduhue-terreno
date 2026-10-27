@@ -809,7 +809,7 @@ async function clAddFotos(v,k,files){
   for(const f of files){
     const r=v.items[k]||(v.items[k]={});r.fotos=r.fotos||[];
     if(r.fotos.length>=MAXF){toast(`Máximo ${MAXF} fotos por ítem.`);break}
-    let img;try{img=await compress(f,1600,0.75)}catch(e){toast("No se pudo leer la imagen.");continue}
+    let img;try{img=await compress(f,1600,0.75)}catch(e){toast(msgImg(e,f),7000);continue}
     let ref=null;
     if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:v.id,k,col:"visitas"});QF[t]={actaId:v.id,k,col:"visitas"};ref=t}catch(e){}}
     if(!ref){ref=refSinEspacio();if(!ref)continue} /* v106 (C-04) */

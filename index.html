@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=124">
+<link rel="stylesheet" href="estilos.css?v=125">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="124";
+const APP_VER="125";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -207,7 +207,7 @@ function rutClean(s){return String(s||"").replace(/[^0-9kK]/g,"").toUpperCase()}
 function rutFmt(s){const c=rutClean(s);if(c.length<2)return c;const b=c.slice(0,-1),dv=c.slice(-1);return b.replace(/\B(?=(\d{3})+(?!\d))/g,".")+"-"+dv}
 function rutOk(s){const c=rutClean(s);if(c.length<2)return false;const b=c.slice(0,-1),dv=c.slice(-1);if(!/^\d+$/.test(b))return false;let sum=0,m=2;for(let i=b.length-1;i>=0;i--){sum+=(+b[i])*m;m=m===7?2:m+1}const r=11-(sum%11);return (r===11?"0":r===10?"K":String(r))===dv}
 const predioDe=a=>a.predio==="Otro"?(a.predioOtro||""):(a.predio||"");
-let toastT;function toast(m){let t=$(".toast");if(!t){t=document.createElement("div");t.className="toast";t.setAttribute("role","status");document.body.appendChild(t)}t.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),3200)}
+let toastT;function toast(m,ms){let t=$(".toast");if(!t){t=document.createElement("div");t.className="toast";t.setAttribute("role","status");document.body.appendChild(t)}t.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),ms||3200)}
 /* Ventana de confirmación propia (el confirm() del navegador está bloqueado dentro de la app) */
 function ask(title,msg,ok,danger,extraHTML,cancelar){
   return new Promise(res=>{
@@ -1653,20 +1653,64 @@ function fotosHTML(it){
     ${old.length?`<div class="fl">En la entrega</div><div class="strip">${old.map(f=>thumb(f,it.k,false,true)).join("")}</div><div class="fl">En la devolución</div>`:""}
     <div class="strip">${mine.map(f=>ro()?thumb(f,it.k,true,false):`<span class="thw">${thumb(f,it.k,true,false)}<button class="thx" data-a="delFoto" data-ref="${esc(f)}" data-k="${it.k}" aria-label="Eliminar foto">✕</button></span>`).join("")}${canAdd?`${ESCRITORIO()?`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Subir foto<input class="vh" type="file" accept="image/*" multiple data-foto="${it.k}"></label>`:`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-foto="${it.k}"></label><label class="addf gal"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Galería<input class="vh" type="file" accept="image/*" multiple data-foto="${it.k}"></label>`}`:""}</div></div>`;
 }
-function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
+/* v125: lectura de fotos. Antes solo se probaba con <img> y, si el navegador no abría la foto, salía «No se pudo leer la imagen»
+   sin la causa (pasó con la Galería en Android). Ahora se prueba en orden: 1) <img>, como antes; 2) createImageBitmap
+   reduciendo al decodificar (fotos muy grandes); 3) si es HEIC (formato de alta eficiencia de Samsung y iPhone), se convierte
+   a JPEG con heic2any (lib/heic2any-0.0.4: se baja en segundo plano y queda guardada para usarla sin señal).
+   Si nada resulta, el error lleva un código (e.cod) y msgImg() arma un aviso con la causa. */
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(errImg("decode"));i.src=src})}
+function errImg(cod){const x=new Error("img:"+cod);x.cod=cod;return x}
+const HEIC_LIB="lib/heic2any-0.0.4/heic2any.min.js";let HEIC_P=null;
+function heicLib(){if(window.heic2any)return Promise.resolve(window.heic2any);
+  if(!HEIC_P)HEIC_P=new Promise((res,rej)=>{const s=document.createElement("script");s.src=HEIC_LIB;
+    s.onload=()=>window.heic2any?res(window.heic2any):(HEIC_P=null,rej(errImg("heic_lib")));
+    s.onerror=()=>{HEIC_P=null;s.remove();rej(errImg("heic_lib"))};document.head.appendChild(s)});
+  return HEIC_P}
+/* el conversor se guarda en el teléfono unos segundos después de abrir (como el lector del código del SII), para que funcione sin señal */
+setTimeout(()=>{try{if(navigator.onLine!==false)fetch(HEIC_LIB).catch(()=>{})}catch(e){}},8000);
+async function cabeceraImg(file){let b;try{b=new Uint8Array(await file.slice(0,16).arrayBuffer())}catch(e){throw errImg("noread")}
+  const m=String.fromCharCode(...b.slice(4,12));
+  return /^ftyp(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(m)||((/heic|heif/i.test(file.type||"")||/\.(heic|heif)$/i.test(file.name||""))&&!/^ftypavi/.test(m))}
+async function dibujarImg(src,w0,h0,max,q){if(!w0||!h0)throw errImg("decode");
+  const s=Math.min(1,max/Math.max(w0,h0)),w=Math.max(1,Math.round(w0*s)),h=Math.max(1,Math.round(h0*s));
+  const c=document.createElement("canvas");c.width=w;c.height=h;
+  try{const x=c.getContext("2d");if(!x)throw errImg("memoria");x.drawImage(src,0,0,w,h);
+    const dataURL=c.toDataURL("image/jpeg",q);const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",q));
+    if(!blob||!blob.size||dataURL.length<100)throw errImg("memoria");return{dataURL,blob}}
+  finally{c.width=c.height=0}}
+async function porImg(blob,max,q){const url=URL.createObjectURL(blob);
+  try{const im=await loadImg(url);return await dibujarImg(im,im.naturalWidth,im.naturalHeight,max,q)}finally{URL.revokeObjectURL(url)}}
+async function porBitmap(blob,max,q){if(typeof createImageBitmap!=="function")throw errImg("decode");
+  let bm;try{bm=await createImageBitmap(blob,{imageOrientation:"from-image",resizeWidth:max,resizeQuality:"medium"})}
+  catch(e){try{bm=await createImageBitmap(blob)}catch(e2){throw errImg("decode")}}
+  try{return await dibujarImg(bm,bm.width,bm.height,max,q)}finally{try{bm.close()}catch(e){}}}
 async function compress(file,max,q){
-  const url=URL.createObjectURL(file);
-  try{const im=await loadImg(url);let w=im.naturalWidth,h=im.naturalHeight;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);
-    const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);
-    const dataURL=c.toDataURL("image/jpeg",q);const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",q));c.width=c.height=0;return{dataURL,blob}}
-  finally{URL.revokeObjectURL(url)}
+  if(!file||!file.size)throw errImg("vacia");
+  const heic=await cabeceraImg(file);
+  let ult=null;
+  /* Safari (iPhone y Mac) abre HEIC directamente, por eso <img> se prueba también con HEIC */
+  try{return await porImg(file,max,q)}catch(e){ult=e}
+  if(!heic){try{return await porBitmap(file,max,q)}catch(e){throw ult&&ult.cod==="memoria"?ult:e}}
+  let h2a;try{h2a=await heicLib()}catch(e){throw errImg(navigator.onLine===false?"heic_sinred":"heic_lib")}
+  let jpg;try{jpg=await h2a({blob:file,toType:"image/jpeg",quality:0.92});if(Array.isArray(jpg))jpg=jpg[0];if(!jpg||!jpg.size)throw 0}catch(e){throw errImg("heic")}
+  try{return await porImg(jpg,max,q)}catch(e){return await porBitmap(jpg,max,q)}
 }
+/* aviso para la persona cuando una foto no se pudo leer; en el caso general dice el tipo y el tamaño, para poder revisarlo */
+function msgImg(e,f){const c=e&&e.cod;
+  if(c==="vacia")return "La foto llegó vacía: puede estar solo en la nube. Ábrela primero en la Galería del teléfono para que se descargue, o usa Cámara.";
+  if(c==="noread")return "El teléfono no entregó la foto. Vuelve a elegirla o usa Cámara.";
+  if(c==="heic_sinred")return "La foto está en formato HEIC y para convertirla hace falta señal la primera vez. Prueba con señal o usa Cámara.";
+  if(c==="heic_lib")return "No se pudo cargar el conversor de fotos HEIC. Revisa la señal y prueba de nuevo, o usa Cámara.";
+  if(c==="heic")return "No se pudo convertir la foto HEIC. Usa Cámara o cambia la cámara del teléfono a formato JPG.";
+  if(c==="memoria")return "La foto es demasiado grande para el teléfono. Usa Cámara o elige una foto de menor resolución.";
+  const t=f?[f.type||(f.name&&f.name.split(".").pop())||"",f.size?(f.size/1048576).toFixed(1).replace(".",",")+" MB":""].filter(Boolean).join(", "):"";
+  return "No se pudo leer la imagen"+(t?" ("+t+")":"")+". Prueba con otra foto o usa Cámara."}
 function refreshItem(a,k){if(cur!==a||view!=="edit"||step!==1)return;const el=$("#it-"+k);const it=ITEMS.find(i=>i.k===k);if(el&&it)el.outerHTML=itemHTML(it)}
 async function addFotos(a,k,files){
   for(const f of files){
     const r=a.items[k]||(a.items[k]={});r.fotos=r.fotos||[];
     if(r.fotos.length>=MAXF){toast(`Máximo ${MAXF} fotos por ítem.`);break}
-    let img;try{img=await compress(f,1600,0.75)}catch(e){toast("No se pudo leer la imagen"+(e&&e.message?": "+e.message:"")+". Prueba con otra foto o tómala de nuevo.");continue}
+    let img;try{img=await compress(f,1600,0.75)}catch(e){toast(msgImg(e,f),7000);continue}
     let ref=null;
     if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:a.id,k});const back=await IDB.get("fotos",t);if(back&&back.data&&back.data.byteLength===buf.byteLength){QF[t]={actaId:a.id,k};ref=t}else{IDB.del("fotos",t).catch(()=>{})}}catch(e){}}
     if(!ref){const t="l:"+uid();try{localStorage.setItem("actas-foto-"+t,(await compress(f,1000,0.6)).dataURL);ref=t}catch(e){}}
@@ -2938,10 +2982,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=124"></script>
-<script src="modulos/bodega.js?v=124"></script>
-<script src="modulos/rendiciones.js?v=124"></script>
-<script src="modulos/actas-entrega.js?v=124"></script>
+<script src="modulos/checklist.js?v=125"></script>
+<script src="modulos/bodega.js?v=125"></script>
+<script src="modulos/rendiciones.js?v=125"></script>
+<script src="modulos/actas-entrega.js?v=125"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

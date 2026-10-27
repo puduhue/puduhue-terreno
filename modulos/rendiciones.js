@@ -1870,7 +1870,7 @@ async function rdChange(ev){const t=ev.target;
   if(t.dataset.rdrefoto){const f=t.files[0];t.value="";if(f&&rdd&&editaPersona(rdv))await rdCambiarDoc(rdv,rdd,f);return true}
   return rdInput(ev)}
 async function rdGuardarFoto(r,d,file){
-  let img;try{img=file&&file.dataURL&&file.blob?file:await compress(file,2560,0.8)}catch(e){toast("No se pudo leer la imagen.");return null}
+  let img;try{img=file&&file.dataURL&&file.blob?file:await compress(file,2560,0.8)}catch(e){toast(msgImg(e,file),7000);return null}
   let ref=null;if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:r.id,k:d.k,col:"rendiciones"});QF[t]={actaId:r.id,k:d.k,col:"rendiciones"};ref=t}catch(e){}}
   if(!ref)ref=refSinEspacio();if(!ref)return null; /* v106 (C-04) */
   FOTO[ref]=img.dataURL;schedSync(800);return ref;
