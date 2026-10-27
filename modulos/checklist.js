@@ -322,7 +322,10 @@ function actaPatente(p){try{const L=Object.values(ACTAS).filter(a=>a.tipo==="veh
 /* camionetas del check list: las que tienen acta de entrega sin devolución cerrada, más las que ya tienen revisiones */
 function patentesCL(){const s=new Set();try{Object.values(ACTAS).forEach(a=>{if(a.tipo==="vehiculo"&&a.mov!=="devolucion"&&!a.anulada&&!(a.devolucionId&&ACTAS[a.devolucionId]&&ACTAS[a.devolucionId].estado==="cerrada")){const p=normPat((a.veh||{}).patente);if(p)s.add(p)}})}catch(e){}
   Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.tipo==="camionetas"&&v.predio)s.add(v.predio)});return [...s].sort()}
-const unidadesCL=tipo=>(tipo||clTipo)==="camionetas"?patentesCL():prediosCL();
+/* v124: el check list de bodega suma bodegas que no son predios (Corte Alto, pedido por Benja el 27-10-2026) */
+const BODEGAS_EXTRA=["Corte Alto"];
+const unidadesCL=tipo=>{const t=tipo||clTipo;if(t==="camionetas")return patentesCL();const L=prediosCL(t);
+  return t==="bodega"?L.concat(BODEGAS_EXTRA.filter(b=>!L.includes(b))).sort((a,b)=>a.localeCompare(b,"es")):L};
 const cmDesc=p=>{const a=actaPatente(p);if(!a)return"Sin acta de entrega en la app";const ve=a.veh||{};return [[ve.marca,ve.modelo,ve.anio].filter(Boolean).join(" "),predioDe(a),a.conductor].filter(Boolean).join(" · ")};
 const kmNum=x=>+String(x||"").replace(/[^0-9]/g,"")||0;
 /* kilometraje: lo recorrido desde la entrega y la próxima mantención de los 10.000 km (±500) */
