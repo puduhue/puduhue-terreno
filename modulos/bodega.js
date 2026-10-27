@@ -339,7 +339,7 @@ function cbInput(ev){const t=ev.target;
 function cbChange(ev){const t=ev.target;if(t.dataset.cbfoto){const files=[...t.files];t.value="";cbAddFotos(cbv,t.dataset.cbfoto,files);return true}return cbInput(ev)}
 async function cbAddFotos(c,k,files){
   for(const f of files){const r=c.items[k]||(c.items[k]={});r.fotos=r.fotos||[];if(r.fotos.length>=3){toast("Máximo 3 fotos por producto.");break}
-    let img;try{img=await compress(f,1600,0.75)}catch(e){toast("No se pudo leer la imagen.");continue}
+    let img;try{img=await compress(f,1600,0.75)}catch(e){toast(msgImg(e,f),7000);continue}
     let ref=null;if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:c.id,k,col:"conteos"});QF[t]={actaId:c.id,k,col:"conteos"};ref=t}catch(e){}}
     if(!ref)ref=refSinEspacio();if(!ref)continue; /* v106 (C-04) */
     FOTO[ref]=img.dataURL;r.fotos.push(ref);cbTouch();cbRefresh(k)}
