@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=123">
+<link rel="stylesheet" href="estilos.css?v=124">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="123";
+const APP_VER="124";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -33,8 +33,9 @@ window.addEventListener("unhandledrejection",e=>{try{const r=e.reason;if(r&&(r.c
 /* ---------- Datos fijos del protocolo ---------- */
 const PREDIOS=["Bellavista","Cadenasso","Casa Anita","Ciruelillo","Coipomó","Mi Tierra","Radales","San Francisco","San Miguel","Tradicional","Tronador"];
 /* v105: Valle Verde salió de la lista (es una planta lechera que recibe leche, no un predio). Un registro antiguo con un predio
-   que ya no está en la lista lo sigue mostrando: en las actas, como opción elegida; en el Check list, mientras tenga visitas. */
-const prediosCL=()=>{const x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&v.tipo!=="camionetas"&&!PREDIOS.includes(v.predio))x.add(v.predio)});return PREDIOS.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
+   que ya no está en la lista lo sigue mostrando: en las actas, como opción elegida; en el Check list, mientras tenga visitas.
+   v124: con un tipo de check list, solo los de ese tipo (una bodega como Corte Alto no aparece en «Visitas a predios»). */
+const prediosCL=t=>{const x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&(t?tipoDe(v)===t:v.tipo!=="camionetas")&&!PREDIOS.includes(v.predio))x.add(v.predio)});return PREDIOS.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
 const optPredioAntiguo=(p,lista)=>p&&p!=="Otro"&&!lista.includes(p)?`<option selected>${esc(p)}</option>`:"";
 /* Cada ítem tiene una clave fija (k) para que las actas guardadas no cambien si se reordena el check list */
 const SECC=[
@@ -2937,10 +2938,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=123"></script>
-<script src="modulos/bodega.js?v=123"></script>
-<script src="modulos/rendiciones.js?v=123"></script>
-<script src="modulos/actas-entrega.js?v=123"></script>
+<script src="modulos/checklist.js?v=124"></script>
+<script src="modulos/bodega.js?v=124"></script>
+<script src="modulos/rendiciones.js?v=124"></script>
+<script src="modulos/actas-entrega.js?v=124"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
