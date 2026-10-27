@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 125 | 2026-10-27 | [a1246b5](https://github.com/puduhue/puduhue-terreno/tree/a1246b5) | fotos elegidas con Galería que no se podían leer («No se pudo leer la imagen»): ahora se abren también las fotos HEIC (se convierten a JPEG con heic2any), las muy grandes, y el aviso dice la causa (foto solo en la nube, sin señal para el conversor, demasiado grande) en todos los módulos |
 | 124 | 2026-10-27 | [968ec81](https://github.com/puduhue/puduhue-terreno/tree/968ec81) | check list de bodega: se agrega la bodega Corte Alto (no aparece en «Visitas a predios» ni en las actas) |
 | 123 | 2026-10-26 | [ed7aa5e](https://github.com/puduhue/puduhue-terreno/tree/ed7aa5e) | en las pantallas principales (Actas, Rendiciones, Check list, Control de bodega y Stock), flecha «‹» arriba a la izquierda para volver al inicio |
 | 122 | 2026-10-26 | [e4b3644](https://github.com/puduhue/puduhue-terreno/tree/e4b3644) | actas de vivienda: se elige «Casa de familia» o «Casa de huéspedes»; en la casa de huéspedes se pide el cargo y el acta de entrega trae el reglamento de convivencia (en pantalla y en el PDF como Anexo 4, con la firma del trabajador) |
