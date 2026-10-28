@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=126">
+<link rel="stylesheet" href="estilos.css?v=127">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="126";
+const APP_VER="127";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -2110,8 +2110,9 @@ function anillo(pct){const r=20,c=2*Math.PI*r;return `<svg class="lx-ring" viewB
 function renderLaunch(){
   const todasAx=Object.values(ACTAS).filter(a=>!a.anulada);
   const todas=todasAx.filter(a=>!esAx(a));
-  const borr=todas.filter(a=>a.estado!=="cerrada").sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
-  const visAbL=Object.values(VIS).filter(v=>v.estado!=="cerrada"&&!v.anulada).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
+  /* v127: en «Para hoy» solo lo que creó la persona (tbMio); antes salía también lo abierto por otras personas */
+  const borr=todas.filter(a=>a.estado!=="cerrada"&&tbMio(a)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
+  const visAbL=Object.values(VIS).filter(v=>v.estado!=="cerrada"&&!v.anulada&&tbMio(v)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
   const visAbs=["visitas","bodega","camionetas"].map(t=>visAbL.find(v=>tipoDe(v)===t)).filter(Boolean);
   const on=RED==="ok",chk=RED==="checking";
   const sig=chk?`<span class="lx-sig chk">${ICO.wifi}<span>Comprobando señal<i class="dots"></i></span></span>`
@@ -2141,9 +2142,9 @@ function renderLaunch(){
     conts.push(`<button class="lx-cont" data-a="open" data-id="${borr.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Acta de ${borr.tipo==="entrega"?"entrega":"devolución"} · ${esc(borr.trabajador||"Sin nombre")}</span><span class="lx-cw">${esc([predioDe(borr),borr.vivienda].filter(Boolean).join(", ")||"Sin predio")}</span><span class="lx-cn">${done} de ${ITEMS.length} ítems revisados</span></span>${ICO.arrow}</button>`)}
   (permAgrega("cl")?visAbs:[]).forEach(visAb=>{const sc=puntaje(visAb),TV=itemsDe(visAb).length,pct=TV?Math.round(sc.rev/TV*100):0;
     conts.push(`<button class="lx-cont" data-a="clAbrir" data-id="${visAb.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Visita ${visAb.n} · ${esc(visAb.predio)}</span><span class="lx-cw">${CLK[tipoDe(visAb)].titulo} · ${fmtD(visAb.fecha)}</span><span class="lx-cn">${sc.rev} de ${TV} ítems revisados</span></span>${ICO.arrow}</button>`)});
-  const cbAb=Object.values(CONT).filter(c=>c.estado!=="cerrado"&&!c.anulado).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
+  const cbAb=Object.values(CONT).filter(c=>c.estado!=="cerrado"&&!c.anulado&&tbMio(c)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
   if(cbAb&&permAgrega("cb")){const R=resumenConteo(cbAb),pct=R.total?Math.round(R.cont/R.total*100):0;conts.push(`<button class="lx-cont" data-a="cbAbrir" data-id="${cbAb.id}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Conteo ${cbAb.n} · ${esc(cbAb.bodega)}</span><span class="lx-cw">Control de bodega · ${fmtD(cbAb.fecha)}</span><span class="lx-cn">${R.cont} de ${R.total} productos contados</span></span>${ICO.arrow}</button>`)}
-  (permAgrega("ax")?Object.values(ACTAS):[]).filter(a=>esAx(a)&&!a.anulada&&a.estado!=="cerrada"&&a.creadoPor&&ME&&a.creadoPor.id===ME.id).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||""))).slice(0,1).forEach(a=>{const T=AX[a.tipo],m=axFaltantes(a).length;
+  (permAgrega("ax")?Object.values(ACTAS):[]).filter(a=>esAx(a)&&!a.anulada&&a.estado!=="cerrada"&&tbMio(a)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||""))).slice(0,1).forEach(a=>{const T=AX[a.tipo],m=axFaltantes(a).length;
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${a.id}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
   cont=`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy${ph.length?`<span class="cnt">${ph.length}</span>`:""}</h2>${ph.length?`<div class="lx-conts">${disPh(ph)}</div>`:`<div class="ph-aldia">${EST_ICO.ok}<span>No tienes nada pendiente.</span></div>`}</section>`;
@@ -2982,10 +2983,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=126"></script>
-<script src="modulos/bodega.js?v=126"></script>
-<script src="modulos/rendiciones.js?v=126"></script>
-<script src="modulos/actas-entrega.js?v=126"></script>
+<script src="modulos/checklist.js?v=127"></script>
+<script src="modulos/bodega.js?v=127"></script>
+<script src="modulos/rendiciones.js?v=127"></script>
+<script src="modulos/actas-entrega.js?v=127"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
