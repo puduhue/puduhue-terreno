@@ -1882,6 +1882,10 @@ function procMostrar(file,txt){procQuitar();const m=document.createElement("div"
   let u="";try{if(esImagen(file))u=URL.createObjectURL(file)}catch(e){}
   m.innerHTML=`<div class="procc">${u?`<img src="${u}" alt="">`:`<span class="procpdf" aria-hidden="true">PDF</span>`}<b><span class="spin" aria-hidden="true"></span> ${esc(txt)}</b><span class="procs">Buscando el código del SII y revisando que se lea bien.</span></div>`;
   PROC={m,u,t:setTimeout(()=>{if(PROC&&PROC.m===m)document.body.appendChild(m)},120)}}
+/* v126: si la foto es HEIC, la devuelve convertida ({dataURL,blob}, como compress) y pone la miniatura del aviso «Revisando la foto…»;
+   si no es HEIC (o no se puede leer la cabecera), devuelve null y todo sigue como antes */
+async function rdHeicJpg(file){let h=false;try{h=await cabeceraImg(file)}catch(e){}if(!h)return null;
+  const j=await compress(file,2560,0.8);const pi=PROC&&PROC.m.querySelector(".procc img");if(pi)pi.src=j.dataURL;return j}
 function procQuitar(){if(!PROC)return;const{m,u,t}=PROC;PROC=null;clearTimeout(t);m.remove();if(u)URL.revokeObjectURL(u)}
 async function rdAgregarDoc(r,file,op){
   op=op||{};
@@ -1890,13 +1894,15 @@ async function rdAgregarDoc(r,file,op){
 }
 async function rdAgregarDoc0(r,file,op){
   let img=null;if(esPdf(file)){img=await rdPdfImagen(file);if(!img)return}
+  /* v126: una foto HEIC se convierte primero a JPEG; si no, no se leía el timbre ni se revisaba la nitidez */
+  let hj=null;if(!img){try{hj=await rdHeicJpg(file)}catch(e){toast(msgImg(e,file),7000);return}}
   /* v98: el timbre del SII se busca en el teléfono (sirve sin señal); si no hay timbre, se revisa que la foto no esté borrosa ni oscura */
   let tim=op.timbre||null;
-  if(!tim)tim=await timbreLeer(img?img.blob:file); /* v116: el aviso «Revisando la foto…» ya está a la vista */
-  if(!tim&&!img&&!op.sinRevisar){const q=await fotoCalidad(file);if(q.mala){procQuitar();const x=await fotoPregunta(q);if(x==="descartar")return;if(x&&x!=="usar")return rdAgregarDoc(r,x,op);op={...op,sinRevisar:true}}}
+  if(!tim)tim=await timbreLeer(img?img.blob:hj?hj.blob:file); /* v116: el aviso «Revisando la foto…» ya está a la vista */
+  if(!tim&&!img&&!op.sinRevisar){const q=await fotoCalidad(hj?hj.blob:file);if(q.mala){procQuitar();const x=await fotoPregunta(q);if(x==="descartar")return;if(x&&x!=="usar")return rdAgregarDoc(r,x,op);op={...op,sinRevisar:true}}}
   const c=colabDe(r);
   const d={k:"d"+uid(),creado:new Date().toISOString(),tipo:"boleta",emisor:"",rut:"",folio:"",fecha:"",total:0,neto:0,iva:0,centro:(c&&centroExiste(c.centro))?c.centro:"",gasto:"",glosa:""};if(d.centro)d.centroSug=true;
-  const foto=await rdGuardarFoto(r,d,img||file);if(!foto)return; /* v106 (C-04) */
+  const foto=await rdGuardarFoto(r,d,img||hj||file);if(!foto)return; /* v106 (C-04) */
   r.docs[d.k]=d;d.foto=foto;if(img)await rdPonerPdf(r,d,file,img);
   if(tim)timbreAplicar(d,tim);if(op.escaneo)d.deEscaneo=true;
   if(d.rut&&!d.gasto){const gh=gastoHistorial(d.rut,d.k);if(gh){d.gasto=gh;d.gastoHist=true}}
@@ -1959,9 +1965,10 @@ async function rdCambiarDoc(r,d,f){
   let img=null;
   if(esPdf(f)){img=await rdPdfImagen(f);if(!img)return}
   else if(!esImagen(f)){toast("Elige una foto o un PDF de la factura o boleta.");return}
+  else{try{img=await rdHeicJpg(f)}catch(e){toast(msgImg(e,f),7000);return}} /* v126: HEIC a JPEG (img queda null si no es HEIC) */
   const nf=await rdGuardarFoto(r,d,img||f);if(!nf)return; /* v106 (C-04) */
   if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d);
-  d.foto=nf;if(img)await rdPonerPdf(r,d,f,img);
+  d.foto=nf;if(img&&esPdf(f))await rdPonerPdf(r,d,f,img);
   const tv=d.deEscaneo?d.timbre:null;delete d.timbre;delete d.deEscaneo;{const t=await timbreLeer(img?img.blob:f);if(t)timbreAplicar(d,t);else if(tv)timbreAplicar(d,tv)}
   d.lectura={estado:navigator.onLine===false?"pendiente":"leyendo"};d.revisadoManual=false;rdTouch();render();leerDoc(r,d)
 }
