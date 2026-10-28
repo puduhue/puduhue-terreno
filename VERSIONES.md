@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 127 | 2026-10-28 | [c77e7a2](https://github.com/puduhue/puduhue-terreno/tree/c77e7a2) | «Para hoy» del inicio muestra solo lo que creó la persona (acta de vivienda en borrador, visitas abiertas del check list y conteo de bodega abierto); antes salían también los de otras personas. Los registros antiguos sin creador no salen ahí; en los módulos se ven todos, como antes |
 | 126 | 2026-10-28 | [5a44570](https://github.com/puduhue/puduhue-terreno/tree/5a44570) | Rendiciones: con una foto HEIC (iPhone) de una boleta o factura, ahora se lee el timbre del SII y se revisa la nitidez (antes se saltaba); también al cambiar la foto de un documento |
 | 125 | 2026-10-27 | [a1246b5](https://github.com/puduhue/puduhue-terreno/tree/a1246b5) | fotos elegidas con Galería que no se podían leer («No se pudo leer la imagen»): ahora se abren también las fotos HEIC (se convierten a JPEG con heic2any), las muy grandes, y el aviso dice la causa (foto solo en la nube, sin señal para el conversor, demasiado grande) en todos los módulos |
 | 124 | 2026-10-27 | [968ec81](https://github.com/puduhue/puduhue-terreno/tree/968ec81) | check list de bodega: se agrega la bodega Corte Alto (no aparece en «Visitas a predios» ni en las actas) |
