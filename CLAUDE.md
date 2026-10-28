@@ -17,8 +17,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
 - `sw.js`: service worker. Guarda la app para abrir sin señal (index.html, estilos.css y los módulos, en la caché de la versión),
   separa las bibliotecas en cachés propias y muestra las notificaciones.
 - `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.18.5 mini (Excel),
-  jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF), zxing-wasm 3.1.4 (código del SII) y heic2any 0.0.4
-  (fotos HEIC a JPEG, desde la v125; se carga solo cuando hace falta, desde `compress()` en index.html). Además, `lib/marca-puduhue-1/marcas.js` define
+  jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF) y zxing-wasm 3.1.4 (código del SII). Además, `lib/marca-puduhue-1/marcas.js` define
   los logos en base64 (`MARCA`, `MARCA_HZ` y `LOGO`, este último para los PDF), desde la v101.
 - `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, Finnegans, lectura de boletas). Se publica solo con
   GitHub Actions al subir cambios de `servidor/` a main.
