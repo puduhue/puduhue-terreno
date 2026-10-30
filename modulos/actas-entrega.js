@@ -45,14 +45,16 @@ const VEH_RESP=[
  ["2.14","Cobertura de seguro y uso autorizado.","El Conductor declara conocer que la póliza de seguro del vehículo cubre exclusivamente los usos autorizados por la Empresa conforme al presente acta. El uso del vehículo en condiciones no autorizadas (incluyendo, sin limitación, transporte de pasajeros no autorizados, uso fuera de horario laboral sin autorización escrita, o uso para fines personales) puede determinar la exclusión total o parcial de cobertura por parte de la aseguradora. En tal caso, el Conductor será civilmente responsable de la totalidad de los daños propios y a terceros no cubiertos por la póliza, sin perjuicio de las medidas disciplinarias aplicables."]
 ];
 const VEH_R3="El incumplimiento de cualquiera de las obligaciones contenidas en esta acta será sancionado conforme al procedimiento disciplinario del RIOHS, aplicando de manera progresiva y según la gravedad de la falta:";
-/* VEH_PEND: el texto del punto 3.4 está incompleto (falta la página siguiente del acta). Mientras sea true, no se puede cerrar un acta de vehículo. */
-const VEH_PEND=true;
+/* VEH_PEND: mientras sea true, no se puede cerrar un acta de vehículo. v130: texto completo (Acta de entrega de Camionetas 11.docx) */
+const VEH_PEND=false;
 const VEH_DISC=[
  ["3.1","Amonestación verbal con registro interno, para faltas leves o primeras infracciones no graves (por ejemplo: omisión del chequeo diario preoperacional, atraso menor en mantención, no reportar anomalía menor)."],
  ["3.2","Amonestación escrita con copia a carpeta personal, para faltas reiteradas o de mediana gravedad (por ejemplo: exceso de velocidad no constitutivo de infracción gravísima, estacionamiento indebido reiterado, uso del TAG para fines particulares sin rendición, incumplimiento de mantención dentro del rango de tolerancia)."],
  ["3.3","Amonestación escrita con copia a la Inspección del Trabajo, para faltas graves (por ejemplo: conducir sin licencia vigente, transporte de personas no autorizadas, uso del vehículo fuera del territorio nacional sin autorización, desconexión o manipulación del GPS, no reportar siniestro dentro del plazo, fumar o vapear en el vehículo)."],
- ["3.4","Término del contrato de trabajo por aplicación del artículo 160 del Código del Trabajo, en particular sus numerales 1, 5 y 7, para faltas gravísimas o reiteración de faltas graves (por ejemplo: conducir bajo"+(VEH_PEND?" [texto pendiente: falta la página siguiente del acta]":"")]
+ ["3.4","Término del contrato de trabajo por aplicación del artículo 160 del Código del Trabajo, en particular sus numerales 1, 5 y 7, para faltas gravísimas o reiteración de faltas graves (por ejemplo: conducir bajo efectos de alcohol o drogas, participación en carreras o picadas, accidente con resultado de lesiones graves por negligencia del Conductor, uso reiterado del vehículo para fines personales no autorizados, transporte de terceros ajenos con resultado de siniestro)."]
 ];
+const VEH_R3B="La Empresa se reserva el derecho de saltar etapas del procedimiento progresivo cuando la gravedad de la falta así lo amerite.";
+const VEH_ACEPT="El Conductor declara haber leído, comprendido y aceptado íntegramente este documento, reconociendo que el incumplimiento de cualquiera de sus puntos constituye falta grave conforme al RIOHS de CAPAC SpA y podrá dar lugar a las sanciones contempladas en el Reglamento Interno y en el artículo 160 del Código del Trabajo, sin perjuicio de la responsabilidad civil por los daños causados.";
 function vehIntro(a){
   const p=String(a.fecha||"").split("-"),dia=p[2]?String(+p[2]):"____",mes=p[1]?MESES[+p[1]-1]:"__________",anio=p[0]||"____";
   return `En ${a.ciudad||"__________"}, a ${dia} de ${mes} de ${anio}, entre CAPAC SPA (en adelante "la Empresa") y el trabajador que suscribe (en adelante "el Conductor"), se deja constancia de la entrega del vehículo individualizado y de las responsabilidades que asume en materia de seguridad, cuidado y uso, conforme al Reglamento Interno de Orden, Higiene y Seguridad (RIOHS) vigente, al contrato de arrendamiento suscrito con Salfa Rent y a la Ley 16.744.`;
@@ -87,7 +89,7 @@ function camionetasPanel(v){
   const porPat={};L.forEach(a=>{const k=((a.veh||{}).patente||a.id).toUpperCase();if(!porPat[k])porPat[k]=a});
   const V=Object.values(porPat);
   if(!V.length)return `<div class="info" style="border-left:5px solid var(--r-ink)"><b>Actas de vehículo en la app:</b> no hay actas de entrega registradas para ${esc(pre)}. Si el predio tiene camionetas asignadas, falta su acta.</div>`;
-  const fila=a=>{const ve=a.veh||{},km=+String(ve.km||"").replace(/[^0-9]/g,""),dev=a.devolucionId&&ACTAS[a.devolucionId],cerr=a.estado==="cerrada";
+  const fila=a=>{const ve=a.veh||{},km=axNum(ve.km),dev=devVig(a),cerr=a.estado==="cerrada";
     const firm=cerr?"Acta cerrada y firmada":((a.firmas||{}).conductor||{}).img?"Firmada, sin cerrar":"Acta en borrador, sin firmar";
     const prox=km?Math.ceil((km+1)/10000)*10000:0;
     return `<li><button class="lnk" data-a="axOpen" data-id="${a.id}" style="text-align:left"><b>${esc(ve.patente||"Sin patente")}</b> ${esc([ve.marca,ve.modelo].filter(Boolean).join(" "))} · ${esc(a.conductor||"sin conductor")}</button><br>
@@ -102,6 +104,9 @@ function vehDevIntro(a){
 }
 const actDevIntro=a=>`Por medio de la presente, se deja constancia de la devolución del (los) siguiente (s) ACTIVO (S) FIJO (S), entregados a ${a.recibe||"__________"} mediante Registro de entrega de activos de fecha ${fmtD(a.entregaFecha)||"________"}:`;
 const ACT_DEV_PEND="Los activos marcados como no devueltos quedan pendientes de restitución, bajo la responsabilidad de quien los recibió.";
+/* v130: números escritos (km, valores): el punto es de miles y la coma de decimales, como en Control de bodega (v129).
+   Antes se borraba todo lo que no era dígito: «28500,5» km quedaba 285005 y «650.000,00», 65.000.000 */
+const axNum=x=>{if(x==null||x==="")return 0;if(typeof x==="number")return x;const n=parseFloat(String(x).replace(/[^\d,.\-]/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."));return isNaN(n)?0:n};
 function nuevaAxDev(e){
   prepAx(e);const base={id:uid(),tipo:e.tipo,mov:"devolucion",entregaId:e.id,entregaFecha:e.fecha,creadoPor:yo(),fecha:today(),predio:e.predio||"",predioOtro:e.predioOtro||"",items:{},firmas:{},estado:"borrador",creado:new Date().toISOString(),actualizado:new Date().toISOString()};
   if(e.tipo==="vehiculo")return Object.assign(base,{ciudad:e.ciudad||"",conductor:e.conductor||"",rut:e.rut||"",veh:Object.assign({},e.veh),kmDev:"",acc:{},llavesN:"",docs:{},estadoDesc:"",observaciones:"",
@@ -132,7 +137,7 @@ const axQuien=a=>a.tipo==="capacitacion"?(String(a.tema||"").trim()||"Sin tema")
 const axDonde=a=>a.tipo==="capacitacion"?[capPredios(a).join(", "),(n=>n?n+(n===1?" participante":" participantes"):"")(capUsados(a).length)].filter(Boolean).join(" · "):a.tipo==="vehiculo"?[(a.veh||{}).patente,[(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "),predioDe(a)].filter(Boolean).join(" · "):[(a.activos||[]).filter(x=>x.tipo).map(x=>x.tipo).join(", "),predioDe(a)].filter(Boolean).join(" · ");
 const axEntrega=a=>{const f=(a.firmas||{})[a.tipo==="vehiculo"?"empresa":a.tipo==="capacitacion"?"relator":"entrega"]||{};return f.nombre||""};
 function axFaltantes(a){
-  const m=[];prepAx(a);
+  const m=[];prepAx(a);if(fechaFalta(a))m.push(fechaFalta(a));
   if(a.tipo==="capacitacion"){
     if(!a.fecha)m.push("Fecha");if(!String(a.realizadaPor||"").trim())m.push("Realizada por (relator)");
     if(!a.inicio)m.push("Hora de inicio");if(!a.fin)m.push("Hora de término");else if(a.inicio&&!capMinutos(a))m.push("Hora de término posterior al inicio");
@@ -145,7 +150,7 @@ function axFaltantes(a){
   }
   if(esDev(a)){
     if(!a.fecha)m.push("Fecha");
-    if(a.tipo==="vehiculo"){if(!a.ciudad)m.push("Lugar (ciudad) de la devolución");const kd=+String(a.kmDev||"").replace(/[^0-9]/g,""),ke=+String((a.antes||{}).km||"").replace(/[^0-9]/g,"");
+    if(a.tipo==="vehiculo"){if(!a.ciudad)m.push("Lugar (ciudad) de la devolución");const kd=axNum(a.kmDev),ke=axNum((a.antes||{}).km);
       if(!kd)m.push("Km de devolución");else if(ke&&kd<ke)m.push("Km de devolución menor que el de entrega");
       const sin=VEH_ACC.concat(VEH_DOC).filter(([k])=>!(a.acc[k]||a.docs[k])).length;if(sin)m.push(`${sin} ${sin===1?"accesorio o documento":"accesorios o documentos"} sin marcar Sí o No`);
       if(a.acc.llaves==="si"&&!String(a.llavesN||"").trim())m.push("Cantidad de llaves");
@@ -347,9 +352,10 @@ function vehFirmas(){
   const a=cur;
   return `<h1 style="font-size:22px">${VEH_TIT.charAt(0)+VEH_TIT.slice(1).toLowerCase()}</h1>
   <div class="acta"><p>${esc(vehIntro(a))}</p>
-  <details class="resp"${ro()?"":" open"}><summary><b>2. Responsabilidades de Seguridad del Conductor</b> y 3. Régimen disciplinario (leer junto al conductor)</summary>
+  <details class="resp"${ro()?"":" open"}><summary><b>2. Responsabilidades de Seguridad del Conductor</b> 3. Régimen disciplinario y 4. Aceptación (leer junto al conductor)</summary>
     <p>${esc(VEH_R2)}</p>${VEH_RESP.map(([n,t,x])=>`<p>${n?`<b>${esc(n)} ${esc(t)}</b> `:""}${esc(x)}</p>`).join("")}
-    <p class="k">3. Régimen disciplinario y medidas aplicables</p><p>${esc(VEH_R3)}</p>${VEH_DISC.map(([n,x])=>`<p><b>${n}</b> ${esc(x)}</p>`).join("")}
+    <p class="k">3. Régimen disciplinario y medidas aplicables</p><p>${esc(VEH_R3)}</p>${VEH_DISC.map(([n,x])=>`<p><b>${n}</b> ${esc(x)}</p>`).join("")}<p>${esc(VEH_R3B)}</p>
+    <p class="k">4. Aceptación</p><p>${esc(VEH_ACEPT)}</p>
   </details></div>
   ${VEH_PEND?`<div class="info" style="background:var(--r-bg);color:var(--r-ink)">El texto del punto 3.4 está incompleto: falta la página siguiente del acta en papel. Hasta completarlo, el acta se puede llenar y firmar como borrador, pero no cerrar.</div>`:""}
   <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae el acta completa con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
@@ -391,7 +397,7 @@ function actFirmas(){
 }
 /* Devolución de vehículo · paso 1 */
 function vehDevDatos(){
-  const a=cur,ke=+String((a.antes||{}).km||"").replace(/[^0-9]/g,""),kd=+String(a.kmDev||"").replace(/[^0-9]/g,"");
+  const a=cur,ke=axNum((a.antes||{}).km),kd=axNum(a.kmDev);
   return `<div class="info">Devolución del vehículo <b>${esc((a.veh||{}).patente||"")}</b> ${esc([(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "))}, entregado a <b>${esc(a.conductor||"")}</b> el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${a.entregaId}">Ver acta de entrega</button>`:""}</div>
   <div class="grid2">${axInp("ciudad","Lugar de la devolución (ciudad)",{ph:"Ej.: Osorno"})}${axInp("fecha","Fecha de devolución",{type:"date"})}</div>
   ${axPredio()}
@@ -447,7 +453,7 @@ async function axClick(A,b){
   if(A==="axOpen"){await flush();const x=ACTAS[b.dataset.id];if(!x)return true;cur=prepAx(x);axTipo=x.tipo;axStep=0;go("axe");return true}
   if(A==="axStep"){const s=+b.dataset.s;if(s<0||s>2)return true;axStep=s;window.scrollTo(0,0);render();return true}
   if(A==="axDev"){await flush();const e=ACTAS[b.dataset.id];if(!e||e.estado!=="cerrada"||esDev(e))return true;
-    if(e.devolucionId&&ACTAS[e.devolucionId]){cur=prepAx(ACTAS[e.devolucionId]);axTipo=cur.tipo;axStep=0;go("axe");return true}
+    if(devVig(e)){cur=prepAx(devVig(e));axTipo=cur.tipo;axStep=0;go("axe");return true}
     const d=nuevaAxDev(e);await saveActa(d);e.devolucionId=d.id;e.actualizado=new Date().toISOString();await saveActa(e);cur=d;axTipo=d.tipo;axStep=0;go("axe");return true}
   if(A==="axDevA"){if(ro())return true;const x=(cur.activos||[]).find(y=>y.id===b.dataset.r);if(!x)return true;x.devuelto=x.devuelto===b.dataset.v?"":b.dataset.v;if(x.devuelto!=="si"){x.estadoDev=""}touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
   if(A==="axYN"){if(ro())return true;const g=b.dataset.g,k=b.dataset.k,v=b.dataset.v;cur[g]=cur[g]||{};cur[g][k]=cur[g][k]===v?undefined:v;if(!cur[g][k])delete cur[g][k];touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
@@ -466,7 +472,7 @@ async function axClick(A,b){
     if(!(await ask("¿Eliminar este borrador?",`${axTitulo(a)} · ${axQuien(a)}. Se borran el acta y sus fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     await removeActa(a.id);Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));
     if(esDev(a)&&a.entregaId&&ACTAS[a.entregaId]&&ACTAS[a.entregaId].devolucionId===a.id){const e=ACTAS[a.entregaId];delete e.devolucionId;e.actualizado=new Date().toISOString();await saveActa(e)}
-    if(cur&&cur.id===a.id)cur=null;axTipo=a.tipo;go("axl");toast("Borrador eliminado.");return true}
+    if(cur&&cur.id===a.id)cur=null;axTipo=a.tipo;go("axl");toast("Borrador eliminado.");if(DB&&navigator.onLine!==false)setTimeout(()=>axXlsx(a.tipo,false),1500);/* v130: sin su fila */return true}
   if(A==="axDelFoto"){if(!cur||ro())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;
     const r=cur.items[k]||{};r.fotos=(r.fotos||[]).filter(x=>x!==ref);delete LOST[ref];borrarFotoRef(ref);touch();const keep=window.scrollY;render();window.scrollTo(0,keep);toast("Foto eliminada.");return true}
   if(A==="axPdf"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await axDescargar(a);return true}
@@ -482,6 +488,7 @@ async function axClick(A,b){
     if(!(await ask(`¿Anular el acta de ${axQuien(a)}?`,"Quedará tachada, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: acta de prueba"></div>`)))return true;
     const mot=(document.querySelector("#motAn")||{}).value||"";a.anulada={por:yo(),fecha:today(),motivo:mot.trim()};a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta anulada.");if(DB&&navigator.onLine!==false)axXlsx(a.tipo,false);return true}
   if(A==="axRest"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin())return true;if(!(await ask("¿Restaurar el acta?","Volverá a contar en los registros.","Restaurar")))return true;
+    if(!(await devRestaurable(a)))return true;
     delete a.anulada;a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta restaurada.");if(DB&&navigator.onLine!==false)axXlsx(a.tipo,false);return true}
   return false;
 }
@@ -592,7 +599,7 @@ function buildCap(a,IM){
     K.y+=rh});
   K.y+=4;K.para(`${P.length} ${P.length===1?"participante":"participantes"}.`,{s:8.5,c:[90,90,90]});
   anexoFotos(d,a,IM,K,[["c_fotos","Fotos de la capacitación"]]);
-  return finPDF(d,axPie(d,a));
+  return finPDF(d,axPie(d,a),a);
 }
 function axPDFkit(d,a){
   const L=15,W=180,TOP=38,BOT=280;const header=()=>a.tipo==="vehiculo"?axHeaderVeh(d):a.tipo==="capacitacion"?capHeader(d):axHeaderAct(d);
@@ -670,10 +677,13 @@ function buildVeh(a,IM){
   K.y+=2;K.para("3.  Régimen disciplinario y medidas aplicables",{f:"bold",s:10.5,gap:2});
   K.para(VEH_R3,{s:9,gap:2.5});
   VEH_DISC.forEach(([n,x])=>K.paraB(n,x,{s:9,gap:2.2,ind:4}));
+  K.para(VEH_R3B,{s:9,gap:2.5});
+  K.y+=2;K.para("4.  Aceptación",{f:"bold",s:10.5,gap:2});
+  K.para(VEH_ACEPT,{s:9,gap:2.5});
   K.y+=4;firmasPDF(d,a,K);
   K.para("Fecha: "+(fmtD(a.fecha)||"________________"),{s:9});
   anexoFotos(d,a,IM,K,VEH_FOTOS);
-  return finPDF(d,{footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}});
+  return finPDF(d,{footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}},a);
 }
 function buildAct(a,IM){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=axPDFkit(d,a);const {L,W}=K;prepAx(a);
@@ -687,7 +697,7 @@ function buildAct(a,IM){
   const head=()=>{d.setFont("helvetica","bold");d.setFontSize(7.5);cols.forEach((c,i)=>{d.setFillColor(233,238,244);d.rect(xs[i],K.y,c[1],8,"FD");d.text(d.splitTextToSize(c[0].toUpperCase(),c[1]-2),xs[i]+c[1]/2,K.y+3.3,{align:"center",lineHeightFactor:1.1})});K.y+=8};
   head();
   const filas=(a.activos||[]).filter(x=>x.tipo||x.marca||x.ref);const n=Math.max(filas.length,6);
-  for(let i=0;i<n;i++){const x=filas[i]||{};const vals=[x.tipo,x.marca,x.ref,x.estado,x.factura,x.valor?("$ "+String(x.valor).replace(/[^0-9]/g,"").replace(/\B(?=(\d{3})+(?!\d))/g,".")):"",x.obs||(filas[i]?"-":"")];
+  for(let i=0;i<n;i++){const x=filas[i]||{};const vals=[x.tipo,x.marca,x.ref,x.estado,x.factura,x.valor?("$ "+Math.round(axNum(x.valor)).toLocaleString("es-CL")):"",x.obs||(filas[i]?"-":"")];
     d.setFont("helvetica","normal");d.setFontSize(7.5);const ls=vals.map((v,j)=>d.splitTextToSize(String(v||""),cols[j][1]-2));const h=Math.max(6.5,Math.max(...ls.map(l=>l.length))*3.2+2.5);
     if(K.y+h>K.BOT){d.addPage();K.header();K.y=K.TOP;head()}
     cols.forEach((c,j)=>{d.rect(xs[j],K.y,c[1],h);if(ls[j].length)d.text(ls[j],xs[j]+1,K.y+3.8,{lineHeightFactor:1.2})});K.y+=h}
@@ -696,7 +706,7 @@ function buildAct(a,IM){
   {const ob=String(a.obs||"").trim();d.setFontSize(9);const ls=ob?d.splitTextToSize(ob,W-4):[];const h=Math.max(14,ls.length*4.4+5);K.nb(h);d.rect(L,K.y,W,h);if(ls.length)d.text(ls,L+2,K.y+5,{lineHeightFactor:1.3});K.y+=h+6}
   firmasPDF(d,a,K);
   anexoFotos(d,a,IM,K,(a.activos||[]).map((x,i)=>["a_"+x.id,`Activo ${i+1}: ${[x.tipo,x.marca,x.ref].filter(Boolean).join(" · ")||"sin datos"}`]));
-  return finPDF(d,{footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}});
+  return finPDF(d,{footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}},a);
 }
 const buildAx=(a,IM)=>a.tipo==="capacitacion"?buildCap(a,IM):esDev(a)?(a.tipo==="vehiculo"?buildVehDev(a,IM):buildActDev(a,IM)):a.tipo==="vehiculo"?buildVeh(a,IM):buildAct(a,IM);
 const axPie=(d,a)=>({footer:(p,n)=>{d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${p} de ${n}`,195,289,{align:"right"});const pie=pieAutoria(a);if(pie)d.text(d.splitTextToSize(pie,150)[0],15,289);d.setTextColor(0)}});
@@ -706,7 +716,7 @@ function buildVehDev(a,IM){
   K.header();K.y=K.TOP;
   K.para(vehDevIntro(a),{s:9.5,gap:3});
   d.setFont("helvetica","bold");d.setFontSize(10.5);d.text("1.  Identificación del vehículo",L+4,K.y+4);K.y+=7;
-  const ke=+String(ant.km||"").replace(/[^0-9]/g,""),kd=+String(a.kmDev||"").replace(/[^0-9]/g,"");
+  const ke=axNum(ant.km),kd=axNum(a.kmDev);
   const rows1=VEH_ID1.map(([k,l])=>[l,(a.veh||{})[k]]),rows2=[["Patente",(a.veh||{}).patente],["Km de entrega",ant.km],["Km de devolución",a.kmDev],["Km recorridos",ke&&kd&&kd>=ke?(kd-ke).toLocaleString("es-CL"):""]];
   const tabla=(x,w,rows,y0)=>{let y=y0;const c1=w*0.45;d.setFontSize(8.5);d.setFillColor(233,238,244);d.rect(x,y,w,5.6,"FD");d.line(x+c1,y,x+c1,y+5.6);d.setFont("helvetica","bold");d.text("Item",x+1.5,y+4);d.text("Detalle",x+c1+1.5,y+4);y+=5.6;
     rows.forEach(([l,v])=>{d.rect(x,y,w,6.4);d.line(x+c1,y,x+c1,y+6.4);d.setFont("helvetica","normal");d.text(l,x+1.5,y+4.4);d.setFont("helvetica","bold");d.text(String(v||""),x+c1+1.5,y+4.4);y+=6.4});return y};
@@ -727,7 +737,7 @@ function buildVehDev(a,IM){
   d.setFontSize(7.5);d.setTextColor(110);d.text("Fila destacada: se entregó y no se devuelve.",L,K.y);d.setTextColor(0);K.y+=6;
   firmasPDF(d,a,K);K.para("Fecha: "+(fmtD(a.fecha)||"________________"),{s:9});
   anexoFotos(d,a,IM,K,VEH_FOTOS);
-  return finPDF(d,axPie(d,a));
+  return finPDF(d,axPie(d,a),a);
 }
 function buildActDev(a,IM){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=axPDFkit(d,a);const {L,W}=K;prepAx(a);
@@ -744,7 +754,7 @@ function buildActDev(a,IM){
   {const ob=String(a.obs||"").trim();d.setFontSize(9);const ls=ob?d.splitTextToSize(ob,W-4):[];const h=Math.max(14,ls.length*4.4+5);K.nb(h);d.rect(L,K.y,W,h);if(ls.length)d.text(ls,L+2,K.y+5,{lineHeightFactor:1.3});K.y+=h+6}
   firmasPDF(d,a,K);
   anexoFotos(d,a,IM,K,(a.activos||[]).map((x,i)=>["a_"+x.id,`Activo ${i+1}: ${[x.tipo,x.marca,x.ref].filter(Boolean).join(" · ")||"sin datos"}`]));
-  return finPDF(d,axPie(d,a));
+  return finPDF(d,axPie(d,a),a);
 }
 function axNombre(a){
   const s=x=>String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"");
@@ -772,7 +782,7 @@ async function subirPDFsAx(a){
   if(!DB||navigator.onLine===false||!window.jspdf)return;
   try{prepAx(a);if(Object.values(a.items||{}).some(r=>(r.fotos||[]).some(f=>QF[f])))return;
     const d=buildAx(a,await axImgs(a));await actaSubir(a,null,axTitulo(a)+".pdf",d.output("blob"),"application/pdf");
-    a.pdfs=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);schedSync(500);
+    a.pdfs=new Date().toISOString();if(a.anulada)a.pdfsAnul=a.pdfs;else delete a.pdfsAnul;LOCAL[a.id]=a;await localPut(a);schedSync(500);
   }catch(e){console.warn("pdf acta",e)}
 }
 
@@ -798,7 +808,7 @@ function axXlsxBuild(tipo){
   }else{
     const mov=a=>esDev(a)?"Devolución":"Entrega";
     const h1=["Movimiento","Estado","Fecha","Predio o área","Responsable del activo","RUT","Cargo","Administración (entregó o recibió)","N° de activos","Valor referencial total","Observaciones generales","Fotos","Registrada por","Cerrada por","Fecha cierre","Anulada"];
-    const val=x=>+String(x||"").replace(/[^0-9]/g,"")||0;
+    const val=x=>axNum(x);
     const r1=[h1];L.forEach(a=>{const fe=a.firmas.entrega||{},A=a.activos.filter(x=>x.tipo||x.marca||x.ref);r1.push([mov(a),est(a),fmtD(a.fecha),predioDe(a),a.recibe||"",a.rutRecibe?rutFmt(a.rutRecibe):"",a.cargo||"",fe.nombre||"",A.length,A.reduce((s,x)=>s+val(x.valor),0),a.obs||"",nF(a),quien(a.creadoPor),quien(a.cerradoPor),a.cerrada?fmtD(a.cerrada):"",a.anulada?`${fmtD(a.anulada.fecha)} ${quien(a.anulada.por)}${a.anulada.motivo?": "+a.anulada.motivo:""}`:""])});
     add(r1,"Entregas",[11,10,11,16,26,13,24,24,10,14,40,6,22,22,11,30]);
     const r2=[["Movimiento","Estado","Fecha","Predio o área","Responsable del activo","Cargo","Administración","Tipo de activo","Marca","Referencia","Estado del activo","Factura","Valor referencial","Observación","Devuelto","Estado al devolver","Observación devolución","Fotos"]];

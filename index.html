@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=129">
+<link rel="stylesheet" href="estilos.css?v=130">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="129";
+const APP_VER="130";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -599,7 +599,7 @@ async function eliminarActa(a){
   if(a.tipo==="devolucion"&&a.entregaId&&ACTAS[a.entregaId]){const e=ACTAS[a.entregaId];if(e.devolucionId===a.id){delete e.devolucionId;e.actualizado=new Date().toISOString();await saveActa(e)}}
   Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));
   if(cur&&cur.id===a.id)cur=null;
-  go("home");toast("Borrador eliminado.");return true;
+  go("home");toast("Borrador eliminado.");if(DB&&navigator.onLine!==false)setTimeout(()=>actasXlsx(false),1500);/* v130: sin su fila */return true;
 }
 
 /* ---------- v93: barra de navegación abajo ----------
@@ -721,7 +721,7 @@ function mnViv(a){if(!a)return;const c=a.estado==="cerrada",an=!!a.anulada;
   mnHoja(`${a.tipo==="devolucion"?"Recepción":"Entrega"} · ${a.trabajador||"Sin nombre"}`,[fmtD(a.fecha),predioDe(a),a.vivienda].filter(Boolean).join(" · "),ops)}
 function mnAx(a){if(!a)return;const c=a.estado==="cerrada",an=!!a.anulada;
   const ops=[{a:"axPdf",id:a.id,t:"Acta (PDF)"}];
-  if(c&&!esDev(a)&&!an&&a.tipo!=="capacitacion")ops.push(a.devolucionId&&ACTAS[a.devolucionId]?{a:"axOpen",id:a.devolucionId,t:"Ver devolución"}:{a:"axDev",id:a.id,t:"Registrar devolución"});
+  if(c&&!esDev(a)&&!an&&a.tipo!=="capacitacion")ops.push(devVig(a)?{a:"axOpen",id:a.devolucionId,t:"Ver devolución"}:{a:"axDev",id:a.id,t:"Registrar devolución"});
   if(!c)ops.push({a:"axDel",id:a.id,t:"Eliminar borrador",d:1});
   if(c&&esAdmin())ops.push(an?{a:"axRest",id:a.id,t:"Restaurar acta"}:{a:"axAnular",id:a.id,t:"Anular acta",d:1});
   mnHoja(`${axTitulo(a)} · ${axQuien(a)}`,[fmtD(a.fecha),axDonde(a)].filter(Boolean).join(" · "),ops)}
@@ -1289,7 +1289,7 @@ function renderHome(){
   const L=lista();
   const card=a=>{
     const c=a.estado==="cerrada",an=!!a.anulada;
-    const st=an?"":c?(a.tipo==="entrega"&&a.devolucionId?"Devuelta":`Cerrada ${fmtD(a.cerrada)}`):`${ITEMS.filter(i=>(a.items&&a.items[i.k]||{}).v).length}/${ITEMS.length} ítems`;
+    const st=an?"":c?(a.tipo==="entrega"&&devVig(a)?"Devuelta":`Cerrada ${fmtD(a.cerrada)}`):`${ITEMS.filter(i=>(a.items&&a.items[i.k]||{}).v).length}/${ITEMS.length} ítems`;
     return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="open" data-id="${a.id}">
       <span class="tag ${an?"none":c?"cerrada":"borrador"}">${an?"Anulada":c?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(a.trabajador||"Sin nombre")}</span>
@@ -1318,7 +1318,7 @@ function renderHome(){
   </main>`;
 }
 function renderPick(){
-  const ents=Object.values(ACTAS).filter(a=>a.tipo==="entrega"&&!a.devolucionId&&!a.anulada).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+  const ents=Object.values(ACTAS).filter(a=>a.tipo==="entrega"&&a.estado==="cerrada"&&!devVig(a)&&!a.anulada).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   const rows=ents.map(a=>`<button class="row" data-a="pick" data-id="${a.id}">
       <span class="tag entrega">${a.estado==="cerrada"?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(a.trabajador||"Sin nombre")}</span>
@@ -1362,8 +1362,8 @@ function stepDatos(){
   <div class="f"><label for="rut">RUT</label><input id="rut" data-f="rut" value="${esc(a.rut)}" inputmode="text" autocomplete="off" placeholder="12.345.678-9" ${dis()}>${rutMsg}</div>
   ${esHuesp(a)?`<div class="f"><label for="cargo">Cargo o área de trabajo</label><input id="cargo" data-f="cargo" value="${esc(a.cargo)}" placeholder="Ej.: Ordeñador, lechería" ${dis()}></div>`:""}
   ${!ro()&&a.estado!=="cerrada"?`<div class="btns"><button class="btn danger" data-a="del">Eliminar borrador</button></div>`:""}
-  ${ro()&&a.tipo==="entrega"&&!a.devolucionId?`<div class="btns"><button class="btn" data-a="devFrom">Registrar la devolución de esta vivienda</button></div>`:""}
-  ${a.tipo==="entrega"&&a.devolucionId&&ACTAS[a.devolucionId]?`<div class="btns"><button class="btn" data-a="open" data-id="${a.devolucionId}">Ver acta de devolución</button></div>`:""}
+  ${ro()&&a.tipo==="entrega"&&a.estado==="cerrada"&&!a.anulada&&!devVig(a)?`<div class="btns"><button class="btn" data-a="devFrom">Registrar la devolución de esta vivienda</button></div>`:""}
+  ${a.tipo==="entrega"&&devVig(a)?`<div class="btns"><button class="btn" data-a="open" data-id="${a.devolucionId}">Ver acta de devolución</button></div>`:""}
   ${a.tipo==="devolucion"&&a.entregaId&&ACTAS[a.entregaId]?`<div class="btns"><button class="btn" data-a="open" data-id="${a.entregaId}">Ver acta de entrega</button></div>`:""}`;
 }
 function itemHTML(it){
@@ -1403,9 +1403,12 @@ function actaParrafo(a){
   if(a.tipo==="entrega")return `En la fecha ${f} se hace entrega formal de la vivienda${ch} ubicada en el predio ${p}${v} al trabajador ${t} RUT ${r}, quien declara haber recibido la propiedad en las siguientes condiciones:`;
   return `En la fecha ${f} el trabajador ${t} RUT ${r} hace devolución a Capac SpA. de la vivienda${ch} ubicada en el predio ${p}${v}${a.entregaFecha?`, recibida mediante acta de entrega del ${fmtD(a.entregaFecha)}`:""}. La vivienda se recibe en las siguientes condiciones:`;
 }
+/* v130: fecha no posterior a hoy; la devolución, no anterior a su entrega */
+function fechaFalta(a){if(!a.fecha)return "";if(a.fecha>today())return "Fecha: no puede ser posterior a hoy";
+  if(esDevolucion(a)){const fe=(ACTAS[a.entregaId]||{}).fecha||a.entregaFecha;if(fe&&a.fecha<fe)return `Fecha: la devolución no puede ser anterior a la entrega (${fmtD(fe)})`}return ""}
 function faltantes(){
   const a=cur,m=[];
-  if(!a.fecha)m.push("Fecha");if(!predioDe(a))m.push("Predio");if(!CASAS[a.casa])m.push("Tipo de vivienda (casa de familia o de huéspedes)");
+  if(!a.fecha)m.push("Fecha");else if(fechaFalta(a))m.push(fechaFalta(a));if(!predioDe(a))m.push("Predio");if(!CASAS[a.casa])m.push("Tipo de vivienda (casa de familia o de huéspedes)");
   if(esHuesp(a)&&a.tipo==="entrega"&&!(a.cargo||"").trim())m.push("Cargo o área de trabajo del trabajador(a)");if(!a.trabajador)m.push("Nombre del trabajador(a)");
   if(!a.rut||!rutOk(a.rut))m.push("RUT válido");
   const n=ITEMS.filter(i=>!(a.items[i.k]||{}).v).length;if(n)m.push(`${n} ítems del check list sin evaluar`);
@@ -1458,6 +1461,13 @@ function devDesde(e){
   d.firmas.trabajador={nombre:e.trabajador||""};
   return d;
 }
+/* v130: devolución vigente de una entrega (una devolución anulada no cuenta: la entrega acepta otra) */
+const devVig=e=>{const d=e&&e.devolucionId&&ACTAS[e.devolucionId];return d&&!d.anulada?d:null};
+const esDevolucion=a=>!!a&&(a.tipo==="devolucion"||a.mov==="devolucion");
+/* al restaurar una devolución: no si la entrega ya tiene otra vigente; si no, se vuelve a vincular */
+async function devRestaurable(a){if(!esDevolucion(a)||!a.entregaId)return true;const e=ACTAS[a.entregaId];if(!e)return true;const v=devVig(e);
+  if(v&&v.id!==a.id){toast("No se puede restaurar: la entrega ya tiene otra devolución vigente. Anula esa primero.");return false}
+  if(e.devolucionId!==a.id){e.devolucionId=a.id;e.actualizado=new Date().toISOString();await saveActa(e)}return true}
 async function linkEntrega(e,devId){
   e.devolucionId=devId;e.actualizado=new Date().toISOString();await saveActa(e);
 }
@@ -1533,6 +1543,9 @@ async function onClickAccion(ev,b,A){
   if(A==="devManual"){cur=nueva("devolucion");step=0;go("edit");return}
   if(A==="pick"||A==="devFrom"){
     const e=A==="pick"?ACTAS[b.dataset.id]:cur;if(!e)return;
+    /* v130: solo desde una entrega cerrada, sin anular y sin devolución vigente */
+    if(e.tipo!=="entrega"||e.estado!=="cerrada"||e.anulada){toast("La devolución se registra desde una entrega cerrada.");return}
+    if(devVig(e)){await flush();cur=devVig(e);step=0;go("edit");return}
     await flush();
     const d=devDesde(e);cur=d;await saveActa(d);await linkEntrega(e,d.id);step=0;go("edit");return}
   if(A==="open"){await flush();const x=ACTAS[b.dataset.id];if(!x)return;cur=x;if(!cur.firmas)cur.firmas={};normFirmas(cur);if(!cur.obs)cur.obs=["","",""];if(!cur.items)cur.items={};step=0;go("edit");return}
@@ -1564,6 +1577,7 @@ async function onClickAccion(ev,b,A){
     a.anulada={por:yo(),fecha:today(),motivo:mot.trim()};a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta anulada.");if(DB&&navigator.onLine!==false)actasXlsx(false);return}
   if(A==="restaurarActa"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin())return;
     if(!(await ask("¿Restaurar el acta?","Volverá a contar en los registros.","Restaurar")))return;
+    if(!(await devRestaurable(a)))return;
     delete a.anulada;a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta restaurada.");if(DB&&navigator.onLine!==false)actasXlsx(false);return}
   if(A==="close"){if(ro())return;
     const m=faltantes();
@@ -2001,15 +2015,22 @@ function secReglamento(d,a,K){
   d.setLineWidth(0.25);d.line(65,lineY+0.8,145,lineY+0.8);d.setLineWidth(0.2);
   d.setFont("helvetica","normal");d.setFontSize(8.5);d.text("Firma del trabajador",105,lineY+5,{align:"center"});
 }
-function finPDF(d,K){const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);K.footer(i,n)}return d}
+function finPDF(d,K,a){const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);K.footer(i,n);if(a&&a.anulada)marcaAnulada(d,a)}return d}
+/* v130: un acta anulada lleva en cada página «ANULADA» cruzado y, arriba, quién, cuándo y por qué */
+function marcaAnulada(d,a){const an=a.anulada||{};try{
+  const gs=d.GState?new d.GState({opacity:0.18}):null;if(gs){d.saveGraphicsState();d.setGState(gs)}
+  d.setTextColor(200,0,0);d.setFont("helvetica","bold");d.setFontSize(96);const w=d.getTextWidth("ANULADA"),c=Math.SQRT1_2;
+  d.text("ANULADA",105-w/2*c,150+w/2*c,{angle:45});if(gs)d.restoreGraphicsState();
+  d.setTextColor(200,0,0);d.setFontSize(9);d.text(d.splitTextToSize(`ACTA ANULADA el ${fmtD(an.fecha)||""}${an.por&&an.por.nombre?" por "+an.por.nombre:""}${an.motivo?". Motivo: "+an.motivo:""}`,180).slice(0,2),105,6.5,{align:"center"});
+  d.setTextColor(0);d.setFont("helvetica","normal")}catch(e){console.warn("marca anulada",e)}}
 function pieAutoria(a){const t=autoriaTxt(a);const an=a.anulada?`ACTA ANULADA el ${fmtD(a.anulada.fecha)} por ${quien(a.anulada.por)}${a.anulada.motivo?" ("+a.anulada.motivo+")":""}. `:"";return an+(t?"Registro en la app: "+t.charAt(0).toLowerCase()+t.slice(1):"")}
 function buildGeneral(a,IM){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=pdfKit(d);K.setPie(pieAutoria(a));
-  secChecklist(d,a,K);d.addPage();secFotos(d,a,IM,K);return finPDF(d,K);
+  secChecklist(d,a,K);d.addPage();secFotos(d,a,IM,K);return finPDF(d,K,a);
 }
 function buildActa(a){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const K=pdfKit(d);K.setPie(pieAutoria(a));
-  secActa(d,a,K);if(a.tipo==="entrega"&&esHuesp(a)){d.addPage();secReglamento(d,a,K)}return finPDF(d,K);
+  secActa(d,a,K);if(a.tipo==="entrega"&&esHuesp(a)){d.addPage();secReglamento(d,a,K)}return finPDF(d,K,a);
 }
 function nombreArchivo(a){
   const s=x=>String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"");
@@ -2272,7 +2293,7 @@ async function importarArchivo(file){
   /* Vincular devoluciones con su entrega (por id, o por RUT y predio si se hizo "sin acta de entrega") */
   for(const id of ids){const a=ACTAS[id];if(a.tipo!=="devolucion")continue;
     let e=a.entregaId&&ACTAS[a.entregaId];
-    if(!e){const c=Object.values(ACTAS).filter(z=>z.tipo==="entrega"&&!z.devolucionId&&a.rut&&rutClean(z.rut)===rutClean(a.rut)&&predioDe(z)===predioDe(a));
+    if(!e){const c=Object.values(ACTAS).filter(z=>z.tipo==="entrega"&&!devVig(z)&&a.rut&&rutClean(z.rut)===rutClean(a.rut)&&predioDe(z)===predioDe(a));
       if(c.length===1){e=c[0];const antes={};ITEMS.forEach(i=>{const v=(e.items[i.k]||{}).v;if(v)antes[i.k]=v});Object.assign(a,{entregaId:e.id,entregaFecha:e.fecha,antes});vin++}}
     if(e&&e.devolucionId!==a.id){e.devolucionId=a.id;e.actualizado=new Date().toISOString();await saveActa(e)}
   }
@@ -2357,7 +2378,7 @@ async function subirPDFsActa(a){
     const IM={};for(const r of refs)IM[r]=await pdfImg(r);
     const d1=buildActa(a);await actaSubir(a,null,"Acta.pdf",d1.output("blob"),"application/pdf");
     const d2=buildGeneral(a,IM);await actaSubir(a,null,"Informe general.pdf",d2.output("blob"),"application/pdf");
-    a.pdfs=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);schedSync(500);
+    a.pdfs=new Date().toISOString();if(a.anulada)a.pdfsAnul=a.pdfs;else delete a.pdfsAnul;LOCAL[a.id]=a;await localPut(a);schedSync(500);
   }catch(e){console.warn("pdf acta",e)}
 }
 function fotosAntiguas(){let n=0;Object.values(ACTAS).forEach(a=>{if(a._col==="visitas")return;Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>{if(f.startsWith("a:")&&!esItemId(f.slice(2)))n++}))});return n}
@@ -2381,7 +2402,7 @@ async function ordenarFotosAntiguas(){
     if(cambio){a.actualizado=new Date().toISOString();await saveActa(a)}}
   render();toast(`Listo: ${hechas} fotos ordenadas${fallas?`, ${fallas} no se pudieron mover`:""}.`);if(hechas)setTimeout(()=>actasXlsx(false),2500);
 }
-async function pdfsPendientes(){if(!DB||navigator.onLine===false||syncing)return;for(const a of Object.values(ACTAS)){if(a._col==="visitas"||a.estado!=="cerrada"||a.pdfs||a.anulada||LOCAL[a.id])continue;if(esAx(a))await subirPDFsAx(a);else await subirPDFsActa(a)}}
+async function pdfsPendientes(){if(!DB||navigator.onLine===false||syncing)return;for(const a of Object.values(ACTAS)){if(a._col==="visitas"||a.estado!=="cerrada"||(a.pdfs&&!a.anulada===!a.pdfsAnul)||LOCAL[a.id])continue;/* v130: también al anular o restaurar */if(esAx(a))await subirPDFsAx(a);else await subirPDFsActa(a)}}
 /* ---------- Servidor Puduhue (Cloudflare) y prueba de conexión con Finnegans ---------- */
 async function workerFetch(path){
   const tok=await getToken();let r;
@@ -2983,10 +3004,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=129"></script>
-<script src="modulos/bodega.js?v=129"></script>
-<script src="modulos/rendiciones.js?v=129"></script>
-<script src="modulos/actas-entrega.js?v=129"></script>
+<script src="modulos/checklist.js?v=130"></script>
+<script src="modulos/bodega.js?v=130"></script>
+<script src="modulos/rendiciones.js?v=130"></script>
+<script src="modulos/actas-entrega.js?v=130"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
