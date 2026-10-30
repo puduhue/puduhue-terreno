@@ -156,7 +156,10 @@ function nuevoConteo(dep,op){
 /* tolerancia: una diferencia menor al % definido se informa pero no cuenta como discrepancia */
 function enTol(c,l,d){if(d===null||Math.abs(d)<1e-9)return true;const t=c.tol==null?2:+c.tol;if(!t)return false;const base=l.sis||0;return base>0&&Math.abs(d)/base*100<=t}
 const lineasDe=c=>Object.values(c.lineas||{}).sort((a,b)=>String(a.manual?"zzz":a.fam||"").localeCompare(String(b.manual?"zzz":b.fam||""))||String(a.prod).localeCompare(String(b.prod)));
-const obsDe=(c,k)=>{const r=(c.items||{})[k];return r&&r.obs!==undefined&&r.obs!==""?num(r.obs):null};
+/* v129: hasta la v128, «= Coincide» guardaba String(l.sis) con punto decimal («12.345» kg se leía 12345): si lo observado es
+   exactamente eso, vale la cantidad del sistema */
+const obsDe=(c,k)=>{const r=(c.items||{})[k];if(!(r&&r.obs!==undefined&&r.obs!==""))return null;const l=(c.lineas||{})[k];
+  return l&&typeof r.obs==="string"&&r.obs===String(l.sis||0)?(l.sis||0):num(r.obs)};
 function difDe(c,l){const o=obsDe(c,l.k);if(o===null)return null;return o-(l.sis||0)}
 function resumenConteo(c){
   const L=lineasDe(c);let cont=0,ok=0,tol=0,dif=0,falt=0,sobr=0,vf=0,vs=0;
@@ -293,7 +296,7 @@ async function cbClick(A,b){
   if(A==="cbFiltro"){cbFiltro=b.dataset.f;cbLim=120;render();return true}
   if(A==="cbRecontar"){if(cbRO())return true;const k=b.dataset.k,r=cbv.items[k]||{};delete r.obs;cbv.items[k]=r;cbTouch();cbRefresh(k);setTimeout(()=>{const e=$("#cbo-"+CSS.escape(k));if(e)e.focus()},30);return true}
   if(A==="cbMas"){cbLim+=200;render();return true}
-  if(A==="cbIgual"){if(cbRO())return true;const k=b.dataset.k,l=cbv.lineas[k];const r=cbv.items[k]||{};r.obs=String(l.sis||0);cbv.items[k]=r;cbTouch();cbRefresh(k);return true}
+  if(A==="cbIgual"){if(cbRO())return true;const k=b.dataset.k,l=cbv.lineas[k];const r=cbv.items[k]||{};r.obs=String(l.sis||0).replace(".",",");cbv.items[k]=r;/* v129: con coma decimal, como se escribe a mano (el punto es de miles) */cbTouch();cbRefresh(k);return true}
   if(A==="cbNuevoProd"){cbNuevoProd={};render();setTimeout(()=>{const e=$("[data-cbn=prod]");if(e){e.focus();e.scrollIntoView({block:"center"})}},50);return true}
   if(A==="cbNuevoCancel"){cbNuevoProd=null;render();return true}
   if(A==="cbNuevoAdd"){const n=cbNuevoProd||{};if(!(n.prod||"").trim()){toast("Escribe el nombre del producto.");return true}
