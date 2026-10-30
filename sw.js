@@ -1,5 +1,5 @@
 /* Guarda la app en el teléfono para que abra sin señal. Cambia VER al publicar una versión nueva. */
-const VER="actas-v127";
+const VER="actas-v128";
 /* v100: la copia de prueba (carpeta prueba/) usa cachés con otro nombre y solo borra las suyas,
    para no tocar las de la app real (las cachés son comunes a todo puduhue.github.io). */
 const PRUEBA=self.registration.scope.includes("/prueba/"),PRE=PRUEBA?"prueba-":"";
