@@ -1237,7 +1237,7 @@ function rdRevisionHTML(){
   const grupos=[...new Set(L.map(x=>x.g))];
   return `<details class="rvd"${nb?" open":""}><summary><b>Revisión de datos</b> · ${nb?`${nb} por corregir`:"sin problemas"}${L.length-nb?` · ${L.length-nb} ${L.length-nb===1?"aviso":"avisos"}`:""}</summary>
     ${L.length?grupos.map(g=>`<h3>${esc(g)}</h3><ul>${L.filter(x=>x.g===g).sort((a,b)=>({b:0,r:1,i:2}[a.n])-({b:0,r:1,i:2}[b.n])).map(x=>`<li class="rv-${x.n}">${x.id?`<button class="lnk" data-a="rdAbrir" data-id="${esc(x.id)}">${esc(x.m)}</button>`:esc(x.m)}</li>`).join("")}</ul>`).join(""):`<p class="note">Todo en orden: la lista de colaboradores, el catálogo y las rendiciones en curso no tienen problemas.</p>`}
-    <p class="note">La lista de colaboradores y el catálogo se corrigen en el Excel y se vuelven a cargar en <b>Maestros contables</b>.</p></details>`;
+    <p class="note">La lista de colaboradores se corrige en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button>. El catálogo de tipos de gasto se corrige en el Excel y se vuelve a cargar en <b>Maestros contables</b>.</p></details>`;
 }
 function rdDocCard(r,d){
   const P=problemasDoc2(r,d),probs=P.b;const le=d.lectura||{};const cat=gastoDe(d),centro=centroDoc(r,d);
@@ -1630,8 +1630,13 @@ function rdColCentros(){const m=new Map(CENTROS_DEF.map(x=>[x[0],x[1]]));if(maeT
 function rdColFaltan(c){const o=[];if(!c.rut||!rutValido(c.rut))o.push("RUT");if(!correosDe(c).length)o.push("correo");if(!c.centro)o.push("centro");else if(!centroExiste(c.centro))o.push("el centro no existe");
   if(!c.jefe)o.push("jefatura");else{const j=jefaturaDe(c);if(!j||!j.correo)o.push("la jefatura no tiene correo")}return o}
 /* quienes rinden con su cuenta y no están en la lista (por ejemplo, una persona nueva): se pueden agregar con un toque */
+/* v128: el nombre es el de quien tiene la cuenta. Si Contabilidad asignó la rendición a alguien de la lista («Persona que rinde»),
+   r.persona trae el nombre de esa persona con el correo de la cuenta que la creó: se usa creadoPor (si creó con ese correo) */
 function rdColFuera(){const m={};Object.values(REND).forEach(r=>{if(!r||r.anulada||!r.persona)return;const co=String(r.persona.correo||"").toLowerCase();
-  if(!/@/.test(co)||colabs().some(c=>correosDe(c).includes(co)))return;(m[co]=m[co]||{correo:co,nombre:r.persona.nombre||co,n:0}).n++});return Object.values(m).sort((a,b)=>cmpEs(a.nombre,b.nombre))}
+  if(!/@/.test(co)||colabs().some(c=>correosDe(c).includes(co)))return;
+  const cre=String(r.cuenta||"").toLowerCase()===co&&r.creadoPor&&r.creadoPor.nombre,asig=r.persona.rut&&colabPorRut(r.persona.rut),nom=cre||(!asig&&r.persona.nombre)||"";
+  const x=m[co]=m[co]||{correo:co,nombre:"",cre:false,n:0};x.n++;if(nom&&(!x.nombre||(cre&&!x.cre))){x.nombre=nom;x.cre=!!cre}});
+  return Object.values(m).map(x=>({correo:x.correo,nombre:x.nombre||x.correo,n:x.n})).sort((a,b)=>cmpEs(a.nombre,b.nombre))}
 const rdColPend=()=>{try{return JSON.parse(localStorage.getItem(RDCOL_PEND)||"[]")}catch(e){return[]}};
 const rdColPendSet=L=>{try{L.length?localStorage.setItem(RDCOL_PEND,JSON.stringify(L.slice(-50))):localStorage.removeItem(RDCOL_PEND)}catch(e){}};
 function rdColListaHTML(){
