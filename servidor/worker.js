@@ -15,7 +15,7 @@
     FINN_PARAMS_STOCK   (texto)   opcional. Parámetros fijos del reporte de stock; si no se define se usan los de abajo
     FINN_REPORTES       (texto)   otros reportes que la app puede consultar, separados por coma (ej.: HACREPORTELECHE)
     CORREOS_ACTUALIZAR  (texto)   correos autorizados a usar /reporte (pantalla de prueba de Finnegans) y a cambiar
-                                  parámetros del stock, separados por coma: b.barrientos@puduhue.cl. Si queda vacía, nadie
+                                  parámetros del stock, separados por coma (el correo del administrador). Si queda vacía, nadie
                                   (desde la app v132; antes, todos).
                                   El stock (/stock) lo puede traer cualquier cuenta de Puduhue (desde la app v61).
     ANTHROPIC_API_KEY   (Secret)  clave de la API de Claude, para leer boletas (módulo Rendiciones)
@@ -26,6 +26,8 @@
                                   Siempre se aceptan https://puduhue.github.io (app en la organización Puduhue, desde la v85)
                                   y https://benjaminbarrientoscardenas-glitch.github.io (dirección anterior, durante la mudanza).
     DOMINIO             (texto)   opcional. Por defecto puduhue.cl
+    CORREOS_CONTAB      (texto)   desde la v138: correos de Contabilidad, separados por coma (antes estaban en el código). Sin
+                                  ella, Contabilidad depende de la lista que publica junto con el padrón del fondo.
     TENANT_ID           (texto)   opcional (v134). Organización de Microsoft de Puduhue; por defecto la de TENANT_PUDUHUE
     CLIENT_ID           (texto)   opcional (v134). Aplicaciones de Entra aceptadas, separadas por coma; por defecto la de la app
     LIMITE_BOLETAS      (texto)   opcional (v134). Lecturas de boletas por persona al día; por defecto 150
@@ -38,7 +40,7 @@
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
-import { rutasFondo, esContabSrv } from "./fondo.js";
+import { rutasFondo, esContabSrv, contabDef } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION } from "./boleta.js";
 export { Avisos };
@@ -57,7 +59,7 @@ export function tokenDePuduhue(auth, env) {
   return String(t.tid || "").toLowerCase() === tenant && apps.includes(String(t.appid || t.azp || "").toLowerCase());
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v134"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
+const VERSION_SERVIDOR = "v138"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
 
 /* ---- Lectura de boletas con Claude: ver boleta.js (desde la v98, con revisión y timbre del SII) ---- */
 const PARAMS_STOCK = "PARAMWEBREPORT_Empresa=2&PARAMWEBREPORT_tipoStock=0&PARAMWEBREPORT_soloStockNoCero=true&PARAMWEBREPORT_soloStockDebajoPtoReposicion=false&PARAMWEBREPORT_soloDepositos=0&PARAMWEBREPORT_TipoPrecio=0&PARAMWEBREPORT_AgruparPor=1";
@@ -108,15 +110,18 @@ async function listarMaestro(env, entidad, desde) {
   throw { status: 502, error: `Finnegans no entregó el listado de ${entidad}.`, detalle: JSON.stringify(intentos).slice(0, 1500) };
 }
 
+const url0 = req => new URL(req.url);
 export default {
   async fetch(req, env, ctx) {
     const origenes = ["https://puduhue.github.io", "https://benjaminbarrientoscardenas-glitch.github.io"].concat((env.ORIGEN_APP || "").split(",").map(x => x.trim().replace(/\/+$/, "")).filter(Boolean));
     const pide = req.headers.get("Origin") || "", origen = origenes.includes(pide) ? pide : origenes[0];
     const cors = { "Access-Control-Allow-Origin": origen, Vary: "Origin", "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type", "Access-Control-Max-Age": "86400" };
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    /* v136 (A-09): cuántos pedidos llegan todavía desde la dirección antigua (para saber cuándo retirarla) */
+    if (pide === "https://benjaminbarrientoscardenas-glitch.github.io" && env.AVISOS && url0(req).pathname !== "/salud") ctx.waitUntil(objetoAvisos(env).contarAntiguo(hoyChile()).catch(() => {}));
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
     const url = new URL(req.url);
-    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null });
+    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null });
 
     // Quién pide: se valida la sesión Microsoft que ya tiene la app
     const auth = req.headers.get("Authorization") || "";
@@ -131,9 +136,11 @@ export default {
     const autorizado = permitidos.includes(correo); // v132 (M-22): con CORREOS_ACTUALIZAR vacía no queda nadie autorizado (antes, todos)
     if (url.pathname === "/reporte" && !autorizado) return json({ error: "Tu cuenta no está autorizada para consultar reportes de Finnegans." }, 403);
     /* v134 (M-20, M-21): Contabilidad (lista fija o la que publica Contabilidad con el padrón del fondo) o el administrador */
-    let contab = null; const esContab = async () => contab ??= await esContabSrv(env.AVISOS ? objetoAvisos(env) : null, correo, autorizado);
+    let contab = null; const esContab = async () => contab ??= await esContabSrv(env.AVISOS ? objetoAvisos(env) : null, correo, autorizado, env);
 
     try {
+      // /yo → roles de quien pide (v138, B-15): administrador, Contabilidad y la lista de Contabilidad
+      if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env) });
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)
       const rp = await rutasPush(req, env, url, correo, json, autorizado, esContab); if (rp) return rp;
       // /fondo → saldo del fondo por rendir (110106) desde el Libro Mayor de Finnegans (v94)

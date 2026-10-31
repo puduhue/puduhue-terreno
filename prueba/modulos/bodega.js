@@ -303,21 +303,23 @@ async function cbClick(A,b){
     const k="m"+uid();cbv.lineas[k]={k,cod:(n.cod||"").trim(),prod:n.prod.trim(),fam:"",un:(n.un||"").trim(),sis:0,pu:0,manual:true,orden:9999};cbNuevoProd=null;cbFiltro="all";cbQ="";cbTouch();render();
     setTimeout(()=>{const e=$("#cbo-"+CSS.escape(k));if(e){e.scrollIntoView({block:"center"});e.focus()}},60);return true}
   if(A==="cbDelFoto"){if(cbRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=cbv.items[k];if(r&&r.fotos)r.fotos=r.fotos.filter(x=>x!==ref);borrarFotoRef(ref);cbTouch();cbRefresh(k);return true}
-  if(A==="cbDel"){const c=CONT[b.dataset.id];if(!c||c.estado==="cerrado")return true;
+  if(A==="cbDel"){const c=CONT[b.dataset.id];if(!c||c.estado==="cerrado")return true;if(!puedeBorrar(c)){toast(NO_BORRAR);return true}
     if(!(await ask("¿Eliminar este conteo?",`Conteo ${esc(c.n)} de ${c.bodega}. Se borran las cantidades, comentarios y fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     clearTimeout(LT[c.id]);delete LT[c.id];delete CONT[c.id];delete LOCAL[c.id];await localDel(c.id);if(DB){colaBorrar("conteos/"+c.id,c);schedSync(200)}
     Object.values(c.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));if(cbv&&cbv.id===c.id){cbv=null;go("cbb")}else{status();render()}toast("Conteo eliminado.");return true}
   if(A==="cbCerrar"){if(cbRO())return true;const R=resumenConteo(cbv);
+    if(!R.cont){toast("No se puede cerrar: no hay productos contados.");return true} /* v136 (M-10) */
     const msg=`${R.cont} de ${R.total} productos contados${R.total-R.cont?`; ${R.total-R.cont} quedan sin contar y saldrán así en el informe`:""}. ${R.dif?`${R.dif} con discrepancia (faltante ${fmtP(Math.abs(R.vf))}, sobrante ${fmtP(R.vs)})`:"Sin discrepancias"}${R.tol?`, ${R.tol} dentro de tolerancia`:""}. Al cerrar ya no se podrá modificar.`;
     if(!(await ask("¿Cerrar el conteo?",msg,"Cerrar conteo")))return true;
     cbv.estado="cerrado";cbv.cerrado=today();cbv.actualizado=new Date().toISOString();if(ME)cbv.cerradoPor=yo();await saveCont(cbv);
     const cc=cbv;cbv=null;go("cbb");exito("Conteo cerrado","El informe se guarda en OneDrive.");
     if(DB&&navigator.onLine!==false)setTimeout(()=>cbSubirArchivos(cc),2500);return true}
   if(A==="cbAnular"){const c=CONT[b.dataset.id];if(!c||!esAdmin()||c.estado!=="cerrado")return true;
-    const ok=await ask(`¿Anular el conteo ${esc(c.n)} de ${c.bodega}?`,"Quedará tachado, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: conteo de prueba"></div>`);if(!ok)return true;
+    const ok=await ask(`¿Anular el conteo ${esc(c.n)} de ${c.bodega}?`,"Quedará tachado, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" data-obl="3" placeholder="Ej.: conteo de prueba"></div>`);if(!ok)return true;
     const mot=(document.querySelector("#motAn")||{}).value||"";c.anulado={por:yo(),fecha:today(),motivo:mot.trim()};c.actualizado=new Date().toISOString();await saveCont(c);render();toast("Conteo anulado.");return true}
   if(A==="cbRest"){const c=CONT[b.dataset.id];if(!c||!esAdmin())return true;if(!(await ask("¿Restaurar el conteo?","Volverá a contar en el historial.","Restaurar")))return true;delete c.anulado;c.actualizado=new Date().toISOString();await saveCont(c);render();toast("Conteo restaurado.");return true}
-  if(A==="cbPdf"){const c=CONT[b.dataset.id];if(c)await cbPdf(c);return true}
+  if(A==="cbPdf"){const c=CONT[b.dataset.id];if(!c)return true;if(c.ciego&&c.estado!=="cerrado"){toast("El informe de un conteo ciego se descarga al cerrarlo (muestra las cantidades del sistema).");return true} /* v136 (B-10) */
+    await cbPdf(c);return true}
   return false;
 }
 let cbqT=null;
@@ -327,7 +329,8 @@ function cbInput(ev){const t=ev.target;
   if(t.dataset.cbq!==undefined){cbQ=t.value;clearTimeout(cbqT);cbqT=setTimeout(()=>{cbLim=120;render();const i=$("[data-cbq]");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250);return true}
   if(t.dataset.cbn){cbNuevoProd=cbNuevoProd||{};cbNuevoProd[t.dataset.cbn]=t.value;return true}
   if(!cbv||cbRO())return true;
-  if(t.dataset.cbenc){if(t.dataset.cbenc==="ciego"){cbv.ciego=t.checked;cbTouch();render();return true}cbv[t.dataset.cbenc]=t.value;cbTouch();return true}
+  if(t.dataset.cbenc){if(t.dataset.cbenc==="ciego"){if(cbv.ciego&&!t.checked&&cbv.estado!=="cerrado"){t.checked=true;toast("El conteo ciego no se puede desactivar mientras se cuenta.");return true} /* v136 (B-10) */
+      cbv.ciego=t.checked;cbTouch();render();return true}cbv[t.dataset.cbenc]=t.value;cbTouch();return true}
   if(t.dataset.cbf){const k=t.dataset.k,r=cbv.items[k]||{};
     if(t.dataset.cbf==="obs"){const v=t.value.replace(/[^\d,.\-]/g,"");r.obs=v;if(v==="")delete r.obs}else r[t.dataset.cbf]=t.value;
     cbv.items[k]=r;cbTouch();
@@ -357,7 +360,7 @@ async function cbCarpeta(segs){let parent=CB.root,path="";
     if(!id){const r=await crearCarpeta(parent,seg);id=r.id}
     CBPATH[path]=id;parent=id}return parent}
 const carpetaConteo=c=>[limpiaNombre(c.bodega),`${c.fecha} Conteo ${esc(c.n)}`];
-async function cbSubir(segs,name,blob,type){const f=await cbCarpeta(segs);const r=await gfetch(`/drives/${M365.drive}/items/${f}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+async function cbSubir(segs,name,blob,type){const f=await cbCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10) */
 function cbXlsx(c){
   const wb=XLSX.utils.book_new();const L=lineasDe(c);const R=resumenConteo(c);
   const rows=[["Código","Producto","Familia","Partida","Unidad","Sistema","Observado","Diferencia","Precio unitario","Valor diferencia","Estado","Comentario","Fotos"]];
@@ -414,3 +417,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
+window.MODV=window.MODV||{};window.MODV["bodega"]="138"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

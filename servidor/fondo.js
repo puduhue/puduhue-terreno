@@ -12,7 +12,8 @@
     FONDO_CUENTA        cuenta del fondo. Por defecto 110106.
     FINN_PARAMS_FONDO   parámetros extra del Libro Mayor (ej.: PARAMWEBREPORT_Empresa=2).
 */
-const CONTAB_DEF = ["emartinez@puduhue.cl", "nvidal@puduhue.cl"];
+/* v138 (B-15): Contabilidad = variable CORREOS_CONTAB de Cloudflare (separados por coma); el código público ya no trae correos */
+export const contabDef = env => String((env && env.CORREOS_CONTAB) || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
 const MAX_PERSONAS = 400;
 const normK = k => String(k).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
 const normTxt = t => String(t == null ? "" : t).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -138,15 +139,15 @@ async function mayorFondo(env, ctx, reporte, forzar) {
 }
 /* rutas /fondo… */
 /* v134: ¿es de Contabilidad (o el administrador)? Lista fija o la que publica Contabilidad junto con el padrón del fondo */
-export async function esContabSrv(obj, correo, admin) {
-  if (admin || CONTAB_DEF.includes(correo)) return true;
+export async function esContabSrv(obj, correo, admin, env) {
+  if (admin || contabDef(env).includes(correo)) return true;
   try { const p = obj && await obj.leerPadron(); return !!(p && (p.contab || []).includes(correo)); } catch (e) { return false; }
 }
 export async function rutasFondo(req, env, ctx, url, correo, json, admin, obj, reporte) {
   if (url.pathname !== "/fondo" && !url.pathname.startsWith("/fondo/")) return null;
   const dominio = "@" + (env.DOMINIO || "puduhue.cl").toLowerCase();
   const padron = (obj && await obj.leerPadron()) || { personas: [], contab: [] };
-  const esContab = admin || CONTAB_DEF.includes(correo) || (padron.contab || []).includes(correo);
+  const esContab = admin || contabDef(env).includes(correo) || (padron.contab || []).includes(correo);
   if (url.pathname === "/fondo/padron") {
     if (req.method !== "POST") return json({ error: "Método no permitido." }, 405);
     if (!esContab) return json({ error: "Solo Contabilidad o el administrador publican la lista de colaboradores." }, 403);

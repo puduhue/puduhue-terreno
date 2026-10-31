@@ -513,7 +513,8 @@ async function lecClick(A,b){
    ============================================================ */
 const RD={root:"01RAJ2KQBLDIZGFMASZVCIDO2PGKXQW5VY",maeDir:"_maestros",maeFile:"maestros.json"};
 const CAPAC_RUT="76459811-3";
-const CONTAB_DEF=["emartinez@puduhue.cl","nvidal@puduhue.cl"]; /* revisión contable mientras no se cargue la hoja Aprobadores */
+/* v138 (B-15): Contabilidad mientras no se cargue la hoja Aprobadores: la lista que da el servidor (CORREOS_CONTAB) */
+const contabDef=()=>rolesSrv().lista||[];
 const UMBRAL_AF=500000; /* desde este monto se pregunta si es activo fijo */
 const CTA_BLOQ={"410514":"está bloqueada","420501":"ya no se usa (va a 410517)","410101":"es Certificaciones (mano de obra es 410501)"};
 const CTA_SIN_PROD=["110106","110105","110203","110111","210202"];
@@ -639,7 +640,7 @@ function rdSinJefaturaADirecto(){if(!ME||!esContab())return;
 function rdCompletarRut(){if(!colabs().length||!ME)return;
   Object.values(REND).forEach(r=>{if(!r||r.anulada||!r.persona||r.persona.rut)return;if(!(esContab()||esMiaR(r)))return;
     const c=colabPorCorreo(r.persona.correo);if(!c||!c.rut)return;r.persona=Object.assign({},r.persona,{rut:c.rut});rdHist(r,"persona",`RUT ${c.rut} tomado de la lista de colaboradores`);r.actualizado=new Date().toISOString();saveRend(r)})}
-function contabCorreos(){const l=aprobadores().filter(a=>a.rol==="cont").map(a=>a.correo).filter(Boolean);return l.length?l:CONTAB_DEF}
+function contabCorreos(){const l=aprobadores().filter(a=>a.rol==="cont").map(a=>a.correo).filter(Boolean);return l.length?l:contabDef()}
 function contabNombres(){const l=aprobadores().filter(a=>a.rol==="cont").map(a=>a.nombre).filter(Boolean);return l.length?l.join(" o "):"Contabilidad"}
 const esContab=()=>!!(ME&&(contabCorreos().includes(meCorreo())||esAdmin()));
 /* Jefatura que aprueba: la columna puede traer un nombre (se busca su correo en Aprobadores o en Colaboradores) o directamente un correo */
@@ -701,7 +702,9 @@ async function rdPurgarVacias(){
    El registro no se borra: queda anulada (motivo y quién) y fuera de las listas, del fondo por rendir y del Excel. */
 const rdPuedeEliminar=r=>!!r&&!r.anulada&&editaPersona(r);
 const rdPuedeAnular=r=>!!r&&!r.anulada&&esContab()&&r.estado!=="contabilizada"&&!editaPersona(r);
-function rdElimHTML(r){return rdPuedeEliminar(r)?`<div class="btns"><button class="btn danger" data-a="rdEliminar">Eliminar rendición</button></div>`
+/* v136 (M-19): la anulada o eliminada muestra quién, cuándo y por qué; Contabilidad la puede restaurar */
+function rdAnuladaHTML(r){const x=r.anulada;return `<div class="info netbox"><b>${x.eliminada?"Eliminada por quien rinde":"Anulada"}</b> por ${esc(quien(x.por))} el ${esc(fmtD(x.fecha))}${x.motivo?`: ${esc(x.motivo)}`:""}.</div>${esContab()?`<div class="btns"><button class="btn" data-a="rdRestaurar">Restaurar rendición</button></div>`:""}`}
+function rdElimHTML(r){if(r&&r.anulada)return rdAnuladaHTML(r);return rdPuedeEliminar(r)?`<div class="btns"><button class="btn danger" data-a="rdEliminar">Eliminar rendición</button></div>`
   :rdPuedeAnular(r)?`<div class="btns"><button class="btn danger" data-a="rdAnular">Anular rendición</button></div>`:""}
 /* v133 (M-14): huella de los documentos y sus montos, para saber si cambiaron desde que Contabilidad la devolvió */
 const rdHuella=r=>docsDe(r).map(d=>d.k+":"+Math.round(num(d.total)||0)).sort().join("|");
@@ -1294,7 +1297,7 @@ function renderRD(){
     ${apr.length?`<div class="btns"><button class="btn pri" data-a="rdImpTodas" ${listas.length?"":"disabled"} style="flex:1">Excel para FinnegansGO (${listas.length} ${listas.length===1?"asiento":"asientos"})</button></div>${nExp?`<p class="note">${nExp} ${nExp===1?"ya se exportó y no entra":"ya se exportaron y no entran"} en este Excel. Para descargar una de nuevo, ábrela.</p>`:""}${esperan.length?`<p class="note">${esperan.length} ${esperan.length===1?"espera":"esperan"} un proveedor o persona por crear en Finnegans; al descargar, la app revisa Finnegans y deja fuera solo ${esperan.length===1?"esa":"esas"} si todavía falta.</p>`:""}${apr.some(r=>r.exportada)?`<div class="btns"><button class="btn" data-a="rdContabTodas">Marcar las exportadas como contabilizadas</button></div>`:""}`:""}
     <div class="list">${apr.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones aprobadas pendientes.</div>`}</div>
     ${enJ.length?`<h2>En revisión de jefatura<span class="cnt">${enJ.length}</span></h2><div class="list">${enJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
-    ${cont.length?`<h2>Contabilizadas recientes</h2><div class="list">${cont.map(r=>rdCard(r,"cont")).join("")}</div>`:""}${rdRevisionHTML()}`;
+    ${cont.length?`<h2>Contabilizadas recientes</h2><div class="list">${cont.map(r=>rdCard(r,"cont")).join("")}</div>`:""}${(A=>A.length?`<details class="rdanu"><summary><b>Anuladas y eliminadas</b> (${A.length})</summary><p class="note">Ábrela para ver el motivo y restaurarla.</p><div class="list">${A.map(r=>rdCard(r,"cont")).join("")}</div></details>`:"")(Object.values(REND).filter(r=>r&&r.anulada&&docsDe(r).length).sort((a,b)=>String(b.anulada.fecha||"").localeCompare(String(a.anulada.fecha||""))).slice(0,30))}${rdRevisionHTML()}`;
   }else{
     const p=periodoActual(),cs=colabsDeCuenta(),act=misRend().filter(r=>r.periodo===p),ant=misRend().filter(r=>r.periodo!==p);
     const falta=cs.length>1?cs.some(c=>!act.some(r=>normRut(r.persona&&r.persona.rut)===normRut(c.rut)&&rdEditable(r))):!act.some(rdEditable);
@@ -1711,7 +1714,7 @@ function rdMaeColabXlsx(){
   const wb=XLSX.utils.book_new();
   const c=[["RUT","Nombre","Centro por defecto (código)","Centro por defecto (nombre)","Tipo de fondo","Cuenta fondo","Jefatura que aprueba","Correo Microsoft","Observaciones","Activo"]].concat(colabs().map(x=>[x.rut,x.nombre,x.centro,centroNombre(x.centro),x.fondo||"Fondo por rendir",x.cuenta||"110106",x.jefe||"",x.correo||"",x.obs||"",x.activo===false?"No":"Sí"]));
   const w1=XLSX.utils.aoa_to_sheet(c);w1["!cols"]=[13,24,20,24,16,12,22,30,40,8].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,w1,"Colaboradores");
-  const ap=aprobadores().length?aprobadores():CONTAB_DEF.map(m=>({nombre:m,correo:m,rol:"cont"}));
+  const ap=aprobadores().length?aprobadores():contabDef().map(m=>({nombre:m,correo:m,rol:"cont"}));
   const w2=XLSX.utils.aoa_to_sheet([["Nombre","Correo","Rol"]].concat(ap.map(a=>[a.nombre,a.correo,a.rol==="cont"?"Revisión contable":"Jefatura"])));w2["!cols"]=[{wch:28},{wch:30},{wch:20}];XLSX.utils.book_append_sheet(wb,w2,"Aprobadores");
   const d=[["Servicio","Centro (código)","Centro (nombre)","Dispositivos","Cuenta","Producto","Partida"]];Object.entries((MAE&&MAE.dist)||{}).forEach(([s,rows])=>rows.forEach(x=>d.push([s,x.centro,centroNombre(x.centro),x.disp,x.cuenta,x.prod,x.part])));
   const w3=XLSX.utils.aoa_to_sheet(d);w3["!cols"]=[12,20,24,12,10,10,10].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,w3,"Distribuciones");
@@ -1911,13 +1914,17 @@ async function rdClick(A,b){
     /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
     const directo=!vuelveCont&&!(j&&j.correo);
     delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;delete rdv.huellaDev;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada",cambio?"cambió documentos después de la devolución de Contabilidad":"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
+  if(A==="rdRestaurar"){const r=rdv;if(!r||!r.anulada||!esContab())return true;
+    if(!(await ask("¿Restaurar esta rendición?","Vuelve a las listas, al fondo por rendir y al Excel, en el estado que tenía. Queda registrado en el historial.","Restaurar")))return true;
+    const x=r.anulada;delete r.anulada;rdHist(r,"restaurada",x&&x.motivo?"estaba "+(x.eliminada?"eliminada":"anulada")+": "+x.motivo:"");r.actualizado=new Date().toISOString();await saveRend(r);render();toast("Rendición restaurada.");
+    if(r.estado!=="borrador"&&DB&&navigator.onLine!==false)subirExcel("rend:"+r.periodo,false,()=>rdXlsxUpload(r.periodo)).catch(e=>console.warn("excel rendición",e));return true}
   if(A==="rdEliminar"||A==="rdAnular"){const r=rdv,el=A==="rdEliminar";if(!(el?rdPuedeEliminar(r):rdPuedeAnular(r)))return true;
     const D=docsDe(r),nd=`${D.length} ${D.length===1?"documento":"documentos"}`;
     let mot="";const leer=()=>{const x=document.querySelector("#motAn");if(x)mot=x.value.trim()};document.addEventListener("input",leer,true);
     let ok;try{ok=await ask(el?"¿Eliminar esta rendición?":"¿Anular esta rendición?",
       el?`${D.length?`Se quita con ${D.length===1?"su documento":`sus ${nd}`} (${fmtP(totalRend(r))}). `:""}Deja de aparecer en tus rendiciones y en el fondo por rendir. No se puede deshacer.`
         :`La rendición de ${r.persona&&r.persona.nombre||"sin nombre"} (${nd}, ${fmtP(totalRend(r))}) sale de las listas, del fondo por rendir y del Excel. Queda registrada con el motivo y tu nombre.`,
-      el?"Eliminar":"Anular",true,`<div class="f"><label for="motAn">Motivo${el?" (opcional)":""}</label><input id="motAn" placeholder="Ej.: rendición de prueba"></div>`)}
+      el?"Eliminar":"Anular",true,`<div class="f"><label for="motAn">Motivo${el?" (opcional)":""}</label><input id="motAn"${el?"":' data-obl="3"'} placeholder="Ej.: rendición de prueba"></div>`)}
     finally{leer();document.removeEventListener("input",leer,true)}
     if(!ok)return true;const enExcel=r.estado!=="borrador";
     r.anulada=Object.assign({por:yo(),fecha:today(),motivo:mot},el?{eliminada:true}:{});rdHist(r,el?"eliminada por quien rinde":"anulada",mot);
@@ -2130,7 +2137,7 @@ async function rdCarpeta(segs){let parent=RD.root,path="";
     if(!id){const x=await crearCarpeta(parent,seg);id=x.id}
     RDPATH[path]=id;parent=id}return parent}
 const carpetaRend=r=>[r.periodo,limpiaNombre(r.persona?r.persona.nombre:"Sin nombre")];
-async function rdSubir(segs,name,blob,type){const f=await rdCarpeta(segs);const x=await gfetch(`/drives/${M365.drive}/items/${f}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return x.json()}
+async function rdSubir(segs,name,blob,type){const f=await rdCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10): PDF de hasta 15 MB, por partes */
 function rdXlsxBuild(periodo,soloId){
   const RS=Object.values(REND).filter(r=>r.periodo===periodo&&!r.anulada&&(!soloId||r.id===soloId));const wb=XLSX.utils.book_new();
   const h=["Período","Persona","RUT","Estado rendición","Tipo documento","Emisor","RUT emisor","Folio","Fecha","Neto","IVA","Total","Centro de costo","Código centro","Tipo de gasto","Detalle","Cuenta","Producto","Partida","Bien de uso","Tercero","Lectura","Datos en blanco","Revisión","Observación","Jefatura","Aprobación jefatura","Contabilidad","Aprobación contable","Documento"];
@@ -2183,3 +2190,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="138"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
