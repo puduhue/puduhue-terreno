@@ -106,6 +106,10 @@ export class Avisos extends DurableObject {
     const n = x.n[correo] || 0; if (n >= tope) return { ok: false, n };
     x.n[correo] = n + 1; await this.ctx.storage.put(k, x); return { ok: true, n: n + 1 };
   }
+  /* v136 (A-09): pedidos desde la dirección antigua de la app */
+  async contarAntiguo(fecha) { const x = (await this.ctx.storage.get("antiguo")) || { total: 0, desde: fecha, dias: {} }; x.total++; x.ultimo = fecha; x.dias[fecha] = (x.dias[fecha] || 0) + 1;
+    const ks = Object.keys(x.dias).sort(); while (ks.length > 30) delete x.dias[ks.shift()]; await this.ctx.storage.put("antiguo", x); return x.total; }
+  async leerAntiguo() { const x = await this.ctx.storage.get("antiguo"); return x ? { total: x.total, desde: x.desde, ultimo: x.ultimo } : { total: 0 }; }
   /* v84: agenda de pendientes que deja la app y recordatorios diarios */
   async guardarAgenda(ag) { await this.ctx.storage.put("agenda", ag); return { aprobar: ag.aprobar.length, enviar: ag.enviar.length }; }
   async leerAgenda() { return (await this.ctx.storage.get("agenda")) || null; }

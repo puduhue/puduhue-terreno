@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ewlqInH4N9jA+UMct8p20ygx2/gGZkaZSQXdtaL8xjQ=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -11,19 +12,19 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Prueba">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#8DB3E2">
-<script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
-<script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
-<script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=135">
+<link rel="stylesheet" href="estilos.css?v=138">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
+<!-- v137 (M-27): las bibliotecas van después de «Cargando…» para que se vea mientras bajan (el orden de ejecución es el mismo) -->
+<script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
+<script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
+<script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="135";
+const APP_VER="138";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
-const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
 /* si ese archivo no cargó, la app abre igual: logo transparente en pantalla y PDF sin logo (addImage está en try) */
@@ -215,7 +216,10 @@ function ask(title,msg,ok,danger,extraHTML,cancelar){
     m.innerHTML=`<div class="sheet" role="alertdialog" aria-modal="true" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${msg?`<p>${esc(msg)}</p>`:""}${extraHTML||""}<div class="btns"><button class="btn" data-m="no">${esc(cancelar||"Cancelar")}</button>${ok?`<button class="btn pri${danger?" danger":""}" data-m="yes" style="flex:1;${danger?"background:var(--danger-bg);border-color:var(--danger-bg);color:var(--danger-ink)":""}">${esc(ok)}</button>`:""}</div></div>`;
     document.body.appendChild(m);document.body.style.overflow="hidden";
     const done=v=>{m.remove();document.body.style.overflow="";res(v)};
-    m.addEventListener("click",e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(a==="yes"){const inp=m.querySelector("#motAn");if(inp){const g=document.createElement("input");g.type="hidden";g.id="motAn";g.value=inp.value;document.body.appendChild(g);setTimeout(()=>g.remove(),500)}done(true)}else if(a==="no"||e.target===m)done(false)});
+    m.addEventListener("click",e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(a==="yes"){const inp=m.querySelector("#motAn");
+      /* v136 (B-02): motivo obligatorio (data-obl = mínimo de letras): la hoja no se cierra */
+      if(inp&&inp.dataset.obl&&inp.value.trim().length<+inp.dataset.obl){let er=m.querySelector(".motErr");if(!er){er=document.createElement("p");er.className="note motErr";er.style.color="var(--m-ink)";er.textContent=`Escribe el motivo (al menos ${inp.dataset.obl} letras).`;inp.after(er)}inp.focus();return}
+      if(inp){const g=document.createElement("input");g.type="hidden";g.id="motAn";g.value=inp.value;document.body.appendChild(g);setTimeout(()=>g.remove(),500)}done(true)}else if(a==="no"||e.target===m)done(false)});
     const y=m.querySelector('[data-m="yes"]')||m.querySelector('[data-m="no"]');if(y)y.focus();
   });
 }
@@ -375,7 +379,23 @@ async function actaCarpeta(segs){
     ACTPATH[path]=id;parent=id}
   return parent;
 }
-async function actaSubir(a,sub,name,blob,type){const folder=await actaCarpeta(carpetaActa(a).concat(sub?[sub]:[]));const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+/* v137 (A-10): más de 4 MB se sube por partes (sesión de carga de OneDrive); la dirección de la sesión no lleva la sesión de Microsoft */
+const PARTE=320*1024*12;
+async function subirBlob(folder,name,blob,type){
+  const ruta=`/drives/${M365.drive}/items/${folder}:/${encName(name)}:`;
+  if(!blob||!(blob.size>4*1048576)){const r=await gfetch(ruta+"/content",{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+  const s=await gjson(ruta+"/createUploadSession",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:{"@microsoft.graph.conflictBehavior":"replace"}})});
+  let res=null;
+  for(let i=0;i<blob.size;i+=PARTE){const fin=Math.min(i+PARTE,blob.size);let r=null;
+    for(let k=1;;k++){try{r=await fetch(s.uploadUrl,{method:"PUT",headers:{"Content-Range":`bytes ${i}-${fin-1}/${blob.size}`},body:blob.slice(i,fin)})}catch(e){r=null}
+      if(r&&r.status<500)break;if(k>=3){try{await fetch(s.uploadUrl,{method:"DELETE"})}catch(e){}throw r?{code:"graph",status:r.status}:{code:"network"}}
+      await new Promise(o=>setTimeout(o,1500*k))}
+    if(!r.ok){try{await fetch(s.uploadUrl,{method:"DELETE"})}catch(e){}throw{code:"graph",status:r.status}}
+    if(r.status===200||r.status===201)res=await r.json()}
+  return res}
+/* v137 (A-10): parte del nombre de una foto que sale de la foto misma: un reintento reemplaza el archivo en vez de duplicarlo */
+const sufRef=(ref,n)=>{let h=5381;const s=String(ref||uid());for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36).padStart(n,"0").slice(-n)};
+async function actaSubir(a,sub,name,blob,type){const folder=await actaCarpeta(carpetaActa(a).concat(sub?[sub]:[]));if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
 const nombreFoto=(a,k,ref)=>{if(a.tipo==="capacitacion"){const fs=((a.items||{})[k]||{}).fotos||[];return `Capacitacion_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}if(a.tipo==="vehiculo"||a.tipo==="activo"){const fs=((a.items||{})[k]||{}).fotos||[];const lb=a.tipo==="vehiculo"?(k==="v_km"?"Kilometraje":"Estado_general"):"Activo_"+(((a.activos||[]).find(x=>"a_"+x.id===k)||{}).tipo||"").replace(/\s+/g,"_");return limpiaNombre(lb).replace(/[(),.]/g,"")+`_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}const it=ITEMS.find(i=>i.k===k);const fs=((a.items||{})[k]||{}).fotos||[];const idx=Math.max(0,fs.indexOf(ref))+1;return limpiaNombre(`${it?SECC[it.s].t:"Item"}_${it?it.n:k}`).replace(/\s+/g,"_").replace(/[(),.]/g,"")+`_${idx}_${uid().slice(-4)}.jpg`};
 /* --- Base de actas: un archivo JSON por acta en OneDrive/actas --- */
 const REMOTE={actas:{},visitas:{},conteos:{},rendiciones:{}},SNAP={};let pullT=null,pulling=false;
@@ -390,13 +410,28 @@ async function carpetaCol(col){
     FOLDERS[col]=id}
   try{localStorage.setItem("actas-m365-folders",JSON.stringify(FOLDERS))}catch(e){}return FOLDERS[col];
 }
+/* v137: corre fn sobre la lista, hasta n a la vez */
+async function enParalelo(L,n,fn){let i=0;const t=async()=>{while(i<L.length){const x=L[i++];await fn(x)}};await Promise.all(Array.from({length:Math.min(n,L.length)},t))}
+/* v137 (A-11): la copia en el teléfono de fotos y PDF ya subidos (almacén «cache») no pasa de 200 MB: una vez al día se borra lo
+   más antiguo hasta 150 MB (se vuelve a bajar de OneDrive si hace falta). Lo pendiente de subir está en «fotos» y no se toca. */
+const CACHE_MAX=200*1048576,CACHE_K="actas-cache-recorte";
+async function cacheRecortar(forzar,max){
+  max=max||CACHE_MAX;if(!IDB.db)return 0;try{if(!forzar&&Date.now()-(+localStorage.getItem(CACHE_K)||0)<864e5)return 0;localStorage.setItem(CACHE_K,String(Date.now()))}catch(e){}
+  const L=[];let tot=0;
+  try{await new Promise((res,rej)=>{const q=IDB.db.transaction("cache","readonly").objectStore("cache").openCursor();
+    q.onsuccess=()=>{const c=q.result;if(!c){res();return}const v=c.value||{},d=v.data;const n=d?(d.byteLength||d.size||0):0;L.push({k:c.key,n,t:v.t||0});tot+=n;c.continue()};q.onerror=()=>rej(q.error)})}
+  catch(e){console.warn("caché",e);return 0}
+  if(tot<=max)return 0;L.sort((a,b)=>a.t-b.t);let borr=0;
+  for(const x of L){if(tot<=max*0.75)break;try{await IDB.del("cache",x.k);tot-=x.n;borr++;const u=FOTO[x.k];if(u&&String(u).startsWith("blob:")){try{URL.revokeObjectURL(u)}catch(e){}delete FOTO[x.k]}}catch(e){}}
+  return borr}
 async function pullCol(col){
   const folder=await carpetaCol(col);const R=REMOTE[col];
   let url=`/drives/${M365.drive}/items/${folder}/children?$select=id,name,eTag,lastModifiedDateTime,size&$top=200`;const vistos=new Set();let cambios=0;
-  while(url){const pg=await gjson(url);
+  while(url){const pg=await gjson(url);const baja=[];
     for(const it of (pg.value||[])){if(!/\.json$/i.test(it.name))continue;const id=it.name.replace(/\.json$/i,"");vistos.add(id);const ek=rkey(col,id);
-      if(ETAGS[ek]===it.eTag&&R[id])continue;
-      try{const r=await gfetch(`/drives/${M365.drive}/items/${it.id}/content`);const d=await r.json();d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=it.eTag;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}catch(e){console.warn(col,id,e)}}
+      if(ETAGS[ek]===it.eTag&&R[id])continue;baja.push([it,id,ek])}
+    /* v137 (M-28): hasta 6 a la vez (antes, de a uno: la primera sincronización con cientos de registros tardaba minutos) */
+    await enParalelo(baja,6,async([it,id,ek])=>{try{const r=await gfetch(`/drives/${M365.drive}/items/${it.id}/content`);const d=await r.json();d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=it.eTag;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}catch(e){console.warn(col,id,e)}});
     url=pg["@odata.nextLink"]||null}
   for(const id of Object.keys(R)){if(!vistos.has(id)&&!LOCAL[id]){delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++}}
   return cambios;
@@ -577,13 +612,13 @@ const GAS={
   async upload(blob,meta){
     let id,url;
     if(meta&&meta.col==="rendiciones"){const r=REND[meta.actaId];if(!r)throw{code:"gone"};const d=(r.docs||{})[meta.k]||{};
-      const name=limpiaNombre(`${d.fecha||"sinfecha"}_${d.emisor||"documento"}_${d.folio||""}`).replace(/\s+/g,"_").slice(0,60)+`_${uid().slice(-4)}${blob.type==="application/pdf"?".pdf":".jpg"}`;
+      const name=limpiaNombre(`${d.fecha||"sinfecha"}_${d.emisor||"documento"}_${d.folio||""}`).replace(/\s+/g,"_").slice(0,60)+`_${sufRef(meta.ref,4)}${blob.type==="application/pdf"?".pdf":".jpg"}`;
       const x=await rdSubir(carpetaRend(r),name,blob,blob.type||"image/jpeg");id=x.id;url=x.webUrl}
     else if(meta&&meta.col==="conteos"){const c=CONT[meta.actaId];if(!c)throw{code:"gone"};const l=(c.lineas||{})[meta.k]||{};
-      const name=limpiaNombre(`${l.cod||"prod"}_${l.prod||""}`).replace(/\s+/g,"_").slice(0,60)+`_${uid().slice(-4)}.jpg`;
+      const name=limpiaNombre(`${l.cod||"prod"}_${l.prod||""}`).replace(/\s+/g,"_").slice(0,60)+`_${sufRef(meta.ref,4)}.jpg`;
       const r=await cbSubir(carpetaConteo(c).concat(["Fotos"]),name,blob,blob.type||"image/jpeg");id=r.id;url=r.webUrl}
     else if(meta&&meta.col==="visitas"){const v=VIS[meta.actaId];if(!v)throw{code:"gone"};const it=itemDe(v,meta.k);
-      const name=`${(it?it.areaName:"Item").replace(/\s+/g,"")}_${it?codigo(it):meta.k}_${uid().slice(-6)}.jpg`;
+      const name=`${(it?it.areaName:"Item").replace(/\s+/g,"")}_${it?codigo(it):meta.k}_${sufRef(meta.ref,6)}.jpg`;
       const r=await clSubir(carpetaVisita(v).concat(["Fotos"]),name,blob,blob.type||"image/jpeg",tipoDe(v));id=r.id;url=r.webUrl}
     else{const a=ACTAS[meta.actaId];if(!a)throw{code:"gone"};
       const r=await actaSubir(a,"Fotos",nombreFoto(a,meta.k,meta.ref),blob,blob.type||"image/jpeg");id=r.id;url=r.webUrl}
@@ -622,7 +657,8 @@ const IDB={db:null,
   open(){return new Promise(res=>{try{const r=indexedDB.open("actas-vivienda",2);r.onupgradeneeded=()=>{const d=r.result;["actas","fotos","cache","remote"].forEach(n=>{if(!d.objectStoreNames.contains(n))d.createObjectStore(n)})};r.onsuccess=()=>{IDB.db=r.result;res(true)};r.onerror=()=>res(false);r.onblocked=()=>res(false)}catch(e){res(false)}})},
   tx(st,mode,fn){return new Promise((res,rej)=>{if(!IDB.db)return rej(new Error("sin almacenamiento"));let out;try{const t=IDB.db.transaction(st,mode);const rq=fn(t.objectStore(st));if(rq)rq.onsuccess=()=>{out=rq.result};t.oncomplete=()=>res(out);t.onerror=t.onabort=()=>rej(t.error)}catch(e){rej(e)}})},
   /* v114: si no se puede guardar algo nuevo, se vacía la copia local de fotos ya subidas («cache») y se reintenta una vez */
-  put(st,k,v){return this.tx(st,"readwrite",s=>s.put(v,k)).catch(async e=>{if(st==="cache"||!(await this.liberar()))throw e;return this.tx(st,"readwrite",s=>s.put(v,k))})},
+  put(st,k,v){if(st==="cache"&&v&&typeof v==="object"&&!v.t)v.t=Date.now(); /* v137 (A-11): fecha de la copia */
+    return this.tx(st,"readwrite",s=>s.put(v,k)).catch(async e=>{if(st==="cache"||!(await this.liberar()))throw e;return this.tx(st,"readwrite",s=>s.put(v,k))})},
   liberado:false,
   async liberar(){if(this.liberado||!this.db)return false;this.liberado=true;try{await this.tx("cache","readwrite",s=>s.clear());console.warn("espacio: se vació la copia local de fotos ya subidas");return true}catch(e){return false}},
   get(st,k){return this.tx(st,"readonly",s=>s.get(k))},
@@ -675,7 +711,7 @@ function pendHTML(){
 }
 function netHTML(){
   if(navigator.onLine!==false)return"";
-  return `<div class="info netbox"><b>Sin señal.</b> Puedes seguir trabajando: todo queda guardado en este teléfono${DB?" y se envía solo cuando vuelva la señal":""}. <b>No recargues ni cierres esta pestaña</b> hasta tener señal, porque sin conexión la app no vuelve a abrir.</div>`;
+  return `<div class="info netbox"><b>Sin señal.</b> Puedes seguir trabajando: todo queda guardado en este teléfono${DB?" y se envía solo cuando vuelva la señal":""}.</div>`;
 }
 function slotHTML(){return netHTML()+pendHTML()}
 window.addEventListener("offline",()=>status());window.addEventListener("online",()=>status());
@@ -774,8 +810,11 @@ async function removeActa(id){
   if(DB){colaBorrar(id,o);schedSync(200)}
   status();return true;
 }
+/* v136 (B-07): un borrador lo elimina quien lo creó o el administrador (los antiguos sin creador, cualquiera) */
+const puedeBorrar=o=>!o||!o.creadoPor||!ME||o.creadoPor.id===ME.id||(typeof esAdmin==="function"&&esAdmin());
+const NO_BORRAR="Solo quien lo creó o el administrador puede eliminar este borrador.";
 async function eliminarActa(a){
-  if(!a||a.estado==="cerrada")return false;
+  if(!a||a.estado==="cerrada")return false;if(!puedeBorrar(a)){toast(NO_BORRAR);return false}
   const ok=await ask("¿Eliminar este borrador?",`${a.tipo==="entrega"?"Entrega":"Devolución"} · ${a.trabajador||"Sin nombre"}. Se borran el acta y sus fotos. No se puede deshacer.`,"Eliminar",true);
   if(!ok)return false;
   await removeActa(a.id);
@@ -1072,7 +1111,7 @@ function renderPerm(){
 function permHoja(c){
   const p=permPersonas().find(x=>x.c===c)||{c,n:c,col:false};
   const html=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Permisos de ${esc(p.n)}"><h3>${esc(p.n)}</h3><p class="note" style="margin-top:0">${esc(c)}</p>
-    ${ADMINS.includes(c)?`<div class="info">Es el administrador de la app: siempre ve y edita en todo, aunque aquí se cambie.</div>`:""}
+    ${c===String((ME&&ME.correo)||"").toLowerCase()&&rolesSrv().admin?`<div class="info">Es el administrador de la app: siempre ve y edita en todo, aunque aquí se cambie.</div>`:""}
     ${PERM_MODS.map(m=>{const v=permDe(m.k,c),op=m.soloVer?[["agregar","Ve","C"],["no","No ve","N"]]:[["agregar","Ve y edita","C"],["ver","Solo ve","P"],["no","No ve","N"]];
       return `<div class="f permmod"><label>${esc(m.t)}</label><div class="seg" style="grid-template-columns:repeat(${op.length},1fr)" role="group" aria-label="${esc(m.t)}">${op.map(([k,t,e])=>`<button data-a="permSet" data-c="${esc(c)}" data-mod="${esc(m.k)}" data-v="${esc(k)}" data-e="${esc(e)}" aria-pressed="${v===k}">${t}</button>`).join("")}</div></div>`}).join("")}
     <p class="note">Rendiciones: todas las personas. Los cambios se guardan solos.</p>
@@ -1599,6 +1638,7 @@ function faltantes(){
   if(!a.rut||!rutOk(a.rut))m.push("RUT válido");
   const n=ITEMS.filter(i=>!(a.items[i.k]||{}).v).length;if(n)m.push(`${n} ítems del check list sin evaluar`);
   if(!(a.firmas.trabajador||{}).img&&!(a.firmas.trabajador||{}).noFirmo)m.push("Firma del trabajador(a) (o marcar que se retiró sin firmar)");
+  if((a.firmas.trabajador||{}).noFirmo&&String((a.firmas.trabajador||{}).motivo||"").trim().length<3)m.push("Motivo de por qué el trabajador(a) no firmó"); /* v136 (B-03) */
   normFirmas(a);const fe=a.firmas.empresa||{};
   if(!fe.sel&&!fe.nombre)m.push("Elegir quién firma por la empresa");
   else if(!fe.nombre)m.push("Nombre de la persona de administración que firma");
@@ -1618,7 +1658,7 @@ function stepActa(){
     return `<div class="sig"><div class="lb">${esc(l)}</div><div class="sub">${esc(sub)}</div>
       ${pick}
       ${k==="trabajador"?`<label class="nf${f.noFirmo?" on":""}"><input type="checkbox" data-nf="1" ${f.noFirmo?"checked":""} ${dis()}><span>El trabajador(a) se retiró y no firmó el acta ${a.tipo==="devolucion"?"de devolución":"de entrega"} de la vivienda</span></label>`:""}
-      ${k==="trabajador"&&f.noFirmo?`<div class="nfbox">Se retiró sin firmar el acta</div><input data-nfm="1" value="${esc(f.motivo)}" placeholder="Detalle (opcional): ej. se fue del predio antes de la revisión" ${dis()}>`:`<button class="pad" data-a="sign" data-r="${esc(k)}" ${dis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${esc(f.img)}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button>`}</div>`}).join("");
+      ${k==="trabajador"&&f.noFirmo?`<div class="nfbox">Se retiró sin firmar el acta</div><input data-nfm="1" value="${esc(f.motivo)}" placeholder="Motivo: ej. se fue del predio antes de la revisión" ${dis()}>`:`<button class="pad" data-a="sign" data-r="${esc(k)}" ${dis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${esc(f.img)}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button>`}</div>`}).join("");
   const m=faltantes();
   return `<h1 style="font-size:22px">${dev?"Acta de devolución vivienda":"Acta de entrega vivienda"}</h1>
   <div class="acta"><p>${esc(actaParrafo(a))}</p><p class="k">Observaciones generales sobre el estado de la vivienda:</p>
@@ -1759,7 +1799,7 @@ async function onClickAccion(ev,b,A){
   if(A==="actasXlsx"){await actasXlsx(true);return}
   if(A==="ordenarFotos"){await ordenarFotosAntiguas();return}
   if(A==="anularActa"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin()||a.estado!=="cerrada")return;
-    const ok=await ask(`¿Anular el acta de ${a.tipo==="entrega"?"entrega":"devolución"} de ${a.trabajador||"sin nombre"}?`,"Quedará tachada y fuera de los conteos, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: acta de prueba"></div>`);
+    const ok=await ask(`¿Anular el acta de ${a.tipo==="entrega"?"entrega":"devolución"} de ${a.trabajador||"sin nombre"}?`,"Quedará tachada y fuera de los conteos, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" data-obl="3" placeholder="Ej.: acta de prueba"></div>`);
     if(!ok)return;const mot=(document.querySelector("#motAn")||{}).value||"";
     a.anulada={por:yo(),fecha:today(),motivo:mot.trim()};a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta anulada.");if(DB&&navigator.onLine!==false)actasXlsx(false);return}
   if(A==="restaurarActa"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin())return;
@@ -1793,7 +1833,7 @@ document.addEventListener("input",ev=>{
   if(t.dataset.og!==undefined){cur.obs[+t.dataset.og]=t.value;touch();return}
   if(t.dataset.nfm){cur.firmas.trabajador=Object.assign(cur.firmas.trabajador||{},{motivo:t.value});touch();return}
   if(t.dataset.sc){cur.firmas[t.dataset.sc]=Object.assign(cur.firmas[t.dataset.sc]||{},{cargo:t.value});touch();return}
-  if(t.dataset.sn){cur.firmas[t.dataset.sn]=Object.assign(cur.firmas[t.dataset.sn]||{},{nombre:t.value});touch();updateClose();return}
+  if(t.dataset.sn){cur.firmas[t.dataset.sn]=Object.assign(cur.firmas[t.dataset.sn]||{},{nombre:t.value});firmaNombreCambio(cur.firmas[t.dataset.sn]);touch();updateClose();return}
 });
 document.addEventListener("change",ev=>{
   const t=ev.target;if(view==="axe"){axChange(ev);return}if(view==="rdv"||view==="rdd"||view==="rdm"){rdChange(ev);return}if(view==="cbv"){cbChange(ev);return}if(view==="stock"&&t.dataset.sk){stkInput(ev);return}if(view==="clcat"){catInput(ev);return}if(view==="clv"){clChange(ev);return}if(!cur||ro())return;
@@ -1805,6 +1845,11 @@ document.addEventListener("change",ev=>{
 
 function updateClose(){const box=$("#closeBox");if(!box||view!=="edit"||step!==2)return;const t=document.createElement("div");t.innerHTML=stepActa();box.innerHTML=t.querySelector("#closeBox").innerHTML}
 /* ---------- Firma ---------- */
+/* v136 (B-03): si se cambia el nombre de quien ya firmó (con nombre al firmar), la firma se borra: debe volver a firmar */
+function firmaNombreCambio(f){
+  if(!f||!f.img||!f.nombreFirma)return false;if(String(f.nombre||"").trim()===f.nombreFirma)return false;
+  delete f.img;delete f.fechaFirma;delete f.nombreFirma;toast("Cambió el nombre de quien firmó: la firma se borró y debe volver a firmar.",5000);
+  setTimeout(()=>{if(typeof sinPerderFoco==="function")sinPerderFoco(render);else render()},50);return true}
 function openSign(role){
   const rr=rolesDe(cur).find(r=>r[0]===role)||[role,"Firma",""];const l=rr[1]+" · "+rr[2];const f=cur.firmas[role]||{};
   const m=document.createElement("div");m.className="modal";
@@ -1814,19 +1859,21 @@ function openSign(role){
   const c=m.querySelector("canvas"),dpr=Math.max(1,window.devicePixelRatio||1);
   const W=c.clientWidth,H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;
   const g=c.getContext("2d");g.scale(dpr,dpr);g.lineCap="round";g.lineJoin="round";g.strokeStyle="#0E2238";g.lineWidth=2.6;
-  let drawing=false,any=false,last=null;
+  let drawing=false,any=false,last=null,largo=0; /* v136 (B-03): largo del trazo; un toque no cuenta como firma */
   const pt=e=>{const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
   c.addEventListener("pointerdown",e=>{e.preventDefault();c.setPointerCapture(e.pointerId);drawing=true;last=pt(e);g.beginPath();g.arc(last.x,last.y,1.2,0,Math.PI*2);g.fillStyle="#0E2238";g.fill();any=true});
-  c.addEventListener("pointermove",e=>{if(!drawing)return;e.preventDefault();const p=pt(e);g.beginPath();g.moveTo(last.x,last.y);g.lineTo(p.x,p.y);g.stroke();last=p;any=true});
+  c.addEventListener("pointermove",e=>{if(!drawing)return;e.preventDefault();const p=pt(e);g.beginPath();g.moveTo(last.x,last.y);g.lineTo(p.x,p.y);g.stroke();largo+=Math.hypot(p.x-last.x,p.y-last.y);last=p;any=true});
   const end=()=>{drawing=false};c.addEventListener("pointerup",end);c.addEventListener("pointercancel",end);
   const close=()=>{m.remove();document.body.style.overflow=""};
   m.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.m;
-    if(a==="clear"){g.clearRect(0,0,W,H);any=false}
+    if(a==="clear"){g.clearRect(0,0,W,H);any=false;largo=0}
     if(a==="cancel")close();
     if(a==="ok"){if(!any){toast("Dibuja la firma antes de guardar.");return}
+      if(largo<40){toast("La firma es muy corta: firma con el dedo dentro del recuadro.");return}
       const out=document.createElement("canvas");out.width=600;out.height=Math.round(600*H/W);
       const o=out.getContext("2d");o.drawImage(c,0,0,out.width,out.height);
       cur.firmas[role]=Object.assign(cur.firmas[role]||{},{img:out.toDataURL("image/png"),fechaFirma:new Date().toISOString()});
+      {const fr=cur.firmas[role];if(String(fr.nombre||"").trim())fr.nombreFirma=String(fr.nombre).trim();else delete fr.nombreFirma} /* v136 (B-03) */
       touch();close();const keep=window.scrollY;render();window.scrollTo(0,keep);toast("Firma guardada.")}
   });
 }
@@ -2280,20 +2327,6 @@ function estadoExp(a){const e=EXP[a.id];if(!e)return"nueva";return String(a.actu
 function pendientes(){return Object.values(ACTAS).filter(a=>estadoExp(a)!=="exportada")}
 function marcarExportado(actas){const t=new Date().toISOString();actas.forEach(a=>{EXP[a.id]={act:String(a.actualizado||""),t}});try{localStorage.setItem(EXPK,JSON.stringify(EXP));localStorage.setItem(EXK,t)}catch(e){}}
 function chipSync(a){if(!DB)return`<span class="xp nueva">Solo en este teléfono</span>`;if(LOCAL[a.id]||[...DELQ].includes(a.id))return`<span class="xp camb">${syncing?"Subiendo…":"Pendiente de subir"}</span>`;const nf=Object.values(a.items||{}).some(r=>(r.fotos||[]).some(f=>QF[f]));if(nf)return`<span class="xp camb">Fotos por subir</span>`;return`<span class="xp ok">Sincronizada</span>`}
-/* Sincronizar: exporta lo pendiente y lleva a la app en línea para importarlo */
-async function sincronizar(){
-  if(RED!=="ok"){toast(RED==="checking"?"Todavía estoy comprobando la señal.":"Sin señal: la sincronización necesita internet.");checkRed();return}
-  const p=pendientes();
-  if(!p.length){abrirOnlineModal("Todo exportado","No hay actas nuevas en este teléfono. Si todavía no las importaste en la app en línea, ábrela y usa Importar actas desde archivo.");return}
-  await exportarActas(true);
-}
-function abrirOnlineModal(titulo,texto){
-  const m=document.createElement("div");m.className="modal";
-  m.innerHTML=`<div class="sheet" role="alertdialog" aria-modal="true" aria-label="${esc(titulo)}"><h3>${esc(titulo)}</h3><p>${esc(texto)}</p><div class="btns"><button class="btn" data-m="no">Cerrar</button><a class="btn pri" href="${esc(URL_ONLINE)}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none" data-m="go">Abrir app en línea ↗</a></div></div>`;
-  document.body.appendChild(m);document.body.style.overflow="hidden";
-  const close=()=>{m.remove();document.body.style.overflow="";render()};
-  m.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.m;if(a==="no"||e.target===m)close();if(a==="go")setTimeout(close,300)});
-}
 function saludo(){const h=new Date().getHours();return h<12?"Buenos días":h<20?"Buenas tardes":"Buenas noches"}
 function fechaLarga(){try{const t=new Date().toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"});return t.charAt(0).toUpperCase()+t.slice(1)}catch(e){return fmtD(today())}}
 const ICO={
@@ -2408,7 +2441,7 @@ async function exportarActas(soloPend){
   const msg=`${actas.length} ${actas.length===1?"acta":"actas"} exportadas${falt?` (${falt} fotos no se pudieron incluir)`:""}.`;
   if(DL){try{await DL.save({filename:name,data:blob});marcarExportado(actas);toast(msg)}catch(e){if(e&&e.code!=="declined")toast("No se pudo descargar el archivo.")}return}
   try{const file=new File([blob],name,{type:"application/json"});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){compartirListo(file,msg,null,null,null,()=>{marcarExportado(actas);if(soloPend)abrirOnlineModal("Archivo enviado","Ahora abre la app en línea y toca Importar actas desde archivo para cargarlo. Las actas quedarán marcadas como exportadas en este teléfono.");else render()});return}}catch(e){}
+    if(navigator.canShare&&navigator.canShare({files:[file]})){compartirListo(file,msg,null,null,null,()=>{marcarExportado(actas);render()});return}}catch(e){}
   marcarExportado(actas);
   const u=URL.createObjectURL(blob),l=document.createElement("a");l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);toast(msg);
 }
@@ -2596,6 +2629,18 @@ async function ordenarFotosAntiguas(){
 }
 async function pdfsPendientes(){if(!DB||navigator.onLine===false||syncing)return;for(const a of Object.values(ACTAS)){if(a._col==="visitas"||a.estado!=="cerrada"||(a.pdfs&&!a.anulada===!a.pdfsAnul)||LOCAL[a.id])continue;/* v130: también al anular o restaurar */if(esAx(a))await subirPDFsAx(a);else await subirPDFsActa(a)}}
 /* ---------- Servidor Puduhue (Cloudflare) y prueba de conexión con Finnegans ---------- */
+/* v138 (B-15): quién es administrador y de Contabilidad lo dice el servidor (/yo); el código público ya no trae correos.
+   Se guarda en el teléfono para usarlo sin señal; sin dato guardado, no se es administrador. */
+const ROLES_K="actas-roles";
+function rolesSrv(){try{const x=JSON.parse(localStorage.getItem(ROLES_K)||"null");return x&&ME&&x.correo===String(ME.correo||"").toLowerCase()?x:{}}catch(e){return{}}}
+let ROLES_PIDIENDO=false;
+async function rolesTraer(forzar){
+  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3)return false;
+  ROLES_PIDIENDO=true;
+  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),hora:Date.now()};
+    const antes=JSON.stringify([x.admin,x.contab,x.lista]);try{localStorage.setItem(ROLES_K,JSON.stringify(n))}catch(e){}
+    if(antes!==JSON.stringify([n.admin,n.contab,n.lista])&&loaded)render();return true}
+  catch(e){console.warn("roles",e);return false}finally{ROLES_PIDIENDO=false}}
 async function workerFetch(path){
   const tok=await getToken();let r;
   try{r=await fetch(WORKER+path,{headers:{Authorization:"Bearer "+tok}})}catch(e){throw{error:"No se pudo conectar con el servidor de Puduhue. Revisa la señal."}}
@@ -3157,6 +3202,8 @@ async function init(){
   loaded=true;render();abrirEnlace();vistaVolver();if(SES_VENCIDA)setTimeout(sesionVencida,300); /* v132 (A-04): si venció al abrir, se revisa ahora si puede ir sola */
   if(view==="launch")checkRed();
   setTimeout(enviarCorreosPend,3000);
+  setTimeout(()=>{rolesTraer().catch(()=>{})},1200); /* v138 (B-15) */
+  setTimeout(()=>{cacheRecortar().catch(()=>{})},15000); /* v137 (A-11) */
   setTimeout(()=>{try{leerPendientes().catch(()=>{})}catch(e){}},3500); /* v133 (B-12) */
   recoverFotos();
   setTimeout(()=>{try{traspasarBodega()}catch(e){console.warn("traspaso bodega",e)}},2500);
@@ -3240,10 +3287,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=135"></script>
-<script src="modulos/bodega.js?v=135"></script>
-<script src="modulos/rendiciones.js?v=135"></script>
-<script src="modulos/actas-entrega.js?v=135"></script>
+<script src="modulos/checklist.js?v=138"></script>
+<script src="modulos/bodega.js?v=138"></script>
+<script src="modulos/rendiciones.js?v=138"></script>
+<script src="modulos/actas-entrega.js?v=138"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
@@ -3264,7 +3311,11 @@ if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 /* v114: si el sitio ya usa más del 80 % del espacio que le da el navegador, se vacía la copia local de fotos ya subidas */
 setTimeout(()=>{try{if(navigator.storage&&navigator.storage.estimate)navigator.storage.estimate().then(e=>{if(e&&e.quota&&e.usage/e.quota>0.8)IDB.liberar()}).catch(()=>{})}catch(e){}},6000);
-if(MOD_OK)init();else{const ap=document.getElementById("app");if(ap)ap.innerHTML="<div class=\"band\"><div class=\"in\"><b>PUDUHUE</b><span>Sin cargar</span></div></div><main class=\"wrap\" style=\"padding-top:28px\"><h2 style=\"margin:0 0 8px\">No se pudo cargar la app</h2><p style=\"margin:0 0 18px\">Falta una parte de la app en este equipo. Revisa la se\u00f1al y vuelve a intentarlo.</p><div class=\"btns\"><button class=\"btn pri\" onclick=\"location.reload()\">Reintentar</button></div></main>"}
+/* v137 (M-29): index.html y módulos de versiones distintas (sin el service worker): se recarga una vez */
+function modVerRecargar(){const K="actas-recarga-mod",V=window.MODV||{},mal=["checklist","bodega","rendiciones","actas-entrega"].some(m=>V[m]!==APP_VER);
+  try{if(!mal){sessionStorage.removeItem(K);return false}if(sessionStorage.getItem(K))return false;sessionStorage.setItem(K,"1")}catch(e){return false}
+  console.warn("módulos de otra versión",V,APP_VER);(window.__recargar||(()=>location.reload()))();return true}
+if(MOD_OK&&modVerRecargar()){}else if(MOD_OK)init();else{const ap=document.getElementById("app");if(ap)ap.innerHTML="<div class=\"band\"><div class=\"in\"><b>PUDUHUE</b><span>Sin cargar</span></div></div><main class=\"wrap\" style=\"padding-top:28px\"><h2 style=\"margin:0 0 8px\">No se pudo cargar la app</h2><p style=\"margin:0 0 18px\">Falta una parte de la app en este equipo. Revisa la se\u00f1al y vuelve a intentarlo.</p><div class=\"btns\"><button class=\"btn pri\" onclick=\"location.reload()\">Reintentar</button></div></main>"}
 if(MOD_OK)setTimeout(()=>{try{pushRefrescar()}catch(e){}},1500);
 </script>
 </body>
