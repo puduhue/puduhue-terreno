@@ -51,11 +51,15 @@ function fdAuto(){
   const viejo=!FD.p||Date.now()-new Date(FD.p.hora).getTime()>15*60e3;
   if(viejo&&!FD.cargando&&!FD.intento&&DB&&navigator.onLine!==false){FD.intento=1;setTimeout(()=>fdTraer(false,true),0)}
 }
+/* v133 (B-09): una rendición aprobada que ya se exportó a Excel, o cuyo asiento ya aparece en Finnegans (misma descripción),
+   ya está en el saldo de Finnegans: no se descuenta otra vez como «en revisión» */
+const fdYaEnFinnegans=(r,movs)=>{if(!r||r.estado!=="aprobada")return false;if(r.exportada)return true;
+  const ds=normTxt((r.asiento&&r.asiento.desc)||rdDescAsiento(r));return !!ds&&(movs||[]).some(x=>num(x.m)<0&&normTxt(x.d)===ds)};
 const fdRendDe=rut=>{const n=normRut(rut);return n?Object.values(REND).filter(r=>!r.anulada&&normRut(r.persona&&r.persona.rut)===n):[]};
 function fdCalc(p){
   const movs=(p.movs||[]).filter(x=>x&&x.f).slice().sort((a,b)=>String(a.f).localeCompare(String(b.f)));
   const saldo=Math.round(movs.reduce((s,x)=>s+(num(x.m)||0),0));
-  const R=fdRendDe(p.rut),tram=R.filter(r=>FD_TRAMITE.includes(r.estado)),borr=R.filter(r=>(r.estado==="borrador"||r.estado==="observada")&&docsDe(r).length);
+  const R=fdRendDe(p.rut),tram=R.filter(r=>FD_TRAMITE.includes(r.estado)&&!fdYaEnFinnegans(r,movs)),borr=R.filter(r=>(r.estado==="borrador"||r.estado==="observada")&&docsDe(r).length);
   const enTram=tram.reduce((s,r)=>s+totalRend(r),0),enBorr=borr.reduce((s,r)=>s+totalRend(r),0),porRendir=saldo-enTram;
   /* antigüedad: lo rendido o devuelto descuenta primero lo más antiguo que se entregó */
   const cola=[];const usar=q=>{while(q>0.5&&cola.length){const c=cola[0],u=Math.min(q,c.r);c.r-=u;q-=u;if(c.r<=0.5)cola.shift()}};
@@ -362,6 +366,9 @@ const lecFacturaSinNeto=d=>d.tipo==="factura"&&!(d.timbre&&+d.timbre.td===34)&&!
 /* con timbre, la tarjeta se muestra aunque falte elegir el centro o el tipo de gasto (son filas de la misma tarjeta) */
 const lecSoloElegir=P=>P.b.every(m=>/^rd(Ce|Ga)$/.test(campoDeMsg(m)||""));
 /* línea de la tarjeta para confirmar: de dónde salen los datos y qué falta */
+/* v133 (B-11): cambiar la foto de un documento escaneado, con Cámara y Galería (en el computador, «Subir foto») */
+const rdRefotoHTML=t=>`${t}: `+(ESCRITORIO()?`<label class="lnk">Subir foto<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label>`
+  :`<label class="lnk">Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label> · <label class="lnk">Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label>`);
 function lecTarjetaHTML(d,P){
   const le=d.lectura||{};let h="";
   if(P&&P.b.length)h+=`<p class="rdok-av">${ICO_ALERTA}<span>Para enviar falta elegir ${P.b.map(m=>campoDeMsg(m)==="rdCe"?"el centro de costo":"el tipo de gasto").filter((x,i,a)=>a.indexOf(x)===i).join(" y ")}.</span></p>`;
@@ -369,8 +376,8 @@ function lecTarjetaHTML(d,P){
     h+=df.length?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(df.join(" "))}</span></p>`:`<p class="rdok-tim">${ICO_OK96}<span>RUT, N°, fecha y total del timbre del SII</span></p>`}
   if(le.estado==="leyendo")h+=`<p class="rdok-ia"><span class="spin" aria-hidden="true"></span><span>Completando el comercio y el detalle…</span></p>`;
   if(d.deEscaneo){
-    if(lecFacturaSinNeto(d))h+=`<p class="rdok-av rdok-fac">${ICO_ALERTA}<span>Es una factura: saca también la foto completa para leer el neto y el IVA. <label class="lnk">Sacar foto completa<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label></span></p>`;
-    else h+=`<p class="rdok-ia">La foto es la del escaneo. <label class="lnk">Cambiarla por una foto de la boleta completa<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label></p>`}
+    if(lecFacturaSinNeto(d))h+=`<p class="rdok-av rdok-fac">${ICO_ALERTA}<span>Es una factura: saca también la foto completa para leer el neto y el IVA. ${rdRefotoHTML("Foto completa")}</span></p>`;
+    else h+=`<p class="rdok-ia">La foto es la del escaneo. ${rdRefotoHTML("Cambiarla por una foto de la boleta completa")}</p>`}
   return h;
 }
 
@@ -659,7 +666,10 @@ const esMiaR=r=>!!(ME&&r&&(esPropia(r)||(r.cuenta&&r.cuenta===meCorreo())));
 const soyJefeDe=r=>!!(ME&&r&&r.jefatura&&r.jefatura.correo&&r.jefatura.correo===meCorreo());
 const sinJefatura=r=>!(r&&r.jefatura&&r.jefatura.correo);
 const puedeJefatura=r=>!!(r&&r.estado==="enviada"&&!esPropia(r)&&(soyJefeDe(r)||(sinJefatura(r)&&esContab())));
-const puedeContab=r=>!!(r&&r.estado==="revcont"&&esContab()&&!esPropia(r));
+/* v133 (M-15): quien la aprobó como jefatura no la aprueba también en Contabilidad */
+const aprobeJef=r=>!!(ME&&r&&r.aprobJef&&r.aprobJef.por&&r.aprobJef.por.id===ME.id);
+const correoAprobJef=r=>r&&r.aprobJef&&r.jefatura&&r.jefatura.correo?String(r.jefatura.correo).toLowerCase():"";
+const puedeContab=r=>!!(r&&r.estado==="revcont"&&esContab()&&!esPropia(r)&&!aprobeJef(r));
 const puedeContabilizar=r=>!!(r&&r.estado==="aprobada"&&esContab());
 const editaPersona=r=>!!(r&&esMiaR(r)&&(r.estado==="borrador"||r.estado==="observada"));
 const rdRO=r=>!(editaPersona(r)||puedeContab(r));
@@ -690,6 +700,13 @@ const rdPuedeEliminar=r=>!!r&&!r.anulada&&editaPersona(r);
 const rdPuedeAnular=r=>!!r&&!r.anulada&&esContab()&&r.estado!=="contabilizada"&&!editaPersona(r);
 function rdElimHTML(r){return rdPuedeEliminar(r)?`<div class="btns"><button class="btn danger" data-a="rdEliminar">Eliminar rendición</button></div>`
   :rdPuedeAnular(r)?`<div class="btns"><button class="btn danger" data-a="rdAnular">Anular rendición</button></div>`:""}
+/* v133 (M-14): huella de los documentos y sus montos, para saber si cambiaron desde que Contabilidad la devolvió */
+const rdHuella=r=>docsDe(r).map(d=>d.k+":"+Math.round(num(d.total)||0)).sort().join("|");
+function rdCambioDesdeDev(r){
+  if(r.huellaDev!=null)return rdHuella(r)!==r.huellaDev;
+  const f=(r.hist||[]).filter(h=>h.a==="devuelta"&&h.fecha).map(h=>h.fecha).sort().pop();  /* devuelta antes de la v133 */
+  return !!f&&docsDe(r).some(d=>String(d.creado||"")>f);
+}
 const rdHist=(r,a,nota)=>{(r.hist=r.hist||[]).push({a,por:yo(),fecha:new Date().toISOString(),nota:nota||""})};
 /* ---------- Avisos por correo (v78) ----------
    Salen desde la cuenta Microsoft de quien hace la acción (permiso delegado Mail.Send).
@@ -705,7 +722,7 @@ function listaNombres(L){const n=[...new Set(L)];return n.length<2?(n[0]||""):n.
 function rdDestinos(r,ev){
   let L=[];
   if(ev==="enviada")L=r.estado==="revcont"||!(r.jefatura&&r.jefatura.correo)?contabCorreos():[r.jefatura.correo];
-  else if(ev==="aprobJef"||ev==="reenvCont")L=contabCorreos();
+  else if(ev==="aprobJef"||ev==="reenvCont"){const aj=correoAprobJef(r);L=contabCorreos().filter(x=>String(x||"").toLowerCase()!==aj)} /* v133 (M-15) */
   else if(ev==="devuelta"||ev==="aprobada")L=correosPersona(r);
   const me=meCorreo();return [...new Set(L.map(x=>String(x||"").toLowerCase().trim()))].filter(x=>/@/.test(x)&&x!==me);
 }
@@ -761,15 +778,37 @@ const mailtoDe=m=>`mailto:${m.para.join(",")}?subject=${encodeURIComponent(m.asu
 function correosPend(){try{const L=JSON.parse(localStorage.getItem(CORREO_K)||"[]");return Array.isArray(L)?L:[]}catch(e){return[]}}
 function guardarCorreosPend(L){try{L.length?localStorage.setItem(CORREO_K,JSON.stringify(L)):localStorage.removeItem(CORREO_K)}catch(e){}}
 /* aviso de una acción: msg es el mensaje de la acción, al que se le suma a quién se avisó */
+/* v133 (M-04): el aviso sale solo cuando el cambio ya está en OneDrive y la versión de OneDrive sigue en ese estado.
+   true: se puede enviar · null: todavía no se sube · false: otro teléfono la cambió (no se envía) */
+function rdAvisoVigente(m){
+  if(!m||!m.rid||!m.est||!DB)return true;   /* avisos de antes de la v133 */
+  if(LOCAL[m.rid]||LT[m.rid])return null;
+  const r=(REMOTE.rendiciones||{})[m.rid];if(!r)return REND[m.rid]?null:false;
+  return !r.anulada&&r.estado===m.est&&(!m.hf||(r.hist||[]).some(h=>h.fecha===m.hf));
+}
+async function rdEsperarSubida(id,ms){
+  if(!DB)return true;const t0=Date.now();schedSync(50);
+  while(Date.now()-t0<ms){if(navigator.onLine===false)return false;if(!LOCAL[id]&&!LT[id]&&REMOTE.rendiciones&&REMOTE.rendiciones[id])return true;await new Promise(res=>setTimeout(res,300))}
+  return false;
+}
+const correoPendCambiar=(id,f)=>guardarCorreosPend(correosPend().map(x=>x.id===id?f(x):x).filter(Boolean));
 async function rdAvisar(r,ev,msg,op){
   setTimeout(()=>rdAgendaPublicar(true).catch(()=>{}),1500); /* v84: el servidor queda al día para los recordatorios */
   let m=null;try{m=rdCorreo(r,ev,op)}catch(e){console.warn("correo",e)}
   if(!m){if(msg)disAviso(ev,msg);return}
   if(msg)disAviso(ev,msg);
+  /* v133 (M-04): queda en la cola (por si la app se cierra) y sale después de subir el cambio */
+  m.est=r.estado;m.hf=((r.hist||[]).slice(-1)[0]||{}).fecha||"";m.esperando=Date.now();guardarCorreosPend(correosPend().concat([m]));
+  if(!(await rdEsperarSubida(r.id,20000))){correoPendCambiar(m.id,x=>Object.assign(x,{esperando:0}));toast(`${msg?msg+" ":""}El aviso a ${m.nombres} sale cuando la rendición quede guardada en OneDrive${navigator.onLine===false?" (al volver la señal)":""}.`);return}
+  const v=rdAvisoVigente(m);
+  if(v===false){correoPendCambiar(m.id,()=>null);toast(`No se envió el aviso a ${m.nombres}: la rendición se cambió en otro teléfono.`);return}
+  if(!correosPend().some(x=>x.id===m.id))return; /* ya lo envió la cola */
+  correoPendCambiar(m.id,()=>null);
   const pp=pushAviso(m); /* v83: la notificación sale en paralelo al correo */
   try{await enviarCorreo(m);const pr=await Promise.race([pp,new Promise(res=>setTimeout(()=>res(null),4000))]);toast(`${msg?msg+" ":""}Se avisó por correo${pr&&pr.enviadas?" y con una notificación":""} a ${m.nombres}.`)}
   catch(e){
-    if(e&&e.code==="network"){await pp;guardarCorreosPend(correosPend().concat([m]));toast(`${msg?msg+" ":""}El aviso por correo a ${m.nombres} sale cuando vuelva la señal.`);return}
+    const temporal=e&&e.code==="graph"&&(e.status===429||e.status>=500); /* v133 (B-08): error temporal de Microsoft: se reintenta */
+    if(e&&e.code==="network"||temporal){const pr=await pp;delete m.esperando;if(pr&&pr.enviadas)m.pushHecho=true;if(temporal)m.intentos=1;guardarCorreosPend(correosPend().concat([m]));toast(`${msg?msg+" ":""}El aviso por correo a ${m.nombres} sale ${temporal?"en un rato (Microsoft no respondió)":"cuando vuelva la señal"}.`);return}
     console.warn("correo",e);{const t=$(".toast");if(t)t.remove()}
     if(await ask("No se pudo avisar por correo",`${m.queAccion}, pero la app no pudo mandar el aviso a ${m.nombres}${e&&e.code==="permiso"?" (falta autorizar el permiso de correo en Microsoft)":""}. ¿Abrimos tu correo con el mensaje listo para que lo envíes tú?`,"Abrir mi correo",false,"","Ahora no"))location.href=mailtoDe(m);
   }
@@ -777,13 +816,20 @@ async function rdAvisar(r,ev,msg,op){
 let ENVIANDO_CORREOS=false;
 async function enviarCorreosPend(){
   if(ENVIANDO_CORREOS||navigator.onLine===false||!CUENTA)return;
-  const L=correosPend();if(!L.length)return;ENVIANDO_CORREOS=true;const listos=new Set(),notif=new Set();
+  const L=correosPend();if(!L.length)return;ENVIANDO_CORREOS=true;const listos=new Set(),notif=new Set(),reint=new Set();
   try{for(const m of L){
       if(m.cuenta!==meCorreo())continue;  /* v132 (M-23): quedó de otra cuenta: no se manda a su nombre; espera a que vuelva a entrar */
+      if(m.esperando&&Date.now()-m.esperando<60000)continue; /* v133: lo está enviando la acción que lo creó */
+      /* v133 (M-04): solo cuando el cambio ya está en OneDrive y sigue en ese estado */
+      const v=rdAvisoVigente(m);if(v===null)continue;
+      if(v===false){listos.add(m.id);toast(`No se envió el aviso a ${m.nombres}: la rendición se cambió en otro teléfono.`);continue}
       if(!m.pushHecho&&await pushAviso(m))notif.add(m.id);
       try{await enviarCorreo(m);listos.add(m.id);toast(`Se avisó por correo a ${m.nombres}.`)}
-      catch(e){if(e&&e.code==="network")break;listos.add(m.id);console.warn("correo pendiente",e);toast(`No se pudo mandar el aviso por correo a ${m.nombres}.`)}}}
-  finally{guardarCorreosPend(correosPend().filter(x=>!listos.has(x.id)).map(x=>notif.has(x.id)?Object.assign(x,{pushHecho:true}):x));ENVIANDO_CORREOS=false}
+      catch(e){if(e&&e.code==="network")break;
+        /* v133 (B-08): error temporal de Microsoft (429 o 5xx): queda en la cola y se reintenta, hasta 5 veces */
+        if(e&&e.code==="graph"&&(e.status===429||e.status>=500)&&(m.intentos||0)<4){reint.add(m.id);console.warn("correo pendiente, se reintenta",e);break}
+        listos.add(m.id);console.warn("correo pendiente",e);toast(`No se pudo mandar el aviso por correo a ${m.nombres}.`)}}}
+  finally{guardarCorreosPend(correosPend().filter(x=>!listos.has(x.id)).map(x=>Object.assign(x,notif.has(x.id)?{pushHecho:true}:{},reint.has(x.id)?{intentos:(x.intentos||0)+1}:{})));ENVIANDO_CORREOS=false}
 }
 /* ---------- v84: agenda de pendientes para los recordatorios automáticos ----------
    Cada vez que la app sincroniza (o alguien hace una acción en una rendición), le deja al servidor un resumen de lo
@@ -804,7 +850,8 @@ function rdAgenda(){
     if(!r||r.anulada)return;const per=r.persona||{},propios=correosPersona(r);
     if(r.estado==="enviada"||r.estado==="revcont"){
       const cont=r.estado==="revcont"||sinJefatura(r);
-      const para=(cont?contabCorreos():[r.jefatura.correo]).map(x=>String(x||"").toLowerCase()).filter(x=>/@/.test(x)&&!propios.includes(x)); /* nadie aprueba lo propio */
+      const aj=r.estado==="revcont"?correoAprobJef(r):"";
+      const para=(cont?contabCorreos():[r.jefatura.correo]).map(x=>String(x||"").toLowerCase()).filter(x=>/@/.test(x)&&!propios.includes(x)&&x!==aj); /* nadie aprueba lo propio ni los dos pasos (v133) */
       if(para.length)aprobar.push({para,rid:r.id,rol:cont?"cont":"jef",persona:per.nombre||"",periodo:r.periodo,total:fmtP(totalRend(r)),desde:rdDesde(r)});
     }else if(rdEditable(r)){
       const n=docsDe(r).length;if(!n&&r.estado!=="observada")return;
@@ -872,12 +919,17 @@ function rdTouch(){if(!rdv)return;rdv.actualizado=new Date().toISOString();if(ME
 const docsDe=r=>Object.values(r.docs||{}).sort((a,b)=>String(a.fecha||"9")<String(b.fecha||"9")?-1:String(a.fecha||"9")>String(b.fecha||"9")?1:String(a.creado).localeCompare(String(b.creado)));
 const totalRend=r=>docsDe(r).reduce((s,d)=>s+(num(d.total)||0),0);
 const centroDoc=(r,d)=>d.centro||PREDIO_CENTRO[d.predio]||"";
+/* v133 (M-17): N° de boleta o factura sin ceros a la izquierda ni otros signos; orden de llegada de dos documentos */
+const folioNorm=f=>{const s=String(f||"").trim(),n=s.replace(/\D/g,"").replace(/^0+/,"");return n||s.toUpperCase()};
+const docAntes=(x,y)=>{const a=String(x.creado||""),b=String(y.creado||"");return a<b||(a===b&&String(x.k||"")<String(y.k||""))};
 /* Problemas de un documento: b impide enviar · a advertencia (se envía igual y quien revisa la ve) */
 function problemasDoc2(r,d){
   const b=[],a=[];
   if(!d.foto)b.push("Falta la foto del documento.");
   if(!(num(d.total)>0))b.push("Falta el total.");
-  if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
+  /* v133 (M-16): con timbre de nota de crédito, guía o nota de débito no sirve aunque se cambie el tipo a mano */
+  if(d.timbre&&d.timbre.td&&!TD_TIPO98[d.timbre.td]&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`El timbre del SII dice «${TD_NOMBRE98[d.timbre.td]||"otro documento"}», que no sirve para rendir aunque se cambie el tipo. Elimina el documento o cambia la foto.`);
+  else if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
   if(d.tipo==="peaje"&&gastoDe(d)&&!esGastoPeaje(d))b.push("Un comprobante de peaje solo se rinde con el tipo de gasto «Peajes / barcaza». Cambia el tipo de gasto o el tipo de documento.");
   /* en facturas y boletas de honorarios el RUT viene impreso y Finnegans lo exige; en boletas es opcional */
   const rutObl=d.tipo==="factura"||d.tipo==="boleta_honorarios";
@@ -888,10 +940,18 @@ function problemasDoc2(r,d){
   if(d.fecha&&d.fecha>today())b.push("La fecha es futura.");
   if(!centroDoc(r,d))b.push("Falta el centro de costo.");
   if(!gastoDe(d))b.push("Falta el tipo de gasto.");
-  if(d.rut&&d.folio){const igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&String(y.folio).trim()===String(d.folio).trim();const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
+  /* v133 (M-17): el N° se compara sin ceros a la izquierda; solo la copia más nueva queda bloqueada (la original sigue su curso) */
+  if(d.rut&&d.folio){const fd=folioNorm(d.folio),igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&folioNorm(y.folio)===fd&&docAntes(y,d);const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
     if(otra){const quien_=otra.persona&&otra.persona.nombre||quien(otra.creadoPor)||"otra persona",mia=esMiaR(otra);
       b.push(`Documento duplicado: esta boleta o factura (mismo RUT y número) ya está en ${mia?"tu rendición":"la rendición de "+quien_} de ${periodoTxt(otra.periodo).toLowerCase()} (${(RD_ESTADO[otra.estado]||otra.estado||"").toLowerCase()}). Debe quedar en una sola rendición: elimínala de una de las dos.`)}
     else if(Object.values(r.docs||{}).some(igual))b.push("Documento duplicado: esta boleta o factura (mismo RUT y número) está dos veces en esta misma rendición. Elimina una.")}
+  /* v133 (M-17): boletas sin RUT con el mismo total y fecha: posible duplicado (aviso en la más nueva; los peajes se repiten) */
+  if(d.tipo==="boleta"&&!(d.rut&&rutValido(d.rut))&&num(d.total)>0&&d.fecha){
+    const par=y=>y!==d&&y.tipo==="boleta"&&!(y.rut&&rutValido(y.rut))&&Math.round(num(y.total))===Math.round(num(d.total))&&y.fecha===d.fecha&&docAntes(y,d);
+    const otra=Object.values(r.docs||{}).some(par)?r:Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(par));
+    if(otra)a.push(otra===r?"Posible duplicado: en esta rendición hay otra boleta sin RUT con el mismo total y fecha. Si es la misma, elimina una.":`Posible duplicado: ${esMiaR(otra)?"tu rendición":"la rendición de "+(otra.persona&&otra.persona.nombre||"otra persona")} de ${periodoTxt(otra.periodo).toLowerCase()} tiene una boleta sin RUT con el mismo total y fecha. Si es la misma, elimina una.`)}
+  /* v133 (M-16): la lectura con IA dice que la foto no se lee o no es una boleta o factura */
+  if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
   if(d.lectura&&d.lectura.estado==="error")a.push("La lectura automática falló; los datos quedan como los escribas.");
   if(!d.emisor)a.push("Sin nombre del emisor.");
@@ -977,10 +1037,11 @@ function validarLinea(l){
 }
 /* Asiento completo de una rendición: gastos al DEBE (boletas consolidadas, facturas una por una, gastos compartidos distribuidos)
    y al HABER el fondo por rendir de la persona, una línea por cada combinación de centro + partida */
+function rdDescAsiento(r){const per=String(r.periodo||"").split("-");return `RENDICION ${per[1]||""}-${per[0]||""} ${normTxt(r.persona&&r.persona.nombre)}${(r.n||1)>1?" N"+r.n:""}`.trim()}
 function rdAsiento(r){
   const D=docsDe(r),al=[],deb=[],grupos={};const add=(n,m,k)=>al.push({n,m,k:k||""});
   const c=colabDe(r),per=String(r.periodo||"").split("-");
-  const desc=`RENDICION ${per[1]||""}-${per[0]||""} ${normTxt(r.persona&&r.persona.nombre)}${(r.n||1)>1?" N"+r.n:""}`.trim();
+  const desc=rdDescAsiento(r);
   D.forEach(d=>{
     problemasDoc2(r,d).b.forEach(m=>add("b",m,d.k));
     const im=imputar(r,d);im.al.forEach(a=>al.push(Object.assign({},a,{k:d.k})));
@@ -1014,11 +1075,22 @@ function rdAsiento(r){
   const vistos=new Set(),A2=al.filter(a=>{const k=a.n+a.m+a.k;if(vistos.has(k))return false;vistos.add(k);return true}).sort((a,b)=>({b:0,p:1}[a.n]??2)-({b:0,p:1}[b.n]??2));
   return{lineas,debe,haber,fecha:f.slice(8,10)+"-"+f.slice(5,7)+"-"+f.slice(0,4),fechaISO:f,desc,al:A2,bloq:A2.filter(a=>a.n==="b").length,pend:A2.filter(a=>a.n==="p").length};
 }
+/* v133 (M-18): asiento para el Excel: el que aprobó Contabilidad (r.asiento). Del calculado hoy solo se toma el tercero que
+   faltaba al aprobar (persona o proveedor creado después en Finnegans). «distinto»: hoy saldría otro asiento. */
+function rdAsientoExcel(r){
+  const A=rdAsiento(r),G=r.asiento;
+  if(!G||!Array.isArray(G.lineas)||!G.lineas.length||!["aprobada","contabilizada"].includes(r.estado))return{A,distinto:false,aprobado:false};
+  const clave=l=>[l.lado,l.cuenta,l.prod||"",l.part||"",l.centro||"",l.bu||"",Math.round(num(l.monto))].join("|");
+  const lin=G.lineas.map(l=>{const x=Object.assign({},l);if(!x.ter){const m=A.lineas.find(y=>y.ter&&clave(y)===clave(l));if(m)x.ter=m.ter}return x});
+  const firma=L=>L.map(l=>clave(l)+"|"+(l.ter||"")).sort().join("\n");
+  const debe=lin.filter(l=>l.lado==="D").reduce((s,l)=>s+num(l.monto),0),haber=lin.filter(l=>l.lado==="H").reduce((s,l)=>s+num(l.monto),0);
+  return{A:Object.assign({},A,{lineas:lin,fecha:G.fecha||A.fecha,desc:G.desc||A.desc,debe,haber}),distinto:firma(lin)!==firma(A.lineas),aprobado:true};
+}
 /* Excel de importación de asiento genérico (FinnegansGO): una hoja IMPORTADOR, todos los valores como texto y las celdas vacías sin valor */
 const IMP_COLS=["EMPRESA","DOCUMENTO","NUMERO","FECHA","DESCRIPCION","CUENTA","CODIGOMONEDAITEM","DEBE","HABER","TERCERO","PRODUCTO","DIMENSION","DIMENSIONVALOR","DESCRIPCIONITEM","FECHAVENCIMIENTO","OPERACIONBANCARIA","CHEQUERA","NUMERO_CHEQUE","BANCOCHEQUE","CUITLIBRADOR","FECHACHEQUE","FECHAVENCIMIENTOCHEQUE","DIMENSION2","DIMENSIONVALOR2","DIMENSION3","DIMENSIONVALOR3","CODIGOMONEDA","COTIZACION"];
 function rdImportXlsx(RS){
   const rows=[IMP_COLS.slice()];
-  RS.forEach((r,i)=>{const A=rdAsiento(r);A.lineas.forEach(l=>{const w=new Array(28).fill(null);
+  RS.forEach((r,i)=>{const A=rdAsientoExcel(r).A;A.lineas.forEach(l=>{const w=new Array(28).fill(null);
     w[0]="2";w[1]="AG";w[2]=String(i+1);w[3]=A.fecha;w[4]=A.desc;w[5]=String(l.cuenta);w[6]="PES";
     if(l.lado==="D")w[7]=String(l.monto);else w[8]=String(l.monto);
     if(l.ter)w[9]=String(l.ter);if(l.prod)w[10]=String(l.prod);w[11]="DIMCTC";w[12]=String(l.centro);w[13]=l.glosa;
@@ -1031,12 +1103,28 @@ const MESES3=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov",
 const mesArch=p=>{const [y,m]=String(p||"").split("-");return (MESES3[(+m||1)-1]||"")+(y||"")};
 const nomArch=t=>normTxt(t).split(" ").filter(Boolean).map(w=>w.charAt(0)+w.slice(1).toLowerCase()).join("");
 /* Antes del Excel: si alguna rendición espera proveedores por crear, se revisa Finnegans; las que siguen esperando quedan fuera */
-async function rdExportarListas(RS,marcar){
+/* v133 (A-07): antes del Excel se traen los últimos cambios de OneDrive (otra persona pudo exportarlas o cambiarlas) */
+async function rdTraerUltimo(){
+  if(!DB)return true;if(navigator.onLine===false)return false;
+  try{let esp=0;while(pulling&&esp<480){await new Promise(r=>setTimeout(r,250));esp++}if(pulling)return false;
+    const antes=SYNC_INFO.ultima;await pull(false);return !(SYNC_INFO.error||!SYNC_INFO.ultima||SYNC_INFO.ultima===antes)}
+  catch(e){return false}
+}
+async function rdExportarListas(RS,marcar,todas){
+  toast("Revisando los últimos cambios en OneDrive…");
+  if(!(await rdTraerUltimo())&&!(await ask("No se pudo revisar OneDrive","No se pudieron traer los últimos cambios: puede que otra persona de Contabilidad ya haya exportado alguna de estas rendiciones. ¿Descargar el Excel igual?","Descargar igual",false,"","Cancelar")))return;
+  {const t=$(".toast");if(t)t.remove()}
+  const ids=RS.map(r=>r.id);RS=ids.map(id=>REND[id]).filter(r=>r&&!r.anulada&&(todas?r.estado==="aprobada"&&!r.exportada:true));
+  if(todas&&RS.length<ids.length)toast(`${ids.length-RS.length} ${ids.length-RS.length===1?"ya no está lista (otra persona la exportó o la cambió)":"ya no están listas (otra persona las exportó o las cambió)"}.`);
+  if(!RS.length){render();return}
   if(RS.some(r=>rdAsiento(r).pend)&&navigator.onLine!==false)await rdOrgsFinnegans(true);
   const esperan=RS.filter(r=>rdAsiento(r).pend),listas=RS.filter(r=>!rdAsiento(r).pend&&!rdAsiento(r).bloq);
   if(esperan.length){const falt=[...new Set(esperan.flatMap(r=>rdAsiento(r).al.filter(a=>a.n==="p").map(a=>`${a.nombre} (RUT ${a.rut})`)))].join(", ");
     if(!listas.length){await ask("Falta crear en Finnegans",`${esperan.length===1?"Esta rendición espera":"Estas rendiciones esperan"} que se cree en Finnegans: ${falt}. Cuando exista, vuelve a descargar el Excel.`,"Entendido");return}
     if(!(await ask("Algunas rendiciones esperan",`${esperan.length} ${esperan.length===1?"rendición queda":"rendiciones quedan"} fuera porque falta crear en Finnegans: ${falt}. ¿Descargar el Excel con las otras ${listas.length}?`,"Descargar")))return}
+  /* v133 (M-18): sale el asiento aprobado; si hoy saldría distinto, se avisa */
+  const dist=listas.filter(r=>rdAsientoExcel(r).distinto);
+  if(dist.length&&!(await ask("El asiento cambió desde que se aprobó",`${dist.length===1?"La rendición de "+(dist[0].persona&&dist[0].persona.nombre||"")+" saldría":"Las rendiciones de "+listaNombres(dist.map(r=>r.persona&&r.persona.nombre||""))+" saldrían"} distinto con los maestros de hoy. El Excel lleva el asiento que aprobó Contabilidad. Si corresponde el nuevo, cancela, abre la rendición y usa «Volver a revisión contable».`,"Descargar con el aprobado",false,"","Cancelar")))return;
   await rdExportar(listas,marcar);
 }
 async function rdExportar(RS,marcar){
@@ -1046,9 +1134,10 @@ async function rdExportar(RS,marcar){
   const per=[...new Set(RS.map(r=>r.periodo))];
   const name=RS.length===1?`Importar_Rendicion_${nomArch(RS[0].persona&&RS[0].persona.nombre)}_${mesArch(RS[0].periodo)}${(RS[0].n||1)>1?"_"+RS[0].n:""}.xlsx`:`Importar_Rendiciones_${per.length===1?mesArch(per[0]):"varios_meses"}_${today()}.xlsx`;
   const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  if(marcar){const hoy=today();RS.forEach((r,i)=>{if(r.estado!=="aprobada")return;r.exportada={archivo:name,fecha:hoy,por:yo(),numero:i+1};rdHist(r,"exportada",name);r.actualizado=new Date().toISOString();saveRend(r)});
-    if(DB&&navigator.onLine!==false)rdSubir(["Importaciones FinnegansGO"],name,blob,blob.type).catch(e=>console.warn("importación",e))}
-  await compartirBlob(blob,name,RS.length===1?"Excel para FinnegansGO listo.":`Excel para FinnegansGO listo: ${RS.length} asientos (NUMERO 1 a ${RS.length}).`,["Importaciones FinnegansGO"]);
+  /* v133 (A-07): se marca «exportada» solo cuando el Excel se descarga, se comparte o se abre */
+  const alTomar=marcar?async()=>{const hoy=today();for(const [i,r0] of RS.entries()){const r=REND[r0.id]||r0;if(r.estado!=="aprobada"||r.anulada)continue;r.exportada={archivo:name,fecha:hoy,por:yo(),numero:i+1};rdHist(r,"exportada",name);r.actualizado=new Date().toISOString();await saveRend(r)}
+    if(DB&&navigator.onLine!==false)rdSubir(["Importaciones FinnegansGO"],name,blob,blob.type).catch(e=>console.warn("importación",e));render()}:null;
+  await compartirBlob(blob,name,RS.length===1?"Excel para FinnegansGO listo.":`Excel para FinnegansGO listo: ${RS.length} asientos (NUMERO 1 a ${RS.length}).`,["Importaciones FinnegansGO"],{alTomar});
   render();
 }
 
@@ -1067,8 +1156,13 @@ async function leerDoc(r,d){
       if(!blob)throw{error:"No se encontró la foto en el teléfono."};dataURL=await blobToDataURL(blob)}
     const tok=await getToken();
     const tipos=catalogo().filter(t=>!t.c&&!t.otro&&t.activo!==false).map(t=>({id:t.id,n:t.n}));
-    const res=await fetch(WORKER+"/boleta",{method:"POST",headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify({imagen:dataURL,mime:"image/jpeg",tipos,timbre:d.timbre||undefined,escaneo:d.deEscaneo||undefined})});
-    const j=await res.json().catch(()=>({error:"Respuesta no válida del servidor."}));if(!res.ok)throw j;
+    /* v133 (B-12): una lectura que tarda más de 90 s se corta y queda como falla */
+    const ac=window.AbortController?new AbortController():null,tope=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}},90000);let res,j;
+    try{res=await fetch(WORKER+"/boleta",{method:"POST",signal:ac?ac.signal:undefined,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify({imagen:dataURL,mime:"image/jpeg",tipos,timbre:d.timbre||undefined,escaneo:d.deEscaneo||undefined})});
+      j=await res.json().catch(e=>{if(e&&e.name==="AbortError")throw e;return{error:"Respuesta no válida del servidor."}})}
+    catch(e){if(e&&e.name==="AbortError")throw{error:"La lectura tardó demasiado. Los datos quedan como los escribas."};throw e}
+    finally{clearTimeout(tope)}
+    if(!res.ok)throw j;
     const x=j.datos||{};
     d.lectura={estado:"ok",confianza:+x.confianza||0,problemas:Array.isArray(x.problemas)?x.problemas:[],legible:x.legible!==false,hora:j.hora,modelo:j.modelo};if(j.revision)d.lectura.revision={modelo:j.revision.modelo,motivos:(j.revision.motivos||[]).slice(0,6),error:j.revision.error||undefined};
     if(!d.revisadoManual){if(x.tipo&&TIPO_DOC[x.tipo])d.tipo=x.tipo;if(x.emisor)d.emisor=String(x.emisor).slice(0,80);if(x.rut_emisor)d.rut=rutLimpio(x.rut_emisor);if(x.folio)d.folio=String(x.folio).trim();if(x.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(x.fecha))d.fecha=x.fecha;if(num(x.total)>0)d.total=Math.round(num(x.total));if(num(x.neto)>0)d.neto=Math.round(num(x.neto));if(num(x.iva)>0)d.iva=Math.round(num(x.iva));if(x.glosa&&(!d.glosa||d.glosaTimbre)){d.glosa=String(x.glosa).slice(0,120);delete d.glosaTimbre}}
@@ -1083,7 +1177,10 @@ async function leerDoc(r,d){
   }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento."};console.warn("lectura",e)}
   finally{listo();delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
 }
-async function leerPendientes(){if(navigator.onLine===false)return;for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{})){if(d.foto&&d.lectura&&(d.lectura.estado==="pendiente")&&!QF[d.foto])await leerDoc(r,d)}}}
+async function leerPendientes(){
+  /* v133 (B-12): una lectura que quedó en «Leyendo…» porque la app se cerró a mitad vuelve a «pendiente» y se lee de nuevo */
+  for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{}))if(d.lectura&&d.lectura.estado==="leyendo"&&!LEYENDO[d.k])d.lectura={estado:"pendiente"}}
+  if(navigator.onLine===false)return;for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{})){if(d.foto&&d.lectura&&(d.lectura.estado==="pendiente")&&!QF[d.foto]&&!LEYENDO[d.k])await leerDoc(r,d)}}}
 
 /* ---------- Pantallas ---------- */
 /* ---------- v92: seguimiento por pasos y revisión de documentos uno por uno ----------
@@ -1176,7 +1273,7 @@ function renderRD(){
     rdOrgsAuto();
     const sinJ=todas.filter(r=>r.estado==="enviada"&&sinJefatura(r)).sort(porEnvio),rev=todas.filter(r=>r.estado==="revcont").sort(porEnvio),apr=todas.filter(r=>r.estado==="aprobada").sort(porEnvio),enJ=todas.filter(r=>r.estado==="enviada"&&!sinJefatura(r)).sort(porEnvio);
     const cont=todas.filter(r=>r.estado==="contabilizada").sort((a,b)=>String(b.contab&&b.contab.fecha||"").localeCompare(String(a.contab&&a.contab.fecha||""))).slice(0,20);
-    const listas=apr.filter(r=>!rdAsiento(r).bloq),esperan=listas.filter(r=>rdAsiento(r).pend);
+    const listas=apr.filter(r=>!r.exportada&&!rdAsiento(r).bloq),esperan=listas.filter(r=>rdAsiento(r).pend),nExp=apr.filter(r=>r.exportada).length; /* v133 (A-07) */
     /* proveedores y personas que faltan en Finnegans, de todas las rendiciones en curso */
     const porCrear={};todas.filter(r=>["enviada","revcont","aprobada"].includes(r.estado)).forEach(r=>rdAsiento(r).al.filter(a=>a.n==="p").forEach(a=>{const k=normRut(a.rut);const x=porCrear[k]=porCrear[k]||{rut:a.rut,nombre:a.nombre,tipo:a.tipo,quien:new Set()};x.quien.add(r.persona&&r.persona.nombre||"")}));
     const PC=Object.values(porCrear).sort((a,b)=>cmpEs(a.nombre,b.nombre));
@@ -1186,7 +1283,7 @@ function renderRD(){
     <h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>
     ${sinJ.length?`<h2>Sin jefatura asignada<span class="cnt">${sinJ.length}</span></h2><p class="note">Quien rinde no tiene jefatura en la lista de colaboradores: Contabilidad aprueba ambos pasos.</p><div class="list">${sinJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
     <h2>Aprobadas, por contabilizar<span class="cnt">${apr.length}</span></h2>
-    ${apr.length?`<div class="btns"><button class="btn pri" data-a="rdImpTodas" ${listas.length?"":"disabled"} style="flex:1">Excel para FinnegansGO (${listas.length} ${listas.length===1?"asiento":"asientos"})</button></div>${esperan.length?`<p class="note">${esperan.length} ${esperan.length===1?"espera":"esperan"} un proveedor o persona por crear en Finnegans; al descargar, la app revisa Finnegans y deja fuera solo ${esperan.length===1?"esa":"esas"} si todavía falta.</p>`:""}${apr.some(r=>r.exportada)?`<div class="btns"><button class="btn" data-a="rdContabTodas">Marcar las exportadas como contabilizadas</button></div>`:""}`:""}
+    ${apr.length?`<div class="btns"><button class="btn pri" data-a="rdImpTodas" ${listas.length?"":"disabled"} style="flex:1">Excel para FinnegansGO (${listas.length} ${listas.length===1?"asiento":"asientos"})</button></div>${nExp?`<p class="note">${nExp} ${nExp===1?"ya se exportó y no entra":"ya se exportaron y no entran"} en este Excel. Para descargar una de nuevo, ábrela.</p>`:""}${esperan.length?`<p class="note">${esperan.length} ${esperan.length===1?"espera":"esperan"} un proveedor o persona por crear en Finnegans; al descargar, la app revisa Finnegans y deja fuera solo ${esperan.length===1?"esa":"esas"} si todavía falta.</p>`:""}${apr.some(r=>r.exportada)?`<div class="btns"><button class="btn" data-a="rdContabTodas">Marcar las exportadas como contabilizadas</button></div>`:""}`:""}
     <div class="list">${apr.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones aprobadas pendientes.</div>`}</div>
     ${enJ.length?`<h2>En revisión de jefatura<span class="cnt">${enJ.length}</span></h2><div class="list">${enJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
     ${cont.length?`<h2>Contabilizadas recientes</h2><div class="list">${cont.map(r=>rdCard(r,"cont")).join("")}</div>`:""}${rdRevisionHTML()}`;
@@ -1340,12 +1437,13 @@ function renderRDV(){
   const r=rdv,D=docsDe(r),edit=editaPersona(r),jef=puedeJefatura(r),con=puedeContab(r),ctz=puedeContabilizar(r);
   const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).length,0);
   const c=colabDe(r),jefE=r.jefatura||(c?jefaturaDe(c):null);
-  const verAsi=esContab()&&r.estado!=="borrador"&&!esPropia(r)||con||ctz;const A=verAsi&&D.length?rdAsiento(r):null;
+  const verAsi=esContab()&&r.estado!=="borrador"&&!esPropia(r)||con||ctz;const AX=verAsi&&D.length?rdAsientoExcel(r):null,A=AX?AX.A:null; /* v133 (M-18) */
   let acciones="";
   if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>
       ${disTip("rdsolo",`Solo sirven <b>facturas y boletas</b>, en foto o en PDF.${ESCRITORIO()?" También puedes arrastrar las fotos o los PDF a esta página.":""}`,"rdsolo")}
       ${D.length?`${inc?`<p class="note">Faltan datos obligatorios en ${inc} ${inc===1?"documento":"documentos"} (foto, total, tipo de documento, centro de costo, tipo de gasto o RUT de la factura). <button class="lnk" data-a="rdDoc" data-k="${esc(D.find(d=>!docCompleto(r,d)).k)}">Ir ${inc===1?"al documento":"al primero"}</button></p>`:adv?`<p class="note">${adv} ${adv===1?"dato queda en blanco":"datos quedan en blanco"}; se puede enviar igual y quien revisa los completa.</p>`:""}`:""}`;
   else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Toca cada documento para marcarlo revisado u observarlo. Para devolver, al menos uno debe tener observación.</p>`;
+  else if(esContab()&&r.estado==="revcont"&&aprobeJef(r)&&!esPropia(r))acciones=`<p class="note">La aprobaste como jefatura: la revisión contable la hace otra persona de Contabilidad.</p>`;
   else if(con)acciones=`${A&&A.bloq?`<p class="note">Corrige lo que está en «Por corregir» (toca el documento) para poder aprobar.</p>`:""}`;
   else if(ctz)acciones=`<div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button><button class="btn pri" data-a="rdContabilizar" style="flex:1">Marcar contabilizada</button></div><div class="btns"><button class="btn" data-a="rdReabrir">Volver a revisión contable</button></div>`;
   else if(esContab()&&r.estado==="contabilizada")acciones=`<div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button></div>`;
@@ -1357,6 +1455,7 @@ function renderRDV(){
   const asi=A?`<h2>Asiento contable</h2>
     <div class="lx-sync sks ${A.bloq?"no":"ok"}"><div class="lx-syncl"><span class="lx-synct">${A.debe===A.haber?`DEBE = HABER = ${fmtP(A.debe)}${A.bloq?"":" ✓"}`:`Descuadre: debe ${fmtP(A.debe)} · haber ${fmtP(A.haber)}`}</span><span class="lx-syncs">Fecha ${esc(A.fecha)} · ${esc(A.desc)}</span></div></div>
     ${con?`<div class="skf dupla"><div class="f"><label for="rdFA">Fecha del asiento</label><input id="rdFA" type="date" data-rdr="fechaAsiento" value="${esc(A.fechaISO)}"></div><div class="f"><label for="rdPer">Persona que rinde</label>${perSel}</div></div>`:""}
+    ${AX&&AX.distinto?`<div class="info netbox">Es el asiento que aprobó Contabilidad y es el que va al Excel. Con los maestros de hoy saldría distinto; si corresponde el nuevo, usa «Volver a revisión contable» y apruébala de nuevo.</div>`:""}
     ${rdAlertasHTML(A.al,r)}${(con||ctz)&&alertaOrgs(A.al)?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Buscar proveedores nuevos en Finnegans"}</button></div>`:""}${rdTablaAsiento(A.lineas,con)}${con?`<p class="note">Si una línea quedó mal imputada, toca <b>✎ Cambiar</b>: el cambio se aplica a todos los documentos de esa línea y queda registrado en el historial.</p>`:""}`:"";
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rd">Rendiciones</button><div class="ttl">${esc(rdTitulo(r))}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
@@ -1795,14 +1894,15 @@ async function rdClick(A,b){
   if(A==="rdDelDoc"){if(!editaPersona(rdv))return true;const d=rdv.docs[b.dataset.k];if(!d)return true;if(!(await ask("¿Eliminar este documento?",d.pdf?"Se borran la imagen, el PDF y los datos.":"Se borra la foto y los datos.","Eliminar",true)))return true;if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d);delete rdv.docs[d.k];rdd=null;rdTouch();go("rdv");return true}
   if(A==="rdEnviar"){if(!editaPersona(rdv))return true;const D=docsDe(rdv);if(!D.length)return true;const inc=D.filter(d=>!docCompleto(rdv,d)).length;if(inc){toast(`Faltan datos en ${inc} ${inc===1?"documento":"documentos"}.`);return true}
     const c=colabDe(rdv);let j=c?jefaturaDe(c):null;if(j&&j.correo&&(j.correo===meCorreo()||correosDe(c).includes(j.correo)))j=null;
-    const vuelveCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&rdv.aprobJef,eraObs=rdv.estado==="observada";
+    const devCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&!!rdv.aprobJef,cambio=devCont&&rdCambioDesdeDev(rdv); /* v133 (M-14) */
+    const vuelveCont=devCont&&!cambio,eraObs=rdv.estado==="observada";
     const adv=D.reduce((n,d)=>n+docAdvertencias(rdv,d).length,0);
-    const quienRev=vuelveCont?"Vuelve a revisión de Contabilidad, que recibirá un aviso por correo.":j&&j.correo?`La aprueba ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:"No tienes jefatura asignada: la revisa Contabilidad, que recibirá un aviso por correo.";
+    const quienRev=vuelveCont?"Vuelve a revisión de Contabilidad, que recibirá un aviso por correo.":cambio&&j&&j.correo?`Como agregaste, quitaste o cambiaste el monto de documentos, vuelve a aprobación de ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:j&&j.correo?`La aprueba ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:"No tienes jefatura asignada: la revisa Contabilidad, que recibirá un aviso por correo.";
     if(!(await ask(vuelveCont?"¿Reenviar la rendición?":"¿Enviar a aprobación?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))}. ${quienRev}${adv?` Hay ${adv} ${adv===1?"dato en blanco":"datos en blanco"} que quien revisa podrá completar.`:""} Después de enviar no se puede modificar hasta que la revisen.`,"Enviar")))return true;
     if(!vuelveCont){rdv.jefatura=j;delete rdv.aprobJef}
     /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
     const directo=!vuelveCont&&!(j&&j.correo);
-    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
+    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;delete rdv.huellaDev;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada",cambio?"cambió documentos después de la devolución de Contabilidad":"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
   if(A==="rdEliminar"||A==="rdAnular"){const r=rdv,el=A==="rdEliminar";if(!(el?rdPuedeEliminar(r):rdPuedeAnular(r)))return true;
     const D=docsDe(r),nd=`${D.length} ${D.length===1?"documento":"documentos"}`;
     let mot="";const leer=()=>{const x=document.querySelector("#motAn");if(x)mot=x.value.trim()};document.addEventListener("input",leer,true);
@@ -1822,6 +1922,7 @@ async function rdClick(A,b){
     let com="";const leer=()=>{const el=document.querySelector("#motAn");if(el)com=el.value.trim()};document.addEventListener("input",leer,true);
     let ok;try{ok=await ask(obs.length?"¿Devolver con observaciones?":"¿Devolver la rendición?",obs.length?`${obs.length} ${obs.length===1?"documento observado":"documentos observados"}. La persona recibirá un aviso por correo con tu comentario y podrá corregir y reenviar.`:"Ningún documento está marcado con «Observar»: se devuelve la rendición completa. La persona recibirá un aviso por correo con tu comentario y podrá corregir y reenviar.","Devolver",true,`<div class="f"><label for="motAn">Comentario para ${esc((rdv.persona&&rdv.persona.nombre)||"quien rinde")}</label><input id="motAn" placeholder="Ej.: faltan boletas de combustible del viaje del 12"></div>`)}finally{leer();document.removeEventListener("input",leer,true)}
     if(!ok)return true;if(!com){toast("Escribe un comentario para la persona: es lo que verá al abrir su rendición.");return true}
+    if(rdv.estado==="revcont")rdv.huellaDev=rdHuella(rdv);else delete rdv.huellaDev; /* v133 (M-14) */
     rdv.devueltaEn=rdv.estado;rdv.estado="observada";rdv.comentario=com;rdv.revisadaPor=yo();if(rdv.devueltaEn==="enviada")delete rdv.aprobJef;delete rdv.aprobCont;rdHist(rdv,"devuelta",rdv.comentario);rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"devuelta","Rendición devuelta.").catch(e=>console.warn("correo",e));return true}
   if(A==="rdPickAj"){if(!rdd||!puedeContab(rdv))return true;const f=b.dataset.f,base=imputar(rdv,rdd,true),bk={cuenta:"cuenta",producto:"prod",partida:"part",tercero:"ter"}[f];
     pickAj(f,{actual:(rdd.aj||{})[f]||"",base:base[bk]||"",onPick:v=>{rdd.aj=rdd.aj||{};if(v&&v!==String(base[bk]||""))rdd.aj[f]=v;else delete rdd.aj[f];if(!Object.keys(rdd.aj).length)delete rdd.aj;rdTouch();const keep=window.scrollY;render();window.scrollTo(0,keep)}});return true}
@@ -1834,14 +1935,20 @@ async function rdClick(A,b){
     const nr=As.al.filter(a=>a.n==="r").length;
     if(!(await ask("¿Aprobar la imputación?",`Asiento de ${fmtP(As.debe)} con ${As.lineas.length} líneas${nr?` y ${nr} ${nr===1?"alerta revisada":"alertas revisadas"}`:""}. ${As.pend?`Falta crear en Finnegans: ${As.al.filter(a=>a.n==="p").map(a=>`${a.nombre} (${a.rut})`).join(", ")}; el Excel de esta rendición sale cuando exista.`:"Queda lista para el Excel de FinnegansGO."} ${rdv.persona&&rdv.persona.nombre?primerNombre(rdv.persona.nombre)+" recibirá un aviso por correo.":""}`,"Aprobar")))return true;
     D.forEach(d=>{d.estadoRev="ok"});rdv.aprobCont={por:yo(),fecha:today()};rdv.asiento={lineas:As.lineas.map(l=>({lado:l.lado,cuenta:l.cuenta,prod:l.prod,part:l.part,centro:l.centro,ter:l.ter,bu:l.bu,monto:l.monto,glosa:l.glosa})),fecha:As.fecha,desc:As.desc,debe:As.debe};rdv.estado="aprobada";rdHist(rdv,"aprobada por Contabilidad");rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"aprobada","Imputación aprobada.").catch(e=>console.warn("correo",e));if(DB&&navigator.onLine!==false)setTimeout(()=>rdArchivos(rr),2500);return true}
-  if(A==="rdReabrir"){if(!puedeContabilizar(rdv))return true;if(!(await ask("¿Volver a revisión contable?","Podrás corregir la imputación y aprobarla de nuevo.","Volver a revisión")))return true;rdv.estado="revcont";delete rdv.aprobCont;rdHist(rdv,"vuelve a revisión contable");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();return true}
+  if(A==="rdReabrir"){if(!puedeContabilizar(rdv))return true;const ex=rdv.exportada;
+    if(!(await ask("¿Volver a revisión contable?",`Podrás corregir la imputación y aprobarla de nuevo.${ex?` Ya se exportó a Excel el ${fmtD(ex.fecha)}: si ya está cargada en FinnegansGO, corrígela también allá, porque al aprobarla de nuevo vuelve a salir en el Excel.`:""}`,"Volver a revisión")))return true;
+    rdv.estado="revcont";delete rdv.aprobCont;delete rdv.exportada; /* v133 (A-07) */rdHist(rdv,"vuelve a revisión contable",ex?"estaba exportada: "+(ex.archivo||""):"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();return true}
   if(A==="rdContabilizar"){if(!puedeContabilizar(rdv))return true;const o=await askVal("¿Marcar como contabilizada?","Hazlo cuando el asiento ya esté cargado en FinnegansGO.","Marcar contabilizada",`<div class="f"><label for="rdAsN">N° de asiento en FinnegansGO (opcional)</label><input id="rdAsN" data-v="asiento" inputmode="numeric"></div>`);if(!o)return true;
     rdv.estado="contabilizada";rdv.contab={asiento:String(o.asiento||"").trim(),fecha:today(),por:yo()};rdHist(rdv,"contabilizada",rdv.contab.asiento);rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();exito("Rendición contabilizada","");return true}
   if(A==="rdContabTodas"){if(!esContab())return true;const L=Object.values(REND).filter(r=>!r.anulada&&r.estado==="aprobada"&&r.exportada);if(!L.length)return true;
     if(!(await ask("¿Marcar como contabilizadas?",`${L.length} ${L.length===1?"rendición exportada":"rendiciones exportadas"} a Excel. Hazlo cuando ya estén cargadas en FinnegansGO.`,"Marcar contabilizadas")))return true;
     for(const r of L){r.estado="contabilizada";r.contab={asiento:"",fecha:today(),por:yo()};rdHist(r,"contabilizada");r.actualizado=new Date().toISOString();await saveRend(r)}render();toast(`${L.length} ${L.length===1?"rendición contabilizada":"rendiciones contabilizadas"}.`);return true}
-  if(A==="rdImpUna"){if(!esContab()||!rdv)return true;const As=rdAsiento(rdv);if(As.bloq){toast("El asiento tiene cosas por corregir.");return true}await rdExportarListas([rdv],rdv.estado==="aprobada");return true}
-  if(A==="rdImpTodas"){if(!esContab())return true;const L=Object.values(REND).filter(r=>!r.anulada&&r.estado==="aprobada"&&!rdAsiento(r).bloq).sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));await rdExportarListas(L,true);return true}
+  if(A==="rdImpUna"){if(!esContab()||!rdv)return true;const As=rdAsiento(rdv);if(As.bloq){toast("El asiento tiene cosas por corregir.");return true}
+    /* v133 (A-07): descargar de nuevo una ya exportada o contabilizada pide confirmar */
+    if(rdv.estado==="contabilizada"&&!(await ask("¿Descargar de nuevo?",`Esta rendición ya está contabilizada en FinnegansGO${rdv.contab&&rdv.contab.asiento?` (asiento ${rdv.contab.asiento})`:""}. No la cargues otra vez.`,"Descargar de nuevo")))return true;
+    if(rdv.estado==="aprobada"&&rdv.exportada&&!(await ask("¿Descargar de nuevo?",`Esta rendición ya se exportó el ${fmtD(rdv.exportada.fecha)} (${rdv.exportada.archivo||"Excel"}). Si ya está cargada en FinnegansGO, no la cargues otra vez.`,"Descargar de nuevo")))return true;
+    await rdExportarListas([rdv],rdv.estado==="aprobada");return true}
+  if(A==="rdImpTodas"){if(!esContab())return true;const L=Object.values(REND).filter(r=>!r.anulada&&r.estado==="aprobada"&&!r.exportada&&!rdAsiento(r).bloq).sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));await rdExportarListas(L,true,true);return true}
   if(A==="rdPdf"){const r=REND[b.dataset.id];if(r)await rdPdf(r);return true}
   if(A==="rdXlsx"){const r=REND[b.dataset.id];if(!r)return true;await flush();const buf=rdXlsxBuild(r.periodo,r.id);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Rendicion_${r.periodo}_${limpiaNombre(r.persona?r.persona.nombre:"").replace(/\s+/g,"_")}${(r.n||1)>1?"_"+r.n:""}.xlsx`,"Excel listo.",carpetaRend(r));return true}
   if(A==="rdXlsxMes"){const p=b.dataset.p;await flush();const buf=rdXlsxBuild(p);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Rendiciones_${p}.xlsx`,"Excel listo.",[p]);return true}
