@@ -1,5 +1,5 @@
 /* Guarda la app en el teléfono para que abra sin señal. Cambia VER al publicar una versión nueva. */
-const VER="actas-v131";
+const VER="actas-v132";
 /* v100: la copia de prueba (carpeta prueba/) usa cachés con otro nombre y solo borra las suyas,
    para no tocar las de la app real (las cachés son comunes a todo puduhue.github.io). */
 const PRUEBA=self.registration.scope.includes("/prueba/"),PRE=PRUEBA?"prueba-":"";
@@ -18,7 +18,10 @@ self.addEventListener("install",e=>{e.waitUntil(
   caches.open(CACHE).then(c=>c.addAll(FILES.map(f=>new Request(f,{cache:"reload"}))))
   .then(()=>Promise.all(LIB_INICIO.map(f=>caches.open(libCache(f.split("/")[1])).then(c=>c.match(f).then(r=>r||c.add(new Request(f,{cache:"reload"})))))))
   .then(()=>self.skipWaiting()))});
-self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith("prueba-")===PRUEBA&&k!==CACHE&&!LIBS.map(libCache).includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+/* v132 (A-01): solo se borran las cachés de esta app («actas-v…» y «lib-…», con «prueba-» en la copia de prueba). Las demás de
+   puduhue.github.io (Lechería: «lec-…») no se tocan; antes se borraban. */
+const esMia=k=>k.startsWith(PRE+"actas-v")||k.startsWith(PRE+"lib-");
+self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>esMia(k)&&k!==CACHE&&!LIBS.map(libCache).includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener("fetch",e=>{
   if(e.request.method!=="GET")return;
   const u=new URL(e.request.url);
