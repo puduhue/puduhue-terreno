@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=132">
+<link rel="stylesheet" href="estilos.css?v=133">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="132";
+const APP_VER="133";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -765,7 +765,8 @@ async function sync(){
       let res;try{res=await TO(subirRegistro(col,id,a),45000)}catch(e){if(errSubida(e,col))break;continue}
       try{await aplicarSubida(col,id,a,stamp,res)}catch(e){console.warn("después de subir",e)}status();
     }}
-  }finally{syncing=false;status();if(view==="home"||view==="launch")render();if(again){again=false;schedSync(300)}else if(pend()&&!noWrite)schedSync(navigator.onLine?15000:30000)}
+  }finally{syncing=false;status();setTimeout(()=>{try{enviarCorreosPend().catch(()=>{})}catch(e){}},600); /* v133 (M-04) */
+    if(view==="home"||view==="launch")render();if(again){again=false;schedSync(300)}else if(pend()&&!noWrite)schedSync(navigator.onLine?15000:30000)}
 }
 async function removeActa(id){
   clearTimeout(LT[id]);delete LT[id];const o=ACTAS[id];
@@ -2414,11 +2415,13 @@ async function exportarActas(soloPend){
 /* v73: archivo listo con opciones claras. Si viene una carpeta (segs) y hay señal, el Excel se sube a OneDrive (Rendiciones/...)
    y se puede abrir directo en la app de Excel o verlo en el navegador; además se puede descargar o compartir */
 function bajarBlob(blob,name){const u=URL.createObjectURL(blob),l=document.createElement("a");l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),8000)}
-async function compartirBlob(blob,name,msg,segs){
+async function compartirBlob(blob,name,msg,segs,op){
+  /* v133 (A-07): op.alTomar se llama una vez, cuando el archivo se descarga, se comparte o se abre (no al cerrar sin usarlo) */
+  let tomado=false;const tomar=()=>{if(tomado||!op||!op.alTomar)return;tomado=true;try{const x=op.alTomar();if(x&&x.catch)x.catch(e=>console.warn("alTomar",e))}catch(e){console.warn("alTomar",e)}};
   const esX=/\.xlsx$/i.test(name),nube=!!(esX&&segs&&DB&&navigator.onLine!==false);
   let file=null;try{file=new File([blob],name,{type:blob.type})}catch(e){}
   const share=!!(file&&navigator.canShare&&(()=>{try{return navigator.canShare({files:[file]})}catch(e){return false}})());
-  if(DL&&!nube){try{await DL.save({filename:name,data:blob});toast(msg)}catch(e){if(!e||e.code!=="declined")toast("No se pudo descargar el archivo.")}return}
+  if(DL&&!nube){try{await DL.save({filename:name,data:blob});tomar();toast(msg)}catch(e){if(!e||e.code!=="declined")toast("No se pudo descargar el archivo.")}return}
   let subida=null;const subir=()=>subida||(subida=rdSubir(segs,name,blob,blob.type).catch(e=>{subida=null;throw e}));
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet" role="alertdialog" aria-modal="true" aria-label="Archivo listo"><h3>Archivo listo</h3><p>${esc(msg)}</p><p class="note" style="margin:-4px 0 10px;word-break:break-all">${esc(name)}</p>
@@ -2432,12 +2435,12 @@ async function compartirBlob(blob,name,msg,segs){
   const close=()=>{m.remove();document.body.style.overflow=""};const nota=t=>{const x=m.querySelector("#arNota");if(x)x.innerHTML=t};
   m.addEventListener("click",async e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(!a&&e.target!==m)return;
     if(a==="no"||e.target===m){close();return}
-    if(a==="bajar"){bajarBlob(blob,name);toast("Descargando "+name);return}
-    if(a==="share"){navigator.share({files:[file],title:name}).then(()=>toast("Listo.")).catch(err=>{if(!err||err.name!=="AbortError")toast("No se pudo compartir: "+((err&&err.message)||"error"))});return}
-    if(a==="excel"){nota("Guardando en OneDrive…");try{const x=await subir();location.href="ms-excel:ofe|u|"+x.webUrl;
+    if(a==="bajar"){bajarBlob(blob,name);tomar();toast("Descargando "+name);return}
+    if(a==="share"){navigator.share({files:[file],title:name}).then(()=>{tomar();toast("Listo.")}).catch(err=>{if(!err||err.name!=="AbortError")toast("No se pudo compartir: "+((err&&err.message)||"error"))});return}
+    if(a==="excel"){nota("Guardando en OneDrive…");try{const x=await subir();tomar();location.href="ms-excel:ofe|u|"+x.webUrl;
         nota(`Abriendo Excel… Si no se abre, usa <b>Ver en el navegador</b> (ahí está el botón «Abrir en la aplicación de escritorio») o <b>Descargar</b>.`)}
       catch(err){console.warn(err);nota("No se pudo guardar en OneDrive ("+esc(errMsg(err))+"). Usa <b>Descargar</b>.")}return}
-    if(a==="web"){const w=window.open("","_blank");nota("Guardando en OneDrive…");try{const x=await subir();if(w)w.location.href=x.webUrl;else location.href=x.webUrl;nota("Abierto en el navegador.")}
+    if(a==="web"){const w=window.open("","_blank");nota("Guardando en OneDrive…");try{const x=await subir();tomar();if(w)w.location.href=x.webUrl;else location.href=x.webUrl;nota("Abierto en el navegador.")}
       catch(err){if(w)w.close();console.warn(err);nota("No se pudo guardar en OneDrive ("+esc(errMsg(err))+"). Usa <b>Descargar</b>.")}return}
   });
 }
@@ -3154,6 +3157,7 @@ async function init(){
   loaded=true;render();abrirEnlace();vistaVolver();if(SES_VENCIDA)setTimeout(sesionVencida,300); /* v132 (A-04): si venció al abrir, se revisa ahora si puede ir sola */
   if(view==="launch")checkRed();
   setTimeout(enviarCorreosPend,3000);
+  setTimeout(()=>{try{leerPendientes().catch(()=>{})}catch(e){}},3500); /* v133 (B-12) */
   recoverFotos();
   setTimeout(()=>{try{traspasarBodega()}catch(e){console.warn("traspaso bodega",e)}},2500);
   window.addEventListener("online",()=>{schedSync(500);if(DB)programarPull(1500);setTimeout(enviarCorreosPend,2500)});
@@ -3236,10 +3240,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=132"></script>
-<script src="modulos/bodega.js?v=132"></script>
-<script src="modulos/rendiciones.js?v=132"></script>
-<script src="modulos/actas-entrega.js?v=132"></script>
+<script src="modulos/checklist.js?v=133"></script>
+<script src="modulos/bodega.js?v=133"></script>
+<script src="modulos/rendiciones.js?v=133"></script>
+<script src="modulos/actas-entrega.js?v=133"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
