@@ -1331,3 +1331,8 @@ html{background:var(--bg)}
 .sesbar .btn{white-space:nowrap}
 body.contab .sesbar{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 @media (min-width:760px){body.contab .sesbar{bottom:96px}}
+
+/* v135: «Sugerido» en tono neutro (antes rojizo, parecía un error); detalle de las dudas de la lectura */
+.xp.sug{background:var(--soft);color:var(--act)}
+.rdok-det{margin-top:4px;color:var(--muted)}
+.rdok-det summary{cursor:pointer;font-weight:700;color:var(--act);list-style-position:inside}
