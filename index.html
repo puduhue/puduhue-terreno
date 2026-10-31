@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=131">
+<link rel="stylesheet" href="estilos.css?v=132">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="131";
+const APP_VER="132";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -254,7 +254,7 @@ async function initM365(){
 function limpiarInteraccion(){for(const st of [sessionStorage,localStorage]){try{Object.keys(st).filter(k=>/msal\.interaction\.status|\.request\.(state|params|origin)/.test(k)).forEach(k=>st.removeItem(k))}catch(e){}}}
 function iniciarSesion(reintento){if(!MSAL)return toast(AUTH_ERR||"Inicio de sesión no disponible.");try{sessionStorage.setItem("actas-login","1")}catch(e){}MSAL.loginRedirect({scopes:M365.scopes,prompt:"select_account"}).catch(e=>{if(e&&e.errorCode==="interaction_in_progress"&&!reintento){limpiarInteraccion();iniciarSesion(true);return}toast("No se pudo iniciar sesión: "+((e&&e.errorCode)||"error"))})}
 async function cerrarSesion(){
-  if(pend()){if(!(await ask("Hay actas sin subir","Si cierras sesión ahora, lo pendiente queda en este teléfono y se subirá cuando alguien vuelva a iniciar sesión aquí. ¿Cerrar sesión igual?","Cerrar sesión",true)))return}
+  if(pend()){if(!(await ask("Hay cambios sin subir","Si cierras sesión ahora, lo pendiente queda en este teléfono y se sube cuando vuelvas a iniciar sesión. Si entra otra persona, la app le preguntará si lo sube con su cuenta o lo borra. ¿Cerrar sesión igual?","Cerrar sesión",true)))return}
   else if(!(await ask("¿Cerrar sesión?","Las actas ya sincronizadas siguen en OneDrive. Para volver a usar la app habrá que iniciar sesión con señal.","Cerrar sesión")))return;
   try{if(pushGuardado())await Promise.race([pushDesactivar(true),new Promise(r=>setTimeout(r,3000))])}catch(e){}
   try{await MSAL.logoutRedirect({account:CUENTA,postLogoutRedirectUri:location.origin+location.pathname})}catch(e){toast("No se pudo cerrar sesión.")}
@@ -264,16 +264,70 @@ function getToken(){
   if(TOKEN_P)return TOKEN_P;
   TOKEN_P=(async()=>{
     if(!MSAL||!CUENTA)throw{code:"auth"};
-    try{const t=await MSAL.acquireTokenSilent({scopes:M365.scopes,account:CUENTA});return t.accessToken}
+    try{const t=await MSAL.acquireTokenSilent({scopes:M365.scopes,account:CUENTA});sesionAlDia();return t.accessToken}
     catch(e){
-      if(e&&e.errorCode&&/interaction_required|login_required|consent_required|invalid_grant|no_tokens_found/.test(e.errorCode)){
-        if(navigator.onLine!==false){try{sessionStorage.setItem("actas-login","1")}catch(x){}MSAL.acquireTokenRedirect({scopes:M365.scopes,account:CUENTA}).catch(()=>{})}
-      }
+      /* v132 (A-04): ya no va sola a Microsoft desde segundo plano: avisa y, solo si es seguro, va una vez (sesionVencida) */
+      if(e&&e.errorCode&&/interaction_required|login_required|consent_required|invalid_grant|no_tokens_found/.test(e.errorCode))sesionVencida();
       throw{code:"auth",detail:e&&e.errorCode}
     }
   })();
-  TOKEN_P.finally(()=>{setTimeout(()=>{TOKEN_P=null},0)});
+  TOKEN_P.finally(()=>{setTimeout(()=>{TOKEN_P=null},0)}).catch(()=>{}); /* v132: sin rechazo suelto (quien llama recibe el error) */
   return TOKEN_P;
+}
+/* ---------- v132: sesión vencida (auditoría A-04) ----------
+   Con la sesión de Microsoft vencida la app ya no salta sola al inicio de sesión desde segundo plano: muestra el aviso
+   «Tu sesión venció» (sesBarra) y sigue guardando en el teléfono. Va sola a Microsoft una sola vez y solo si es seguro: app a la
+   vista, con señal y en una pantalla de lista sin nada a medio escribir ni la cámara abierta (updSegura, el mismo criterio de la
+   actualización automática). Si ese intento no termina con la sesión renovada, no se repite en 24 horas (REAUTO_K): no hay bucle.
+   Antes de ir se guarda lo pendiente (flush) y la pantalla (vistaGuardar); al volver se abre la misma (vistaVolver, en init). */
+let SES_VENCIDA=false;
+const REAUTO_K="actas-reauto",VOLVER_K="actas-volver";
+function sesionVencida(){
+  if(!SES_VENCIDA){SES_VENCIDA=true;sesBarra();try{status()}catch(e){}}
+  if(navigator.onLine===false||document.visibilityState!=="visible"||!loaded)return;
+  let t=0;try{t=+localStorage.getItem(REAUTO_K)||0}catch(e){}
+  if(Date.now()-t<864e5)return; /* ya se intentó y no resultó: solo el aviso, hasta que la persona entre */
+  if(!updSegura())return;
+  reautenticar();
+}
+function sesionAlDia(){
+  if(SES_VENCIDA){SES_VENCIDA=false;const b=$(".sesbar");if(b)b.remove();try{status()}catch(e){}}
+  try{if(localStorage.getItem(REAUTO_K))localStorage.removeItem(REAUTO_K)}catch(e){}
+}
+function sesBarra(){
+  if(!SES_VENCIDA||!document.body||$(".sesbar"))return;
+  const b=document.createElement("div");b.className="updbar sesbar";b.setAttribute("role","status");
+  b.innerHTML=`<span><b>Tu sesión venció.</b> Lo que hagas queda guardado en este teléfono y se sube al volver a entrar.</span><button class="btn pri" data-a="reauth">Iniciar sesión</button>`;
+  document.body.appendChild(b);
+}
+async function reautenticar(){
+  if(!MSAL)return toast(AUTH_ERR||"Inicio de sesión no disponible.");
+  if(navigator.onLine===false)return toast("Sin señal: inicia sesión cuando haya conexión. Lo que hagas queda guardado en este teléfono.");
+  try{localStorage.setItem(REAUTO_K,String(Date.now()))}catch(e){}
+  try{await flush()}catch(e){}
+  vistaGuardar();
+  try{sessionStorage.setItem("actas-login","1")}catch(e){}
+  const pedir=r=>MSAL.acquireTokenRedirect({scopes:M365.scopes,account:CUENTA}).catch(e=>{if(e&&e.errorCode==="interaction_in_progress"&&!r){limpiarInteraccion();return pedir(true)}toast("No se pudo abrir el inicio de sesión: "+((e&&e.errorCode)||"error desconocido")+".")});
+  return pedir(false);
+}
+/* pantalla y registro abiertos, para volver a ellos después del inicio de sesión (vale una hora) */
+function vistaGuardar(){
+  try{const s={view,step,t:Date.now(),cur:cur&&cur.id,axStep,clTipo,clPredio,cbBod,clv:clv&&clv.id,cbv:cbv&&cbv.id,rdv:rdv&&rdv.id,rdd:rdd&&rdd.k};
+    sessionStorage.setItem(VOLVER_K,JSON.stringify(s))}catch(e){}
+}
+function vistaVolver(){
+  let s=null;try{s=JSON.parse(sessionStorage.getItem(VOLVER_K)||"null");sessionStorage.removeItem(VOLVER_K)}catch(e){}
+  if(!s||!s.view||Date.now()-(s.t||0)>36e5||!CUENTA)return false;
+  try{
+    if(s.clTipo)clTipo=s.clTipo;if(s.clPredio)clPredio=s.clPredio;if(s.cbBod)cbBod=s.cbBod;
+    if(s.view==="edit"||s.view==="axe"){const x=s.cur&&ACTAS[s.cur];if(!x)return false;
+      if(s.view==="axe"){cur=prepAx(x);axTipo=x.tipo;axStep=s.axStep||0}
+      else{cur=x;if(!cur.firmas)cur.firmas={};normFirmas(cur);if(!cur.obs)cur.obs=["","",""];if(!cur.items)cur.items={};step=s.step||0}}
+    else if(s.view==="clv"){const v=VIS[s.clv];if(!v)return false;clTipo=tipoDe(v);clv=v;clPredio=v.predio;if(!clv.items)clv.items={};clFiltro="all"}
+    else if(s.view==="cbv"){const c=CONT[s.cbv];if(!c)return false;cbv=c;cbBod=c.bodega;if(!cbv.items)cbv.items={};cbFiltro=c.estado==="cerrado"?"all":"pend";cbQ="";cbFam="";cbSub="";cbLim=120}
+    else if(s.view==="rdv"||s.view==="rdd"){const r=REND[s.rdv];if(!r)return false;rdv=r;RD_COLA=null;if(!rdv.docs)rdv.docs={};rdd=s.view==="rdd"&&s.rdd&&rdv.docs[s.rdd]||null;if(!rdd)s.view="rdv"}
+    go(s.view);return true;
+  }catch(e){console.warn("volver a la pantalla",e);return false}
 }
 async function gfetch(path,opts,reintento){
   const token=await getToken();
@@ -352,18 +406,50 @@ async function pull(manual){
   pulling=true;SYNC_INFO.estado="bajando";status();
   try{
     while(syncing)await new Promise(r=>setTimeout(r,200)); /* v106 (M-02): un solo candado para bajar y subir */
-    let cambios=0;for(const col of Object.keys(M365.cols)){const c=await pullCol(col);cambios+=c;if(c||manual)emitir(col)}
+    let cambios=0,nSin=0,eSin=null;for(const col of Object.keys(M365.cols)){let c=0;
+      /* v132 (M-24): sin acceso a la carpeta de un módulo (403, o 404 de la carpeta), se sigue con los demás */
+      try{c=await pullAcceso(col)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")){SIN_ACCESO[col]=e.code;nSin++;eSin=e;continue}throw e}
+      cambios+=c;if(c||manual)emitir(col)}
+    if(nSin===Object.keys(M365.cols).length)throw eSin;
     try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")renderFondo()}}catch(e){console.warn("catálogo",e)}
     try{if(await stockPull()&&(view==="stock"||view==="launch"))renderFondo()}catch(e){console.warn("stock",e)}
     try{if(await rdMaePull()&&/^rd/.test(view))renderFondo()}catch(e){console.warn("maestros rendiciones",e)}
     try{if(await permPull())renderFondo()}catch(e){console.warn("permisos",e)}
     if(CAT_PEND&&esAdmin())await guardarCatalogo(false);
     guardarEtags();SYNC_INFO.ultima=new Date().toISOString();SYNC_INFO.error="";if(noWrite){noWrite=false;schedSync(1000)} /* v106 (A-03) */try{localStorage.setItem(LK,SYNC_INFO.ultima)}catch(e){}
-    if(manual)toast(cambios?`Actualizado: ${cambios} ${cambios===1?"registro":"registros"} con cambios.`:"Todo al día.");
+    if(manual)toast(sinAccesoTxt()||(cambios?`Actualizado: ${cambios} ${cambios===1?"registro":"registros"} con cambios.`:"Todo al día."),sinAccesoTxt()?6000:0);
   }catch(e){SYNC_INFO.error=errMsg(e);Object.values(SNAP).forEach(x=>{if(x.err)x.err(e)});if(manual)toast(SYNC_INFO.error);if(e&&e.code==="forbidden")noWrite=true}
   finally{pulling=false;SYNC_INFO.estado="";status();setTimeout(()=>{try{traspasarBodega()}catch(e){console.warn("traspaso bodega",e)}reintentarExcel();pdfsPendientes();leerPendientes();try{rdCompletarRut();rdSinJefaturaADirecto()}catch(e){console.warn("rut rendiciones",e)}abrirEnlace(true);try{pushSincronizar()}catch(e){};rdAgendaPublicar().catch(()=>{});setTimeout(mudanzaRevisar,500);enviarCorreosPend()},1500)}
 }
-function errMsg(e){if(!e)return"Error desconocido.";if(e.code==="auth")return"Hay que iniciar sesión de nuevo para sincronizar.";if(e.code==="forbidden")return"Tu cuenta no tiene acceso a la carpeta de actas en OneDrive. Pide acceso a TI.";if(e.code==="network")return"Sin conexión con OneDrive.";if(e.code==="not_found")return"No se encontró la carpeta de actas en OneDrive.";return"OneDrive respondió con un error"+(e.detail?": "+e.detail:".")}
+function errMsg(e){if(!e)return"Error desconocido.";if(e.code==="auth")return"Hay que iniciar sesión de nuevo para sincronizar.";if(e.code==="forbidden")return"Tu cuenta no tiene acceso a las carpetas de la app en OneDrive. Pide acceso a TI.";if(e.code==="network")return"Sin conexión con OneDrive.";if(e.code==="not_found")return"No se encontraron las carpetas de la app en OneDrive, o tu cuenta no tiene acceso. Pide ayuda a TI.";return"OneDrive respondió con un error"+(e.detail?": "+e.detail:".")}
+/* ---------- v132: sin acceso a la carpeta de un módulo (auditoría M-24) ----------
+   SIN_ACCESO[col]: «forbidden» (403 al leer), «not_found» (no se encontró la carpeta o no se ve) o «escritura» (403 al subir).
+   Ese módulo se salta al bajar y al subir (lo suyo queda pendiente en el teléfono) y los demás siguen. Se quita cuando la
+   carpeta vuelve a responder al bajar (así un 403 pasajero no detiene la subida: A-03) o al tocar «Sincronizar» o «Enviar
+   ahora». El aviso de «escritura» sale una vez por módulo (SIN_AVISO), no en cada intento. */
+const SIN_ACCESO={},SIN_AVISO={};
+const COL_MOD={actas:"Actas",visitas:"Check list de cumplimiento",conteos:"Control de bodega",rendiciones:"Rendiciones"};
+const MOD_COL={ax:"actas",cl:"visitas",cb:"conteos",rd:"rendiciones"};
+async function pullAcceso(col){
+  let c;try{c=await pullCol(col)}
+  catch(e){if(!(e&&e.code==="not_found"&&FOLDERS[col]))throw e;
+    delete FOLDERS[col];try{localStorage.setItem("actas-m365-folders",JSON.stringify(FOLDERS))}catch(x){} /* la carpeta guardada ya no existe: se busca de nuevo */
+    c=await pullCol(col)}
+  if(SIN_ACCESO[col]==="escritura")schedSync(1000); /* vuelve a intentar subir lo de ese módulo */
+  delete SIN_ACCESO[col];return c;
+}
+function sinAccesoTxt(col){
+  const L=col?(SIN_ACCESO[col]?[col]:[]):Object.keys(SIN_ACCESO);if(!L.length)return"";
+  const ns=L.map(c=>COL_MOD[c]||c),n=ns.length<2?ns[0]:ns.slice(0,-1).join(", ")+" y "+ns[ns.length-1];
+  if(L.every(c=>SIN_ACCESO[c]==="escritura"))return `Tu cuenta no tiene permiso para guardar en ${n} en OneDrive: lo de ${L.length>1?"esos módulos":"ese módulo"} queda en este teléfono. Pide acceso a TI.`;
+  if(L.some(c=>SIN_ACCESO[c]==="not_found"))return `No se encontró en OneDrive la carpeta de ${n}, o tu cuenta no tiene acceso. Pide ayuda a TI.`;
+  return `Tu cuenta no tiene acceso a ${n} en OneDrive. Pide acceso a TI.`;
+}
+function sinAccesoReset(){Object.keys(SIN_ACCESO).forEach(c=>{if(SIN_ACCESO[c]==="escritura")delete SIN_ACCESO[c]});Object.keys(SIN_AVISO).forEach(c=>{delete SIN_AVISO[c]})}
+function sinAccesoTrasRender(app){
+  const c=MOD_COL[tbModDe(view==="pickDev"?"axl":view)];if(!c||!SIN_ACCESO[c]||!app)return;
+  const mn=app.querySelector("main");if(mn&&!mn.querySelector(".sinacc"))mn.insertAdjacentHTML("afterbegin",`<div class="info sinacc">${esc(sinAccesoTxt(c))}</div>`);
+}
 function programarPull(ms){clearTimeout(pullT);pullT=setTimeout(()=>pull(false),ms)}
 let pullOnce=false;
 /* ---------- v131: conflictos entre teléfonos (auditoría C-01, C-02, C-03, C-05) ----------
@@ -580,12 +666,12 @@ const fotosTxt=n=>{const np=AS?Object.values(QF).filter(m=>m&&m.pdf).length:0;re
 function pendHTML(){
   const n=pend();if(!n||!DB)return"";
   /* v120: con señal, mientras suben las fotos se ve el avance y se pide dejar la app abierta */
-  if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite){const nf=fotosPend(),S=SYNC_INFO.subida;if(!nf)return"";
+  if(navigator.onLine!==false&&!SYNC_INFO.error&&!noWrite&&!sinAccesoTxt()){const nf=fotosPend(),S=SYNC_INFO.subida;if(!nf)return"";
     return `<div class="info pendbox subiendo"><span class="spin" aria-hidden="true"></span> <b>${S&&S.total?`Subiendo fotos: ${Math.min(S.hechas+1,S.total)} de ${S.total}.`:`${fotosTxt(nf)} por subir.`}</b> Deja la app abierta hasta que termine.</div>`}
   const qs=AS?Object.values(QF):[],np=qs.filter(m=>m&&m.pdf).length,nf=qs.length-np+NSUELTAS,na=Object.keys(LOCAL).length,nd=DELQ.size;
   const L=[na?`${na} ${na===1?"registro con cambios":"registros con cambios"}`:"",nf?`${nf} ${nf===1?"foto":"fotos"}`:"",np?`${np} PDF`:"",nd?`${nd} ${nd===1?"borrador eliminado":"borradores eliminados"}`:""].filter(Boolean);
   const det=L.length>1?L.slice(0,-1).join(", ")+" y "+L[L.length-1]:L.join("");
-  return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal y la app esté abierta: al tener señal, ábrela y déjala abierta un momento. No cierres sesión ni borres los datos de la app mientras tanto.${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
+  return `<div class="info pendbox"><b>Guardado en este teléfono, falta enviar:</b> ${det}. Se sube solo a OneDrive cuando haya señal y la app esté abierta: al tener señal, ábrela y déjala abierta un momento. No cierres sesión ni borres los datos de la app mientras tanto.${sinAccesoTxt()?"<br>"+esc(sinAccesoTxt()):""}${noWrite?"<br>No tienes permiso para escribir en la carpeta de actas de OneDrive; pide acceso a TI.":`<div class="btns" style="margin-top:8px"><button class="btn" data-a="syncNow">${syncing?"Enviando…":"Enviar ahora"}</button></div>`}</div>`;
 }
 function netHTML(){
   if(navigator.onLine!==false)return"";
@@ -611,7 +697,8 @@ function schedSync(ms){if(syncing){again=true;return}clearTimeout(syncT);syncT=s
 /* v106 (M-03): errores que afectan a toda la cola (sin red, sesión, permiso, OneDrive saturado) la detienen y se reintenta
    después; cualquier otro es de un registro o una foto: se salta, se cuenta y se sigue con los demás (queda pendiente). */
 const errDeCola=e=>navigator.onLine===false||!!e&&(["network","timeout","wake","auth","forbidden"].includes(e.code)||e.code==="graph"&&(e.status===429||e.status>=500));
-function errSubida(e){if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);
+function errSubida(e,col){if(e&&e.code==="forbidden"&&col){SIN_ACCESO[col]="escritura";if(!SIN_AVISO[col]){SIN_AVISO[col]=1;toast(sinAccesoTxt(col),6000)}return false} /* v132 (M-24) */
+  if(e&&e.code==="forbidden"){noWrite=true;toast(errMsg(e))}else if(e&&e.code==="auth")SYNC_INFO.error=errMsg(e);
   if(errDeCola(e))return true;console.warn("no se pudo subir",e);SYNC_INFO.fallidos=(SYNC_INFO.fallidos||0)+1;SYNC_INFO.error=errMsg(e);return false}
 /* v106 (C-04): fotos fuera de la cola QF: «l:» (respaldo en localStorage de Actas de vivienda) y «m:» (solo en memoria,
    en un navegador que no deja guardar). Se suben en sync() y cuentan como pendientes. */
@@ -645,11 +732,11 @@ async function sync(){
       /* v120: de a 3 fotos a la vez (antes de a una); un error de toda la cola (sin red, sesión, permiso) detiene a los 3 */
       const refs=Object.keys(QF);let parar=false;SYNC_INFO.subida={total:refs.length+NSUELTAS,hechas:0};status();
       const una=async ref=>{
-        const meta=QF[ref];if(!meta)return;let rec=null;try{rec=await IDB.get("fotos",ref)}catch(e){}
+        const meta=QF[ref];if(!meta||SIN_ACCESO[meta.col||"actas"])return;let rec=null;try{rec=await IDB.get("fotos",ref)}catch(e){}
         const blob=await recBlob(rec);
         if(!blob){LOST[ref]=true;delete QF[ref];refrescarFotoItem(meta);return}
         if(!objetoDeFoto(meta)){delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}return}
-        let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];return}if(errSubida(e))parar=true;return}
+        let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone"){delete QF[ref];return}if(errSubida(e,meta.col||"actas"))parar=true;return}
         noWrite=false;await fotoSubida(ref,meta,u);
         delete QF[ref];try{await IDB.del("fotos",ref)}catch(e){}
         SYNC_INFO.subida.hechas++;status()};
@@ -658,24 +745,24 @@ async function sync(){
       if(!parar){
     for(const {ref,meta} of fotosSueltas()){
       let src="";try{src=ref.startsWith("l:")?localStorage.getItem("actas-foto-"+ref)||"":FOTO[ref]||""}catch(e){}
-      if(!src||!objetoDeFoto(meta))continue;
+      if(!src||!objetoDeFoto(meta)||SIN_ACCESO[meta.col||"actas"])continue;
       let blob;try{blob=dataURLtoBlob(src)}catch(e){continue}
-      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone")continue;if(errSubida(e))break;continue}
+      let u;try{u=await TO(AS.upload(blob,Object.assign({ref},meta)),120000)}catch(e){if(e&&e.code==="gone")continue;if(errSubida(e,meta.col||"actas"))break;continue}
       noWrite=false;FOTO[ref]=FOTO[ref]||src;await fotoSubida(ref,meta,u);
       if(ref.startsWith("l:")){try{localStorage.removeItem("actas-foto-"+ref)}catch(e){}}
       SYNC_INFO.subida.hechas++;contarSueltas();status();
     }}
     SYNC_INFO.subida=null;contarSueltas()}
-    if(DB&&!noWrite){for(const key of [...DELQ]){const [col,id]=key.includes("/")?key.split("/"):["actas",key];
-      let r;try{r=await TO(borrarRegistro(col,id,DELE[key]),20000)}catch(e){if(errSubida(e))break;continue}
+    if(DB&&!noWrite){for(const key of [...DELQ]){const [col,id]=key.includes("/")?key.split("/"):["actas",key];if(SIN_ACCESO[col])continue;
+      let r;try{r=await TO(borrarRegistro(col,id,DELE[key]),20000)}catch(e){if(errSubida(e,col))break;continue}
       DELQ.delete(key);delete DELE[key];saveDQ();try{localStorage.setItem(DEK,JSON.stringify(DELE))}catch(e){}status();
       /* v131 (C-05): otro teléfono lo modificó o lo cerró: no se eliminó y vuelve a la lista */
       if(r&&r.restaurado){emitir(col);toast(`${nombreRegistro(col,r.restaurado)} no se eliminó: se modificó en otro teléfono. Volvió a la lista.`)}
     }}
     if(DB&&!noWrite){for(const id of Object.keys(LOCAL)){
-      const a=LOCAL[id];if(!a)continue;const stamp=a.actualizado;const col=a._col||"actas";
+      const a=LOCAL[id];if(!a)continue;const stamp=a.actualizado;const col=a._col||"actas";if(SIN_ACCESO[col])continue;
       /* v131 (C-01, C-03): se combina con lo de otros teléfonos; nunca se descarta lo de este */
-      let res;try{res=await TO(subirRegistro(col,id,a),45000)}catch(e){if(errSubida(e))break;continue}
+      let res;try{res=await TO(subirRegistro(col,id,a),45000)}catch(e){if(errSubida(e,col))break;continue}
       try{await aplicarSubida(col,id,a,stamp,res)}catch(e){console.warn("después de subir",e)}status();
     }}
   }finally{syncing=false;status();if(view==="home"||view==="launch")render();if(again){again=false;schedSync(300)}else if(pend()&&!noWrite)schedSync(navigator.onLine?15000:30000)}
@@ -1086,13 +1173,15 @@ function disChip(){
   if(!on&&!chk)return `<button class="lx-sig no" id="lxChip" data-a="checkRed" title="Volver a revisar la señal">${ICO.nowifi}<span>Sin señal${np?` · ${np} por subir`:""}</span></button>`;
   if(chk)return `<span class="lx-sig chk" id="lxChip">${ICO.wifi}<span>Comprobando señal<i class="dots"></i></span></span>`;
   if(syncing||pulling||SYNC_INFO.estado==="bajando")return `<span class="lx-sig chk" id="lxChip"><span class="spin" aria-hidden="true"></span><span>Sincronizando<i class="dots"></i></span></span>`;
+  if(SES_VENCIDA)return `<button class="lx-sig err" id="lxChip" data-a="reauth" title="Tu sesión venció: toca para iniciar sesión">${ICO_ALERTA}<span>Iniciar sesión</span></button>`; /* v132 */
   if(SYNC_INFO.error)return `<button class="lx-sig err" id="lxChip" data-a="pull" title="${esc(SYNC_INFO.error)}">${ICO_ALERTA}<span>No se sincronizó</span></button>`;
+  if(sinAccesoTxt())return `<button class="lx-sig err" id="lxChip" data-a="pull" title="${esc(sinAccesoTxt())}">${ICO_ALERTA}<span>Falta acceso</span></button>`;
   if(np)return `<button class="lx-sig pend" id="lxChip" data-a="pull" title="Toca para subirlos ahora">${ICO_PEND}<span>${np} por subir</span></button>`;
   return `<button class="lx-sig ok" id="lxChip" data-a="pull" title="Última sincronización: ${esc(disUlt())}. Toca para sincronizar." aria-label="Al día. Última sincronización: ${esc(disUlt())}. Toca para sincronizar.">${ICO_OK96}<span>Al día</span></button>`;
 }
 function disSyncMasHTML(){
   const np=pend(),on=RED==="ok";
-  const st=SYNC_INFO.estado==="bajando"||syncing||pulling?["chk","Sincronizando…"]:SYNC_INFO.error?["no",SYNC_INFO.error]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
+  const st=SYNC_INFO.estado==="bajando"||syncing||pulling?["chk","Sincronizando…"]:SYNC_INFO.error?["no",SYNC_INFO.error]:sinAccesoTxt()?["no",sinAccesoTxt()]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
   return `<div class="lx-sync tbsync ${st[0]}"><div class="lx-syncl"><span class="lx-synct">${esc(st[1])}</span><span class="lx-syncs">Última sincronización: ${esc(disUlt())}</span></div><button class="btn" data-a="pull" ${on?"":"disabled"}>${on?"Sincronizar":"Sin señal"}</button></div>`;
 }
 function disBuscadorHTML(){return `<button type="button" class="lx-bus" data-a="disBuscar">${ICO_BUS}<span>Buscar actas, visitas o rendiciones</span></button>`}
@@ -1370,6 +1459,7 @@ function renderPantalla(){
   else if(view==="edit")app.innerHTML=renderEdit();
   if(view==="clv")setTimeout(clTabsAjustar,0);
   try{permTrasRender(app)}catch(e){console.warn("permisos",e)}
+  try{sinAccesoTrasRender(app)}catch(e){console.warn("sin acceso",e)} /* v132 (M-24) */
   try{tbSync()}catch(e){console.warn("barra",e)}
   try{disTrasRender()}catch(e){console.warn("v96",e)}
   try{if(/^(launch|rd|rdv|rdd)$/.test(view))zxPrecargar()}catch(e){}
@@ -1629,7 +1719,8 @@ async function onClickAccion(ev,b,A){
   if(A==="tema"){cambiarTema();return}
   if(A==="login"){iniciarSesion();return}
   if(A==="logout"){await cerrarSesion();return}
-  if(A==="pull"){if(!DB)return toast("Inicia sesión para sincronizar.");noWrite=false;await flush();schedSync(100);await pull(true);return}
+  if(A==="reauth"){reautenticar();return} /* v132 (A-04) */
+  if(A==="pull"){if(!DB)return toast("Inicia sesión para sincronizar.");if(SES_VENCIDA){reautenticar();return}noWrite=false;sinAccesoReset();await flush();schedSync(100);await pull(true);return}
   if(A==="sync"){if(!DB)return toast("Inicia sesión para sincronizar.");await flush();schedSync(100);await pull(true);return}
   if(A==="buscarUpd"){await buscarUpdate(true);return}
   if(A==="checkRed"){if(REDMSG)toast(REDMSG);checkRed();return}
@@ -1685,7 +1776,7 @@ async function onClickAccion(ev,b,A){
   if(A==="informe"||A==="dlInf"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await descargarGeneral(a);return}
   if(A==="delFoto"){await quitarFoto(b.dataset.k,b.dataset.ref);return}
   if(A==="foto"){verFoto(b.dataset.ref,b.dataset.k,b.dataset.own==="1");return}
-  if(A==="syncNow"){noWrite=false;sync();return}
+  if(A==="syncNow"){if(SES_VENCIDA){reautenticar();return}noWrite=false;sinAccesoReset();sync();return}
   if(A==="exportar"){await exportarActas();return}
   if(A==="quitarLost"){const L=lostRefs();if(!(await ask(`¿Quitar ${L.length} fotos no recuperables?`,"","Quitar",true)))return;L.forEach(([k,f])=>{const r=cur.items[k];r.fotos=r.fotos.filter(x=>x!==f);delete LOST[f];IDB.del("fotos",f).catch(()=>{})});touch();render();toast("Fotos quitadas. Ya puedes tomarlas de nuevo.");return}
 }
@@ -2251,7 +2342,7 @@ function renderLaunch(){
   }
   const np=pend(),cerr=todas.filter(a=>a.estado==="cerrada").length;
   const ult=SYNC_INFO.ultima?(()=>{const d=new Date(SYNC_INFO.ultima),hoy=today()===isoLocal(SYNC_INFO.ultima);return (hoy?"hoy a las ":fmtD(isoLocal(SYNC_INFO.ultima))+" a las ")+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")})():"nunca";
-  const estado=SYNC_INFO.estado==="bajando"||syncing?["chk","Sincronizando<i class='dots'></i>"]:SYNC_INFO.error?["no",esc(SYNC_INFO.error)]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
+  const estado=SYNC_INFO.estado==="bajando"||syncing?["chk","Sincronizando<i class='dots'></i>"]:SYNC_INFO.error?["no",esc(SYNC_INFO.error)]:sinAccesoTxt()?["no",esc(sinAccesoTxt())]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
   const sync=`<section class="lx-sec"><div class="lx-sync ${estado[0]}"><div class="lx-syncl"><span class="lx-synct">${estado[1]}</span><span class="lx-syncs">Última sincronización: ${ult}</span></div><button class="btn" data-a="pull" ${on?"":"disabled"}>${on?"Sincronizar":"Sin señal"}</button></div></section>`;
   let cont="";const conts=[];
   if(borr&&permAgrega("ax")){const done=ITEMS.filter(i=>(borr.items&&borr.items[i.k]||{}).v).length,pct=Math.round(done/ITEMS.length*100);
@@ -2834,6 +2925,7 @@ const EST_ICO={
 function estadoInfo(){
   const n=pend(),off=navigator.onLine===false;
   if(!DB)return{c:"ok",t:"Guardado",h:"Todo queda guardado en este teléfono."};
+  if(SES_VENCIDA&&!off)return{c:"pend",t:"Iniciar sesión",h:"Tu sesión venció: lo que hagas queda guardado en este teléfono. Toca para iniciar sesión."}; /* v132 */
   if(off)return{c:"off",t:"Sin señal",h:n?`Sin señal: ${n} ${n===1?"cambio quedó guardado":"cambios quedaron guardados"} en este teléfono y ${n===1?"se sube solo":"se suben solos"} cuando vuelva la señal.`:"Sin señal: puedes seguir trabajando; todo queda guardado en este teléfono."};
   if(n)return{c:"pend",t:`${n} por subir`,h:`${n} ${n===1?"cambio guardado":"cambios guardados"} en este teléfono todavía no se ${n===1?"sube":"suben"} a OneDrive. Toca para subirlos ahora.`};
   return{c:"ok",t:"Al día",h:"Todo está guardado en OneDrive."};
@@ -2841,6 +2933,7 @@ function estadoInfo(){
 function estadoChip(){const e=estadoInfo();return `<button class="saved est est-${e.c}" id="saved" data-a="estadoSync" title="${esc(e.h)}" aria-label="${esc(e.t+". "+e.h)}">${EST_ICO[e.c]}<span>${esc(e.t)}</span></button>`}
 function estadoSync(){
   const e=estadoInfo();
+  if(SES_VENCIDA&&navigator.onLine!==false){reautenticar();return} /* v132 */
   if(navigator.onLine===false||!DB||!pend()){toast(e.h);return}
   toast("Subiendo los cambios a OneDrive…");try{schedSync(50)}catch(x){}
 }
@@ -3015,7 +3108,7 @@ async function init(){
   await IDB.open();
   const to=ms=>new Promise(r=>setTimeout(()=>r(null),ms));
   await initM365();
-  if(CUENTA){DB=GDB;AS=GAS;await remoteLoad()}
+  if(CUENTA){DB=GDB;AS=GAS;try{await cuentaRevisar()}catch(e){console.warn("cambio de cuenta",e)}await remoteLoad()} /* v132 (M-23) */
   await stockCargarLocal();
   await rdMaeLocal();
   try{if(sessionStorage.getItem("actas-login")){sessionStorage.removeItem("actas-login");if(CUENTA)setTimeout(()=>toast(`Sesión iniciada: ${ME.nombre||ME.correo}.`),600)}}catch(e){}
@@ -3058,7 +3151,7 @@ async function init(){
       setTimeout(done,8000);
     });
   }else{ACTAS=locA;VIS=locV;CONT=locC;REND=locR;DELQ.forEach(id=>{if(id.startsWith("visitas/"))delete VIS[id.slice(8)];else if(id.startsWith("conteos/"))delete CONT[id.slice(8)];else if(id.startsWith("rendiciones/"))delete REND[id.slice(12)];else delete ACTAS[id]})}
-  loaded=true;render();abrirEnlace();
+  loaded=true;render();abrirEnlace();vistaVolver();if(SES_VENCIDA)setTimeout(sesionVencida,300); /* v132 (A-04): si venció al abrir, se revisa ahora si puede ir sola */
   if(view==="launch")checkRed();
   setTimeout(enviarCorreosPend,3000);
   recoverFotos();
@@ -3073,6 +3166,47 @@ async function init(){
   if(pend())schedSync(1500);
 }
 /* ---------- Actualización automática ---------- */
+/* ---------- v132: cambio de usuario (auditoría M-23) ----------
+   La app recuerda la cuenta con que se entró (CUENTA_K). Si entra otra:
+   - si quedaron cambios sin subir, pregunta: subirlos con la cuenta nueva (quedan con el nombre de quien los hizo) o borrarlos
+     (con una segunda confirmación);
+   - borra lo bajado con la cuenta anterior (copia de OneDrive, versiones de partida, fotos guardadas, saldo del fondo, agenda) y
+     lo vuelve a bajar con la nueva;
+   - desactiva las notificaciones del teléfono (eran de la otra persona; la nueva las activa si quiere).
+   Los correos pendientes de otra cuenta no salen desde esta: esperan a su dueño (enviarCorreosPend). */
+const CUENTA_K="actas-cuenta";
+async function cuentaRevisar(){
+  if(!ME)return false;
+  let ant=null;try{ant=JSON.parse(localStorage.getItem(CUENTA_K)||"null")}catch(e){}
+  const yoC={id:ME.id,correo:String(ME.correo||"").toLowerCase(),nombre:ME.nombre||ME.correo||""};
+  const guardar=()=>{try{localStorage.setItem(CUENTA_K,JSON.stringify(yoC))}catch(e){}};
+  if(!ant||ant.id===yoC.id||ant.correo&&ant.correo===yoC.correo){guardar();return false}
+  const quien=ant.nombre||ant.correo||"otra cuenta";
+  const loc=await localAll(),nReg=Object.keys(loc).length;let nFot=0;try{nFot=(await IDB.keys("fotos")).length}catch(e){}
+  try{nFot+=Object.keys(localStorage).filter(k=>k.startsWith("actas-foto-")).length}catch(e){}
+  if(nReg+nFot+DELQ.size){
+    const det=[nReg?`${nReg} ${nReg===1?"registro":"registros"}`:"",nFot?`${nFot} ${nFot===1?"foto o archivo":"fotos o archivos"}`:"",DELQ.size?`${DELQ.size} ${DELQ.size===1?"borrador eliminado":"borradores eliminados"}`:""].filter(Boolean).join(", ");
+    const subir=await ask("Hay cambios sin subir de otra cuenta",`Este teléfono tiene cambios sin subir de ${quien} (${det}). Puedes subirlos con tu cuenta: quedan con el nombre de quien los hizo. Si los borras, se pierden.`,"Subirlos con mi cuenta",false,"","Borrarlos");
+    if(!subir&&await ask("¿Borrar los cambios sin subir?",`Se borran de este teléfono los cambios de ${quien} que no alcanzaron a subir. No se pueden recuperar.`,"Borrarlos",true,"","No, subirlos"))await pendBorrarTodo(loc);
+  }
+  await cacheBorrarCuenta();
+  try{const g=pushGuardado();if(g&&String(g.correo||"").toLowerCase()!==yoC.correo)await Promise.race([pushDesactivar(true),new Promise(r=>setTimeout(r,3000))])}catch(e){}
+  guardar();
+  setTimeout(()=>toast(`Entraste con otra cuenta: ${yoC.nombre}. Los datos se bajan de nuevo con esta cuenta.`,5000),900);
+  return true;
+}
+async function pendBorrarTodo(loc){
+  for(const id of Object.keys(loc||{}))await localDel(id);
+  try{await IDB.tx("fotos","readwrite",s=>s.clear())}catch(e){}
+  try{Object.keys(localStorage).filter(k=>k.startsWith("actas-foto-")).forEach(k=>localStorage.removeItem(k))}catch(e){}
+  DELQ.clear();saveDQ();DELE={};try{localStorage.removeItem(DEK)}catch(e){}
+}
+async function cacheBorrarCuenta(){
+  for(const st of ["remote","cache"]){try{await IDB.tx(st,"readwrite",s=>s.clear())}catch(e){}}
+  Object.keys(REMOTE).forEach(c=>{REMOTE[c]={}});Object.keys(BASES).forEach(k=>{delete BASES[k]});
+  ETAGS={};guardarEtags();SYNC_INFO.ultima="";
+  for(const k of [LK,FD_K,AGENDA_K])try{localStorage.removeItem(k)}catch(e){}
+}
 let SWREG=null,UPD_READY=false,UPD_CHECKING=false,UPD_APLICANDO=false,FOTO_T=0;
 function aplicarUpdate(){if(UPD_APLICANDO)return;UPD_APLICANDO=true;flush().then(()=>{try{sessionStorage.setItem("actas-actualizado","1")}catch(e){}location.reload()})}
 /* v104: la app se recarga sola solo en una pantalla de lista, sin diálogos abiertos, sin una foto por elegir (cámara o galería)
@@ -3102,10 +3236,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=131"></script>
-<script src="modulos/bodega.js?v=131"></script>
-<script src="modulos/rendiciones.js?v=131"></script>
-<script src="modulos/actas-entrega.js?v=131"></script>
+<script src="modulos/checklist.js?v=132"></script>
+<script src="modulos/bodega.js?v=132"></script>
+<script src="modulos/rendiciones.js?v=132"></script>
+<script src="modulos/actas-entrega.js?v=132"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

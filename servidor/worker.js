@@ -15,7 +15,8 @@
     FINN_PARAMS_STOCK   (texto)   opcional. Parámetros fijos del reporte de stock; si no se define se usan los de abajo
     FINN_REPORTES       (texto)   otros reportes que la app puede consultar, separados por coma (ej.: HACREPORTELECHE)
     CORREOS_ACTUALIZAR  (texto)   correos autorizados a usar /reporte (pantalla de prueba de Finnegans) y a cambiar
-                                  parámetros del stock, separados por coma: b.barrientos@puduhue.cl.
+                                  parámetros del stock, separados por coma: b.barrientos@puduhue.cl. Si queda vacía, nadie
+                                  (desde la app v132; antes, todos).
                                   El stock (/stock) lo puede traer cualquier cuenta de Puduhue (desde la app v61).
     ANTHROPIC_API_KEY   (Secret)  clave de la API de Claude, para leer boletas (módulo Rendiciones)
     MODELO_LECTURA      (texto)   opcional. Modelo de la primera lectura. Por defecto claude-haiku-5-5 (desde la v98)
@@ -107,7 +108,7 @@ export default {
     const correo = String(yo.mail || yo.userPrincipalName || "").toLowerCase();
     if (!correo.endsWith("@" + (env.DOMINIO || "puduhue.cl").toLowerCase())) return json({ error: "Solo cuentas de Puduhue." }, 403);
     const permitidos = (env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
-    const autorizado = !permitidos.length || permitidos.includes(correo);
+    const autorizado = permitidos.includes(correo); // v132 (M-22): con CORREOS_ACTUALIZAR vacía no queda nadie autorizado (antes, todos)
     if (url.pathname === "/reporte" && !autorizado) return json({ error: "Tu cuenta no está autorizada para consultar reportes de Finnegans." }, 403);
 
     try {

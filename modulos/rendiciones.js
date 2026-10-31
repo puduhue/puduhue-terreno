@@ -779,7 +779,7 @@ async function enviarCorreosPend(){
   if(ENVIANDO_CORREOS||navigator.onLine===false||!CUENTA)return;
   const L=correosPend();if(!L.length)return;ENVIANDO_CORREOS=true;const listos=new Set(),notif=new Set();
   try{for(const m of L){
-      if(m.cuenta!==meCorreo()){listos.add(m.id);continue}  /* quedó de otra cuenta: no se puede mandar a su nombre */
+      if(m.cuenta!==meCorreo())continue;  /* v132 (M-23): quedó de otra cuenta: no se manda a su nombre; espera a que vuelva a entrar */
       if(!m.pushHecho&&await pushAviso(m))notif.add(m.id);
       try{await enviarCorreo(m);listos.add(m.id);toast(`Se avisó por correo a ${m.nombres}.`)}
       catch(e){if(e&&e.code==="network")break;listos.add(m.id);console.warn("correo pendiente",e);toast(`No se pudo mandar el aviso por correo a ${m.nombres}.`)}}}

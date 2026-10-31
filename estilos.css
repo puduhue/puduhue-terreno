@@ -1326,3 +1326,8 @@ html{background:var(--bg)}
 .acta .rgplan th{background:var(--soft)}
 .acta .rgplan td.d{text-align:center;color:var(--b-ink);font-weight:700;width:22px;padding:4px 2px}
 .acta .rgnota{color:var(--muted);font-size:14px}
+/* v132: aviso «Tu sesión venció» (mismo estilo que el de versión nueva), sobre la barra de abajo */
+.sesbar{z-index:51}
+.sesbar .btn{white-space:nowrap}
+body.contab .sesbar{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+@media (min-width:760px){body.contab .sesbar{bottom:96px}}
