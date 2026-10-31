@@ -86,7 +86,7 @@ function renderStock(){
   const fila=(o,conDep)=>`<div class="skr${o.bajo?" bajo":""}"><div class="skn"><b>${esc(o.PRODUCTO)}</b><span>${esc(o.PRODUCTOCODIGO)}${conDep?` · ${esc(o.DEPOSITO)}`:""}${o.PARTIDA?` · Partida ${esc(o.PARTIDA)}`:""}${o.PARTIDA_VTO?` · vence ${esc(fmtD(String(o.PARTIDA_VTO).slice(0,10)))}`:""}</span>${o.bajo?`<span class="xp camb">Bajo punto de reposición (${fmtN(o.pr)})</span>`:""}</div><div class="skv"><b>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")}</b><span>${fmtP(o.imp)}</span></div></div>`;
   if(skModo==="dep"&&!skDep&&!q){
     const g={};L.forEach(o=>{const d=g[o.DEPOSITO]||(g[o.DEPOSITO]={n:0,imp:0,bajo:0});d.n++;d.imp+=o.imp;if(o.bajo)d.bajo++});
-    cuerpo=`<div class="list">${Object.entries(g).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>`<button class="bod" data-a="stkDep" data-d="${esc(k)}"><span class="bodn">${esc(k)}</span><span class="bodm">${v.n} ${v.n===1?"producto":"productos"} · <b>${fmtP(v.imp)}</b></span>${v.bajo?`<span class="bodc"><span class="xp camb">${v.bajo} bajo reposición</span></span>`:""}${ICO.arrow}</button>`).join("")}</div>`;
+    cuerpo=`<div class="list">${Object.entries(g).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>`<button class="bod" data-a="stkDep" data-d="${esc(k)}"><span class="bodn">${esc(k)}</span><span class="bodm">${esc(v.n)} ${v.n===1?"producto":"productos"} · <b>${fmtP(v.imp)}</b></span>${v.bajo?`<span class="bodc"><span class="xp camb">${v.bajo} bajo reposición</span></span>`:""}${ICO.arrow}</button>`).join("")}</div>`;
   }else if(skModo==="prod"){
     const g={};L.forEach(o=>{const k=o.PRODUCTOCODIGO||o.PRODUCTO;const p=g[k]||(g[k]={o,cant:0,imp:0,deps:[]});p.cant+=o.cant;p.imp+=o.imp;p.deps.push(o)});
     const P=Object.values(g).sort((a,b)=>String(a.o.PRODUCTO).localeCompare(String(b.o.PRODUCTO)));
@@ -181,7 +181,7 @@ function renderCB(){
   const edad=(Date.now()-new Date(STOCK.hora))/3600000;
   const cards=deps.map(d=>{const ab=conteoAbierto(d),cs=conteosDe(d).filter(c=>c.estado==="cerrado"&&!c.anulado),u=cs[0],np=F.filter(o=>o.DEPOSITO===d).length;
     const r=u?resumenConteo(u):null;
-    return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(d)}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${ab?`<span class="xp camb">Conteo ${ab.n} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
+    return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(d)}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${ab?`<span class="xp camb">Conteo ${esc(ab.n)} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
   return head+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Control de bodega</h1>
     <p class="lead">Elige la bodega, revisa producto por producto y anota la cantidad que encuentras. Al cerrar, la app compara con el stock del sistema y genera el informe.</p>
@@ -192,14 +192,14 @@ function renderCB(){
 function renderCBBod(){
   const d=cbBod,ab=conteoAbierto(d),cs=conteosDe(d);
   const filas_=cs.map(c=>{const r=resumenConteo(c),cer=c.estado==="cerrado",an=!!c.anulado;
-    return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="cbAbrir" data-id="${c.id}"><span class="tag ${an?"none":cer?"cerrada":"borrador"}">${an?"Anulado":cer?"Cerrado":"En curso"}</span><span class="who">Conteo ${c.n}</span><span class="when">${fmtD(c.fecha)}</span>
+    return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="cbAbrir" data-id="${esc(c.id)}"><span class="tag ${an?"none":cer?"cerrada":"borrador"}">${an?"Anulado":cer?"Cerrado":"En curso"}</span><span class="who">Conteo ${esc(c.n)}</span><span class="when">${fmtD(c.fecha)}</span>
       <span class="where">${esc(c.responsable||"")} · ${r.cont} de ${r.total} contados${r.dif?` · ${r.dif} con diferencia`:""}</span><span class="st">${!an&&r.exact!==null?`<b>${r.exact}%</b>`:""}</span>
       <span class="by">${chipSync(c)}${an?` <span class="aut">Anulado el ${fmtD(c.anulado.fecha)} por ${esc(quien(c.anulado.por))}${c.anulado.motivo?`: ${esc(c.anulado.motivo)}`:""}</span>`:autoriaTxt(c)?` <span class="aut">${autoriaHTML(c)}</span>`:""}</span></button>
       ${mnBtn("mnCb",c.id,"Opciones del conteo "+c.n)}</div>`}).join("");
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="cb">Bodegas</button><div class="ttl">${esc(d)}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(d)}</h1>
-    <div class="start" style="grid-template-columns:1fr">${ab?`<button class="big dev" data-a="cbAbrir" data-id="${ab.id}"><strong>Continuar conteo ${ab.n}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
+    <div class="start" style="grid-template-columns:1fr">${ab?`<button class="big dev" data-a="cbAbrir" data-id="${esc(ab.id)}"><strong>Continuar conteo ${esc(ab.n)}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
       :`<button class="big ent" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${filas().filter(o=>o.DEPOSITO===d).length} productos según el stock del ${fmtFecha(STOCK.hora)}</span></button>`}</div>
     ${(()=>{const rc=recurrentes(d);if(!rc.length)return"";return`<h2>Diferencias recurrentes<span class="cnt">${rc.length}</span></h2><p class="note" style="margin-top:0">Productos con discrepancia en al menos 2 de los últimos 3 conteos. Suele indicar un problema de registro o de manejo, no un error de conteo.</p>${rc.map(x=>`<div class="skr"><div class="skn"><b>${esc(x.prod)}</b><span>${esc(x.cod||"")} · en ${x.n} conteos</span></div><div class="skv"><b>${x.ult.d<0?"Faltaban":"Sobraban"} ${fmtN(Math.abs(x.ult.d))} ${esc(x.ult.un)}</b><span>conteo ${x.ult.c}</span></div></div>`).join("")}`})()}
     <h2>Conteos<span class="cnt">${cs.length}</span></h2>${cs.length?`${disTip("mncb",`En el «⋯» de cada conteo está el informe PDF${esAdmin()?", anular y restaurar":" y eliminar los que están en curso"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}`:""}
@@ -245,7 +245,7 @@ function renderCBV(){
     <label class="f"><span>Producto</span><input data-cbn="prod" value="${esc(cbNuevoProd.prod||"")}" placeholder="Nombre del producto"></label>
     <div class="plan2"><label class="f"><span>Código (si lo sabes)</span><input data-cbn="cod" value="${esc(cbNuevoProd.cod||"")}"></label><label class="f"><span>Unidad</span><input data-cbn="un" value="${esc(cbNuevoProd.un||"")}" placeholder="KG, LT, UN…"></label></div>
     <div class="btns"><button class="btn" data-a="cbNuevoCancel">Cancelar</button><button class="btn pri" data-a="cbNuevoAdd" style="flex:1">Agregar al conteo</button></div></div>`:"";
-  return `<div class="top"><div class="in"><div class="bar"><button class="back" data-a="cbBodBack">${esc(c.bodega)}</button><div class="ttl">Conteo ${c.n}</div>${estadoChip()}</div></div></div>
+  return `<div class="top"><div class="in"><div class="bar"><button class="back" data-a="cbBodBack">${esc(c.bodega)}</button><div class="ttl">Conteo ${esc(c.n)}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     ${c.anulado?`<div class="info netbox"><b>Conteo anulado</b> el ${fmtD(c.anulado.fecha)} por ${esc(quien(c.anulado.por))}${c.anulado.motivo?`: ${esc(c.anulado.motivo)}`:""}.</div>`:ro?`<div class="info lock">Conteo cerrado el ${fmtD(c.cerrado)}. Ya no se puede modificar.</div>`:""}
     <div class="enc"><div class="f"><label for="cbfe">Fecha</label><input id="cbfe" type="date" data-cbenc="fecha" value="${esc(c.fecha)}" ${ro?"disabled":""}></div>
@@ -256,15 +256,15 @@ function renderCBV(){
     <div class="skf"><div class="f"><label for="cbFam">Familia</label><select id="cbFam" data-cbf="fam"><option value="">Todas (${stk.length})</option>${fams.map(f=>`<option value="${esc(f)}" ${f===cbFam?"selected":""}>${esc(f)} (${stk.filter(l=>famDeLinea(l)===f).length})</option>`).join("")}</select></div>
       <div class="f"><label for="cbSub">Subfamilia</label><select id="cbSub" data-cbf="sub"><option value="">Todas</option>${subs.map(f=>`<option value="${esc(f)}" ${f===cbSub?"selected":""}>${esc(f)} (${stk.filter(l=>(!cbFam||famDeLinea(l)===cbFam)&&subDeLinea(l)===f).length})</option>`).join("")}</select></div>
       <div class="f"><label for="cbQ">Buscar producto</label><input id="cbQ" type="search" placeholder="Nombre o código, ej.: sal, guante, 1203" value="${esc(cbQ)}" data-cbq="1"></div></div>
-    <div class="filt">${[["pend","Por contar"],["dif","Con diferencia"],["ok","Coinciden"],["all","Todos"]].map(([k,t])=>`<button class="fb" data-a="cbFiltro" data-f="${k}" aria-pressed="${cbFiltro===k}">${t}${k==="all"?` (${BASE.length})`:` (${cuenta[k]})`}</button>`).join("")}</div>
+    <div class="filt">${[["pend","Por contar"],["dif","Con diferencia"],["ok","Coinciden"],["all","Todos"]].map(([k,t])=>`<button class="fb" data-a="cbFiltro" data-f="${esc(k)}" aria-pressed="${cbFiltro===k}">${t}${k==="all"?` (${BASE.length})`:` (${cuenta[k]})`}</button>`).join("")}</div>
     ${nuevo}
     ${(()=>{const vis=L.slice(0,cbLim);if(!vis.length)return`<div class="empty">${cbFiltro==="pend"&&!cbFam&&!cbSub&&!q?"No quedan productos por contar.":"Nada que mostrar con este filtro."}</div>`;
       const norm=vis.filter(l=>!l.manual),man=vis.filter(l=>l.manual),tit=cbSub?`${cbFam?cbFam+" · ":""}${cbSub}`:cbFam||"Productos de la A a la Z";
       return (norm.length?`<section class="sec"><h3>${esc(tit)}<span class="cnt">${L.filter(l=>!l.manual).length}</span></h3>${norm.map(cbLineaHTML).join("")}</section>`:"")+(man.length?`<section class="sec"><h3>Agregados en terreno<span class="cnt">${man.length}</span></h3>${man.map(cbLineaHTML).join("")}</section>`:"")})()}
     ${L.length>cbLim?`<div class="btns"><button class="btn" data-a="cbMas">Mostrar más (${L.length-cbLim})</button></div>`:""}
     ${ro?"":`<div class="btns"><button class="btn" data-a="cbNuevoProd">+ Producto que no está en la lista</button></div>`}
-    <div class="btns">${ro?`<button class="btn pri" data-a="cbPdf" data-id="${c.id}" style="flex:1">Informe PDF</button>`:`<button class="btn" data-a="cbPdf" data-id="${c.id}">Informe (borrador)</button><button class="btn pri" data-a="cbCerrar" style="flex:1">Cerrar conteo</button>`}</div>
-    ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn" data-a="cbDel" data-id="${c.id}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar este conteo</button></div><p class="note">Para salir sin cerrar usa ‹ ${esc(c.bodega)} arriba; el conteo queda en curso.</p>`}
+    <div class="btns">${ro?`<button class="btn pri" data-a="cbPdf" data-id="${esc(c.id)}" style="flex:1">Informe PDF</button>`:`<button class="btn" data-a="cbPdf" data-id="${esc(c.id)}">Informe (borrador)</button><button class="btn pri" data-a="cbCerrar" style="flex:1">Cerrar conteo</button>`}</div>
+    ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn" data-a="cbDel" data-id="${esc(c.id)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar este conteo</button></div><p class="note">Para salir sin cerrar usa ‹ ${esc(c.bodega)} arriba; el conteo queda en curso.</p>`}
   </main>`;
 }
 let cbNuevoProd=null;
@@ -304,7 +304,7 @@ async function cbClick(A,b){
     setTimeout(()=>{const e=$("#cbo-"+CSS.escape(k));if(e){e.scrollIntoView({block:"center"});e.focus()}},60);return true}
   if(A==="cbDelFoto"){if(cbRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=cbv.items[k];if(r&&r.fotos)r.fotos=r.fotos.filter(x=>x!==ref);borrarFotoRef(ref);cbTouch();cbRefresh(k);return true}
   if(A==="cbDel"){const c=CONT[b.dataset.id];if(!c||c.estado==="cerrado")return true;
-    if(!(await ask("¿Eliminar este conteo?",`Conteo ${c.n} de ${c.bodega}. Se borran las cantidades, comentarios y fotos. No se puede deshacer.`,"Eliminar",true)))return true;
+    if(!(await ask("¿Eliminar este conteo?",`Conteo ${esc(c.n)} de ${c.bodega}. Se borran las cantidades, comentarios y fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     clearTimeout(LT[c.id]);delete LT[c.id];delete CONT[c.id];delete LOCAL[c.id];await localDel(c.id);if(DB){colaBorrar("conteos/"+c.id,c);schedSync(200)}
     Object.values(c.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));if(cbv&&cbv.id===c.id){cbv=null;go("cbb")}else{status();render()}toast("Conteo eliminado.");return true}
   if(A==="cbCerrar"){if(cbRO())return true;const R=resumenConteo(cbv);
@@ -314,7 +314,7 @@ async function cbClick(A,b){
     const cc=cbv;cbv=null;go("cbb");exito("Conteo cerrado","El informe se guarda en OneDrive.");
     if(DB&&navigator.onLine!==false)setTimeout(()=>cbSubirArchivos(cc),2500);return true}
   if(A==="cbAnular"){const c=CONT[b.dataset.id];if(!c||!esAdmin()||c.estado!=="cerrado")return true;
-    const ok=await ask(`¿Anular el conteo ${c.n} de ${c.bodega}?`,"Quedará tachado, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: conteo de prueba"></div>`);if(!ok)return true;
+    const ok=await ask(`¿Anular el conteo ${esc(c.n)} de ${c.bodega}?`,"Quedará tachado, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: conteo de prueba"></div>`);if(!ok)return true;
     const mot=(document.querySelector("#motAn")||{}).value||"";c.anulado={por:yo(),fecha:today(),motivo:mot.trim()};c.actualizado=new Date().toISOString();await saveCont(c);render();toast("Conteo anulado.");return true}
   if(A==="cbRest"){const c=CONT[b.dataset.id];if(!c||!esAdmin())return true;if(!(await ask("¿Restaurar el conteo?","Volverá a contar en el historial.","Restaurar")))return true;delete c.anulado;c.actualizado=new Date().toISOString();await saveCont(c);render();toast("Conteo restaurado.");return true}
   if(A==="cbPdf"){const c=CONT[b.dataset.id];if(c)await cbPdf(c);return true}
@@ -356,7 +356,7 @@ async function cbCarpeta(segs){let parent=CB.root,path="";
     let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
     if(!id){const r=await crearCarpeta(parent,seg);id=r.id}
     CBPATH[path]=id;parent=id}return parent}
-const carpetaConteo=c=>[limpiaNombre(c.bodega),`${c.fecha} Conteo ${c.n}`];
+const carpetaConteo=c=>[limpiaNombre(c.bodega),`${c.fecha} Conteo ${esc(c.n)}`];
 async function cbSubir(segs,name,blob,type){const f=await cbCarpeta(segs);const r=await gfetch(`/drives/${M365.drive}/items/${f}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
 function cbXlsx(c){
   const wb=XLSX.utils.book_new();const L=lineasDe(c);const R=resumenConteo(c);
@@ -370,7 +370,7 @@ function cbXlsx(c){
 async function cbSubirArchivos(c){
   if(!DB||navigator.onLine===false)return;
   try{if(Object.values(c.items||{}).some(r=>(r.fotos||[]).some(f=>QF[f]))){setTimeout(()=>cbSubirArchivos(c),20000);return}
-    await cbSubir(carpetaConteo(c),`Conteo_${c.n}_${limpiaNombre(c.bodega).replace(/\s+/g,"_")}.xlsx`,new Blob([cbXlsx(c)]),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    await cbSubir(carpetaConteo(c),`Conteo_${esc(c.n)}_${limpiaNombre(c.bodega).replace(/\s+/g,"_")}.xlsx`,new Blob([cbXlsx(c)]),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     await cbPdf(c,true)}catch(e){console.warn("archivos conteo",e)}
 }
 async function cbPdf(c,subir){
@@ -381,7 +381,7 @@ async function cbPdf(c,subir){
   const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
   d.setFillColor(141,179,226);d.rect(X,y,W,21,"F");try{d.addImage(LOGO,"JPEG",X+2,y+1.5,20,18)}catch(e){}
   d.setFont("helvetica","bold");d.setFontSize(14);d.setTextColor(15,39,64);d.text("Control de bodega · Conteo físico",X+26,y+9);d.setFontSize(10);d.setFont("helvetica","normal");
-  d.text(`${c.bodega} · Conteo ${c.n} · ${fmtD(c.fecha)}${c.anulado?" · ANULADO":c.estado!=="cerrado"?" · BORRADOR":""}`,X+26,y+16);d.setTextColor(0);y+=27;
+  d.text(`${c.bodega} · Conteo ${esc(c.n)} · ${fmtD(c.fecha)}${c.anulado?" · ANULADO":c.estado!=="cerrado"?" · BORRADOR":""}`,X+26,y+16);d.setTextColor(0);y+=27;
   d.setFontSize(9.5);d.text(`Responsable: ${c.responsable||"-"}`,X,y);d.text(`Acompañante: ${c.acompanante||"-"}`,X+95,y);y+=5;
   d.text(`Stock del sistema al: ${fmtFecha(c.stockAl)}${c.ciego?" · conteo ciego":""} · ${c.porPartida?"por partida":"por producto"} · tolerancia ${c.tol==null?2:c.tol} %`,X,y);y+=5;
   d.text(`${c.familias?"Alcance: "+c.familias.join(", ")+" · ":"Alcance: toda la bodega · "}Inicio ${fmtFecha(c.creado)}${c.cerrado&&c.actualizado?` · Término ${fmtFecha(c.actualizado)}`:""}`,X,y);y+=8;
@@ -407,7 +407,7 @@ async function cbPdf(c,subir){
   /* firmas */
   chk(30);y+=14;d.setDrawColor(120);d.line(X+5,y,X+75,y);d.line(X+105,y,X+175,y);d.setFontSize(8.5);d.text(c.responsable||"Responsable del conteo",X+40,y+5,{align:"center"});d.text(c.acompanante||"Bodeguero / administrador",X+140,y+5,{align:"center"});
   const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});const a=autoriaTxt(c);if(a)d.text(d.splitTextToSize("Registro en la app: "+a.charAt(0).toLowerCase()+a.slice(1),150)[0],15,289);d.setTextColor(0)}
-  const name=`Informe_conteo_${c.n}_${limpiaNombre(c.bodega).replace(/\s+/g,"_")}_${fmtD(c.fecha)}.pdf`;
+  const name=`Informe_conteo_${esc(c.n)}_${limpiaNombre(c.bodega).replace(/\s+/g,"_")}_${fmtD(c.fecha)}.pdf`;
   if(subir){try{await cbSubir(carpetaConteo(c),name,d.output("blob"),"application/pdf")}catch(e){console.warn(e)}return}
   await guardarPDF(d,name,"Informe listo.");
 }

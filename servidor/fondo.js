@@ -137,6 +137,11 @@ async function mayorFondo(env, ctx, reporte, forzar) {
   return forzar ? { ...x, crudo: r.crudo } : x;
 }
 /* rutas /fondo… */
+/* v134: ¿es de Contabilidad (o el administrador)? Lista fija o la que publica Contabilidad junto con el padrón del fondo */
+export async function esContabSrv(obj, correo, admin) {
+  if (admin || CONTAB_DEF.includes(correo)) return true;
+  try { const p = obj && await obj.leerPadron(); return !!(p && (p.contab || []).includes(correo)); } catch (e) { return false; }
+}
 export async function rutasFondo(req, env, ctx, url, correo, json, admin, obj, reporte) {
   if (url.pathname !== "/fondo" && !url.pathname.startsWith("/fondo/")) return null;
   const dominio = "@" + (env.DOMINIO || "puduhue.cl").toLowerCase();

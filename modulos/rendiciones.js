@@ -87,7 +87,7 @@ function fdTarjeta(){
   const per=c=>D.personas.find(x=>normRut(x.rut)===normRut(c.rut))||null;
   if(!cs.some(per))return `<section class="fdc" aria-label="Fondo por rendir"><div class="fdh"><b>${cs.length>1?"Fondos por rendir":"Tu fondo por rendir"}</b></div><p class="fdn">${esc(D.aviso||"Todavía no hay datos de tu fondo en Finnegans.")} Si crees que es un error, avísale a Contabilidad.</p></section>`;
   if(cs.length>1)return `<section class="fdc" aria-label="Fondos por rendir"><div class="fdh"><b>Fondos por rendir</b></div>
-    <div class="fdvar">${cs.map(c=>{const k=fdCalc(per(c)||{rut:c.rut,nombre:c.nombre,movs:[]}),n=fdNivel(k);return `<button class="fdvr" data-a="fdMov" data-k="${esc(normRut(c.rut))}"><span>${esc(c.nombre)}${k.dias>=FD_DIAS_A&&k.porRendir>0?`<small class="${n}">${k.dias} días sin rendir</small>`:""}</span><b class="${k.porRendir<-0.5?"fav":""}">${k.porRendir<-0.5?"A favor "+fmtP(-k.porRendir):fmtP(Math.max(0,k.porRendir))}</b>${ICO.arrow}</button>`}).join("")}</div><div class="fdpie">${pie}</div></section>`;
+    <div class="fdvar">${cs.map(c=>{const k=fdCalc(per(c)||{rut:c.rut,nombre:c.nombre,movs:[]}),n=fdNivel(k);return `<button class="fdvr" data-a="fdMov" data-k="${esc(normRut(c.rut))}"><span>${esc(c.nombre)}${k.dias>=FD_DIAS_A&&k.porRendir>0?`<small class="${esc(n)}">${k.dias} días sin rendir</small>`:""}</span><b class="${k.porRendir<-0.5?"fav":""}">${k.porRendir<-0.5?"A favor "+fmtP(-k.porRendir):fmtP(Math.max(0,k.porRendir))}</b>${ICO.arrow}</button>`}).join("")}</div><div class="fdpie">${pie}</div></section>`;
   const c=cs.find(per)||cs[0],p=per(c),k=fdCalc(p),n=fdNivel(k);
   const big=k.porRendir>0.5?`<div class="fdm"><b>${fmtP(k.porRendir)}</b><span>por rendir</span></div>`
     :k.porRendir<-0.5?`<div class="fdm fav"><b>${fmtP(-k.porRendir)}</b><span>a tu favor: rendiste más de lo que recibiste</span></div>`
@@ -158,7 +158,7 @@ function renderFDL(){
     ${L.length>8?`<div class="hzbus" style="margin-top:10px"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="fdbus" type="search" value="${esc(fdQ)}" placeholder="Buscar persona o RUT" aria-label="Buscar persona" autocomplete="off" enterkeyhint="search"></div>`:""}
     <div class="list fdlist" style="margin-top:10px">${con.sort(ord).map(fila).join("")||`<div class="empty">Nadie tiene fondos por rendir.</div>`}</div>
     ${favor.length?`<div class="smsep">Con saldo a favor <b>${favor.length}</b></div><div class="list fdlist">${favor.sort((a,b)=>a.porRendir-b.porRendir).map(fila).join("")}</div>`:""}
-    ${alDia.length?`<button class="fdmas" data-a="fdAlDia" aria-expanded="${fdAlDia}">${fdAlDia?"Ocultar":"Ver"} ${alDia.length===1?"la persona al día":`las ${alDia.length} personas al día`}</button>${fdAlDia?`<div class="list fdlist">${alDia.sort((a,b)=>cmpEs(a.nom,b.nom)).map(fila).join("")}</div>`:""}`:""}
+    ${alDia.length?`<button class="fdmas" data-a="fdAlDia" aria-expanded="${esc(fdAlDia)}">${fdAlDia?"Ocultar":"Ver"} ${alDia.length===1?"la persona al día":`las ${alDia.length} personas al día`}</button>${fdAlDia?`<div class="list fdlist">${alDia.sort((a,b)=>cmpEs(a.nom,b.nom)).map(fila).join("")}</div>`:""}`:""}
     <div class="btns" style="margin-top:16px"><button class="btn" data-a="fdActualizar" ${FD.cargando?"disabled":""}>${FD.cargando===2?"Consultando Finnegans…":"Actualizar desde Finnegans"}</button></div>
     <p class="note">Datos de Finnegans de ${esc(fdHora(D.hora))}${D.desde?`, movimientos desde el ${fdF(D.desde,1)}`:""}. Con saldo y más de ${FD_DIAS_A} días sin rendir en ámbar, más de ${FD_DIAS_R} en rojo, contando desde la última rendición (enviada en la app o contabilizada).</p>
     ${cfg}</main>`;
@@ -202,7 +202,7 @@ function disFab(){
   if(!ver){if(f)f.remove();FAB_AB=false;return}
   const html=ESCRITORIO()
     ?`<label class="fabb" title="Sube la foto o el PDF de una factura o boleta">${ICO_SUBIR}<span class="fabt">Rendir</span><input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1" aria-label="Rendir: subir facturas o boletas"></label>`
-    :`<div class="fabm" id="fabm"${FAB_AB?"":" hidden"}>${lecFabAyudaHTML()}<label class="fabo">${ICO_CAM}<span>Cámara</span><input class="vh" type="file" accept="image/*" capture="environment" data-fabrd="1"></label>${lecEscanerBotonHTML()}<label class="fabo">${ICO_GAL}<span>Galería o PDF</span><input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1"></label></div><button type="button" class="fabb" data-a="fabRd" aria-expanded="${FAB_AB}" aria-controls="fabm" aria-label="Rendir una factura o boleta">${ICO_CAM}<span class="fabt">Rendir</span></button>`;
+    :`<div class="fabm" id="fabm"${FAB_AB?"":" hidden"}>${lecFabAyudaHTML()}<label class="fabo">${ICO_CAM}<span>Cámara</span><input class="vh" type="file" accept="image/*" capture="environment" data-fabrd="1"></label>${lecEscanerBotonHTML()}<label class="fabo">${ICO_GAL}<span>Galería o PDF</span><input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1"></label></div><button type="button" class="fabb" data-a="fabRd" aria-expanded="${esc(FAB_AB)}" aria-controls="fabm" aria-label="Rendir una factura o boleta">${ICO_CAM}<span class="fabt">Rendir</span></button>`;
   if(!f){f=document.createElement("div");f.id="fab";f.className="fab";document.body.appendChild(f)}
   if(f._h!==html){f.innerHTML=html;f._h=html}
   f.classList.toggle("ab",FAB_AB);
@@ -258,7 +258,7 @@ function disConfHTML(r,d,P,modo){
 }
 function disTipoHTML(d,dis){
   const ok=TIPOS_RENDIR.includes(d.tipo);
-  return `<div class="f"><label id="rdTdL">Tipo de documento</label><div class="seg segtd" id="rdTd" role="radiogroup" aria-labelledby="rdTdL">${TIPOS_RENDIR.map(k=>`<button type="button" role="radio" data-a="disTipo" data-v="${k}" aria-checked="${d.tipo===k}" aria-pressed="${d.tipo===k}" ${dis}>${k==="boleta_honorarios"?"Honorarios":k==="peaje"?"Peaje":esc(TIPO_DOC[k])}</button>`).join("")}</div>${ok?"":`<span class="hint" style="color:var(--m-ink)">${lecTipoAviso(d)}</span>`}</div>`;
+  return `<div class="f"><label id="rdTdL">Tipo de documento</label><div class="seg segtd" id="rdTd" role="radiogroup" aria-labelledby="rdTdL">${TIPOS_RENDIR.map(k=>`<button type="button" role="radio" data-a="disTipo" data-v="${esc(k)}" aria-checked="${d.tipo===k}" aria-pressed="${d.tipo===k}" ${dis}>${k==="boleta_honorarios"?"Honorarios":k==="peaje"?"Peaje":esc(TIPO_DOC[k])}</button>`).join("")}</div>${ok?"":`<span class="hint" style="color:var(--m-ink)">${lecTipoAviso(d)}</span>`}</div>`;
 }
 
 /* ---- 4) rendiciones: ícono del estado a la izquierda y monto a la derecha ---- */
@@ -864,6 +864,7 @@ const hashTxt=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt
 let AGENDA_ENVIANDO=false;
 async function rdAgendaPublicar(forzar){
   if(AGENDA_ENVIANDO||!CUENTA||!loaded||navigator.onLine===false||!PWA)return false;
+  if(!esContab())return false; /* v134 (M-20): el servidor la acepta solo de Contabilidad y el administrador */
   /* solo con datos recién sincronizados, para no pisar la agenda con una copia vieja */
   if(!forzar&&(!SYNC_INFO.ultima||Date.now()-Date.parse(SYNC_INFO.ultima)>15*60e3))return false;
   const ag=rdAgenda(),h=hashTxt(JSON.stringify(ag));let prev=null;try{prev=JSON.parse(localStorage.getItem(AGENDA_K)||"null")}catch(e){}
@@ -1255,7 +1256,7 @@ function rdTrasSubir(r,keys){keys=keys.filter(Boolean);if(keys.length<2||!rdv||r
 function rdEstadoChip(r){const e=r.estado||"borrador";const cls=e==="aprobada"||e==="contabilizada"?"ok":e==="enviada"||e==="revcont"?"camb":e==="observada"?"nueva":"";return `<span class="xp ${cls}" ${cls?"":'style="background:var(--soft);color:var(--muted)"'}>${RD_ESTADO[e]||e}</span>`}
 function rdCard(r,ctx){const D=docsDe(r),n=D.length,inc=D.filter(d=>!docCompleto(r,d)).length;const nom=ctx||!esPropia(r)||colabsDeCuenta().length>1;
   let extra="";if(ctx==="cont"&&(r.estado==="revcont"||r.estado==="aprobada")){const A=rdAsiento(r);extra=A.bloq?` · <span style="color:var(--m-ink)">${A.bloq} por corregir</span>`:A.pend?` · ${A.pend} por crear en Finnegans`:A.al.length?` · ${A.al.length} por revisar`:" · asiento cuadrado"}
-  return `<button class="bod rdc" data-a="rdAbrir" data-id="${r.id}">${disRdIco(r)}<span class="rdc-x"><span class="bodn">${esc(rdTitulo(r))}${nom?` · ${esc(r.persona?r.persona.nombre:"")}`:""}</span><span class="bodm">${n} ${n===1?"documento":"documentos"}${inc&&(r.estado==="borrador"||r.estado==="observada")?` · ${inc} por completar`:""}${extra}${r.exportada&&r.estado==="aprobada"?" · exportada":""}</span><span class="bodc rdc-e">${rdMiniHTML(r)}${rdEstadoChip(r)}${(x=>x.includes("xp ok")?"":x)(chipSync(r))}</span></span><b class="rdc-v">${fmtP(totalRend(r))}</b>${ICO.arrow}</button>`}
+  return `<button class="bod rdc" data-a="rdAbrir" data-id="${esc(r.id)}">${disRdIco(r)}<span class="rdc-x"><span class="bodn">${esc(rdTitulo(r))}${nom?` · ${esc(r.persona?r.persona.nombre:"")}`:""}</span><span class="bodm">${n} ${n===1?"documento":"documentos"}${inc&&(r.estado==="borrador"||r.estado==="observada")?` · ${inc} por completar`:""}${extra}${r.exportada&&r.estado==="aprobada"?" · exportada":""}</span><span class="bodc rdc-e">${rdMiniHTML(r)}${rdEstadoChip(r)}${(x=>x.includes("xp ok")?"":x)(chipSync(r))}</span></span><b class="rdc-v">${fmtP(totalRend(r))}</b>${ICO.arrow}</button>`}
 function renderRD(){
   const head=band("Rendiciones");
   const todas=Object.values(REND).filter(r=>!r.anulada);
@@ -1291,7 +1292,7 @@ function renderRD(){
     const p=periodoActual(),cs=colabsDeCuenta(),act=misRend().filter(r=>r.periodo===p),ant=misRend().filter(r=>r.periodo!==p);
     const falta=cs.length>1?cs.some(c=>!act.some(r=>normRut(r.persona&&r.persona.rut)===normRut(c.rut)&&rdEditable(r))):!act.some(rdEditable);
     body=`${rdRecordatoriosHTML()}${fdTarjeta()}<h2>${esc(periodoTxt(p))}</h2>${act.length?`<div class="list">${act.map(r=>rdCard(r)).join("")}</div>`:""}
-    ${falta?`<div class="start" style="grid-template-columns:1fr${act.length?";margin-top:10px":""}"><button class="big ent" data-a="rdNueva" data-p="${p}"><strong>${act.length?`Empezar otra rendición de ${esc(periodoTxt(p).toLowerCase())}`:`Empezar la rendición de ${esc(periodoTxt(p).toLowerCase())}`}</strong><span>${act.length&&cs.length<=1?"La que ya enviaste sigue su revisión; los documentos nuevos van en una rendición aparte (N°"+rdSiguienteN(p,cs[0]||null)+").":cs.length>1?"Esta cuenta la usan varias personas: la app te preguntará quién rinde.":"Saca una foto de cada factura o boleta; la app lee los datos y te pide lo que falte."}</span></button></div>`:""}
+    ${falta?`<div class="start" style="grid-template-columns:1fr${act.length?";margin-top:10px":""}"><button class="big ent" data-a="rdNueva" data-p="${esc(p)}"><strong>${act.length?`Empezar otra rendición de ${esc(periodoTxt(p).toLowerCase())}`:`Empezar la rendición de ${esc(periodoTxt(p).toLowerCase())}`}</strong><span>${act.length&&cs.length<=1?"La que ya enviaste sigue su revisión; los documentos nuevos van en una rendición aparte (N°"+rdSiguienteN(p,cs[0]||null)+").":cs.length>1?"Esta cuenta la usan varias personas: la app te preguntará quién rinde.":"Saca una foto de cada factura o boleta; la app lee los datos y te pide lo que falte."}</span></button></div>`:""}
     ${ant.length?`<h2>Anteriores</h2><div class="list">${ant.map(r=>rdCard(r)).join("")}</div>`:""}
     ${colabs().length&&!cs.length?`<p class="note">Tu cuenta no está en la lista de colaboradores de Contabilidad. Puedes rendir igual: Contabilidad asignará tu RUT y revisará la rendición.</p>`:""}
     ${disTip("rdlee","Las boletas se leen solas cuando hay señal. Sin señal puedes fotografiarlas igual: se leen después.")}`;
@@ -1351,7 +1352,7 @@ function rdDocCard(r,d){
   const pdfCh=d.pdf||d.pdfPags?`<span class="xp" style="background:var(--soft);color:var(--muted)">PDF</span>`:"";
   return `<div class="rdd" role="button" tabindex="0" data-a="rdDoc" data-k="${esc(d.k)}">
     <span class="rdth"><span class="th${src?"":" miss"}">${src?`<img src="${esc(src)}" alt="">`:d.foto?(navigator.onLine===false?"Sin señal":"Cargando…"):"Sin foto"}</span></span>
-    <span class="rdx"><span class="rdt">${esc(d.emisor||"Documento sin emisor")}</span><span class="rdm">${d.fecha?fmtD(d.fecha):"Sin fecha"}${d.folio?` · N° ${esc(d.folio)}`:""}${d.tipo?` · ${TIPO_DOC[d.tipo]||d.tipo}`:""}</span><span class="rdm">${[centro?centroNombre(centro):"",cat?cat.n:""].filter(Boolean).map(esc).join(" · ")||"Sin centro ni tipo de gasto"}${d.dist?` · reparto ${esc(d.dist)}`:""}</span><span class="bodc">${pdfCh}${ch.slice(0,2).join("")}</span></span>
+    <span class="rdx"><span class="rdt">${esc(d.emisor||"Documento sin emisor")}</span><span class="rdm">${d.fecha?fmtD(d.fecha):"Sin fecha"}${d.folio?` · N° ${esc(d.folio)}`:""}${d.tipo?` · ${esc(TIPO_DOC[d.tipo]||d.tipo)}`:""}</span><span class="rdm">${[centro?centroNombre(centro):"",cat?cat.n:""].filter(Boolean).map(esc).join(" · ")||"Sin centro ni tipo de gasto"}${d.dist?` · reparto ${esc(d.dist)}`:""}</span><span class="bodc">${pdfCh}${ch.slice(0,2).join("")}</span></span>
     <span class="rdv"><b>${num(d.total)?fmtP(num(d.total)):"—"}</b>${d.obsRev?`<span class="rdo">Obs.</span>`:""}</span></div>`;
 }
 function rdAlertasHTML(al,r){
@@ -1409,7 +1410,7 @@ function rdAjLinea(r,l){
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Cambiar línea del asiento"><h3>${H?"Cuenta del fondo":"Cambiar línea del asiento"}</h3>
     <p>${H?"Cuenta contra la que se rinde (haber). Por defecto, la de la lista de colaboradores: Fondos por rendir; o fondo fijo.":`Se aplica a ${docs.length} ${docs.length===1?"documento":"documentos"} de esta línea (${esc(fmtP(l.monto))}). Busca por nombre; la app guarda el código.`}</p>
-    ${campos.map(([f])=>`<div class="f"><label>${esc(AJ_TIT[f])}</label><span data-ajw="${f}">${ajBtn(f,sel[f],`data-ajf="${f}"`)}</span></div>`).join("")}
+    ${campos.map(([f])=>`<div class="f"><label>${esc(AJ_TIT[f])}</label><span data-ajw="${esc(f)}">${ajBtn(f,sel[f],`data-ajf="${f}"`)}</span></div>`).join("")}
     <div class="btns"><button class="btn" data-m="no">Cancelar</button><button class="btn pri" data-m="ok" style="flex:1">Guardar cambio</button></div></div>`;
   document.body.appendChild(m);document.body.style.overflow="hidden";const close=()=>{m.remove();if(!document.querySelector(".modal"))document.body.style.overflow=""};
   m.addEventListener("click",e=>{const pb=e.target.closest("[data-ajf]");
@@ -1428,11 +1429,11 @@ function rdAjLinea(r,l){
     rdHist(r,"ajuste contable",cambios.join("; "));r.actualizado=new Date().toISOString();saveRend(r);const keep=window.scrollY;render();window.scrollTo(0,keep);toast("Línea actualizada.")});
 }
 function rdTablaAsiento(lineas,edit){const bu=lineas.some(l=>l.bu);
-  return `<div class="asw"><table class="asi"><thead><tr><th>Cuenta</th><th>Centro</th><th>Partida</th><th>Producto</th>${bu?"<th>Bien de uso</th>":""}<th>Glosa</th><th class="n">Debe</th><th class="n">Haber</th></tr></thead><tbody>${lineas.map((l,i)=>`<tr class="${l.lado==="H"?"h":""}"><td>${esc(l.cuenta)}<br><span>${esc(ctaNombre(l.cuenta))}</span>${edit?`<br><button class="lnk" data-a="rdAjLin" data-i="${i}" style="margin-top:4px">✎ Cambiar</button>`:""}</td><td>${esc(centroNombre(l.centro))}<br><span>${esc(l.centro)}</span></td><td>${esc(l.part)}<br><span>${esc(partNombre(l.part))}</span></td><td>${l.prod?`${esc(l.prod)}<br><span>${esc(prodNombre(l.prod))}</span>`:""}</td>${bu?`<td>${l.bu?`${esc(l.bu)}<br><span>${esc(buNombre(l.bu))}</span>`:""}</td>`:""}<td>${esc(l.glosa)}${l.ter?`<br><span>Tercero ${esc(l.ter)}</span>`:l.terPend?`<br><span>Tercero ${esc(l.terPend)} (por crear en Finnegans)</span>`:""}</td><td class="n">${l.lado==="D"?fmtN(l.monto,0):""}</td><td class="n">${l.lado==="H"?fmtN(l.monto,0):""}</td></tr>`).join("")}</tbody></table></div>
+  return `<div class="asw"><table class="asi"><thead><tr><th>Cuenta</th><th>Centro</th><th>Partida</th><th>Producto</th>${bu?"<th>Bien de uso</th>":""}<th>Glosa</th><th class="n">Debe</th><th class="n">Haber</th></tr></thead><tbody>${lineas.map((l,i)=>`<tr class="${l.lado==="H"?"h":""}"><td>${esc(l.cuenta)}<br><span>${esc(ctaNombre(l.cuenta))}</span>${edit?`<br><button class="lnk" data-a="rdAjLin" data-i="${esc(i)}" style="margin-top:4px">✎ Cambiar</button>`:""}</td><td>${esc(centroNombre(l.centro))}<br><span>${esc(l.centro)}</span></td><td>${esc(l.part)}<br><span>${esc(partNombre(l.part))}</span></td><td>${l.prod?`${esc(l.prod)}<br><span>${esc(prodNombre(l.prod))}</span>`:""}</td>${bu?`<td>${l.bu?`${esc(l.bu)}<br><span>${esc(buNombre(l.bu))}</span>`:""}</td>`:""}<td>${esc(l.glosa)}${l.ter?`<br><span>Tercero ${esc(l.ter)}</span>`:l.terPend?`<br><span>Tercero ${esc(l.terPend)} (por crear en Finnegans)</span>`:""}</td><td class="n">${l.lado==="D"?fmtN(l.monto,0):""}</td><td class="n">${l.lado==="H"?fmtN(l.monto,0):""}</td></tr>`).join("")}</tbody></table></div>
   <div class="asc">${lineas.map((l,i)=>{const H=l.lado==="H",fila=(t,a,b)=>a?`<div><dt>${t}</dt><dd>${esc(a)}${b?`<small>${esc(b)}</small>`:""}</dd></div>`:"";
     return `<div class="ascl${H?" h":""}"><div class="asct"><span class="ascc"><b>${esc(ctaNombre(l.cuenta)||l.cuenta)}</b><small>${esc(l.cuenta)}</small></span><span class="ascm"><small>${H?"Haber":"Debe"}</small><b>${fmtP(l.monto)}</b></span></div>
     <dl>${fila("Centro",centroNombre(l.centro),l.centro)}${fila("Partida",partNombre(l.part)||l.part,l.part)}${l.prod?fila("Producto",prodNombre(l.prod)||l.prod,l.prod):""}${l.bu?fila("Bien de uso",buNombre(l.bu)||l.bu,l.bu):""}${l.ter?fila("Tercero",(orgPorRut(l.ter)||[])[1]||l.ter,"RUT "+l.ter):l.terPend?fila("Tercero","Por crear en Finnegans","RUT "+l.terPend):""}</dl>
-    ${l.glosa?`<p class="ascg">${esc(l.glosa)}</p>`:""}${edit?`<button class="btn" data-a="rdAjLin" data-i="${i}" style="width:100%;margin-top:8px">✎ Cambiar esta línea</button>`:""}</div>`}).join("")}</div>`}
+    ${l.glosa?`<p class="ascg">${esc(l.glosa)}</p>`:""}${edit?`<button class="btn" data-a="rdAjLin" data-i="${esc(i)}" style="width:100%;margin-top:8px">✎ Cambiar esta línea</button>`:""}</div>`}).join("")}</div>`}
 function renderRDV(){
   const r=rdv,D=docsDe(r),edit=editaPersona(r),jef=puedeJefatura(r),con=puedeContab(r),ctz=puedeContabilizar(r);
   const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).length,0);
@@ -1467,7 +1468,7 @@ function renderRDV(){
     <h2>Documentos<span class="cnt">${D.length}</span></h2>
     <div class="list">${D.map(d=>rdDocCard(r,d)).join("")||`<div class="empty">Todavía no hay documentos. Toca <b>Agregar documento</b> y saca la foto de la factura o boleta.</div>`}</div>
     ${asi}
-    <div class="btns">${r.estado!=="borrador"||esContab()?`<button class="btn" data-a="rdPdf" data-id="${r.id}" ${D.length?"":"disabled"}>Resumen PDF</button>`:""}<button class="btn" data-a="rdXlsx" data-id="${r.id}" ${D.length?"":"disabled"}>Excel de documentos</button></div>
+    <div class="btns">${r.estado!=="borrador"||esContab()?`<button class="btn" data-a="rdPdf" data-id="${esc(r.id)}" ${D.length?"":"disabled"}>Resumen PDF</button>`:""}<button class="btn" data-a="rdXlsx" data-id="${esc(r.id)}" ${D.length?"":"disabled"}>Excel de documentos</button></div>
     ${rdElimHTML(r)}
     <p class="note">En OneDrive: <b>Rendiciones / ${esc(r.periodo)} / ${esc(r.persona?r.persona.nombre:"")}</b> con las fotos y el resumen.</p>
   </main>${barra}`;
@@ -1493,7 +1494,7 @@ function renderRDD(){
     const nm=(v,f)=>v?`<span class="hint">${esc(f(v)||"no está en el maestro")}</span>`:"";
     contHTML=`<h2>Imputación contable</h2>${mias.length?rdTablaAsiento(mias):`<div class="empty">Este documento todavía no genera línea en el asiento.</div>`}${mias.some(l=>l.docs.length>1)?`<p class="note">Este documento va consolidado con otros del mismo tipo, centro y partida.</p>`:""}${al.length?rdAlertasHTML(al,{docs:{}}):""}${editC&&alertaOrgs(al)?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Buscar proveedores nuevos en Finnegans"}</button></div>`:""}
       ${editC?`<h2>Ajuste contable</h2><p class="note">Si no eliges nada, se usa lo que indica el tipo de gasto (${esc([base.cuenta,base.prod,base.part].filter(Boolean).join(" · ")||"sin imputación")}). Busca por nombre: lo que elijas reemplaza la imputación de este documento y la app guarda el código.</p>
-      <div class="skf dupla">${[["cuenta",base.cuenta],["producto",base.prod],["partida",base.part],["tercero",base.ter]].map(([f,b])=>`<div class="f"><label>${esc(AJ_TIT[f])}</label>${ajBtn(f,aj[f]||"",`data-a="rdPickAj" data-f="${f}"`,b?`Según el tipo de gasto: ${nomAj(f,b)||b}`:"Según el tipo de gasto")}</div>`).join("")}</div>`:""}
+      <div class="skf dupla">${[["cuenta",base.cuenta],["producto",base.prod],["partida",base.part],["tercero",base.ter]].map(([f,b])=>`<div class="f"><label>${esc(AJ_TIT[f])}</label>${ajBtn(f,aj[f]||"",`data-a="rdPickAj" data-f="${esc(f)}"`,b?`Según el tipo de gasto: ${nomAj(f,b)||b}`:"Según el tipo de gasto")}</div>`).join("")}</div>`:""}
       ${d.orig&&Object.keys(d.orig).length?`<p class="note">Cambiado por Contabilidad: ${Object.entries(d.orig).map(([k,v])=>`${esc(k)} (antes: ${esc(String(v||"vacío"))})`).join(" · ")}</p>`:""}`}
   return `<div class="top rddtop"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rdVolver">${esc(rdTitulo(r))}</button><div class="ttl">Documento</div>${estadoChip()}</div></div></div>
   <main class="wrap rddw${conf?" conf":""}">
@@ -1555,7 +1556,7 @@ function sugeridosPick(f){
 function rdPick(f){
   const ops=opcionesPick(f),sug=sugeridosPick(f).filter(x=>ops.some(o=>o.v===x.v)),actual=f==="centro"?centroDoc(rdv,rdd):(gastoDe(rdd)||{}).id,tit=f==="centro"?"Centro de costo":"Tipo de gasto";
   const m=document.createElement("div");m.className="modal";
-  m.innerHTML=`<div class="sheet pksheet" role="dialog" aria-modal="true" aria-label="${tit}"><h3>${tit}</h3><input class="pksearch" type="search" placeholder="${f==="centro"?"Buscar predio o código":"Buscar: bencina, almuerzo, repuesto…"}" autocomplete="off" aria-label="Buscar"><div class="pklist"></div><div class="btns"><button class="btn" data-m="no">Cerrar</button></div></div>`;
+  m.innerHTML=`<div class="sheet pksheet" role="dialog" aria-modal="true" aria-label="${esc(tit)}"><h3>${tit}</h3><input class="pksearch" type="search" placeholder="${f==="centro"?"Buscar predio o código":"Buscar: bencina, almuerzo, repuesto…"}" autocomplete="off" aria-label="Buscar"><div class="pklist"></div><div class="btns"><button class="btn" data-m="no">Cerrar</button></div></div>`;
   document.body.appendChild(m);document.body.style.overflow="hidden";
   const lista=m.querySelector(".pklist"),inp=m.querySelector(".pksearch");
   const item=(o,why)=>`<button class="pkit${o.v===actual?" on":""}" data-v="${esc(o.v)}"><span class="pkt">${esc(o.t)}${o.v===actual?" ✓":""}</span><span class="pks">${esc(why||o.s)}</span></button>`;
@@ -1582,7 +1583,7 @@ function campoDeMsg(m){const t=String(m).toLowerCase();
   if(/duplicado/.test(t))return"rdFol";if(/\brut\b/.test(t))return"rdRut";
   if(/foto|lectura|leído|leer/.test(t))return"rdFotoBox";if(/neto/.test(t))return"rdNe";if(/total/.test(t))return"rdTot";if(/fecha/.test(t))return"rdFe";if(/centro de costo/.test(t))return"rdCe";if(/tipo de gasto/.test(t))return"rdGa";
   if(/duplicado|número de boleta/.test(t))return"rdFol";if(/emisor/.test(t))return"rdEm";if(/detalle/.test(t))return"rdGl";return""}
-const liCampo=p=>{const c=campoDeMsg(p);return `<li>${c?`<span role="button" tabindex="0" class="lnkcampo" data-a="rdIrCampo" data-c="${c}">${esc(p)}</span>`:esc(p)}</li>`};
+const liCampo=p=>{const c=campoDeMsg(p);return `<li>${c?`<span role="button" tabindex="0" class="lnkcampo" data-a="rdIrCampo" data-c="${esc(c)}">${esc(p)}</span>`:esc(p)}</li>`};
 function rdIrCampo(c){const el=document.getElementById(c);if(!el)return;el.scrollIntoView({behavior:"smooth",block:"center"});
   const caja=el.closest(".f")||el;caja.classList.remove("flash");void caja.offsetWidth;caja.classList.add("flash");setTimeout(()=>caja.classList.remove("flash"),1800);
   setTimeout(()=>{if(el.disabled)return;if(el.dataset&&el.dataset.a==="rdPick")rdPick(el.dataset.f);else if(/INPUT|SELECT|TEXTAREA/.test(el.tagName))el.focus({preventScroll:true})},450)}
@@ -1992,7 +1993,7 @@ async function rdGuardarFoto(r,d,file){
 let PROC=null;
 function procMostrar(file,txt){procQuitar();const m=document.createElement("div");m.className="proc";m.setAttribute("role","status");m.setAttribute("aria-live","polite");
   let u="";try{if(esImagen(file))u=URL.createObjectURL(file)}catch(e){}
-  m.innerHTML=`<div class="procc">${u?`<img src="${u}" alt="">`:`<span class="procpdf" aria-hidden="true">PDF</span>`}<b><span class="spin" aria-hidden="true"></span> ${esc(txt)}</b><span class="procs">Buscando el código del SII y revisando que se lea bien.</span></div>`;
+  m.innerHTML=`<div class="procc">${u?`<img src="${esc(u)}" alt="">`:`<span class="procpdf" aria-hidden="true">PDF</span>`}<b><span class="spin" aria-hidden="true"></span> ${esc(txt)}</b><span class="procs">Buscando el código del SII y revisando que se lea bien.</span></div>`;
   PROC={m,u,t:setTimeout(()=>{if(PROC&&PROC.m===m)document.body.appendChild(m)},120)}}
 /* v126: si la foto es HEIC, la devuelve convertida ({dataURL,blob}, como compress) y pone la miniatura del aviso «Revisando la foto…»;
    si no es HEIC (o no se puede leer la cabecera), devuelve null y todo sigue como antes */
@@ -2104,8 +2105,8 @@ async function rdAbrirPdf(r,d){
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet pdfv" role="dialog" aria-modal="true" aria-label="PDF del documento"><h3>${esc(d.emisor||"Documento")} · PDF</h3>
     ${!b?`<p>${pags}El PDF está en la carpeta de la rendición en OneDrive.</p><div class="btns"><button class="btn" data-m="close">Cerrar</button><a class="btn pri" href="${esc(web)}" target="_blank" rel="noopener" style="flex:1">Abrir en OneDrive</a></div>`
-    :ESCRITORIO()?`<iframe class="pdfif" src="${url}" title="PDF del documento"></iframe><div class="btns"><button class="btn" data-m="close">Cerrar</button><a class="btn" href="${url}" download="${esc(nombre)}">Descargar</a><a class="btn pri" href="${url}" target="_blank" rel="noopener" style="flex:1">Abrir en otra pestaña</a></div>`
-    :`<p>${pags}${comp?"Toca <b>Ver o compartir</b> para abrirlo, guardarlo en Archivos o enviarlo.":"Ábrelo para verlo completo o guardarlo."}</p><div class="btns"><button class="btn" data-m="close">Cerrar</button>${comp?`<button class="btn pri" data-m="share" style="flex:1">Ver o compartir</button>`:`<a class="btn pri" href="${url}" target="_blank" rel="noopener" download="${esc(nombre)}" style="flex:1">Abrir PDF</a>`}</div>`}
+    :ESCRITORIO()?`<iframe class="pdfif" src="${esc(url)}" title="PDF del documento"></iframe><div class="btns"><button class="btn" data-m="close">Cerrar</button><a class="btn" href="${esc(url)}" download="${esc(nombre)}">Descargar</a><a class="btn pri" href="${esc(url)}" target="_blank" rel="noopener" style="flex:1">Abrir en otra pestaña</a></div>`
+    :`<p>${pags}${comp?"Toca <b>Ver o compartir</b> para abrirlo, guardarlo en Archivos o enviarlo.":"Ábrelo para verlo completo o guardarlo."}</p><div class="btns"><button class="btn" data-m="close">Cerrar</button>${comp?`<button class="btn pri" data-m="share" style="flex:1">Ver o compartir</button>`:`<a class="btn pri" href="${esc(url)}" target="_blank" rel="noopener" download="${esc(nombre)}" style="flex:1">Abrir PDF</a>`}</div>`}
   </div>`;
   document.body.appendChild(m);document.body.style.overflow="hidden";
   const close=()=>{m.remove();document.body.style.overflow="";if(url)setTimeout(()=>URL.revokeObjectURL(url),60000)};

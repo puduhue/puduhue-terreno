@@ -92,7 +92,7 @@ function camionetasPanel(v){
   const fila=a=>{const ve=a.veh||{},km=axNum(ve.km),dev=devVig(a),cerr=a.estado==="cerrada";
     const firm=cerr?"Acta cerrada y firmada":((a.firmas||{}).conductor||{}).img?"Firmada, sin cerrar":"Acta en borrador, sin firmar";
     const prox=km?Math.ceil((km+1)/10000)*10000:0;
-    return `<li><button class="lnk" data-a="axOpen" data-id="${a.id}" style="text-align:left"><b>${esc(ve.patente||"Sin patente")}</b> ${esc([ve.marca,ve.modelo].filter(Boolean).join(" "))} · ${esc(a.conductor||"sin conductor")}</button><br>
+    return `<li><button class="lnk" data-a="axOpen" data-id="${esc(a.id)}" style="text-align:left"><b>${esc(ve.patente||"Sin patente")}</b> ${esc([ve.marca,ve.modelo].filter(Boolean).join(" "))} · ${esc(a.conductor||"sin conductor")}</button><br>
       <span class="note" style="font-size:13.5px">Entregada el ${fmtD(a.fecha)}${km?` con ${km.toLocaleString("es-CL")} km`:""} · ${dev?(dev.estado==="cerrada"?`devuelta el ${fmtD(dev.fecha)}`:"devolución en borrador"):firm}${!dev&&prox?` · mantención Salfa Rent a los ${prox.toLocaleString("es-CL")} km (±500)`:""}</span></li>`};
   return `<div class="info"><b>Actas de vehículo de ${esc(pre)} en la app (${V.length}):</b><ul style="margin:6px 0 0;padding-left:18px">${V.map(fila).join("")}</ul><span class="note" style="font-size:13px">Compara la patente y el kilometraje del tablero con lo registrado en el acta.</span></div>`;
 }
@@ -186,8 +186,8 @@ function axSet(o,p,v){const ks=p.split(".");let x=o;for(let i=0;i<ks.length-1;i+
 /* ---------- Pantallas ---------- */
 function topBar(titulo,back,backTxt,steps,stepAct){
   return `<div class="top"><div class="in">
-    <div class="bar"${steps?"":` style="padding-bottom:10px"`}><button class="back" data-a="${back}">${esc(backTxt)}</button><div class="ttl">${esc(titulo)}</div>${estadoChip()}</div>
-    ${steps?`<nav class="steps">${steps.map((s,i)=>`<button data-a="axStep" data-s="${i}" ${i===stepAct?'aria-current="step"':""}>${i+1}. ${s}</button>`).join("")}</nav>`:""}
+    <div class="bar"${steps?"":` style="padding-bottom:10px"`}><button class="back" data-a="${esc(back)}">${esc(backTxt)}</button><div class="ttl">${esc(titulo)}</div>${estadoChip()}</div>
+    ${steps?`<nav class="steps">${steps.map((s,i)=>`<button data-a="axStep" data-s="${esc(i)}" ${i===stepAct?'aria-current="step"':""}>${i+1}. ${s}</button>`).join("")}</nav>`:""}
   </div></div>`;
 }
 function renderAxHub(){
@@ -212,7 +212,7 @@ function renderAxList(){
   const T=AX[axTipo],t=axQ.trim().toLowerCase();
   const L=Object.values(ACTAS).filter(a=>a.tipo===axTipo).filter(a=>!t||[axQuien(a),axDonde(a),a.rut,a.rutRecibe,axEntrega(a),a.tipo==="capacitacion"?(a.participantes||[]).map(p=>p.nombre).join(" "):""].join(" ").toLowerCase().includes(t)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
   const card=a=>{const c=a.estado==="cerrada",an=!!a.anulada,f=axFaltantes(a).length;
-    return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="axOpen" data-id="${a.id}">
+    return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="axOpen" data-id="${esc(a.id)}">
       <span class="tag ${an?"none":c?"cerrada":"borrador"}">${an?"Anulada":c?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(axQuien(a))}</span><span class="when">${fmtD(a.fecha)}</span>
       <span class="where">${esDev(a)?"<b>Devolución</b> · ":""}${esc(axDonde(a)||"Sin datos")}</span><span class="st">${c&&a.tipo==="capacitacion"?(axEntrega(a)?"Relator: "+esc(axEntrega(a)):""):c?(esDev(a)?(axEntrega(a)?"Recibió "+esc(axEntrega(a)):""):a.devolucionId&&ACTAS[a.devolucionId]?(ACTAS[a.devolucionId].estado==="cerrada"?"Devuelto el "+fmtD(ACTAS[a.devolucionId].fecha):"Devolución en borrador"):axEntrega(a)?"Entregó "+esc(axEntrega(a)):""):`${f} ${f===1?"dato pendiente":"datos pendientes"}`}</span>
@@ -235,7 +235,7 @@ function renderAxList(){
   </main>`;
 }
 const axDis=()=>ro()?"disabled":"";
-function axInp(path,label,o){o=o||{};const v=axGet(cur,path);return `<div class="f"${o.style?` style="${o.style}"`:""}><label for="x_${path}">${esc(label)}</label><input id="x_${path}" data-x="${path}" value="${esc(v)}" ${o.type?`type="${o.type}"`:""} ${o.mode?`inputmode="${o.mode}"`:""} placeholder="${esc(o.ph||"")}" autocomplete="off" ${axDis()}>${o.hint?`<span class="hint">${esc(o.hint)}</span>`:""}${o.err||""}</div>`}
+function axInp(path,label,o){o=o||{};const v=axGet(cur,path);return `<div class="f"${o.style?` style="${esc(o.style)}"`:""}><label for="x_${path}">${esc(label)}</label><input id="x_${path}" data-x="${esc(path)}" value="${esc(v)}" ${o.type?`type="${o.type}"`:""} ${o.mode?`inputmode="${o.mode}"`:""} placeholder="${esc(o.ph||"")}" autocomplete="off" ${axDis()}>${o.hint?`<span class="hint">${esc(o.hint)}</span>`:""}${o.err||""}</div>`}
 function axPredio(){
   const a=cur;return `<div class="f"><label for="x_predio">Predio o área</label><select id="x_predio" data-xs="predio" ${axDis()}><option value="">Elige</option>${AX_PREDIOS.map(p=>`<option ${a.predio===p?"selected":""}>${p}</option>`).join("")}${optPredioAntiguo(a.predio,AX_PREDIOS)}<option ${a.predio==="Otro"?"selected":""}>Otro</option></select></div>
   ${a.predio==="Otro"?axInp("predioOtro","Nombre del predio o área"):""}`;
@@ -243,19 +243,19 @@ function axPredio(){
 function axFotos(k,titulo){
   const r=cur.items[k]||{},mine=r.fotos||[],canAdd=!ro()&&mine.length<MAXF;
   return `<div class="it" id="axf-${k}"><div class="nm"><span>${esc(titulo)}</span><span class="chip none">${mine.length} ${mine.length===1?"foto":"fotos"}</span></div>
-    <div class="fotos"><div class="strip">${mine.map(f=>thumb(f,k,true,false)).join("")}${canAdd?`${ESCRITORIO()?`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Subir foto<input class="vh" type="file" accept="image/*" multiple data-xfoto="${k}"></label>`:`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-xfoto="${k}"></label><label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Galería<input class="vh" type="file" accept="image/*" multiple data-xfoto="${k}"></label>`}`:""}</div></div></div>`;
+    <div class="fotos"><div class="strip">${mine.map(f=>thumb(f,k,true,false)).join("")}${canAdd?`${ESCRITORIO()?`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Subir foto<input class="vh" type="file" accept="image/*" multiple data-xfoto="${esc(k)}"></label>`:`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-xfoto="${esc(k)}"></label><label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Galería<input class="vh" type="file" accept="image/*" multiple data-xfoto="${esc(k)}"></label>`}`:""}</div></div></div>`;
 }
 /* Persona de Administración que entrega */
 function axAdmPick(role){
   const f=cur.firmas[role]||{},P=personasAdm(),sel=f.sel||(f.nombre?(P.some(p=>p.nombre===f.nombre)?f.nombre:"otro"):"");
-  return `<div class="f" style="margin-bottom:6px"><label for="x_adm_${role}">Persona de Administración que ${esDev(cur)?"recibe":"entrega"}</label><select id="x_adm_${role}" data-xadm="${role}" ${axDis()}><option value="">Elige quién ${esDev(cur)?"recibe":"entrega"}</option>${P.map(p=>`<option value="${esc(p.nombre)}" ${sel===p.nombre?"selected":""}>${esc(p.nombre)}</option>`).join("")}<option value="otro" ${sel==="otro"?"selected":""}>Otra persona de Administración</option></select>${P.length?"":`<span class="hint">La lista se toma de los colaboradores de Administración cargados en Rendiciones; si no aparece, elige «Otra persona» y escribe el nombre.</span>`}</div>
-  ${sel==="otro"?`<input data-xsn="${role}" value="${esc(f.nombre)}" placeholder="Nombre y apellido (Administración)" ${axDis()}>`:""}<input data-xsc="${role}" value="${esc(f.cargo)}" placeholder="Cargo (opcional)" ${axDis()}>`;
+  return `<div class="f" style="margin-bottom:6px"><label for="x_adm_${role}">Persona de Administración que ${esDev(cur)?"recibe":"entrega"}</label><select id="x_adm_${role}" data-xadm="${esc(role)}" ${axDis()}><option value="">Elige quién ${esDev(cur)?"recibe":"entrega"}</option>${P.map(p=>`<option value="${esc(p.nombre)}" ${sel===p.nombre?"selected":""}>${esc(p.nombre)}</option>`).join("")}<option value="otro" ${sel==="otro"?"selected":""}>Otra persona de Administración</option></select>${P.length?"":`<span class="hint">La lista se toma de los colaboradores de Administración cargados en Rendiciones; si no aparece, elige «Otra persona» y escribe el nombre.</span>`}</div>
+  ${sel==="otro"?`<input data-xsn="${esc(role)}" value="${esc(f.nombre)}" placeholder="Nombre y apellido (Administración)" ${axDis()}>`:""}<input data-xsc="${esc(role)}" value="${esc(f.cargo)}" placeholder="Cargo (opcional)" ${axDis()}>`;
 }
 function axFirmas(){
   return rolesDe(cur).map(([k,l,sub])=>{const f=cur.firmas[k]||{};const adm=k==="empresa"||k==="entrega";
     return `<div class="sig"><div class="lb">${esc(l)}</div><div class="sub">${esc(sub)}</div>
-      ${adm?axAdmPick(k):`<input data-xsn="${k}" value="${esc(f.nombre)}" placeholder="Nombre de quien firma" ${axDis()}>`}
-      <button class="pad" data-a="sign" data-r="${k}" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${f.img}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div>`}).join("");
+      ${adm?axAdmPick(k):`<input data-xsn="${esc(k)}" value="${esc(f.nombre)}" placeholder="Nombre de quien firma" ${axDis()}>`}
+      <button class="pad" data-a="sign" data-r="${esc(k)}" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${esc(f.img)}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div>`}).join("");
 }
 function axCloseBox(){
   const m=axFaltantes(cur);
@@ -291,12 +291,12 @@ let capEdit=null;
 const capListo=(a,p)=>!!(capFirma(a,p).img&&String(p.nombre||"").trim()&&p.rut&&rutOk(p.rut));
 function capPart(p,i){
   const a=cur,f=capFirma(a,p),rutE=p.rut&&!rutOk(p.rut);
-  if(capListo(a,p)&&(ro()||capEdit!==p.id))return `<div class="it cpc" id="cpp-${p.id}"><img class="cpf" src="${f.img}" alt="Firma de ${esc(p.nombre)}"><div class="cpt"><b>${i+1}. ${esc(p.nombre)}</b><span>${esc([rutFmt(p.rut),p.cargo].filter(Boolean).join(" · "))}</span></div>${ro()?"":`<button class="mini" data-a="axCapEdit" data-r="${p.id}" aria-label="Editar a ${esc(p.nombre)}">Editar</button>`}</div>`;
-  return `<div class="it" id="cpp-${p.id}"><div class="nm"><span>${i+1}. <span class="cpn">${esc(p.nombre||"Participante")}</span></span>${f.img?'<span class="chip B">Firmó</span>':""}${!ro()?`${capEdit===p.id?`<button class="mini" data-a="axCapEdit" data-r="">Listo</button>`:""}<button class="mini danger" data-a="axCapQuitar" data-r="${p.id}">Quitar</button>`:""}</div>
-    <div class="f"><label for="x_${p.id}_nombre">Nombre</label><input id="x_${p.id}_nombre" data-xp="${p.id}" data-k="nombre" list="capPers" value="${esc(p.nombre)}" placeholder="Nombre y apellido" autocomplete="off" ${axDis()}></div>
-    <div class="grid2"><div class="f"><label for="x_${p.id}_rut">RUT</label><input id="x_${p.id}_rut" data-xp="${p.id}" data-k="rut" value="${esc(p.rut)}" placeholder="12.345.678-9" autocomplete="off" ${axDis()}><span class="err" id="cpe-${p.id}">${rutE?"El RUT no es válido. Revisa el dígito verificador.":""}</span></div>
-      <div class="f"><label for="x_${p.id}_cargo">Cargo</label><input id="x_${p.id}_cargo" data-xp="${p.id}" data-k="cargo" value="${esc(p.cargo)}" placeholder="Ej.: Ordeñador" autocomplete="off" ${axDis()}></div></div>
-    <div class="sig cpsig"><button class="pad" data-a="sign" data-r="p_${p.id}" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${f.img}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div></div>`;
+  if(capListo(a,p)&&(ro()||capEdit!==p.id))return `<div class="it cpc" id="cpp-${p.id}"><img class="cpf" src="${esc(f.img)}" alt="Firma de ${esc(p.nombre)}"><div class="cpt"><b>${i+1}. ${esc(p.nombre)}</b><span>${esc([rutFmt(p.rut),p.cargo].filter(Boolean).join(" · "))}</span></div>${ro()?"":`<button class="mini" data-a="axCapEdit" data-r="${esc(p.id)}" aria-label="Editar a ${esc(p.nombre)}">Editar</button>`}</div>`;
+  return `<div class="it" id="cpp-${p.id}"><div class="nm"><span>${i+1}. <span class="cpn">${esc(p.nombre||"Participante")}</span></span>${f.img?'<span class="chip B">Firmó</span>':""}${!ro()?`${capEdit===p.id?`<button class="mini" data-a="axCapEdit" data-r="">Listo</button>`:""}<button class="mini danger" data-a="axCapQuitar" data-r="${esc(p.id)}">Quitar</button>`:""}</div>
+    <div class="f"><label for="x_${p.id}_nombre">Nombre</label><input id="x_${p.id}_nombre" data-xp="${esc(p.id)}" data-k="nombre" list="capPers" value="${esc(p.nombre)}" placeholder="Nombre y apellido" autocomplete="off" ${axDis()}></div>
+    <div class="grid2"><div class="f"><label for="x_${p.id}_rut">RUT</label><input id="x_${p.id}_rut" data-xp="${esc(p.id)}" data-k="rut" value="${esc(p.rut)}" placeholder="12.345.678-9" autocomplete="off" ${axDis()}><span class="err" id="cpe-${p.id}">${rutE?"El RUT no es válido. Revisa el dígito verificador.":""}</span></div>
+      <div class="f"><label for="x_${p.id}_cargo">Cargo</label><input id="x_${p.id}_cargo" data-xp="${esc(p.id)}" data-k="cargo" value="${esc(p.cargo)}" placeholder="Ej.: Ordeñador" autocomplete="off" ${axDis()}></div></div>
+    <div class="sig cpsig"><button class="pad" data-a="sign" data-r="p_${p.id}" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${esc(f.img)}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div></div>`;
 }
 function capParticipantes(){
   const a=cur,U=capUsados(a),nf=U.filter(p=>capFirma(a,p).img).length,pct=U.length?Math.round(nf/U.length*100):0;
@@ -313,9 +313,9 @@ function capFirmas(){
   return `<h1 style="font-size:22px">Registro de capacitación</h1>
   <div class="acta"><p><b>${esc(String(a.tema||"").trim()||"Sin tema")}</b>${a.detalle?`<br>${esc(a.detalle)}`:""}</p>
     <p>${fmtD(a.fecha)}${a.inicio?` · de ${esc(a.inicio)}${a.fin?" a "+esc(a.fin):""}`:""}${capDur(a)?` (${capDur(a)})`:""}<br>${esc(capPredios(a).join(", ")||"Sin predios")} · ${U.length} ${U.length===1?"participante":"participantes"}, ${U.filter(p=>capFirma(a,p).img).length} con firma</p></div>
-  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae el registro con la firma de cada participante y las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
+  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae el registro con la firma de cada participante y las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${esc(a.id)}">Descargar PDF</button></div></div>
   <h2>Firma del relator</h2><div class="sigs"><div class="sig"><div class="lb">Relator(a)</div><div class="sub">${esc(a.realizadaPor||"Escribe quién la realiza en el paso 1")}</div>
-    <button class="pad" data-a="sign" data-r="relator" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${f.img}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div></div>
+    <button class="pad" data-a="sign" data-r="relator" ${axDis()} aria-label="${f.img?"Cambiar firma":"Firmar"}">${f.img?`<img src="${esc(f.img)}" alt="Firma registrada">`:`<span>Tocar para firmar</span>`}</button></div></div>
   <div id="closeBox">${axCloseBox()}</div>`;
 }
 /* Vehículo · paso 1 */
@@ -332,7 +332,7 @@ function vehDatos(){
 function ynHTML(grp,k,l){
   const v=(cur[grp]||{})[k],dev=esDev(cur),ant=dev?((cur.antes||{})[grp]||{})[k]:null,falta=dev&&ant==="si"&&v==="no";
   return `<div class="it${falta?" worse":""}" id="yn-${grp}-${k}"><div class="nm"><span>${esc(l)}</span>${dev?`<span class="chip ${ant==="si"?"B":ant==="no"?"M":"none"}">Entrega: ${ant==="si"?"Sí":ant==="no"?"No":"sin dato"}${k==="llaves"&&ant==="si"&&(cur.antes||{}).llavesN?" ("+esc(cur.antes.llavesN)+")":""}</span>`:""}</div>
-    <div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="${esc(l)}"><button data-a="axYN" data-g="${grp}" data-k="${k}" data-v="si" data-e="C" aria-pressed="${v==="si"}" ${axDis()}>Sí</button><button data-a="axYN" data-g="${grp}" data-k="${k}" data-v="no" data-e="N" aria-pressed="${v==="no"}" ${axDis()}>No</button></div>
+    <div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="${esc(l)}"><button data-a="axYN" data-g="${esc(grp)}" data-k="${esc(k)}" data-v="si" data-e="C" aria-pressed="${v==="si"}" ${axDis()}>Sí</button><button data-a="axYN" data-g="${esc(grp)}" data-k="${esc(k)}" data-v="no" data-e="N" aria-pressed="${v==="no"}" ${axDis()}>No</button></div>
     ${k==="llaves"&&v==="si"?`<div class="f" style="margin:8px 0 0"><label for="x_llavesN">Cantidad de llaves</label><input id="x_llavesN" data-x="llavesN" inputmode="numeric" value="${esc(cur.llavesN)}" placeholder="Ej.: 4" ${axDis()}></div>`:""}</div>`;
 }
 /* Vehículo · paso 2 */
@@ -358,7 +358,7 @@ function vehFirmas(){
     <p class="k">4. Aceptación</p><p>${esc(VEH_ACEPT)}</p>
   </details></div>
   ${VEH_PEND?`<div class="info" style="background:var(--r-bg);color:var(--r-ink)">El texto del punto 3.4 está incompleto: falta la página siguiente del acta en papel. Hasta completarlo, el acta se puede llenar y firmar como borrador, pero no cerrar.</div>`:""}
-  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae el acta completa con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
+  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae el acta completa con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${esc(a.id)}">Descargar PDF</button></div></div>
   <h2>Firmas</h2><div class="sigs">${axFirmas()}</div>
   <div id="closeBox">${axCloseBox()}</div>`;
 }
@@ -376,10 +376,10 @@ function actDatos(){
 /* Activo · paso 2 */
 function actActivos(){
   const a=cur;
-  const row=(x,i)=>`<div class="it" id="axa-${x.id}"><div class="nm"><span>Activo ${i+1}</span>${!ro()&&a.activos.length>1?`<button class="mini danger" data-a="axDelAct" data-r="${x.id}">Quitar</button>`:""}</div>
-    <div class="grid2">${[["tipo","Tipo de activo","Ej.: Notebook"],["marca","Marca","Ej.: Lenovo"],["ref","Referencia","Modelo o N° de serie"],["factura","Factura","N° de factura"],["valor","Valor referencial","Ej.: 650.000"]].map(([k,l,ph])=>`<div class="f"><label for="x_${x.id}_${k}">${l}</label><input id="x_${x.id}_${k}" data-xa="${x.id}" data-k="${k}" value="${esc(x[k])}" placeholder="${ph}" ${k==="valor"?'inputmode="numeric"':""} autocomplete="off" ${axDis()}></div>`).join("")}
-    <div class="f"><label for="x_${x.id}_estado">Estado</label><select id="x_${x.id}_estado" data-xa="${x.id}" data-k="estado" ${axDis()}><option value="">Elige</option>${ACT_ESTADOS.map(e=>`<option ${x.estado===e?"selected":""}>${e}</option>`).join("")}</select></div></div>
-    <div class="f"><label for="x_${x.id}_obs">Observación</label><input id="x_${x.id}_obs" data-xa="${x.id}" data-k="obs" value="${esc(x.obs)}" placeholder="Accesorios incluidos, detalles" ${axDis()}></div>
+  const row=(x,i)=>`<div class="it" id="axa-${x.id}"><div class="nm"><span>Activo ${i+1}</span>${!ro()&&a.activos.length>1?`<button class="mini danger" data-a="axDelAct" data-r="${esc(x.id)}">Quitar</button>`:""}</div>
+    <div class="grid2">${[["tipo","Tipo de activo","Ej.: Notebook"],["marca","Marca","Ej.: Lenovo"],["ref","Referencia","Modelo o N° de serie"],["factura","Factura","N° de factura"],["valor","Valor referencial","Ej.: 650.000"]].map(([k,l,ph])=>`<div class="f"><label for="x_${x.id}_${k}">${l}</label><input id="x_${x.id}_${k}" data-xa="${esc(x.id)}" data-k="${esc(k)}" value="${esc(x[k])}" placeholder="${esc(ph)}" ${k==="valor"?'inputmode="numeric"':""} autocomplete="off" ${axDis()}></div>`).join("")}
+    <div class="f"><label for="x_${x.id}_estado">Estado</label><select id="x_${x.id}_estado" data-xa="${esc(x.id)}" data-k="estado" ${axDis()}><option value="">Elige</option>${ACT_ESTADOS.map(e=>`<option ${x.estado===e?"selected":""}>${e}</option>`).join("")}</select></div></div>
+    <div class="f"><label for="x_${x.id}_obs">Observación</label><input id="x_${x.id}_obs" data-xa="${esc(x.id)}" data-k="obs" value="${esc(x.obs)}" placeholder="Accesorios incluidos, detalles" ${axDis()}></div>
     ${axFotos("a_"+x.id,"Fotos del activo (opcional)").replace('class="it"','class="it" style="border:0;padding:0;margin:0"')}</div>`;
   return `<h1 style="font-size:22px">Activos que se entregan</h1><p class="lead" style="margin-top:0">${esc(ACT_INTRO)}</p>
   ${a.activos.map(row).join("")}
@@ -391,14 +391,14 @@ function actFirmas(){
   const a=cur;
   return `<h1 style="font-size:22px">Registro de entrega de activos</h1>
   <div class="acta"><p>${esc(actCompromiso(a))}</p></div>
-  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae la ficha completa con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
+  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae la ficha completa con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${esc(a.id)}">Descargar PDF</button></div></div>
   <h2>Firmas</h2><div class="sigs">${axFirmas()}</div>
   <div id="closeBox">${axCloseBox()}</div>`;
 }
 /* Devolución de vehículo · paso 1 */
 function vehDevDatos(){
   const a=cur,ke=axNum((a.antes||{}).km),kd=axNum(a.kmDev);
-  return `<div class="info">Devolución del vehículo <b>${esc((a.veh||{}).patente||"")}</b> ${esc([(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "))}, entregado a <b>${esc(a.conductor||"")}</b> el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${a.entregaId}">Ver acta de entrega</button>`:""}</div>
+  return `<div class="info">Devolución del vehículo <b>${esc((a.veh||{}).patente||"")}</b> ${esc([(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "))}, entregado a <b>${esc(a.conductor||"")}</b> el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${esc(a.entregaId)}">Ver acta de entrega</button>`:""}</div>
   <div class="grid2">${axInp("ciudad","Lugar de la devolución (ciudad)",{ph:"Ej.: Osorno"})}${axInp("fecha","Fecha de devolución",{type:"date"})}</div>
   ${axPredio()}
   <div class="grid2"><div class="f"><label>Km de entrega</label><input value="${esc((a.antes||{}).km||"")}" disabled></div>${axInp("kmDev","Km de devolución",{mode:"numeric",ph:"Lo que marca el tablero"})}</div>
@@ -409,14 +409,14 @@ function vehDevFirmas(){
   const a=cur,falt=VEH_ACC.concat(VEH_DOC).filter(([k])=>((a.antes||{}).acc||{})[k]==="si"&&a.acc[k]==="no"||((a.antes||{}).docs||{})[k]==="si"&&a.docs[k]==="no").map(([,l])=>l);
   return `<h1 style="font-size:22px">Acta de devolución de vehículo</h1>
   <div class="acta"><p>${esc(vehDevIntro(a))}</p>${falt.length?`<p><b>No se devuelven:</b> ${esc(falt.join(", "))}.</p>`:`<p>Se devuelven todos los accesorios y documentos entregados.</p>`}</div>
-  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF compara la devolución con la entrega y trae las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
+  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF compara la devolución con la entrega y trae las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${esc(a.id)}">Descargar PDF</button></div></div>
   <h2>Firmas</h2><div class="sigs">${axFirmas()}</div>
   <div id="closeBox">${axCloseBox()}</div>`;
 }
 /* Devolución de activos */
 function actDevDatos(){
   const a=cur;
-  return `<div class="info">Devolución de activos entregados a <b>${esc(a.recibe||"")}</b>${a.cargo?` (${esc(a.cargo)})`:""} el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${a.entregaId}">Ver registro de entrega</button>`:""}</div>
+  return `<div class="info">Devolución de activos entregados a <b>${esc(a.recibe||"")}</b>${a.cargo?` (${esc(a.cargo)})`:""} el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${esc(a.entregaId)}">Ver registro de entrega</button>`:""}</div>
   <div class="grid2">${axInp("fecha","Fecha de devolución",{type:"date"})}<div>${axPredio()}</div></div>
   <h2>Recibe</h2><div class="sig" style="padding-bottom:12px">${axAdmPick("entrega")}</div>
   ${!ro()?`<div class="btns"><button class="btn danger" data-a="axDel">Eliminar borrador</button></div>`:""}`;
@@ -425,9 +425,9 @@ function actDevActivos(){
   const a=cur;
   const row=(x,i)=>`<div class="it${x.devuelto==="no"?" worse":""}" id="axa-${x.id}"><div class="nm"><span>${i+1}. ${esc([x.tipo,x.marca].filter(Boolean).join(" · ")||"Activo")}</span><span class="chip none">Entrega: ${esc(x.estado||"sin estado")}</span></div>
     ${x.ref?`<p class="note" style="margin:0 0 6px">${esc(x.ref)}</p>`:""}
-    <div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="¿Se devuelve?"><button data-a="axDevA" data-r="${x.id}" data-v="si" data-e="C" aria-pressed="${x.devuelto==="si"}" ${axDis()}>Se devuelve</button><button data-a="axDevA" data-r="${x.id}" data-v="no" data-e="N" aria-pressed="${x.devuelto==="no"}" ${axDis()}>No se devuelve</button></div>
-    ${x.devuelto==="si"?`<div class="f" style="margin-top:8px"><label for="x_${x.id}_estadoDev">Estado al devolver</label><select id="x_${x.id}_estadoDev" data-xa="${x.id}" data-k="estadoDev" ${axDis()}><option value="">Elige</option>${ACT_ESTADOS.filter(e=>e!=="Nuevo").map(e=>`<option ${x.estadoDev===e?"selected":""}>${e}</option>`).join("")}</select></div>`:""}
-    ${x.devuelto?`<div class="f"><label for="x_${x.id}_obsDev">Observación</label><input id="x_${x.id}_obsDev" data-xa="${x.id}" data-k="obsDev" value="${esc(x.obsDev)}" placeholder="${x.devuelto==="no"?"Motivo: extravío, robo, queda asignado…":"Daños, accesorios faltantes"}" ${axDis()}></div>`:""}
+    <div class="seg" style="grid-template-columns:1fr 1fr" role="group" aria-label="¿Se devuelve?"><button data-a="axDevA" data-r="${esc(x.id)}" data-v="si" data-e="C" aria-pressed="${x.devuelto==="si"}" ${axDis()}>Se devuelve</button><button data-a="axDevA" data-r="${esc(x.id)}" data-v="no" data-e="N" aria-pressed="${x.devuelto==="no"}" ${axDis()}>No se devuelve</button></div>
+    ${x.devuelto==="si"?`<div class="f" style="margin-top:8px"><label for="x_${x.id}_estadoDev">Estado al devolver</label><select id="x_${x.id}_estadoDev" data-xa="${esc(x.id)}" data-k="estadoDev" ${axDis()}><option value="">Elige</option>${ACT_ESTADOS.filter(e=>e!=="Nuevo").map(e=>`<option ${x.estadoDev===e?"selected":""}>${e}</option>`).join("")}</select></div>`:""}
+    ${x.devuelto?`<div class="f"><label for="x_${x.id}_obsDev">Observación</label><input id="x_${x.id}_obsDev" data-xa="${esc(x.id)}" data-k="obsDev" value="${esc(x.obsDev)}" placeholder="${x.devuelto==="no"?"Motivo: extravío, robo, queda asignado…":"Daños, accesorios faltantes"}" ${axDis()}></div>`:""}
     ${x.devuelto==="si"?axFotos("a_"+x.id,"Fotos al devolver (opcional)").replace('class="it"','class="it" style="border:0;padding:0;margin:0"'):""}</div>`;
   return `<h1 style="font-size:22px">Activos que se devuelven</h1><p class="lead" style="margin-top:0">${esc(actDevIntro(a))}</p>
   ${(a.activos||[]).map(row).join("")||`<div class="empty">El registro de entrega no tiene activos.</div>`}
@@ -437,7 +437,7 @@ function actDevFirmas(){
   const a=cur,no=(a.activos||[]).filter(x=>x.devuelto==="no");
   return `<h1 style="font-size:22px">Registro de devolución de activos</h1>
   <div class="acta"><p>${esc(actDevIntro(a))}</p><p>${(a.activos||[]).filter(x=>x.devuelto==="si").length} de ${(a.activos||[]).length} ${(a.activos||[]).length===1?"activo devuelto":"activos devueltos"}.</p>${no.length?`<p><b>No se devuelven:</b> ${esc(no.map(x=>[x.tipo,x.marca].filter(Boolean).join(" ")).join(", "))}. ${esc(ACT_DEV_PEND)}</p>`:""}</div>
-  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae la ficha de devolución con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${a.id}">Descargar PDF</button></div></div>
+  <div class="dlbox"><b>Descarga</b><br><span style="font-size:14px;color:var(--muted)">El PDF trae la ficha de devolución con las fotos al final.</span><div class="btns"><button class="btn pri" data-a="axPdf" data-id="${esc(a.id)}">Descargar PDF</button></div></div>
   <h2>Firmas</h2><div class="sigs">${axFirmas()}</div>
   <div id="closeBox">${axCloseBox()}</div>`;
 }

@@ -99,6 +99,13 @@ export class Avisos extends DurableObject {
     }
     return res;
   }
+  /* v134 (M-20, M-21): cuenta los usos de cada persona en el día (de Santiago); ok=false si ya llegó al tope */
+  async usar(tipo, correo, tope, fecha) {
+    const k = "lim:" + tipo; let x = (await this.ctx.storage.get(k)) || null;
+    if (!x || x.fecha !== fecha) x = { fecha, n: {} };
+    const n = x.n[correo] || 0; if (n >= tope) return { ok: false, n };
+    x.n[correo] = n + 1; await this.ctx.storage.put(k, x); return { ok: true, n: n + 1 };
+  }
   /* v84: agenda de pendientes que deja la app y recordatorios diarios */
   async guardarAgenda(ag) { await this.ctx.storage.put("agenda", ag); return { aprobar: ag.aprobar.length, enviar: ag.enviar.length }; }
   async leerAgenda() { return (await this.ctx.storage.get("agenda")) || null; }
@@ -134,7 +141,9 @@ export const sujetoDe = () => "https://puduhue.github.io/puduhue-terreno/"; /* c
 export const objetoAvisos = env => env.AVISOS.get(env.AVISOS.idFromName("puduhue"));
 
 /* Rutas /push/... (la sesión Microsoft ya fue verificada: llega el correo de quien pide) */
-export async function rutasPush(req, env, url, correo, json, admin) {
+/* v134 (M-20): títulos que usa la app (rdCorreo en modulos/rendiciones.js); otros no se envían */
+export const TITULOS_PUSH = ["Rendición por aprobar", "Rendición corregida por aprobar", "Rendición para revisión contable", "Rendición corregida para revisión contable", "Tu rendición fue devuelta", "Tu rendición fue aprobada"];
+export async function rutasPush(req, env, url, correo, json, admin, esContab) {
   if (!url.pathname.startsWith("/push/")) return null;
   if (!env.AVISOS) return json({ error: "Las notificaciones no están configuradas en el servidor." }, 500);
   const obj = objetoAvisos(env);
@@ -152,7 +161,10 @@ export async function rutasPush(req, env, url, correo, json, admin) {
     if (!okEndpoint(s.endpoint) || !s.keys || !s.keys.p256dh || !s.keys.auth) return json({ error: "Suscripción inválida." }, 400);
     return json({ ok: true, equipos: await obj.suscribir(correo, s, b.equipo) });
   }
-  if (p === "agenda") return json({ ok: true, ...(await obj.guardarAgenda(validarAgenda(b, dominio))) });
+  if (p === "agenda") {
+    if (!(esContab ? await esContab() : admin)) return json({ error: "Solo Contabilidad o el administrador publican la agenda de recordatorios." }, 403); /* v134 (M-20) */
+    return json({ ok: true, ...(await obj.guardarAgenda(validarAgenda(b, dominio))) });
+  }
   if (p === "recordatorios") {
     if (!admin) return json({ error: "Solo el administrador de la app." }, 403);
     const pr = await obj.proximos(); let enviadas = 0;
@@ -169,6 +181,9 @@ export async function rutasPush(req, env, url, correo, json, admin) {
     if (!para.length) return json({ ok: true, enviadas: 0, sinEquipos: [], fallas: [] });
     const titulo = String(b.titulo || "").slice(0, 80), texto = String(b.texto || "").slice(0, 240);
     if (!titulo) return json({ error: "Falta el título." }, 400);
+    if (!TITULOS_PUSH.includes(titulo)) return json({ error: "Título de notificación no permitido." }, 400); /* v134 (M-20) */
+    { const tope = +env.LIMITE_NOTIFICACIONES || 40, u = await obj.usar("push", correo, tope, santiago().fecha);
+      if (!u.ok) return json({ error: `Llegaste al límite de ${tope} notificaciones de hoy; los avisos por correo sí salen.` }, 429); }
     const u = String(b.url || "./"); const destino = /^\.\/(\?[\w=&%.-]*)?$/.test(u) ? u : "./";
     const r = await obj.enviar(para, { titulo, texto, url: destino, etiqueta: String(b.etiqueta || "").slice(0, 60), de: correo }, sujeto);
     return json({ ok: true, ...r });

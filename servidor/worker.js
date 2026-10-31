@@ -26,6 +26,10 @@
                                   Siempre se aceptan https://puduhue.github.io (app en la organización Puduhue, desde la v85)
                                   y https://benjaminbarrientoscardenas-glitch.github.io (dirección anterior, durante la mudanza).
     DOMINIO             (texto)   opcional. Por defecto puduhue.cl
+    TENANT_ID           (texto)   opcional (v134). Organización de Microsoft de Puduhue; por defecto la de TENANT_PUDUHUE
+    CLIENT_ID           (texto)   opcional (v134). Aplicaciones de Entra aceptadas, separadas por coma; por defecto la de la app
+    LIMITE_BOLETAS      (texto)   opcional (v134). Lecturas de boletas por persona al día; por defecto 150
+    LIMITE_NOTIFICACIONES (texto) opcional (v134). Notificaciones que envía cada persona al día; por defecto 40
   Notificaciones (v83): no requieren variables. Los equipos registrados y las claves de envío se guardan en el
   Durable Object AVISOS (ver push.js y wrangler.toml); se crea solo al publicar.
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
@@ -34,11 +38,26 @@
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
-import { rutasFondo } from "./fondo.js";
+import { rutasFondo, esContabSrv } from "./fondo.js";
+import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION } from "./boleta.js";
 export { Avisos };
+/* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
+   son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
+const TENANT_PUDUHUE = "8812d491-c151-4cf4-ad03-7671f57a4a23", APP_ENTRA = "7dbe6da2-d0de-49f1-a4a5-76fe822ce9d0";
+export function datosToken(auth) {
+  try { const p = String(auth || "").replace(/^Bearer\s+/i, "").split(".")[1]; if (!p) return null;
+    const b = atob(p.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((p.length + 3) % 4));
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0)))); } catch (e) { return null; }
+}
+export function tokenDePuduhue(auth, env) {
+  const t = datosToken(auth); if (!t) return false;
+  const tenant = String(env.TENANT_ID || TENANT_PUDUHUE).trim().toLowerCase();
+  const apps = String(env.CLIENT_ID || APP_ENTRA).split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  return String(t.tid || "").toLowerCase() === tenant && apps.includes(String(t.appid || t.azp || "").toLowerCase());
+}
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v98"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
+const VERSION_SERVIDOR = "v134"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
 
 /* ---- Lectura de boletas con Claude: ver boleta.js (desde la v98, con revisión y timbre del SII) ---- */
 const PARAMS_STOCK = "PARAMWEBREPORT_Empresa=2&PARAMWEBREPORT_tipoStock=0&PARAMWEBREPORT_soloStockNoCero=true&PARAMWEBREPORT_soloStockDebajoPtoReposicion=false&PARAMWEBREPORT_soloDepositos=0&PARAMWEBREPORT_TipoPrecio=0&PARAMWEBREPORT_AgruparPor=1";
@@ -102,6 +121,7 @@ export default {
     // Quién pide: se valida la sesión Microsoft que ya tiene la app
     const auth = req.headers.get("Authorization") || "";
     if (!auth.startsWith("Bearer ")) return json({ error: "Falta la sesión de Microsoft." }, 401);
+    if (!tokenDePuduhue(auth, env)) return json({ error: "Solo cuentas de Puduhue, desde la app Puduhue Terreno." }, 403); /* v134 (A-08) */
     let yo;
     try { const r = await fetch("https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,displayName", { headers: { Authorization: auth } }); if (!r.ok) return json({ error: "La sesión de Microsoft no es válida o venció." }, 401); yo = await r.json(); }
     catch (e) { return json({ error: "No se pudo verificar la sesión." }, 502); }
@@ -110,10 +130,12 @@ export default {
     const permitidos = (env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
     const autorizado = permitidos.includes(correo); // v132 (M-22): con CORREOS_ACTUALIZAR vacía no queda nadie autorizado (antes, todos)
     if (url.pathname === "/reporte" && !autorizado) return json({ error: "Tu cuenta no está autorizada para consultar reportes de Finnegans." }, 403);
+    /* v134 (M-20, M-21): Contabilidad (lista fija o la que publica Contabilidad con el padrón del fondo) o el administrador */
+    let contab = null; const esContab = async () => contab ??= await esContabSrv(env.AVISOS ? objetoAvisos(env) : null, correo, autorizado);
 
     try {
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)
-      const rp = await rutasPush(req, env, url, correo, json, autorizado); if (rp) return rp;
+      const rp = await rutasPush(req, env, url, correo, json, autorizado, esContab); if (rp) return rp;
       // /fondo → saldo del fondo por rendir (110106) desde el Libro Mayor de Finnegans (v94)
       const rf = await rutasFondo(req, env, ctx, url, correo, json, permitidos.includes(correo), env.AVISOS ? objetoAvisos(env) : null, reporte); if (rf) return rf;
       // /boleta → lectura de un documento con IA (cualquier cuenta de Puduhue)
@@ -122,6 +144,9 @@ export default {
         const imagen = String(body.imagen || "").replace(/^data:[^;]+;base64,/, "");
         if (!imagen || imagen.length < 100) return json({ error: "Falta la imagen." }, 400);
         if (imagen.length > 6_000_000) return json({ error: "La imagen es demasiado grande." }, 413);
+        /* v134 (M-21): límite diario de lecturas por persona (cada lectura tiene costo) */
+        if (env.AVISOS) { const tope = +env.LIMITE_BOLETAS || 150, u = await objetoAvisos(env).usar("boleta", correo, tope, santiago().fecha);
+          if (!u.ok) return json({ error: `Llegaste al límite de ${tope} lecturas automáticas de hoy. Escribe los datos a mano; mañana la app vuelve a leer sola.` }, 429); }
         const r = await leerBoleta(env, { imagen, mime: body.mime || "image/jpeg", tipos: body.tipos, timbre: body.timbre, escaneo: body.escaneo === true });
         return json({ ok: true, leidoPor: correo, hora: new Date().toISOString(), datos: r.datos, uso: r.uso, modelo: r.modelo, revision: r.revision });
       }
@@ -134,10 +159,11 @@ export default {
         const datos = await reporte(env, env.FINN_REPORTE_STOCK, p);
         return json({ ok: true, reporte: env.FINN_REPORTE_STOCK, consultadoPor: correo, hora: new Date().toISOString(), datos });
       }
-      // /maestro?entidad=organizacion → listado de un maestro de Finnegans (cualquier cuenta de Puduhue)
+      // /maestro?entidad=organizacion → listado de un maestro de Finnegans (desde la v134, solo Contabilidad y el administrador)
       if (url.pathname === "/maestro") {
         const entidad = (url.searchParams.get("entidad") || "").trim().toLowerCase();
         if (!MAESTROS_FINN.includes(entidad)) return json({ error: "Ese maestro no está habilitado en el servidor." }, 403);
+        if (!(await esContab())) return json({ error: "Solo Contabilidad o el administrador consultan los maestros de Finnegans." }, 403); /* v134 (M-21) */
         const r = await listarMaestro(env, entidad, (url.searchParams.get("desde") || "").trim());
         return json({ ok: true, entidad, consultadoPor: correo, hora: new Date().toISOString(), origen: r.base === FINN ? "api" : "teamplace", desde: r.fecha, cantidad: Array.isArray(r.datos) ? r.datos.length : null, datos: r.datos });
       }
