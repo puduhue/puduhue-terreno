@@ -468,7 +468,7 @@ async function axClick(A,b){
   if(A==="axDelAct"){if(ro())return true;const r=b.dataset.r,x=cur.activos.find(y=>y.id===r);if(!x)return true;
     if((x.tipo||x.marca||x.ref)&&!(await ask("¿Quitar este activo?",[x.tipo,x.marca,x.ref].filter(Boolean).join(" · "),"Quitar",true)))return true;
     cur.activos=cur.activos.filter(y=>y.id!==r);const it=cur.items["a_"+r];if(it){(it.fotos||[]).forEach(f=>borrarFotoRef(f));delete cur.items["a_"+r]}touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return true}
-  if(A==="axDel"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(!a||a.estado==="cerrada")return true;
+  if(A==="axDel"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(!a||a.estado==="cerrada")return true;if(!puedeBorrar(a)){toast(NO_BORRAR);return true}
     if(!(await ask("¿Eliminar este borrador?",`${axTitulo(a)} · ${axQuien(a)}. Se borran el acta y sus fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     await removeActa(a.id);Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));
     if(esDev(a)&&a.entregaId&&ACTAS[a.entregaId]&&ACTAS[a.entregaId].devolucionId===a.id){const e=ACTAS[a.entregaId];delete e.devolucionId;e.actualizado=new Date().toISOString();await saveActa(e)}
@@ -485,7 +485,7 @@ async function axClick(A,b){
     cur.estado="cerrada";cur.cerrada=today();cur.actualizado=new Date().toISOString();if(ME)cur.cerradoPor=yo();await saveActa(cur);
     const t=cur.tipo;cur=null;axTipo=t;go("axl");exito("Acta cerrada","");if(DB&&navigator.onLine!==false)setTimeout(()=>{axXlsx(t,false);pdfsPendientes()},3000);return true}
   if(A==="axAnular"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin()||a.estado!=="cerrada")return true;
-    if(!(await ask(`¿Anular el acta de ${axQuien(a)}?`,"Quedará tachada, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: acta de prueba"></div>`)))return true;
+    if(!(await ask(`¿Anular el acta de ${axQuien(a)}?`,"Quedará tachada, con el motivo y tu nombre. Se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" data-obl="3" placeholder="Ej.: acta de prueba"></div>`)))return true;
     const mot=(document.querySelector("#motAn")||{}).value||"";a.anulada={por:yo(),fecha:today(),motivo:mot.trim()};a.actualizado=new Date().toISOString();await saveActa(a);render();toast("Acta anulada.");if(DB&&navigator.onLine!==false)axXlsx(a.tipo,false);return true}
   if(A==="axRest"){const a=ACTAS[b.dataset.id];if(!a||!esAdmin())return true;if(!(await ask("¿Restaurar el acta?","Volverá a contar en los registros.","Restaurar")))return true;
     if(!(await devRestaurable(a)))return true;
@@ -508,7 +508,7 @@ function axInput(ev){
     if(k==="rut"){const e=$("#cpe-"+p.id);if(e)e.textContent=""}
     axTouch();return}
   if(t.dataset.xa){const x=cur.activos.find(y=>y.id===t.dataset.xa);if(x){x[t.dataset.k]=t.value;axTouch()}return}
-  if(t.dataset.xsn){cur.firmas[t.dataset.xsn]=Object.assign(cur.firmas[t.dataset.xsn]||{},{nombre:t.value});axTouch();return}
+  if(t.dataset.xsn){cur.firmas[t.dataset.xsn]=Object.assign(cur.firmas[t.dataset.xsn]||{},{nombre:t.value});firmaNombreCambio(cur.firmas[t.dataset.xsn]);axTouch();return}
   if(t.dataset.xsc){cur.firmas[t.dataset.xsc]=Object.assign(cur.firmas[t.dataset.xsc]||{},{cargo:t.value});axTouch();return}
 }
 function axChange(ev){
@@ -823,3 +823,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="138"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

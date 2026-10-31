@@ -298,8 +298,8 @@ const SCORE={C:1,P:.5,N:0};
    fotos y Excel/PDF en OneDrive.
    ============================================================ */
 const CL={root:"01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS",datos:"_datos"}; /* carpeta "Check list de visitas" en Apps de terreno */
-const ADMINS=["b.barrientos@puduhue.cl"];
-const esAdmin=()=>!!(ME&&ME.correo&&ADMINS.includes(String(ME.correo).toLowerCase()));
+/* v138 (B-15): el administrador lo dice el servidor (rolesSrv, index.html); el código público ya no trae su correo */
+const esAdmin=()=>!!(ME&&ME.correo&&rolesSrv().admin);
 const RESP=["Administrador del campo","RR.HH.","Prevención de Riesgos","Finanzas","Control y Gestión"];
 const respDe=t=>t==="bodega"?["Encargado de bodega"].concat(RESP):RESP;
 const codigo=it=>(it.sheet==="cl"?"CG-":it.sheet==="cm"?"CM-":"OA-")+String(it.n).padStart(2,"0");
@@ -355,7 +355,7 @@ function hallazgos0(predio,tipo){
     const h=out[it.key]||(out[it.key]={key:it.key,it,estado:"ok",desde:null,visitas:0,ultima:null,plan:{},cerrado:null,hist:[]});h.it=it;
     h.hist.push({v:v.n,fecha:v.fecha,e:r.e,obs:clObs(r)});
     if(esHallazgo(r.e)){if(h.estado!=="abierto"){h.estado="abierto";h.desde={v:v.n,fecha:v.fecha};h.visitas=0;h.cerrado=null}h.visitas++;h.ultima={v:v.n,fecha:v.fecha,e:r.e,obs:clObs(r)};h.plan={acc:r.acc||"",resp:r.resp||"",plazo:r.plazo||""}}
-    else if(h.estado==="abierto"){h.estado="cerrado";h.cerrado={v:v.n,fecha:v.fecha,e:r.e}}
+    else if(h.estado==="abierto"&&r.e==="C"){h.estado="cerrado";h.cerrado={v:v.n,fecha:v.fecha,e:r.e}} /* v136 (M-08): solo «Cumple» cierra; «N/A» no */
   }));
   return out;
 }
@@ -375,9 +375,22 @@ function nuevaVisita(predio,tipo){tipo=tipo||clTipo;
 const infoBod=r=>!!r&&((r.e&&r.e!=="NA")||!!(r.obs||"").trim()||(r.fotos||[]).length>0||!!(r.acc||"").trim());
 function clavesBodega(v){const cat=v.catalogo?v.catalogo.map(expandir):CL_ITEMS;const ks=new Set(cat.filter(i=>i.area==="bodega").map(i=>i.key));
   Object.keys(v.items||{}).forEach(k=>{const it=CL_BYKEY[k];if(it&&it.area==="bodega")ks.add(k)});return [...ks].filter(k=>v.items&&v.items[k])}
+/* v136 (M-12): dos visitas del mismo predio y tipo con el mismo número (abiertas en dos teléfonos sin señal): la abierta más
+   nueva creada en este teléfono pasa al número siguiente. Las cerradas no se renumeran (su número está en el nombre de la carpeta). */
+function clRenumerar(){
+  if(!ME)return 0;let n=0;const G={};
+  Object.values(VIS).forEach(v=>{if(!v||v.anulada||!v.predio)return;(G[v.predio+"|"+tipoDe(v)]=G[v.predio+"|"+tipoDe(v)]||[]).push(v)});
+  for(const L of Object.values(G)){const porN={};L.forEach(v=>{(porN[v.n]=porN[v.n]||[]).push(v)});
+    for(const D of Object.values(porN)){if(D.length<2)continue;
+      D.sort((a,b)=>String(a.creado||"").localeCompare(String(b.creado||""))||String(a.id).localeCompare(String(b.id)));
+      for(const v of D.slice(1)){if(v.estado==="cerrada"||!v.creadoPor||v.creadoPor.id!==ME.id||clv===v)continue;
+        const antes=v.n;v.n=Math.max(...L.map(x=>+x.n||0))+1;v.actualizado=new Date().toISOString();saveVis(v);n++;
+        toast(`La visita ${antes} a ${v.predio} ya existía en otro teléfono: la tuya pasó a ser la visita ${v.n}.`,6000)}}}
+  return n}
 function traspasarBodega(){
-  if(!loaded)return 0;let n=0;
-  const fuentes=Object.values(VIS).filter(v=>tipoDe(v)==="visitas"&&!VIS["bod-"+v.id]&&!DELQ.has("visitas/bod-"+v.id)&&clavesBodega(v).some(k=>infoBod(v.items[k])))
+  if(!loaded)return 0;let n=0;try{clRenumerar()}catch(e){console.warn("renumerar",e)}
+  /* v136 (M-13): solo visitas cerradas o creadas por quien usa la app (no se editan visitas abiertas de otras personas) */
+  const fuentes=Object.values(VIS).filter(v=>tipoDe(v)==="visitas"&&(v.estado==="cerrada"||(ME&&v.creadoPor&&v.creadoPor.id===ME.id))&&!VIS["bod-"+v.id]&&!DELQ.has("visitas/bod-"+v.id)&&clavesBodega(v).some(k=>infoBod(v.items[k])))
     .sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))||(a.n-b.n));
   for(const v of fuentes){
     const ks=clavesBodega(v),abierta=v.estado!=="cerrada";
@@ -621,10 +634,12 @@ function renderCLV(){
   const v=clv,prev=visitaAnterior(v),ro=clRO();const TODOS=itemsDe(v),KV=CLK[tipoDe(v)];
   const AR=areasDe(tipoDe(v)).filter(a=>TODOS.some(i=>i.area===a.id));if(AR.length&&!AR.some(a=>a.id===clArea))clArea=AR[0].id;
   const areaItems=TODOS.filter(i=>i.area===clArea);
-  const items=areaItems.filter(it=>{const r=v.items[it.key]||{};const pr=prev&&prev.items&&prev.items[it.key];
-    if(clFiltro==="pend")return!r.e;if(clFiltro==="hall")return pr&&esHallazgo(pr.e);if(clFiltro==="mal")return esHallazgo(r.e);return true});
+  /* v136 (M-09): «Hallazgos anteriores» = hallazgos abiertos de las visitas cerradas (no solo de la visita anterior) */
+  const HZ=hallazgos(v.predio,tipoDe(v)),hzAb=k=>!!(HZ[k]&&HZ[k].estado==="abierto");
+  const items=areaItems.filter(it=>{const r=v.items[it.key]||{};
+    if(clFiltro==="pend")return!r.e;if(clFiltro==="hall")return hzAb(it.key);if(clFiltro==="mal")return esHallazgo(r.e);return true});
   const tabs=AR.map(a=>{const sc=puntaje(v,i=>i.area===a.id);const tot=TODOS.filter(i=>i.area===a.id).length;return `<button class="tab${tot&&sc.rev===tot?" lista":""}" data-a="clArea" data-area="${esc(a.id)}" aria-selected="${a.id===clArea}">${esc(a.name)}<small>${tot&&sc.rev===tot?"✓ ":""}${sc.rev}/${tot}</small></button>`}).join("");
-  const nHall=prev?areaItems.filter(it=>{const pr=prev.items&&prev.items[it.key];return pr&&esHallazgo(pr.e)}).length:0;
+  const nHall=areaItems.filter(it=>hzAb(it.key)).length;
   const groups=[];items.forEach(it=>{const g=groups.find(x=>x.b===it.sheet&&x.g===it.group);if(g)g.items.push(it);else groups.push({b:it.sheet,fam:it.fam,g:it.group,items:[it]})});
   const body=groups.map(g=>`<section class="sec"><h3>${g.b==="cm"?"":esc(g.fam)+" · "}${esc(g.g)}</h3>${g.g==="Camionetas"?camionetasPanel(v):""}${g.items.map(clItemHTML).join("")}</section>`).join("")||`<div class="empty">${clFiltro==="pend"?"Todo revisado en esta área.":clFiltro==="hall"?"No hay hallazgos de la visita anterior en esta área.":"Nada que mostrar."}</div>`;
   return `<div class="top"><div class="in">
@@ -756,8 +771,8 @@ async function clClick(A,b){
   if(A==="clVMenu"){clVMenu(VIS[b.dataset.id]);return true}
   if(A==="clPredioBack"){await flush();clv=null;go("clp");return true}
   if(A==="clNueva"){const p=b.dataset.p;if(visitaAbierta(p)){toast(clTipo==="camionetas"?"Ya hay una visita en curso de esta camioneta.":"Ya hay una visita en curso en este predio.");return true}
-    const v=nuevaVisita(p);clv=v;clPredio=p;clArea=areasDe(clTipo)[0].id;clFiltro=visitaAnterior(v)?"hall":"all";await saveVis(v);go("clv");
-    if(clFiltro==="hall")toast("Partimos por los hallazgos de la visita anterior.");return true}
+    const v=nuevaVisita(p);clv=v;clPredio=p;clArea=areasDe(clTipo)[0].id;clFiltro=abiertos(p,clTipo).length?"hall":"all";await saveVis(v);go("clv");
+    if(clFiltro==="hall")toast("Partimos por los hallazgos que siguen abiertos.");return true}
   if(A==="clAbrir"){await flush();const v=VIS[b.dataset.id];if(!v)return true;clTipo=tipoDe(v);clv=v;clPredio=v.predio;if(!clv.items)clv.items={};clFiltro="all";go("clv");return true}
   if(A==="clArea"){clArea=b.dataset.area;window.scrollTo(0,0);render();return true}
   if(A==="clFiltro"){clFiltro=b.dataset.f;render();return true}
@@ -769,11 +784,15 @@ async function clClick(A,b){
   if(A==="clEncEd"){clEncAb[clv.id]=true;render();const f=$("#clfecha");if(f)f.focus();return true}
   if(A==="clEncOk"){clEncAb[clv.id]=false;render();return true}
   if(A==="clDelFoto"){if(clRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=clv.items[k];if(r&&r.fotos){r.fotos=r.fotos.filter(x=>x!==ref)}borrarFotoRef(ref);clTouch();clRefreshItem(clv,k);return true}
-  if(A==="clDel"){const v=VIS[b.dataset.id];if(!v||v.estado==="cerrada")return true;
+  if(A==="clDel"){const v=VIS[b.dataset.id];if(!v||v.estado==="cerrada")return true;if(!puedeBorrar(v)){toast(NO_BORRAR);return true}
     if(!(await ask("¿Eliminar esta visita?",`Visita ${esc(v.n)} a ${v.predio}. Se borran las respuestas y las fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     clearTimeout(LT[v.id]);delete LT[v.id];delete VIS[v.id];delete LOCAL[v.id];await localDel(v.id);if(DB){colaBorrar("visitas/"+v.id,v);schedSync(200)}
     Object.values(v.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));const enVisita=clv&&clv.id===v.id;if(enVisita){clv=null;clPredio=v.predio;go("clp")}else{status();render()}toast("Visita eliminada.");return true}
   if(A==="clCerrar"){if(clRO())return true;const sc=puntaje(clv);
+    /* v136 (M-10): no se cierra vacía, sin fecha o sin revisor */
+    if(!sc.rev){toast("No se puede cerrar: no hay ítems revisados.");return true}
+    if(!clv.fecha){toast("No se puede cerrar: falta la fecha de la visita.");return true}
+    if(!String(clv.revisor||"").trim()){toast("No se puede cerrar: falta quién hizo la revisión (revisor).");return true}
     const falt=itemsDe(clv).filter(it=>{const r=clv.items[it.key];return r&&esHallazgo(r.e)&&(!r.acc||!r.resp||!r.plazo)}).length;
     const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, los ítems en Parcial o No cumple quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
     if(!(await ask("¿Cerrar la visita?",msg,"Cerrar visita")))return true;
@@ -781,12 +800,16 @@ async function clClick(A,b){
     const vv=clv,p=clv.predio;exito("Visita cerrada","Los hallazgos quedaron en seguimiento.");clv=null;clPredio=p;go("clp");
     if(DB&&navigator.onLine!==false)clTrasCierre(p,vv);return true}
   if(A==="clAnular"){const v=VIS[b.dataset.id];if(!v||!esAdmin()||v.estado!=="cerrada")return true;
-    const ok=await ask(`¿Anular la visita ${esc(v.n)} a ${v.predio}?`,"Dejará de contar para los hallazgos y el porcentaje. Queda registrada como anulada con el motivo y tu nombre; se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: visita de prueba"></div>`);
+    const ok=await ask(`¿Anular la visita ${esc(v.n)} a ${v.predio}?`,"Dejará de contar para los hallazgos y el porcentaje. Queda registrada como anulada con el motivo y tu nombre; se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" data-obl="3" placeholder="Ej.: visita de prueba"></div>`);
     if(!ok)return true;const mot=(document.querySelector("#motAn")||{}).value||"";
-    v.anulada={por:yo(),fecha:today(),motivo:mot.trim()};v.actualizado=new Date().toISOString();await saveVis(v);render();toast(`Visita ${esc(v.n)} anulada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
+    v.anulada={por:yo(),fecha:today(),motivo:mot.trim()};v.actualizado=new Date().toISOString();await saveVis(v);
+    {const bo=VIS["bod-"+v.id];if(bo&&!bo.anulada){bo.anulada=Object.assign({},v.anulada);bo.actualizado=v.actualizado;await saveVis(bo);if(DB&&navigator.onLine!==false)clXlsx(bo.predio,false,"bodega")}} /* v136 (M-11) */
+    render();toast(`Visita ${esc(v.n)} anulada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
   if(A==="clRestaurar"){const v=VIS[b.dataset.id];if(!v||!esAdmin())return true;
     if(!(await ask(`¿Restaurar la visita ${esc(v.n)}?`,"Volverá a contar para los hallazgos y el porcentaje.","Restaurar")))return true;
-    delete v.anulada;v.actualizado=new Date().toISOString();await saveVis(v);render();toast(`Visita ${esc(v.n)} restaurada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
+    delete v.anulada;v.actualizado=new Date().toISOString();await saveVis(v);
+    {const bo=VIS["bod-"+v.id];if(bo&&bo.anulada){delete bo.anulada;bo.actualizado=v.actualizado;await saveVis(bo);if(DB&&navigator.onLine!==false)clXlsx(bo.predio,false,"bodega")}} /* v136 (M-11) */
+    render();toast(`Visita ${esc(v.n)} restaurada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
   if(A==="clPdf"){const v=VIS[b.dataset.id];if(v)await clPdf(v);return true}
   if(A==="clXlsx"){await clXlsx(b.dataset.p,true,clTipo);return true}
   return false;
@@ -840,7 +863,7 @@ async function clCarpeta(segs,tipo){
   return parent;
 }
 const carpetaVisita=v=>[v.predio,`${v.fecha} Visita ${esc(v.n)}`];
-async function clSubir(segs,name,blob,type,tipo){const folder=await clCarpeta(segs,tipo);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+async function clSubir(segs,name,blob,type,tipo){const folder=await clCarpeta(segs,tipo);if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
 function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   const vs=validas(p,tipo).filter(v=>v.estado==="cerrada");const wb=XLSX.utils.book_new();const anul=visitasDe(p,tipo).filter(v=>v.anulada);
   const H=hallazgos(p,tipo);
@@ -982,3 +1005,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
+window.MODV=window.MODV||{};window.MODV["checklist"]="138"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
