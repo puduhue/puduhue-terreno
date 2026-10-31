@@ -682,7 +682,7 @@ async function rdPurgarVacias(){
   for(const r of Object.values(REND)){if(!rdVacia(r)||(rdv&&rdv.id===r.id))continue;
     clearTimeout(LT[r.id]);delete LT[r.id];delete REND[r.id];delete LOCAL[r.id];try{await localDel(r.id)}catch(e){}
     try{if(REMOTE.rendiciones&&REMOTE.rendiciones[r.id]){delete REMOTE.rendiciones[r.id];delete ETAGS[rkey("rendiciones",r.id)];if(IDB.db)IDB.del("remote",rkey("rendiciones",r.id)).catch(()=>{})}}catch(e){}
-    if(DB){DELQ.add("rendiciones/"+r.id);saveDQ()}}
+    if(DB)colaBorrar("rendiciones/"+r.id,r)}
   if(DB&&DELQ.size)schedSync(500);status()}
 /* v119: quien rinde elimina su rendición en borrador o devuelta; Contabilidad anula la que no esté contabilizada.
    El registro no se borra: queda anulada (motivo y quién) y fuera de las listas, del fondo por rendir y del Excel. */

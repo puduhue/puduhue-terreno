@@ -771,7 +771,7 @@ async function clClick(A,b){
   if(A==="clDelFoto"){if(clRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=clv.items[k];if(r&&r.fotos){r.fotos=r.fotos.filter(x=>x!==ref)}borrarFotoRef(ref);clTouch();clRefreshItem(clv,k);return true}
   if(A==="clDel"){const v=VIS[b.dataset.id];if(!v||v.estado==="cerrada")return true;
     if(!(await ask("¿Eliminar esta visita?",`Visita ${v.n} a ${v.predio}. Se borran las respuestas y las fotos. No se puede deshacer.`,"Eliminar",true)))return true;
-    clearTimeout(LT[v.id]);delete LT[v.id];delete VIS[v.id];delete LOCAL[v.id];await localDel(v.id);if(DB){DELQ.add("visitas/"+v.id);saveDQ();schedSync(200)}
+    clearTimeout(LT[v.id]);delete LT[v.id];delete VIS[v.id];delete LOCAL[v.id];await localDel(v.id);if(DB){colaBorrar("visitas/"+v.id,v);schedSync(200)}
     Object.values(v.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));const enVisita=clv&&clv.id===v.id;if(enVisita){clv=null;clPredio=v.predio;go("clp")}else{status();render()}toast("Visita eliminada.");return true}
   if(A==="clCerrar"){if(clRO())return true;const sc=puntaje(clv);
     const falt=itemsDe(clv).filter(it=>{const r=clv.items[it.key];return r&&esHallazgo(r.e)&&(!r.acc||!r.resp||!r.plazo)}).length;

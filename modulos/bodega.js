@@ -305,7 +305,7 @@ async function cbClick(A,b){
   if(A==="cbDelFoto"){if(cbRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=cbv.items[k];if(r&&r.fotos)r.fotos=r.fotos.filter(x=>x!==ref);borrarFotoRef(ref);cbTouch();cbRefresh(k);return true}
   if(A==="cbDel"){const c=CONT[b.dataset.id];if(!c||c.estado==="cerrado")return true;
     if(!(await ask("¿Eliminar este conteo?",`Conteo ${c.n} de ${c.bodega}. Se borran las cantidades, comentarios y fotos. No se puede deshacer.`,"Eliminar",true)))return true;
-    clearTimeout(LT[c.id]);delete LT[c.id];delete CONT[c.id];delete LOCAL[c.id];await localDel(c.id);if(DB){DELQ.add("conteos/"+c.id);saveDQ();schedSync(200)}
+    clearTimeout(LT[c.id]);delete LT[c.id];delete CONT[c.id];delete LOCAL[c.id];await localDel(c.id);if(DB){colaBorrar("conteos/"+c.id,c);schedSync(200)}
     Object.values(c.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));if(cbv&&cbv.id===c.id){cbv=null;go("cbb")}else{status();render()}toast("Conteo eliminado.");return true}
   if(A==="cbCerrar"){if(cbRO())return true;const R=resumenConteo(cbv);
     const msg=`${R.cont} de ${R.total} productos contados${R.total-R.cont?`; ${R.total-R.cont} quedan sin contar y saldrán así en el informe`:""}. ${R.dif?`${R.dif} con discrepancia (faltante ${fmtP(Math.abs(R.vf))}, sobrante ${fmtP(R.vs)})`:"Sin discrepancias"}${R.tol?`, ${R.tol} dentro de tolerancia`:""}. Al cerrar ya no se podrá modificar.`;
