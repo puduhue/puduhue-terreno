@@ -313,7 +313,7 @@ const normPat=x=>String(x||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
 /* patentes con acta de entrega de vehículo vigente (sin devolución cerrada) en el predio */
 function patentesPredio(pre){try{return [...new Set(Object.values(ACTAS).filter(a=>a.tipo==="vehiculo"&&a.mov!=="devolucion"&&!a.anulada&&predioDe(a)===pre&&!(a.devolucionId&&ACTAS[a.devolucionId]&&ACTAS[a.devolucionId].estado==="cerrada")).map(a=>normPat((a.veh||{}).patente)).filter(Boolean))].sort()}catch(e){return[]}}
 function clPatHTML(v,it,r,ro){const L=patentesPredio(v.predio),sel=r.pat||[],T=[...new Set(L.concat(sel))];
-  return `<div class="f clpat" style="margin:8px 0 14px"><label>Camionetas con problemas (patente)</label><div class="filt" style="margin:4px 0 0">${T.map(p=>`<button type="button" class="fb" data-a="clPat" data-k="${it.key}" data-v="${esc(p)}" aria-pressed="${sel.includes(p)}" ${ro?"disabled":""}>${esc(p)}</button>`).join("")}${ro?"":`<button type="button" class="fb" data-a="clPatOtra" data-k="${it.key}">+ Otra</button>`}</div>${T.length?"":`<span class="hint">No hay actas de vehículo de este predio en la app; agrega la patente con «+ Otra».</span>`}</div>`}
+  return `<div class="f clpat" style="margin:8px 0 14px"><label>Camionetas con problemas (patente)</label><div class="filt" style="margin:4px 0 0">${T.map(p=>`<button type="button" class="fb" data-a="clPat" data-k="${esc(it.key)}" data-v="${esc(p)}" aria-pressed="${sel.includes(p)}" ${ro?"disabled":""}>${esc(p)}</button>`).join("")}${ro?"":`<button type="button" class="fb" data-a="clPatOtra" data-k="${esc(it.key)}">+ Otra</button>`}</div>${T.length?"":`<span class="hint">No hay actas de vehículo de este predio en la app; agrega la patente con «+ Otra».</span>`}</div>`}
 
 /* ---------- v113: camionetas (patentes) desde las actas de entrega de vehículo ---------- */
 /* acta de entrega más reciente de una patente (no anulada) */
@@ -421,7 +421,7 @@ function clOrdenSet(o){if(!CL_ORDENES.some(x=>x[0]===o))return;try{localStorage.
 const semColor=p=>p===null||p===undefined?"n":p>=90?"v":p>=80?"a":"r";
 const SEM_INK={v:"var(--sm-v)",a:"var(--sm-a-ink)",r:"var(--sm-r)",n:"var(--muted)"};
 function semAnillo(p){const c=semColor(p),C=119.4;
-  return `<svg class="smr ${c}" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="19" class="bg"/>${c==="n"?"":`<circle cx="24" cy="24" r="19" class="fg" stroke-dasharray="${C}" stroke-dashoffset="${(C*(1-p/100)).toFixed(1)}" transform="rotate(-90 24 24)"/>`}<text x="24" y="28.5" text-anchor="middle"${p===100?' class="cien"':""}>${c==="n"?"–":p+"%"}</text></svg>`}
+  return `<svg class="smr ${c}" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="19" class="bg"/>${c==="n"?"":`<circle cx="24" cy="24" r="19" class="fg" stroke-dasharray="${esc(C)}" stroke-dashoffset="${(C*(1-p/100)).toFixed(1)}" transform="rotate(-90 24 24)"/>`}<text x="24" y="28.5" text-anchor="middle"${p===100?' class="cien"':""}>${c==="n"?"–":p+"%"}</text></svg>`}
 function sumarDias(iso,n){const d=new Date(iso+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function haceDias(f){if(!f)return"";const d=Math.round((new Date(today()+"T12:00:00Z")-new Date(String(f).slice(0,10)+"T12:00:00Z"))/864e5);
   return d<=0?"hoy":d===1?"ayer":`hace ${d} días`}
@@ -444,11 +444,11 @@ function semOrdenar(L,o){
 const SEM_CHEV=`<svg class="smv" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>`;
 function semFila(x){
   const ch=[];
-  if(x.ab)ch.push(`<span class="smc cur">Visita ${x.ab.n} en curso</span>`);
+  if(x.ab)ch.push(`<span class="smc cur">Visita ${esc(x.ab.n)} en curso</span>`);
   if(x.venc)ch.push(`<span class="smc rr">${x.venc} ${x.venc===1?"vencido":"vencidos"}</span>`);
   if(x.prox)ch.push(`<span class="smc aa">${x.prox} ${x.prox===1?"vence":"vencen"} esta semana</span>`);
   if(x.ult)ch.push(x.ha?`<span class="smc nn">${x.ha} ${x.ha===1?"hallazgo abierto":"hallazgos abiertos"}</span>`:`<span class="smc vv">Sin hallazgos</span>`);
-  const sub=x.ult?`Visita ${x.ult.n} · ${fmtD(x.ult.fecha)} · ${haceDias(x.ult.fecha)}`:x.ab?`Primera visita${x.ab.revisor?` · ${esc(x.ab.revisor)}`:""}`:"Todavía no se ha visitado";
+  const sub=x.ult?`Visita ${esc(x.ult.n)} · ${fmtD(x.ult.fecha)} · ${haceDias(x.ult.fecha)}`:x.ab?`Primera visita${x.ab.revisor?` · ${esc(x.ab.revisor)}`:""}`:"Todavía no se ha visitado";
   return `<button class="smrow" data-a="clPredio" data-p="${esc(x.p)}">${semAnillo(x.pct)}<span class="smt"><b>${esc(x.p)}</b>${clTipo==="camionetas"?`<span class="sms">${esc(cmDesc(x.p))}</span>`:""}<span class="sms">${sub}</span>${ch.length?`<span class="smch">${ch.join("")}</span>`:""}</span>${SEM_CHEV}</button>`;
 }
 function semListaHTML(){
@@ -456,7 +456,7 @@ function semListaHTML(){
   const tv=info.reduce((n,x)=>n+x.venc,0),th=info.reduce((n,x)=>n+x.ha,0),ts=info.filter(x=>x.sin).length;
   return `<div class="smres"><div${tv?' class="rr"':""}><b>${tv}</b><span>${tv===1?"acción con plazo vencido":"acciones con plazo vencido"}</span></div><div><b>${th}</b><span>${th===1?"hallazgo abierto":"hallazgos abiertos"}</span></div><div><b>${ts}</b><span>${ts===1?KC().uni+" sin visita":KC().unis+" sin visita"}</span></div></div>
     <div class="smol" id="smol">Ordenar por</div>
-    <div class="smord" role="group" aria-labelledby="smol">${CL_ORDENES.map(([k,t])=>`<button data-a="clOrden" data-o="${k}" aria-pressed="${k===o}">${t}</button>`).join("")}</div>
+    <div class="smord" role="group" aria-labelledby="smol">${CL_ORDENES.map(([k,t])=>`<button data-a="clOrden" data-o="${esc(k)}" aria-pressed="${k===o}">${t}</button>`).join("")}</div>
     <div class="smley"><span><i class="v"></i>90 % o más</span><span><i class="a"></i>80 a 89 %</span><span><i class="r"></i>menos de 80 %</span></div>
     <div class="list smlist">${lista.map(semFila).join("")}</div>${sin.length?`<div class="smsep">Sin visita <b>${sin.length}</b></div><div class="smsin">${sin.map(x=>`<button class="smsc" data-a="clPredio" data-p="${esc(x.p)}">${esc(x.p)}</button>`).join("")}</div>`:""}`;
 }
@@ -475,7 +475,7 @@ function renderCLHub(){
     <h1>Check list de cumplimiento</h1>
     <p class="lead">Elige qué vas a revisar. Cada visita compara con la anterior, los hallazgos quedan en seguimiento y el informe PDF se guarda en OneDrive.</p>
     <div class="start" style="grid-template-columns:1fr">
-      ${CL_HUB.map(([t,a,nom,desc],i)=>`<button class="big ${i===1?"dev":"ent"}" data-a="${a}"><strong>${nom}</strong><span>${desc}</span><span><b>${clHubCnt(t)}</b></span></button>`).join("")}
+      ${CL_HUB.map(([t,a,nom,desc],i)=>`<button class="big ${i===1?"dev":"ent"}" data-a="${esc(a)}"><strong>${nom}</strong><span>${desc}</span><span><b>${clHubCnt(t)}</b></span></button>`).join("")}
     </div>
     <p class="note">Versión ${APP_VER}</p>
   </main>`;
@@ -524,25 +524,25 @@ function evolHTML(vv){
   const alto=p=>p===null?0:Math.min(100,Math.max(4,(p-40)/60*100));
   return `<div class="evo"><div class="evt"><span>Cumplimiento ${c.length<vv.filter(v=>v.estado==="cerrada").length?`de las últimas ${c.length} visitas`:"por visita"}</span><span class="evl">- - meta 90 %</span></div>
     <div class="evb">${c.map(v=>{const p=puntaje(v).pct,k=semColor(p);
-      return `<button class="evc" data-a="clAbrir" data-id="${v.id}" aria-label="Visita ${v.n}, ${fmtD(v.fecha)}: ${p===null?"sin porcentaje":p+" %"}"><span class="evp ${k}">${p===null?"–":p}</span><span class="evr"><i class="${k}" style="height:${alto(p)}%"></i></span><span class="evn">V${v.n}</span></button>`}).join("")}</div></div>`;
+      return `<button class="evc" data-a="clAbrir" data-id="${esc(v.id)}" aria-label="Visita ${esc(v.n)}, ${fmtD(v.fecha)}: ${p===null?"sin porcentaje":p+" %"}"><span class="evp ${k}">${p===null?"–":p}</span><span class="evr"><i class="${esc(k)}" style="height:${alto(p)}%"></i></span><span class="evn">V${esc(v.n)}</span></button>`}).join("")}</div></div>`;
 }
 function visitaFilaHTML(v){const sc=puntaje(v);const c=v.estado==="cerrada",an=!!v.anulada;
   /* fila corta: el estado de sincronización solo aparece si falta subir algo, y «Registrada por» solo si no fue el mismo revisor */
   const sy=chipSync(v),syOk=sy.includes("xp ok"),au=autoriaTxt(v),auOtro=au&&v.creadoPor&&quien(v.creadoPor)!==v.revisor;
   const by=`${syOk?"":sy}${an?` <span class="aut">Anulada el ${fmtD(v.anulada.fecha)} por ${esc(quien(v.anulada.por))}${v.anulada.motivo?`: ${esc(v.anulada.motivo)}`:""}</span>`:auOtro?` <span class="aut">${autoriaHTML(v)}</span>`:""}`.trim();
-  return `<div class="card vcard${an?" anulada":""}"><button class="row" data-a="clAbrir" data-id="${v.id}">
+  return `<div class="card vcard${an?" anulada":""}"><button class="row" data-a="clAbrir" data-id="${esc(v.id)}">
       <span class="tag ${an?"none":c?"cerrada":"borrador"}">${an?"Anulada":c?"Cerrada":"En curso"}</span>
-      <span class="who">Visita ${v.n}</span>
+      <span class="who">Visita ${esc(v.n)}</span>
       <span class="where">${fmtD(v.fecha)}${v.revisor?` · ${esc(v.revisor)}`:""}${!c&&sc.rev?` · ${sc.rev} de ${itemsDe(v).length} ítems`:""}</span>
       <span class="st">${!an&&sc.pct!==null?`<b style="color:${SEM_INK[semColor(sc.pct)]}">${sc.pct} %</b>`:""}</span>
       ${by?`<span class="by">${by}</span>`:""}</button>
-      <button class="vmenu" data-a="clVMenu" data-id="${v.id}" aria-label="Opciones de la visita ${v.n}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
+      <button class="vmenu" data-a="clVMenu" data-id="${esc(v.id)}" aria-label="Opciones de la visita ${esc(v.n)}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button></div>`;
 }
 /* «⋯» de una visita: informe PDF y, según el caso, eliminar, anular o restaurar */
 function clVMenu(v){if(!v)return;const c=v.estado==="cerrada",an=!!v.anulada;
   const ops=[["clPdf","Informe PDF"]];if(!c)ops.push(["clDel","Eliminar visita",1]);if(c&&esAdmin())ops.push(an?["clRestaurar","Restaurar visita"]:["clAnular","Anular visita",1]);
   const m=document.createElement("div");m.className="modal";
-  m.innerHTML=`<div class="sheet vmsheet" role="dialog" aria-modal="true" aria-label="Visita ${v.n}"><h3>Visita ${v.n} · ${fmtD(v.fecha)}</h3><div class="vmops">${ops.map(o=>`<button class="btn${o[2]?" danger":""}" data-x="${o[0]}">${o[1]}</button>`).join("")}<button class="btn cancel" data-x="no">Cancelar</button></div></div>`;
+  m.innerHTML=`<div class="sheet vmsheet" role="dialog" aria-modal="true" aria-label="Visita ${esc(v.n)}"><h3>Visita ${esc(v.n)} · ${fmtD(v.fecha)}</h3><div class="vmops">${ops.map(o=>`<button class="btn${o[2]?" danger":""}" data-x="${o[0]}">${o[1]}</button>`).join("")}<button class="btn cancel" data-x="no">Cancelar</button></div></div>`;
   document.body.appendChild(m);
   m.addEventListener("click",e=>{e.stopPropagation();const t=e.target.closest&&e.target.closest("[data-x]");
     if(e.target===m||(t&&t.dataset.x==="no")){m.remove();return}
@@ -577,8 +577,8 @@ function renderCLPredio(){
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(p)}</h1>${clTipo==="camionetas"?`<p class="lead" style="margin-top:-6px">${esc(cmDesc(p))}</p>`:""}
     <div class="start" style="grid-template-columns:1fr">
-      ${ab?`<button class="big dev" data-a="clAbrir" data-id="${ab.id}"><strong>Continuar visita ${ab.n}</strong><span>Iniciada el ${fmtD(ab.fecha)}${ab.revisor?` por ${esc(ab.revisor)}`:""} · ${puntaje(ab).rev} de ${itemsDe(ab).length} ítems</span></button>`
-          :`<button class="big ent" data-a="clNueva" data-p="${esc(p)}"><strong>Nueva visita</strong><span>${vs.length?`Será la visita ${Math.max(...vs.map(v=>v.n))+1}${vv.some(v=>v.estado==="cerrada")?"; compara con la anterior ítem por ítem":""}`:`Primera visita a esta ${clTipo==="camionetas"?"camioneta":"unidad"}`.replace("esta unidad","este predio")}</span></button>`}
+      ${ab?`<button class="big dev" data-a="clAbrir" data-id="${esc(ab.id)}"><strong>Continuar visita ${esc(ab.n)}</strong><span>Iniciada el ${fmtD(ab.fecha)}${ab.revisor?` por ${esc(ab.revisor)}`:""} · ${puntaje(ab).rev} de ${itemsDe(ab).length} ítems</span></button>`
+          :`<button class="big ent" data-a="clNueva" data-p="${esc(p)}"><strong>Nueva visita</strong><span>${vs.length?`Será la visita ${esc(Math.max(...vs.map(v=>+v.n||0))+1)}${vv.some(v=>v.estado==="cerrada")?"; compara con la anterior ítem por ítem":""}`:`Primera visita a esta ${clTipo==="camionetas"?"camioneta":"unidad"}`.replace("esta unidad","este predio")}</span></button>`}
     </div>
     <div class="smord dos ptabs" role="tablist"><button role="tab" data-a="clPTab" data-t="hz" aria-pressed="${tab==="hz"}" aria-selected="${tab==="hz"}">Hallazgos <b>${ha.length}</b></button><button role="tab" data-a="clPTab" data-t="vis" aria-pressed="${tab==="vis"}" aria-selected="${tab==="vis"}">Visitas <b>${vs.length}</b></button></div>
     <div class="ppanel">${tab==="hz"?panelHz:panelVis}</div>
@@ -591,28 +591,28 @@ function clItemHTML(it){
   const v=clv,r=v.items[it.key]||{},prev=visitaAnterior(v),pr=prev&&prev.items&&prev.items[it.key],ro=clRO();
   const antes=pr&&pr.e?pr:null;
   const mejor=antes&&r.e&&esHallazgo(antes.e)&&r.e==="C",peor=antes&&r.e&&antes.e==="C"&&esHallazgo(r.e),sigue=antes&&r.e&&esHallazgo(antes.e)&&esHallazgo(r.e);
-  const prevHTML=antes?`<div class="prev ${antes.e}"><span class="chip ${antes.e==="N"?"M":antes.e==="P"?"R":antes.e==="C"?"B":"none"}">Visita ${prev.n}: ${CL_LABEL[antes.e]}</span>${antes.obs?`<span class="pobs">${esc(antes.obs)}</span>`:""}${(antes.fotos||[]).length?`<div class="strip">${antes.fotos.map(f=>thumb(f,it.key,false,true)).join("")}</div>`:""}${mejor?`<span class="res ok">Corregido</span>`:peor?`<span class="res bad">Empeoró</span>`:sigue?`<span class="res bad">Sigue sin corregirse</span>`:""}</div>`:"";
+  const prevHTML=antes?`<div class="prev ${antes.e}"><span class="chip ${antes.e==="N"?"M":antes.e==="P"?"R":antes.e==="C"?"B":"none"}">Visita ${esc(prev.n)}: ${CL_LABEL[antes.e]}</span>${antes.obs?`<span class="pobs">${esc(antes.obs)}</span>`:""}${(antes.fotos||[]).length?`<div class="strip">${antes.fotos.map(f=>thumb(f,it.key,false,true)).join("")}</div>`:""}${mejor?`<span class="res ok">Corregido</span>`:peor?`<span class="res bad">Empeoró</span>`:sigue?`<span class="res bad">Sigue sin corregirse</span>`:""}</div>`:"";
   const fotos=(r.fotos||[]);const canAdd=!ro&&fotos.length<MAXF;
   const plan=(esHallazgo(r.e)||(!r.e&&(r.acc||r.resp||r.plazo)))?`<div class="plan">
-    <input class="obs" data-clf="acc" data-k="${it.key}" value="${esc(r.acc)}" placeholder="Acción correctiva" ${ro?"disabled":""}>
-    <div class="plan2"><select data-clf="resp" data-k="${it.key}" ${ro?"disabled":""}><option value="">Responsable</option>${respDe(tipoDe(v)).map(x=>`<option ${r.resp===x?"selected":""}>${x}</option>`).join("")}</select><input type="date" data-clf="plazo" data-k="${it.key}" value="${esc(r.plazo||"")}" ${ro?"disabled":""}></div></div>`:"";
+    <input class="obs" data-clf="acc" data-k="${esc(it.key)}" value="${esc(r.acc)}" placeholder="Acción correctiva" ${ro?"disabled":""}>
+    <div class="plan2"><select data-clf="resp" data-k="${esc(it.key)}" ${ro?"disabled":""}><option value="">Responsable</option>${respDe(tipoDe(v)).map(x=>`<option ${r.resp===x?"selected":""}>${x}</option>`).join("")}</select><input type="date" data-clf="plazo" data-k="${esc(it.key)}" value="${esc(r.plazo||"")}" ${ro?"disabled":""}></div></div>`:"";
   const falta=tipoDe(v)==="camionetas"&&cmEntrega(v,it.key)==="si"&&r.e==="N";
   return `<div class="it cli${peor||sigue||falta?" worse":""}${it.key===clFocoDe(v)?" cli-actual":""}" id="cli-${it.key}">
-    <div class="nm"><span class="cod">${codigo(it)}${it.star?' <span class="star" title="Ítem clave"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.8z"/></svg></span>':""}</span>${canAdd?`<span class="addms">${ESCRITORIO()?`<label class="addf addm">${ICO_GAL}<span>Subir foto</span><input class="vh" type="file" accept="image/*" multiple data-clfoto="${it.key}"></label>`:`<label class="addf addm">${ICO_CAM}<span>Cámara</span><input class="vh" type="file" accept="image/*" capture="environment" data-clfoto="${it.key}"></label><label class="addf addm gal">${ICO_GAL}<span>Galería</span><input class="vh" type="file" accept="image/*" multiple data-clfoto="${it.key}"></label>`}</span>`:`<span class="grp">${esc(it.group)}</span>`}</div>
+    <div class="nm"><span class="cod">${codigo(it)}${it.star?' <span class="star" title="Ítem clave"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.8z"/></svg></span>':""}</span>${canAdd?`<span class="addms">${ESCRITORIO()?`<label class="addf addm">${ICO_GAL}<span>Subir foto</span><input class="vh" type="file" accept="image/*" multiple data-clfoto="${esc(it.key)}"></label>`:`<label class="addf addm">${ICO_CAM}<span>Cámara</span><input class="vh" type="file" accept="image/*" capture="environment" data-clfoto="${esc(it.key)}"></label><label class="addf addm gal">${ICO_GAL}<span>Galería</span><input class="vh" type="file" accept="image/*" multiple data-clfoto="${esc(it.key)}"></label>`}</span>`:`<span class="grp">${esc(it.group)}</span>`}</div>
     <div class="txt">${esc(it.txt)}</div>
     <div class="ref">${esc(it.prot)}${it.evid?` · <i>${esc(it.evid)}</i>`:""}</div>
     ${prevHTML}
     ${CL_PAT.includes(it.key)?clPatHTML(v,it,r,ro):""}
     ${(()=>{const en=tipoDe(v)==="camionetas"?cmEntrega(v,it.key):null;if(en===null)return"";return `<div class="cment"><span class="chip ${en==="si"?"B":en==="no"?"M":"none"}">Acta de entrega: ${en==="si"?"Sí":en==="no"?"No":"sin dato"}</span>${en==="no"?`<span class="note" style="margin:0">No se entregó: si sigue sin estar, marca N/A.</span>`:""}</div>`})()}
-    <div class="seg seg4" role="group">${["C","P","N","NA"].map(e=>`<button data-a="clRate" data-k="${it.key}" data-e="${e}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${CL_LABEL[e]}</span></button>`).join("")}</div>
-    ${fotos.length?`<div class="fotos"><div class="strip">${fotos.map(f=>ro?thumb(f,it.key,true,false):`<span class="thw">${thumb(f,it.key,true,false)}<button class="thx" data-a="clDelFoto" data-ref="${esc(f)}" data-k="${it.key}" aria-label="Eliminar foto">✕</button></span>`).join("")}</div></div>`:""}
-    ${r.e||r.obs||ro?`<input class="obs" data-clf="obs" data-k="${it.key}" value="${esc(r.obs)}" placeholder="Observación" ${ro?"disabled":""}>`:""}
+    <div class="seg seg4" role="group">${["C","P","N","NA"].map(e=>`<button data-a="clRate" data-k="${esc(it.key)}" data-e="${esc(e)}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${CL_LABEL[e]}</span></button>`).join("")}</div>
+    ${fotos.length?`<div class="fotos"><div class="strip">${fotos.map(f=>ro?thumb(f,it.key,true,false):`<span class="thw">${thumb(f,it.key,true,false)}<button class="thx" data-a="clDelFoto" data-ref="${esc(f)}" data-k="${esc(it.key)}" aria-label="Eliminar foto">✕</button></span>`).join("")}</div></div>`:""}
+    ${r.e||r.obs||ro?`<input class="obs" data-clf="obs" data-k="${esc(it.key)}" value="${esc(r.obs)}" placeholder="Observación" ${ro?"disabled":""}>`:""}
     ${plan}
   </div>`;
 }
 /* v113: datos de la camioneta en la revisión: acta, predio y kilometraje actual */
 function cmInfoHTML(v,ro){const a=actaPatente(v.predio),ve=(a&&a.veh)||{},i=cmKmInfo(v);
-  return `<div class="info cminfo"><b>${esc(v.predio)}</b>${a?` · ${esc([ve.tipoVeh,ve.marca,ve.modelo,ve.anio].filter(Boolean).join(" "))}<br><span class="note" style="margin:0">Acta de entrega del ${fmtD(a.fecha)}${a.conductor?` a ${esc(a.conductor)}`:""}${ve.km?` · ${kmNum(ve.km).toLocaleString("es-CL")} km`:""}</span> <button class="lnk" data-a="axOpen" data-id="${a.id}">Ver acta</button>`:`<br><span class="note" style="margin:0">No hay acta de entrega de esta camioneta en la app.</span>`}</div>
+  return `<div class="info cminfo"><b>${esc(v.predio)}</b>${a?` · ${esc([ve.tipoVeh,ve.marca,ve.modelo,ve.anio].filter(Boolean).join(" "))}<br><span class="note" style="margin:0">Acta de entrega del ${fmtD(a.fecha)}${a.conductor?` a ${esc(a.conductor)}`:""}${ve.km?` · ${kmNum(ve.km).toLocaleString("es-CL")} km`:""}</span> <button class="lnk" data-a="axOpen" data-id="${esc(a.id)}">Ver acta</button>`:`<br><span class="note" style="margin:0">No hay acta de entrega de esta camioneta en la app.</span>`}</div>
   <div class="grid2"><div class="f"><label for="cmkm">Kilometraje actual</label><input id="cmkm" data-clenc="km" inputmode="numeric" value="${esc(v.km||"")}" placeholder="Lo que marca el tablero" ${ro?"disabled":""}></div>
     <div class="f"><label for="cmpre">Predio</label><select id="cmpre" data-clenc="predioCampo" ${ro?"disabled":""}><option value="">Elige</option>${(typeof AX_PREDIOS!=="undefined"?AX_PREDIOS:PREDIOS).map(p=>`<option ${v.predioCampo===p?"selected":""}>${esc(p)}</option>`).join("")}${v.predioCampo&&!(typeof AX_PREDIOS!=="undefined"?AX_PREDIOS:PREDIOS).includes(v.predioCampo)?`<option selected>${esc(v.predioCampo)}</option>`:""}</select></div></div>
   <p class="note" id="cmkmtx" style="margin-top:-4px">${esc(cmKmTxt(i))}</p>`}
@@ -623,26 +623,26 @@ function renderCLV(){
   const areaItems=TODOS.filter(i=>i.area===clArea);
   const items=areaItems.filter(it=>{const r=v.items[it.key]||{};const pr=prev&&prev.items&&prev.items[it.key];
     if(clFiltro==="pend")return!r.e;if(clFiltro==="hall")return pr&&esHallazgo(pr.e);if(clFiltro==="mal")return esHallazgo(r.e);return true});
-  const tabs=AR.map(a=>{const sc=puntaje(v,i=>i.area===a.id);const tot=TODOS.filter(i=>i.area===a.id).length;return `<button class="tab${tot&&sc.rev===tot?" lista":""}" data-a="clArea" data-area="${a.id}" aria-selected="${a.id===clArea}">${esc(a.name)}<small>${tot&&sc.rev===tot?"✓ ":""}${sc.rev}/${tot}</small></button>`}).join("");
+  const tabs=AR.map(a=>{const sc=puntaje(v,i=>i.area===a.id);const tot=TODOS.filter(i=>i.area===a.id).length;return `<button class="tab${tot&&sc.rev===tot?" lista":""}" data-a="clArea" data-area="${esc(a.id)}" aria-selected="${a.id===clArea}">${esc(a.name)}<small>${tot&&sc.rev===tot?"✓ ":""}${sc.rev}/${tot}</small></button>`}).join("");
   const nHall=prev?areaItems.filter(it=>{const pr=prev.items&&prev.items[it.key];return pr&&esHallazgo(pr.e)}).length:0;
   const groups=[];items.forEach(it=>{const g=groups.find(x=>x.b===it.sheet&&x.g===it.group);if(g)g.items.push(it);else groups.push({b:it.sheet,fam:it.fam,g:it.group,items:[it]})});
   const body=groups.map(g=>`<section class="sec"><h3>${g.b==="cm"?"":esc(g.fam)+" · "}${esc(g.g)}</h3>${g.g==="Camionetas"?camionetasPanel(v):""}${g.items.map(clItemHTML).join("")}</section>`).join("")||`<div class="empty">${clFiltro==="pend"?"Todo revisado en esta área.":clFiltro==="hall"?"No hay hallazgos de la visita anterior en esta área.":"Nada que mostrar."}</div>`;
   return `<div class="top"><div class="in">
-    <div class="bar"><button class="back" data-a="clPredioBack">${esc(v.predio)}</button><div class="ttl">Visita ${v.n}</div>${estadoChip()}</div>
+    <div class="bar"><button class="back" data-a="clPredioBack">${esc(v.predio)}</button><div class="ttl">Visita ${esc(v.n)}</div>${estadoChip()}</div>
     ${AR.length>1?`<nav class="tabs">${tabs}</nav>`:""}</div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     ${v.anulada?`<div class="info netbox"><b>Visita anulada</b> el ${fmtD(v.anulada.fecha)} por ${esc(quien(v.anulada.por))}${v.anulada.motivo?`: ${esc(v.anulada.motivo)}`:""}. No cuenta para los hallazgos ni el porcentaje.</div>`:ro?`<div class="info lock">Visita cerrada el ${fmtD(v.cerrada)}. Ya no se puede modificar.</div>`:""}
-    ${v.traspaso?`<div class="info">Traspasada desde la visita ${v.traspaso.n} del Check list de visitas, donde se revisó la bodega.</div>`:VIS["bod-"+v.id]?`<div class="info">Lo revisado de bodega en esta visita está ahora en el Check list de bodega (visita ${VIS["bod-"+v.id].n}). <button class="lnk" data-a="clAbrir" data-id="bod-${esc(v.id)}">Abrir</button></div>`:""}
+    ${v.traspaso?`<div class="info">Traspasada desde la visita ${esc(v.traspaso.n)} del Check list de visitas, donde se revisó la bodega.</div>`:VIS["bod-"+v.id]?`<div class="info">Lo revisado de bodega en esta visita está ahora en el Check list de bodega (visita ${VIS["bod-"+v.id].n}). <button class="lnk" data-a="clAbrir" data-id="bod-${esc(v.id)}">Abrir</button></div>`:""}
     ${clEncHTML(v,ro,KV)}
     ${tipoDe(v)==="camionetas"?cmInfoHTML(v,ro):""}
-    ${prev?`<p class="note" style="margin-top:0">Comparando con la visita ${prev.n} (${fmtD(prev.fecha)}).</p>`:`<p class="note" style="margin-top:0">Primera visita a ${tipoDe(v)==="camionetas"?"esta camioneta":"este predio"}: no hay comparación anterior.</p>`}
+    ${prev?`<p class="note" style="margin-top:0">Comparando con la visita ${esc(prev.n)} (${fmtD(prev.fecha)}).</p>`:`<p class="note" style="margin-top:0">Primera visita a ${tipoDe(v)==="camionetas"?"esta camioneta":"este predio"}: no hay comparación anterior.</p>`}
     ${clProgHTML()}
     ${ro?"":disUnoSwitchHTML()}
-    <div class="filt"${DIS.uno&&!ro?" hidden":""}>${[["all","Todos"],["pend",`Sin revisar${(()=>{const n=areaItems.filter(i=>!(v.items[i.key]||{}).e).length;return n?` (${n})`:""})()}`],["hall",`Hallazgos anteriores${nHall?` (${nHall})`:""}`],["mal","Parcial / No cumple"]].map(([k,t])=>`<button class="fb" data-a="clFiltro" data-f="${k}" aria-pressed="${clFiltro===k}">${t}</button>`).join("")}</div>
+    <div class="filt"${DIS.uno&&!ro?" hidden":""}>${[["all","Todos"],["pend",`Sin revisar${(()=>{const n=areaItems.filter(i=>!(v.items[i.key]||{}).e).length;return n?` (${n})`:""})()}`],["hall",`Hallazgos anteriores${nHall?` (${nHall})`:""}`],["mal","Parcial / No cumple"]].map(([k,t])=>`<button class="fb" data-a="clFiltro" data-f="${esc(k)}" aria-pressed="${clFiltro===k}">${t}</button>`).join("")}</div>
     <h1 style="font-size:22px">${esc(AREA_NAME[clArea])}</h1>
     ${DIS.uno&&!ro?disUnoHTML(v):body}
-    <div class="btns">${ro?`<button class="btn" data-a="clPdf" data-id="${v.id}">Informe PDF</button><button class="btn pri" data-a="clPredioBack">Volver al predio</button>`:`<button class="btn" data-a="clPdf" data-id="${v.id}">Informe PDF (borrador)</button><button class="btn pri" data-a="clCerrar">Cerrar visita</button>`}</div>
-    ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn danger" data-a="clDel" data-id="${v.id}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar esta visita</button></div>${disTip("cldel",`Si la abriste por error, elimínala: se borran sus respuestas y fotos. Para salir sin cerrar, usa «${esc(v.predio)}» arriba; la visita queda en curso.`)}`}
+    <div class="btns">${ro?`<button class="btn" data-a="clPdf" data-id="${esc(v.id)}">Informe PDF</button><button class="btn pri" data-a="clPredioBack">Volver al predio</button>`:`<button class="btn" data-a="clPdf" data-id="${esc(v.id)}">Informe PDF (borrador)</button><button class="btn pri" data-a="clCerrar">Cerrar visita</button>`}</div>
+    ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn danger" data-a="clDel" data-id="${esc(v.id)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar esta visita</button></div>${disTip("cldel",`Si la abriste por error, elimínala: se borran sus respuestas y fotos. Para salir sin cerrar, usa «${esc(v.predio)}» arriba; la visita queda en curso.`)}`}
   </main>${clBarHTML()}`;
 }
 function clRefreshItem(v,k){if(clv!==v||view!=="clv")return;const el=$("#cli-"+k);const it=itemDe(v,k);if(el&&it)el.outerHTML=clItemHTML(it);const p=$("#clprog");if(p)p.outerHTML=clProgHTML();const cb=$("#clbar");if(cb)cb.outerHTML=clBarHTML();const fp=document.querySelector('[data-a="clFiltro"][data-f="pend"]');if(fp){const n=itemsDe(v).filter(i=>i.area===clArea&&!(v.items[i.key]||{}).e).length;fp.textContent="Sin revisar"+(n?` (${n})`:"")}}
@@ -651,11 +651,11 @@ function clRefreshItem(v,k){if(clv!==v||view!=="clv")return;const el=$("#cli-"+k
 function clHallazgoModal(p,k){
   const H=hallazgos(p)[k];const it=(H&&H.it)||CL_BYKEY[k];if(!it)return;const vs=visitasDe(p).filter(v=>v.estado==="cerrada");const ab=visitaAbierta(p);
   const hist=vs.map(v=>{const r=v.items&&v.items[k];if(!r||!r.e)return"";const fotos=(r.fotos||[]);const cls=r.e==="N"?"M":r.e==="P"?"R":r.e==="C"?"B":"none";
-    return `<div class="hh ${r.e}"><div class="hhl"><span class="chip ${cls}">${CL_LABEL[r.e]}</span><b>Visita ${v.n}</b><span class="hhd">${fmtD(v.fecha)}${v.revisor?` · ${esc(v.revisor)}`:""}</span></div>
+    return `<div class="hh ${r.e}"><div class="hhl"><span class="chip ${cls}">${CL_LABEL[r.e]}</span><b>Visita ${esc(v.n)}</b><span class="hhd">${fmtD(v.fecha)}${v.revisor?` · ${esc(v.revisor)}`:""}</span></div>
       ${clObs(r)?`<div class="hho">${esc(clObs(r))}</div>`:""}
       ${(r.acc||r.resp||r.plazo)&&esHallazgo(r.e)?`<div class="hhp">${r.acc?`<b>Acción:</b> ${esc(r.acc)}. `:""}${r.resp?`<b>Resp.:</b> ${esc(r.resp)}. `:""}${r.plazo?`<b>Plazo:</b> ${fmtD(r.plazo)}`:""}</div>`:""}
       ${fotos.length?`<div class="strip">${fotos.map(f=>thumb(f,k,false,false)).join("")}</div>`:""}
-      <div class="hhb"><button class="mini" data-m="visita" data-id="${v.id}">Abrir visita ${v.n}</button></div></div>`}).filter(Boolean).reverse().join("");
+      <div class="hhb"><button class="mini" data-m="visita" data-id="${esc(v.id)}">Abrir visita ${esc(v.n)}</button></div></div>`}).filter(Boolean).reverse().join("");
   const estado=H?(H.estado==="abierto"?`<span class="xp camb">Abierto desde la visita ${H.desde.v} (${fmtD(H.desde.fecha)})${H.visitas>1?` · ${H.visitas} visitas seguidas`:""}</span>`:H.estado==="cerrado"?`<span class="xp ok">Corregido en la visita ${H.cerrado.v} (${fmtD(H.cerrado.fecha)})</span>`:`<span class="xp ok">Sin hallazgo</span>`):"";
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet hzs" role="dialog" aria-modal="true" aria-label="Detalle del hallazgo">
@@ -666,7 +666,7 @@ function clHallazgoModal(p,k){
     ${H&&H.estado==="abierto"&&(H.plan.acc||H.plan.resp||H.plan.plazo)?`<div class="info" style="margin:0 0 12px"><b>Plan de acción vigente</b><br>${H.plan.acc?`${esc(H.plan.acc)}<br>`:""}${H.plan.resp?`Responsable: ${esc(H.plan.resp)}`:""}${H.plan.plazo?` · Plazo: <span class="${H.plan.plazo<today()?"venc":""}">${fmtD(H.plan.plazo)}${H.plan.plazo<today()?" (vencido)":""}</span>`:""}</div>`:""}
     <h4 class="lx-h2" style="margin:0 0 8px">Historial</h4>
     <div class="hhist">${hist||`<div class="empty">Sin evaluaciones en visitas cerradas.</div>`}</div>
-    <div class="btns">${ab?`<button class="btn pri" data-m="visita" data-id="${ab.id}" style="flex:1">Ir a la visita ${ab.n} en curso</button>`:`<button class="btn pri" data-m="nueva" style="flex:1">Nueva visita para revisarlo</button>`}</div>
+    <div class="btns">${ab?`<button class="btn pri" data-m="visita" data-id="${esc(ab.id)}" style="flex:1">Ir a la visita ${esc(ab.n)} en curso</button>`:`<button class="btn pri" data-m="nueva" style="flex:1">Nueva visita para revisarlo</button>`}</div>
   </div>`;
   document.body.appendChild(m);document.body.style.overflow="hidden";
   const close=()=>{m.remove();document.body.style.overflow=""};
@@ -685,12 +685,12 @@ function renderCLCat(){
   const q=catQ.trim().toLowerCase();
   const lista=CL_ITEMS.filter(i=>i.area===catArea&&(!q||[i.txt,i.group,i.prot,codigo(i)].join(" ").toLowerCase().includes(q)));
   const grupos=[];lista.forEach(i=>{const g=grupos.find(x=>x.sheet===i.sheet&&x.g===i.group);if(g)g.items.push(i);else grupos.push({sheet:i.sheet,fam:i.fam,g:i.group,items:[i]})});
-  const ARC=areasDe(clTipo);const tabs=ARC.map(a=>`<button class="tab" data-a="clCatArea" data-area="${a.id}" aria-selected="${a.id===catArea}">${esc(a.name)}<small>${CL_ITEMS.filter(i=>i.area===a.id&&!i.retirado).length}</small></button>`).join("");
+  const ARC=areasDe(clTipo);const tabs=ARC.map(a=>`<button class="tab" data-a="clCatArea" data-area="${esc(a.id)}" aria-selected="${a.id===catArea}">${esc(a.name)}<small>${CL_ITEMS.filter(i=>i.area===a.id&&!i.retirado).length}</small></button>`).join("");
   const card=i=>{const hist=itemConHistorial(i.key);return `<div class="it cat${i.retirado?" ret":""}" id="cat-${esc(i.key)}">
     <div class="nm"><span class="cod">${codigo(i)}${i.retirado?' <span class="xp nueva">Retirado</span>':""}</span><label class="chk"><input type="checkbox" data-cat="star" data-k="${esc(i.key)}" ${i.star?"checked":""}> Ítem clave ★</label></div>
     <label class="f"><span>Ítem</span><textarea data-cat="txt" data-k="${esc(i.key)}" rows="2">${esc(i.txt)}</textarea></label>
     <div class="plan2"><label class="f"><span>Referencia</span><input data-cat="prot" data-k="${esc(i.key)}" value="${esc(i.prot||"")}"></label><label class="f"><span>Cómo verificar</span><input data-cat="evid" data-k="${esc(i.key)}" value="${esc(i.evid||"")}"></label></div>
-    <div class="plan2"><label class="f"><span>Grupo</span><input data-cat="group" data-k="${esc(i.key)}" value="${esc(i.group)}" list="dl-grupos"></label><label class="f"><span>Área</span><select data-cat="area" data-k="${esc(i.key)}">${AREAS.map(a=>`<option value="${a.id}" ${a.id===i.area?"selected":""}>${esc(a.name)}</option>`).join("")}</select></label></div>
+    <div class="plan2"><label class="f"><span>Grupo</span><input data-cat="group" data-k="${esc(i.key)}" value="${esc(i.group)}" list="dl-grupos"></label><label class="f"><span>Área</span><select data-cat="area" data-k="${esc(i.key)}">${AREAS.map(a=>`<option value="${esc(a.id)}" ${a.id===i.area?"selected":""}>${esc(a.name)}</option>`).join("")}</select></label></div>
     <div class="acts">${i.retirado?`<button class="mini" data-a="clCatRest" data-k="${esc(i.key)}">Volver a activar</button>`:hist?`<button class="mini danger" data-a="clCatRet" data-k="${esc(i.key)}">Retirar</button>`:`<button class="mini danger" data-a="clCatDel" data-k="${esc(i.key)}">Eliminar</button>`}${hist?`<span class="note" style="margin:0;align-self:center">Con historial en visitas</span>`:""}</div></div>`};
   const body=grupos.map(g=>`<section class="sec"><h3>${esc(g.fam)} · ${esc(g.g)}</h3>${g.items.map(card).join("")}</section>`).join("")||`<div class="empty">Ningún ítem coincide.</div>`;
   const grupos_dl=[...new Set(CL_ITEMS.map(i=>i.group))].map(g=>`<option value="${esc(g)}">`).join("");
@@ -770,7 +770,7 @@ async function clClick(A,b){
   if(A==="clEncOk"){clEncAb[clv.id]=false;render();return true}
   if(A==="clDelFoto"){if(clRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=clv.items[k];if(r&&r.fotos){r.fotos=r.fotos.filter(x=>x!==ref)}borrarFotoRef(ref);clTouch();clRefreshItem(clv,k);return true}
   if(A==="clDel"){const v=VIS[b.dataset.id];if(!v||v.estado==="cerrada")return true;
-    if(!(await ask("¿Eliminar esta visita?",`Visita ${v.n} a ${v.predio}. Se borran las respuestas y las fotos. No se puede deshacer.`,"Eliminar",true)))return true;
+    if(!(await ask("¿Eliminar esta visita?",`Visita ${esc(v.n)} a ${v.predio}. Se borran las respuestas y las fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     clearTimeout(LT[v.id]);delete LT[v.id];delete VIS[v.id];delete LOCAL[v.id];await localDel(v.id);if(DB){colaBorrar("visitas/"+v.id,v);schedSync(200)}
     Object.values(v.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));const enVisita=clv&&clv.id===v.id;if(enVisita){clv=null;clPredio=v.predio;go("clp")}else{status();render()}toast("Visita eliminada.");return true}
   if(A==="clCerrar"){if(clRO())return true;const sc=puntaje(clv);
@@ -781,12 +781,12 @@ async function clClick(A,b){
     const vv=clv,p=clv.predio;exito("Visita cerrada","Los hallazgos quedaron en seguimiento.");clv=null;clPredio=p;go("clp");
     if(DB&&navigator.onLine!==false)clTrasCierre(p,vv);return true}
   if(A==="clAnular"){const v=VIS[b.dataset.id];if(!v||!esAdmin()||v.estado!=="cerrada")return true;
-    const ok=await ask(`¿Anular la visita ${v.n} a ${v.predio}?`,"Dejará de contar para los hallazgos y el porcentaje. Queda registrada como anulada con el motivo y tu nombre; se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: visita de prueba"></div>`);
+    const ok=await ask(`¿Anular la visita ${esc(v.n)} a ${v.predio}?`,"Dejará de contar para los hallazgos y el porcentaje. Queda registrada como anulada con el motivo y tu nombre; se puede restaurar.","Anular",true,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" placeholder="Ej.: visita de prueba"></div>`);
     if(!ok)return true;const mot=(document.querySelector("#motAn")||{}).value||"";
-    v.anulada={por:yo(),fecha:today(),motivo:mot.trim()};v.actualizado=new Date().toISOString();await saveVis(v);render();toast(`Visita ${v.n} anulada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
+    v.anulada={por:yo(),fecha:today(),motivo:mot.trim()};v.actualizado=new Date().toISOString();await saveVis(v);render();toast(`Visita ${esc(v.n)} anulada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
   if(A==="clRestaurar"){const v=VIS[b.dataset.id];if(!v||!esAdmin())return true;
-    if(!(await ask(`¿Restaurar la visita ${v.n}?`,"Volverá a contar para los hallazgos y el porcentaje.","Restaurar")))return true;
-    delete v.anulada;v.actualizado=new Date().toISOString();await saveVis(v);render();toast(`Visita ${v.n} restaurada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
+    if(!(await ask(`¿Restaurar la visita ${esc(v.n)}?`,"Volverá a contar para los hallazgos y el porcentaje.","Restaurar")))return true;
+    delete v.anulada;v.actualizado=new Date().toISOString();await saveVis(v);render();toast(`Visita ${esc(v.n)} restaurada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
   if(A==="clPdf"){const v=VIS[b.dataset.id];if(v)await clPdf(v);return true}
   if(A==="clXlsx"){await clXlsx(b.dataset.p,true,clTipo);return true}
   return false;
@@ -839,12 +839,12 @@ async function clCarpeta(segs,tipo){
     CLPATH[path]=id;parent=id}
   return parent;
 }
-const carpetaVisita=v=>[v.predio,`${v.fecha} Visita ${v.n}`];
+const carpetaVisita=v=>[v.predio,`${v.fecha} Visita ${esc(v.n)}`];
 async function clSubir(segs,name,blob,type,tipo){const folder=await clCarpeta(segs,tipo);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
 function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   const vs=validas(p,tipo).filter(v=>v.estado==="cerrada");const wb=XLSX.utils.book_new();const anul=visitasDe(p,tipo).filter(v=>v.anulada);
   const H=hallazgos(p,tipo);
-  const head=["Área","Tipo","Código","Ítem","Referencia","Cómo verificar"].concat(vs.map(v=>`V${v.n} ${fmtD(v.fecha)}`)).concat(["Estado hallazgo","Abierto desde","Acción","Responsable","Plazo","Última observación"]);
+  const head=["Área","Tipo","Código","Ítem","Referencia","Cómo verificar"].concat(vs.map(v=>`V${esc(v.n)} ${fmtD(v.fecha)}`)).concat(["Estado hallazgo","Abierto desde","Acción","Responsable","Plazo","Última observación"]);
   const rows=[head];const UNION=catalogoUnion(vs,tipo);const SEC=seccionesDe(tipo,UNION);
   UNION.forEach(it=>{const h=H[it.key];rows.push([it.areaName,it.fam,codigo(it)+(it.star?" ★":"")+(it.retirado?" (retirado)":""),it.txt,it.prot,it.evid].concat(vs.map(v=>{const r=v.items&&v.items[it.key];return r&&r.e?CL_LABEL[r.e]:""})).concat([h?(h.estado==="abierto"?"Abierto":h.estado==="cerrado"?`Corregido en V${h.cerrado.v}`:"OK"):"",h&&h.estado==="abierto"?`V${h.desde.v} ${fmtD(h.desde.fecha)}`:"",h&&h.estado==="abierto"?h.plan.acc:"",h&&h.estado==="abierto"?h.plan.resp:"",h&&h.estado==="abierto"?fmtD(h.plan.plazo):"",h&&h.ultima?h.ultima.obs:""]))});
   const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:14},{wch:16},{wch:9},{wch:60},{wch:32},{wch:30}].concat(vs.map(()=>({wch:14}))).concat([{wch:18},{wch:16},{wch:40},{wch:22},{wch:12},{wch:40}]);ws["!freeze"]={xSplit:4,ySplit:1};
@@ -852,9 +852,9 @@ function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   /* Resumen por visita y área */
   const CMX=tipo==="camionetas";
   const res=[["Visita","Fecha","Revisor",CLK[tipo].acompX].concat(SEC.map(a=>a.name)).concat(["Total","Ítems revisados","Hallazgos (P/N)"]).concat(CMX?["Predio","Kilometraje","Recorrido desde la entrega"]:[])];
-  vs.forEach(v=>{const t=puntaje(v),ki=CMX?cmKmInfo(v):null;res.push([`V${v.n}`,fmtD(v.fecha),v.revisor||"",v.administrador||""].concat(SEC.map(a=>{const s=puntaje(v,a.f);return s.pct===null?"":s.pct/100})).concat([t.pct===null?"":t.pct/100,t.rev,itemsDe(v).filter(i=>{const r=v.items&&v.items[i.key];return r&&esHallazgo(r.e)}).length]).concat(CMX?[v.predioCampo||"",ki?ki.k:"",ki&&ki.rec!=null?ki.rec:""]:[]))});
+  vs.forEach(v=>{const t=puntaje(v),ki=CMX?cmKmInfo(v):null;res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",v.administrador||""].concat(SEC.map(a=>{const s=puntaje(v,a.f);return s.pct===null?"":s.pct/100})).concat([t.pct===null?"":t.pct/100,t.rev,itemsDe(v).filter(i=>{const r=v.items&&v.items[i.key];return r&&esHallazgo(r.e)}).length]).concat(CMX?[v.predioCampo||"",ki?ki.k:"",ki&&ki.rec!=null?ki.rec:""]:[]))});
   const wr=XLSX.utils.aoa_to_sheet(res);for(let r=1;r<res.length;r++)for(let c=4;c<4+SEC.length+1;c++){const cell=wr[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z="0%"}
-  if(anul.length){res.push([]);res.push(["Visitas anuladas (no cuentan)"]);anul.forEach(v=>res.push([`V${v.n}`,fmtD(v.fecha),v.revisor||"",`Anulada el ${fmtD(v.anulada.fecha)} por ${quien(v.anulada.por)}${v.anulada.motivo?": "+v.anulada.motivo:""}`]))}
+  if(anul.length){res.push([]);res.push(["Visitas anuladas (no cuentan)"]);anul.forEach(v=>res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",`Anulada el ${fmtD(v.anulada.fecha)} por ${quien(v.anulada.por)}${v.anulada.motivo?": "+v.anulada.motivo:""}`]))}
   XLSX.utils.book_append_sheet(wb,wr,"Resumen");
   /* Hallazgos abiertos */
   const hz=[["Área","Código","Ítem","Estado","Abierto desde","Visitas seguidas","Última observación","Acción","Responsable","Plazo","Vencido"]];
@@ -863,7 +863,7 @@ function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   XLSX.utils.book_append_sheet(wb,wh,"Hallazgos abiertos");
   /* Fotos con enlace */
   const fr=[["Visita","Fecha","Área","Código","Ítem","Resultado","Observación","Foto"]];const links=[];
-  vs.forEach(v=>itemsDe(v).forEach(it=>{const r=v.items&&v.items[it.key];if(!r||!(r.fotos||[]).length)return;r.fotos.forEach(f=>{const u=v.fotoUrl&&v.fotoUrl[f];fr.push([`V${v.n}`,fmtD(v.fecha),it.areaName,codigo(it),it.txt,r.e?CL_LABEL[r.e]:"",r.obs||"",u?"Abrir foto":"(pendiente de subir)"]);if(u)links.push([fr.length-1,u])})}));
+  vs.forEach(v=>itemsDe(v).forEach(it=>{const r=v.items&&v.items[it.key];if(!r||!(r.fotos||[]).length)return;r.fotos.forEach(f=>{const u=v.fotoUrl&&v.fotoUrl[f];fr.push([`V${esc(v.n)}`,fmtD(v.fecha),it.areaName,codigo(it),it.txt,r.e?CL_LABEL[r.e]:"",r.obs||"",u?"Abrir foto":"(pendiente de subir)"]);if(u)links.push([fr.length-1,u])})}));
   const wf=XLSX.utils.aoa_to_sheet(fr);wf["!cols"]=[{wch:8},{wch:12},{wch:14},{wch:9},{wch:50},{wch:12},{wch:40},{wch:14}];
   links.forEach(([r,u])=>{const c=wf[XLSX.utils.encode_cell({r,c:7})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});
   XLSX.utils.book_append_sheet(wb,wf,"Fotos");
@@ -892,12 +892,12 @@ async function clPdf(v,subir){
   const titulo=t=>{chk(14);d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(15,39,64);d.text(t,L,y);d.setTextColor(0);y+=6.5};
   /* encabezado */
   d.setFillColor(141,179,226);d.rect(L,y,W,21,"F");try{d.addImage(LOGO,"JPEG",L+2,y+1.5,20,18)}catch(e){}
-  d.setFont("helvetica","bold");d.setFontSize(14);d.setTextColor(15,39,64);d.text(KV.pdf,L+26,y+9);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${v.n} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+26,y+16);d.setTextColor(0);y+=27;
+  d.setFont("helvetica","bold");d.setFontSize(14);d.setTextColor(15,39,64);d.text(KV.pdf,L+26,y+9);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+26,y+16);d.setTextColor(0);y+=27;
   d.setFontSize(9.5);d.text(`Revisor(es): ${v.revisor||"-"}`,L,y);d.text(`${KV.acomp}: ${v.administrador||"-"}`,L+95,y);y+=5;
   if(TV==="camionetas"){const a=actaPatente(v.predio),ve=(a&&a.veh)||{},ki=cmKmInfo(v);
     d.text(`Camioneta: ${[ve.tipoVeh,ve.marca,ve.modelo,ve.anio].filter(Boolean).join(" ")||"-"} · Predio: ${v.predioCampo||"-"}${a?` · Acta de entrega del ${fmtD(a.fecha)}`:" · sin acta de entrega en la app"}`,L,y);y+=5;
     d.text(`Kilometraje: ${ki?ki.k.toLocaleString("es-CL")+" km":"-"}${ki?" · "+cmKmTxt(ki):""}`,L,y);y+=5}
-  d.text(`Comparado con: ${prev?`visita ${prev.n} del ${fmtD(prev.fecha)}`:"sin visita anterior"}`,L,y);y+=8;
+  d.text(`Comparado con: ${prev?`visita ${esc(prev.n)} del ${fmtD(prev.fecha)}`:"sin visita anterior"}`,L,y);y+=8;
   /* 1. resumen por área */
   titulo("Resumen");d.setFontSize(8.5);
   const colsR=[60,24,24,24,24,24];const SECV=seccionesDe(TV,ITV);const headR=[SECV.col,"Cumple","Parcial","No cumple","Evaluados","Cumplimiento"];
@@ -914,7 +914,7 @@ async function clPdf(v,subir){
     d.setFont("helvetica","italic");d.setFontSize(8.5);d.setTextColor(90);const l=d.splitTextToSize(`No se incluyen ${nNA===1?"el punto marcado":"los "+nNA+" puntos marcados"} como N/A (no aplica).${q}`,W);d.text(l,L,y-1);y+=l.length*3.8+2.5;d.setTextColor(0);d.setFont("helvetica","normal")}
   if(!ITA.length){d.setFontSize(9.5);d.text("Ningún punto aplicaba en esta visita.",L,y+2);y+=8}
   const cmp=!!prev;
-  const cols=cmp?[{t:"Código",w:15},{t:"Punto revisado",w:105},{t:`Visita ${prev.n}`,w:28},{t:"Resultado",w:32}]:[{t:"Código",w:15},{t:"Punto revisado",w:133},{t:"Resultado",w:32}];
+  const cols=cmp?[{t:"Código",w:15},{t:"Punto revisado",w:105},{t:`Visita ${esc(prev.n)}`,w:28},{t:"Resultado",w:32}]:[{t:"Código",w:15},{t:"Punto revisado",w:133},{t:"Resultado",w:32}];
   const thead=()=>{chk(8);d.setFillColor(221,235,247);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);let x=L;cols.forEach(c=>{d.text(c.t,x+1.5,y);x+=c.w});d.setFont("helvetica","normal");y+=4};
   const chip=(e,x,w,yy)=>{const t=e?CL_LABEL[e]:"Sin revisar";const fc=e?FILL[e]:[245,245,245],tc=e?COL[e]:[130,130,130];d.setFillColor(...fc);d.roundedRect(x+1,yy-3.6,w-2,5,1.2,1.2,"F");d.setFont("helvetica","bold");d.setFontSize(7.8);d.setTextColor(...tc);d.text(t,x+w/2,yy,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal")};
   SECV.forEach(a=>{
@@ -946,7 +946,7 @@ async function clPdf(v,subir){
   if(!hall.length){d.setFont("helvetica","normal");d.setFontSize(9.5);d.text("Sin puntos en Parcial o No cumple.",L,y);y+=7}
   hall.forEach(it=>{const r=v.items[it.key];const pr=prev&&prev.items&&prev.items[it.key];const hh=H[it.key];
     d.setFontSize(8.8);const lines=d.splitTextToSize(it.txt,W-34);
-    const meta=[];if(pr&&pr.e)meta.push(`Visita ${prev.n}: ${CL_LABEL[pr.e]}${esHallazgo(pr.e)?" (sigue abierto)":" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
+    const meta=[];if(pr&&pr.e)meta.push(`Visita ${esc(prev.n)}: ${CL_LABEL[pr.e]}${esHallazgo(pr.e)?" (sigue abierto)":" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
     const plan=[r.acc?"Acción: "+r.acc:"",r.resp?"Responsable: "+r.resp:"",r.plazo?"Plazo: "+fmtD(r.plazo):""].filter(Boolean).join("   ");
     const pl=plan?d.splitTextToSize(plan,W-6):[d.splitTextToSize("Sin plan de acción definido.",W-6)[0]];
     const h=5+lines.length*4+(meta.length?4.5:0)+pl.length*4+3;chk(h+2);
@@ -975,7 +975,7 @@ async function clPdf(v,subir){
       y+=5});
   }
   const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});const a=autoriaTxt(v);if(a)d.text(d.splitTextToSize("Registro en la app: "+a.charAt(0).toLowerCase()+a.slice(1),150)[0],15,289);d.setTextColor(0)}
-  const name=`Informe_${KV.archivo}_${v.n}_${v.predio.replace(/\s+/g,"_")}_${fmtD(v.fecha)}.pdf`;
+  const name=`Informe_${KV.archivo}_${esc(v.n)}_${v.predio.replace(/\s+/g,"_")}_${fmtD(v.fecha)}.pdf`;
   if(subir){try{await clSubir(carpetaVisita(v),name,d.output("blob"),"application/pdf",TV)}catch(e){console.warn(e)}return}
   await guardarPDF(d,name,"Informe listo.");
 }
