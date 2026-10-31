@@ -14,14 +14,14 @@
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
 <script src="lib/xlsx-0.18.5/xlsx.mini.min.js"></script>
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
-<link rel="stylesheet" href="estilos.css?v=130">
+<link rel="stylesheet" href="estilos.css?v=131">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
 
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="130";
+const APP_VER="131";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const URL_ONLINE="https://claude.ai/artifact/BPGzYVkhx5sCsX9fqdLEU7";
 const PWA=true;
@@ -326,8 +326,8 @@ const nombreFoto=(a,k,ref)=>{if(a.tipo==="capacitacion"){const fs=((a.items||{})
 /* --- Base de actas: un archivo JSON por acta en OneDrive/actas --- */
 const REMOTE={actas:{},visitas:{},conteos:{},rendiciones:{}},SNAP={};let pullT=null,pulling=false;
 const rkey=(col,id)=>col==="actas"?id:col+"/"+id; /* las actas quedaron guardadas sin prefijo */
-async function remoteLoad(){if(!IDB.db)return;try{const ks=await IDB.keys("remote"),vs=await IDB.all("remote");ks.forEach((k,i)=>{const m=String(k).match(/^(\w+)\/(.+)$/);const col=m?m[1]:"actas",id=m?m[2]:k;if(REMOTE[col])REMOTE[col][id]=vs[i]})}catch(e){}}
-function emitir(col){const cb=SNAP[col]&&SNAP[col].cb;if(cb)cb({docs:Object.values(REMOTE[col]).map(d=>({id:d.id,data:()=>Object.assign({},d)}))})}
+async function remoteLoad(){if(!IDB.db)return;try{const ks=await IDB.keys("remote"),vs=await IDB.all("remote");ks.forEach((k,i)=>{if(String(k).startsWith("base:")){BASES[String(k).slice(5)]=vs[i];return}/* v131 */const m=String(k).match(/^(\w+)\/(.+)$/);const col=m?m[1]:"actas",id=m?m[2]:k;if(REMOTE[col])REMOTE[col][id]=vs[i]})}catch(e){}}
+function emitir(col){const cb=SNAP[col]&&SNAP[col].cb;if(cb)cb({docs:Object.values(REMOTE[col]).map(d=>({id:d.id,data:()=>Object.assign({},d,{_etag:ETAGS[rkey(col,d.id)]})}))})}
 let FOLDERS={};try{FOLDERS=JSON.parse(localStorage.getItem("actas-m365-folders")||"{}")}catch(e){}
 async function carpetaCol(col){
   if(FOLDERS[col])return FOLDERS[col];const c=M365.cols[col];
@@ -342,7 +342,7 @@ async function pullCol(col){
   while(url){const pg=await gjson(url);
     for(const it of (pg.value||[])){if(!/\.json$/i.test(it.name))continue;const id=it.name.replace(/\.json$/i,"");vistos.add(id);const ek=rkey(col,id);
       if(ETAGS[ek]===it.eTag&&R[id])continue;
-      try{const r=await gfetch(`/drives/${M365.drive}/items/${it.id}/content`);const d=await r.json();d.id=id;R[id]=d;ETAGS[ek]=it.eTag;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}catch(e){console.warn(col,id,e)}}
+      try{const r=await gfetch(`/drives/${M365.drive}/items/${it.id}/content`);const d=await r.json();d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=it.eTag;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}catch(e){console.warn(col,id,e)}}
     url=pg["@odata.nextLink"]||null}
   for(const id of Object.keys(R)){if(!vistos.has(id)&&!LOCAL[id]){delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++}}
   return cambios;
@@ -366,21 +366,125 @@ async function pull(manual){
 function errMsg(e){if(!e)return"Error desconocido.";if(e.code==="auth")return"Hay que iniciar sesión de nuevo para sincronizar.";if(e.code==="forbidden")return"Tu cuenta no tiene acceso a la carpeta de actas en OneDrive. Pide acceso a TI.";if(e.code==="network")return"Sin conexión con OneDrive.";if(e.code==="not_found")return"No se encontró la carpeta de actas en OneDrive.";return"OneDrive respondió con un error"+(e.detail?": "+e.detail:".")}
 function programarPull(ms){clearTimeout(pullT);pullT=setTimeout(()=>pull(false),ms)}
 let pullOnce=false;
+/* ---------- v131: conflictos entre teléfonos (auditoría C-01, C-02, C-03, C-05) ----------
+   Cada registro lleva _etag: la versión de OneDrive de la que partió la copia del teléfono (no se sube). Al subir se usa If-Match;
+   si OneDrive tiene otra versión, se combinan los cambios de los dos teléfonos contra la versión de partida. Si un mismo dato
+   cambió distinto en los dos, queda el más reciente y la otra versión completa se guarda en <colección>/_conflictos. */
+const BASES={};
+/* resguardo: si OneDrive rechaza la versión (412) sin que el archivo haya cambiado, se deja de usar If-Match en esta sesión (se sube
+   como antes de la v131, con la revisión previa de versión) para que nada quede sin subir */
+let IFM_NO=false;
+const abiertoDe=(col,id)=>{const o=col==="visitas"?clv:col==="conteos"?cbv:col==="rendiciones"?rdv:cur;return o&&o.id===id?o:null};
+/* antes de que pullCol reemplace la copia de OneDrive de un registro, se guarda como versión de partida de lo que está pendiente
+   o abierto (si ya hay una guardada para la versión que necesita ese registro, se conserva) */
+function baseAntesDe(col,id){const ek=rkey(col,id),prev=REMOTE[col][id],pe=ETAGS[ek];if(!prev||!pe)return;
+  const o=LOCAL[id]||abiertoDe(col,id),b=BASES[ek];if(b&&o&&o._etag===b.etag&&o._etag!==pe)return;
+  BASES[ek]={etag:pe,data:prev};if(LOCAL[id]&&IDB.db)IDB.put("remote","base:"+ek,BASES[ek]).catch(()=>{})}
+function baseBorrar(ek){if(!BASES[ek])return;delete BASES[ek];if(IDB.db)IDB.del("remote","base:"+ek).catch(()=>{})}
+function baseDe(col,id,etag){if(!etag)return null;const ek=rkey(col,id);if(ETAGS[ek]===etag&&REMOTE[col][id])return REMOTE[col][id];const b=BASES[ek];return b&&b.etag===etag?b.data:null}
+const esObjeto=x=>!!x&&typeof x==="object"&&!Array.isArray(x);
+function igual(a,b){if(a===b)return true;if(a==null||b==null)return a==null&&b==null;
+  if(Array.isArray(a)){if(!Array.isArray(b)||a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!igual(a[i],b[i]))return false;return true}
+  if(typeof a==="object"){if(typeof b!=="object"||Array.isArray(b))return false;const ka=Object.keys(a).filter(k=>a[k]!==undefined),kb=Object.keys(b).filter(k=>b[k]!==undefined);
+    if(ka.length!==kb.length)return false;for(const k of ka)if(!igual(a[k],b[k]))return false;return true}
+  return false}
+const canon=x=>JSON.stringify(x,(k,v)=>esObjeto(v)?Object.keys(v).sort().reduce((o,kk)=>(o[kk]=v[kk],o),{}):v);
+/* combina un valor: b = versión de partida, l = este teléfono, r = OneDrive. ch junta los datos que cambiaron distinto en los dos */
+function mezclar3(b,l,r,lGana,ruta,ch){
+  if(igual(l,r))return l;if(igual(l,b))return r;if(igual(r,b))return l;
+  if(esObjeto(l)&&esObjeto(r)){const bb=esObjeto(b)?b:{},o={};for(const k of new Set([...Object.keys(r),...Object.keys(l)])){const v=mezclar3(bb[k],l[k],r[k],lGana,ruta?ruta+"."+k:k,ch);if(v!==undefined)o[k]=v}return o}
+  if(Array.isArray(l)&&Array.isArray(r))return mezclarLista(Array.isArray(b)?b:[],l,r,lGana,ruta,ch);
+  ch.push(ruta);if(l===undefined)return r;if(r===undefined)return l;return lGana?l:r}
+function mezclarLista(b,l,r,lGana,ruta,ch){
+  const conId=a=>a.length>0&&a.every(e=>esObjeto(e)&&e.id!=null);
+  if((conId(l)||!l.length)&&(conId(r)||!r.length)&&(conId(b)||!b.length)&&(l.length||r.length)){
+    const ix=a=>new Map(a.map(e=>[String(e.id),e])),B=ix(b),L=ix(l),R=ix(r),out=[];
+    for(const k of [...r.map(e=>String(e.id)),...l.map(e=>String(e.id)).filter(k=>!R.has(k))]){const v=mezclar3(B.get(k),L.get(k),R.get(k),lGana,ruta+"["+k+"]",ch);if(v!==undefined)out.push(v)}
+    return out}
+  if(l.length===r.length&&r.length===b.length&&![...l,...r].some(e=>e&&typeof e==="object"))return r.map((x,i)=>mezclar3(b[i],l[i],x,lGana,ruta+"["+i+"]",ch));
+  /* como conjunto (con repetidos): lo que agregó o quitó cada teléfono */
+  const cnt=a=>{const m=new Map();a.forEach(e=>{const k=canon(e);m.set(k,(m.get(k)||0)+1)});return m},nB=cnt(b),nL=cnt(l),nR=cnt(r),meta=new Map();
+  for(const k of new Set([...nB.keys(),...nL.keys(),...nR.keys()])){const n0=nB.get(k)||0,dl=(nL.get(k)||0)-n0,dr=(nR.get(k)||0)-n0;
+    meta.set(k,Math.max(0,n0+(dl>0&&dr>0?Math.max(dl,dr):dl<0&&dr<0?Math.min(dl,dr):dl+dr)))}
+  const puestos=new Map(),out=[];const poner=e=>{const k=canon(e),n=puestos.get(k)||0;if(n<(meta.get(k)||0)){puestos.set(k,n+1);out.push(e)}};
+  r.forEach(poner);l.forEach(poner);return out}
+const TECNICOS=["modificadoPor","pdfs","pdfsAnul"],NO_MEZCLA=new Set(["id","_col","_etag","_lastT","_lastN","actualizado",...TECNICOS]); /* _lastN: ayuda temporal al escribir el nombre de la firma */
+function mezclarRegistro(base,loc,rem){
+  const sin=o=>{const c={};if(o)for(const k of Object.keys(o))if(!NO_MEZCLA.has(k))c[k]=o[k];return c};
+  const lGana=String(loc.actualizado||"")>=String(rem.actualizado||""),ch=[];
+  const r=mezclar3(base?sin(base):undefined,sin(loc),sin(rem),lGana,"",ch)||{};
+  const act=[loc.actualizado,rem.actualizado].filter(Boolean).sort().pop();if(act)r.actualizado=act;
+  TECNICOS.forEach(k=>{const v=lGana?(loc[k]!==undefined?loc[k]:rem[k]):(rem[k]!==undefined?rem[k]:loc[k]);if(v!==undefined)r[k]=v});
+  return{r,c:ch,lGana}}
+const QUE_COL={visitas:"La visita",rendiciones:"La rendición",conteos:"El conteo"};
+const deRegistro=(col,o)=>!o?"":col==="rendiciones"?(o.persona&&o.persona.nombre)||"":col==="conteos"?o.bodega||"":col==="visitas"?o.predio||"":o.trabajador||o.conductor||o.recibe||o.tema||o.predio||"";
+const nombreRegistro=(col,o)=>{const q=QUE_COL[col]||"El acta",d=deRegistro(col,o);return q+(d?" de "+d:"")};
+/* copia completa de una versión que no quedó, en <colección>/_conflictos (nunca se descarta trabajo) */
+async function guardarConflicto(col,id,version,motivo,campos){
+  const folder=await carpetaCol(col);let dir;try{dir=(await gjson(`/drives/${M365.drive}/items/${folder}:/_conflictos?$select=id`)).id}catch(e){if(e.code!=="not_found")throw e;dir=(await crearCarpeta(folder,"_conflictos")).id}
+  const f=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19),cuerpo=JSON.stringify({guardado:new Date().toISOString(),por:yo()||null,motivo,campos:campos||[],version});
+  await gfetch(`/drives/${M365.drive}/items/${dir}:/${encName(`${id} ${f} ${uid().slice(-4)}.json`)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body:cuerpo})}
+const rutaRegistro=async(col,id)=>`/drives/${M365.drive}/items/${await carpetaCol(col)}:/${encName(id+".json")}`;
+/* sube un registro: con If-Match si OneDrive tiene la versión de partida; si tiene otra, combina; si ya no existe, avisa */
+async function subirRegistro(col,id,a){
+  const ruta=await rutaRegistro(col,id),local=clean(a);delete local.id;delete local._col;delete local._etag;
+  const e0=a._etag||null,base0=e0?baseDe(col,id,e0):null;let copia=false,r412=null;
+  for(let i=0;;i++){
+    let meta=null;try{meta=await gjson(ruta+"?$select=id,eTag")}catch(e){if(e.code!=="not_found")throw e}
+    if(meta&&r412&&meta.eTag===r412)IFM_NO=true; /* OneDrive rechazó la versión sin que cambiara: se sube sin If-Match */
+    if(!meta&&e0){await guardarConflicto(col,id,local,"Eliminado en otro teléfono");return{eliminado:true}}
+    let datos=local,mez=null;
+    if(meta&&meta.eTag!==e0){const rem=await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json();delete rem.id;
+      mez=mezclarRegistro(base0,local,rem);datos=mez.r;mez.base=!!base0;mez.trajo=!igual(datos,local);
+      if(mez.c.length&&!copia){await guardarConflicto(col,id,mez.lGana?rem:local,"Cambiado en dos teléfonos: quedó la versión más reciente",mez.c);copia=true}
+      if(igual(datos,rem))return{datos:rem,etag:meta.eTag,mez,base0}}
+    const h={"Content-Type":"application/json"};if(meta&&!IFM_NO)h["If-Match"]=meta.eTag;
+    try{const r=await gfetch(ruta+":/content",{method:"PUT",headers:h,body:JSON.stringify(datos)});const it=await r.json();return{datos,etag:it.eTag,mez,base0}}
+    catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta&&meta.eTag;continue}if(i<3&&e&&e.code==="not_found")continue;throw e}
+  }
+}
+function quitarRegistro(col,id){const ek=rkey(col,id);
+  if(col==="visitas")delete VIS[id];else if(col==="conteos")delete CONT[id];else if(col==="rendiciones")delete REND[id];else delete ACTAS[id];
+  delete REMOTE[col][id];delete ETAGS[ek];guardarEtags();if(IDB.db)IDB.del("remote",ek).catch(()=>{});baseBorrar(ek);
+  if(col==="visitas"&&clv&&clv.id===id){clv=null;if(view==="clv")go("clp")}else if(col==="conteos"&&cbv&&cbv.id===id){cbv=null;if(view==="cbv")go("cbb")}
+  else if(col==="rendiciones"&&rdv&&rdv.id===id){rdv=null;rdd=null;if(/^rd[vd]$/.test(view))go("rd")}else if(col==="actas"&&cur&&cur.id===id){cur=null;if(view==="axe")go("axl");else if(view==="edit")go("home")}}
+/* deja en el registro abierto (mismo objeto) la versión combinada */
+function reemplazarEnSitio(a,datos){const d=JSON.parse(JSON.stringify(datos));for(const k of Object.keys(a))if(!(k in d)&&!["id","_col","_etag"].includes(k))delete a[k];Object.assign(a,d);
+  if(rdv===a&&rdd){rdd=a.docs&&a.docs[rdd.k]||null;if(view==="rdd"&&!rdd)view="rdv"}}
+const VISTAS_COL={visitas:["cl","clp","clv","launch"],rendiciones:["rd","rdv","rdd","rdm","launch"],conteos:["cb","cbb","cbv","launch"],actas:["home","edit","axl","axe","launch"]};
+async function aplicarSubida(col,id,a,stamp,res){const ek=rkey(col,id);
+  if(res.eliminado){quitarRegistro(col,id);delete LOCAL[id];await localDel(id);toast(`${nombreRegistro(col,a)} se eliminó en otro teléfono. Tus cambios se guardaron en OneDrive, en la carpeta «_conflictos».`);
+    if(VISTAS_COL[col].includes(view))render();return}
+  const d=Object.assign({},res.datos,{id});REMOTE[col][id]=d;ETAGS[ek]=res.etag;guardarEtags();if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});
+  const editando=a.actualizado!==stamp||!!LT[id];
+  if(!editando){if(res.mez&&res.mez.trajo)reemplazarEnSitio(a,res.datos);a._etag=res.etag;if(LOCAL[id]===a){delete LOCAL[id];await localDel(id)}baseBorrar(ek)}
+  else if(!res.mez){a._etag=res.etag;baseBorrar(ek)}
+  else if(a._etag&&res.base0){BASES[ek]={etag:a._etag,data:res.base0};if(IDB.db)IDB.put("remote","base:"+ek,BASES[ek]).catch(()=>{})} /* se escribió mientras subía: lo nuevo se combina en la subida siguiente */
+  if(res.mez){const ab=abiertoDe(col,id)===a,n=res.mez.c.length;
+    if(n)toast(`${nombreRegistro(col,a)} también se cambió en otro teléfono: se juntaron los cambios. ${n===1?"Un dato se cambió":`${n} datos se cambiaron`} distinto en los dos; quedó lo más reciente y la otra versión se guardó en OneDrive («_conflictos»).`);
+    else if(ab&&res.mez.trajo)toast(`${nombreRegistro(col,a)} también se cambió en otro teléfono: se juntaron los cambios de los dos.`);
+    if(res.mez.trajo&&VISTAS_COL[col].includes(view))(ab?sinPerderFoco(render):renderFondo())}}
+/* elimina un registro en OneDrive solo si sigue siendo la versión que se eliminó en este teléfono (o un borrador, en la cola antigua) */
+const esBorradorCol=(col,o)=>!o||(col==="conteos"?o.estado!=="cerrado":col==="rendiciones"?o.estado==="borrador":o.estado!=="cerrada");
+async function borrarRegistro(col,id,e0){const ruta=await rutaRegistro(col,id),ek=rkey(col,id);
+  const limpiar=()=>{delete REMOTE[col][id];delete ETAGS[ek];guardarEtags();if(IDB.db)IDB.del("remote",ek).catch(()=>{});baseBorrar(ek)};
+  let r412=null;
+  for(let i=0;;i++){
+    let meta=null;try{meta=await gjson(ruta+"?$select=id,eTag")}catch(e){if(e.code!=="not_found")throw e}
+    if(!meta){limpiar();return{}}
+    if(r412&&meta.eTag===r412)IFM_NO=true;
+    let ok=!!e0&&meta.eTag===e0,rem=null;
+    if(!ok){rem=await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json();ok=!e0&&esBorradorCol(col,rem)}
+    if(!ok){rem.id=id;REMOTE[col][id]=rem;ETAGS[ek]=meta.eTag;guardarEtags();if(IDB.db)IDB.put("remote",ek,rem).catch(()=>{});return{restaurado:rem}}
+    try{await gfetch(ruta,{method:"DELETE",headers:IFM_NO?{}:{"If-Match":meta.eTag}});limpiar();return{}}
+    catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta.eTag;continue}if(e&&e.code==="not_found"){limpiar();return{}}throw e}
+  }
+}
+const DEK="actas-vivienda-borrar-ver";let DELE={};try{DELE=JSON.parse(localStorage.getItem(DEK)||"{}")}catch(e){}
+/* pone un registro en la cola para eliminar, con la versión de OneDrive que se está eliminando */
+function colaBorrar(key,o){DELQ.add(key);DELE[key]=o&&o._etag||"";saveDQ();try{localStorage.setItem(DEK,JSON.stringify(DELE))}catch(e){}}
 const GDB={
   collection(col){return{onSnapshot(cb,err){SNAP[col]={cb,err};emitir(col);if(!pullOnce){pullOnce=true;pull(false)}return()=>{delete SNAP[col]}}}},
-  doc(path){const [col,id]=path.includes("/")?path.split("/"):["actas",path];return{
-    async set(data){const folder=await carpetaCol(col);
-      /* Protección de conflictos: si en OneDrive hay una versión más reciente (editada desde otro teléfono), gana la más reciente */
-      try{const meta=await gjson(`/drives/${M365.drive}/items/${folder}:/${encName(id+".json")}?$select=id,eTag`);
-        if(meta&&meta.eTag!==ETAGS[rkey(col,id)]){const r0=await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const rem=await r0.json();
-          if(String(rem.actualizado||"")>String(data.actualizado||"")){rem.id=id;REMOTE[col][id]=rem;ETAGS[rkey(col,id)]=meta.eTag;guardarEtags();if(IDB.db)IDB.put("remote",rkey(col,id),rem).catch(()=>{});throw{code:"conflict",remoto:rem}}}}
-      catch(e){if(e&&e.code==="conflict")throw e;if(e&&e.code!=="not_found")throw e}
-      const body=JSON.stringify(data);
-      const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(id+".json")}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body});
-      const it=await r.json();const d=Object.assign({},data,{id});REMOTE[col][id]=d;ETAGS[rkey(col,id)]=it.eTag;guardarEtags();if(IDB.db)IDB.put("remote",rkey(col,id),d).catch(()=>{})},
-    async delete(){const folder=await carpetaCol(col);try{await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(id+".json")}`,{method:"DELETE"})}catch(e){if(e.code!=="not_found")throw e}
-      delete REMOTE[col][id];delete ETAGS[rkey(col,id)];guardarEtags();if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{})}
-  }}
 };
 /* --- Fotos: archivos JPG en OneDrive/fotos; se guardan también en el teléfono para verlas sin señal --- */
 const GAS={
@@ -526,6 +630,9 @@ async function fotoSubida(ref,meta,u){
         const fs=a.items[meta.k].fotos;fs[fs.indexOf(ref)]=nref;if(u.url){(a.fotoUrl=a.fotoUrl||{})[nref]=u.url}a.actualizado=new Date().toISOString();LOCAL[a.id]=a;await localPut(a);refrescarFotoItem(meta);
       }else{try{AS.delete(u.id).catch(()=>{})}catch(e){}}
 }
+/* v131 (C-02): el registro abierto sin cambios pendientes pasa a la versión nueva de OneDrive */
+function abiertoAlDia(vistas){if(loaded&&vistas.includes(view)){renderFondo();toast("Se actualizó con cambios hechos en otro teléfono.")}}
+const sinPendiente=o=>!!o&&!LOCAL[o.id]&&!LT[o.id];
 async function sync(){
   if(syncing||(!DB&&!AS))return;
   if(AS)contarSueltas();
@@ -559,36 +666,24 @@ async function sync(){
       SYNC_INFO.subida.hechas++;contarSueltas();status();
     }}
     SYNC_INFO.subida=null;contarSueltas()}
-    if(DB&&!noWrite){for(const id of [...DELQ]){
-      try{await TO(DB.doc(id.includes("/")?id:"actas/"+id).delete(),20000)}catch(e){if(errSubida(e))break;continue}
-      DELQ.delete(id);saveDQ();status();
+    if(DB&&!noWrite){for(const key of [...DELQ]){const [col,id]=key.includes("/")?key.split("/"):["actas",key];
+      let r;try{r=await TO(borrarRegistro(col,id,DELE[key]),20000)}catch(e){if(errSubida(e))break;continue}
+      DELQ.delete(key);delete DELE[key];saveDQ();try{localStorage.setItem(DEK,JSON.stringify(DELE))}catch(e){}status();
+      /* v131 (C-05): otro teléfono lo modificó o lo cerró: no se eliminó y vuelve a la lista */
+      if(r&&r.restaurado){emitir(col);toast(`${nombreRegistro(col,r.restaurado)} no se eliminó: se modificó en otro teléfono. Volvió a la lista.`)}
     }}
     if(DB&&!noWrite){for(const id of Object.keys(LOCAL)){
-      const a=LOCAL[id];if(!a)continue;const stamp=a.actualizado;const data=clean(a);delete data.id;const col=a._col||"actas";delete data._col;
-      try{await TO(DB.doc(col+"/"+id).set(data),30000)}
-      catch(e){
-        if(e&&e.code==="conflict"){const rem=Object.assign({},e.remoto,{id,_col:a._col});
-          /* v104: la versión más reciente queda en su módulo (antes rendiciones y conteos iban a ACTAS y la copia vieja
-             seguía abierta; el cambio siguiente en este teléfono pisaba la versión buena) */
-          let vistas;
-          if(col==="visitas"){if(clv&&clv.id===id)clv=rem;VIS[id]=rem;vistas=["cl","clp","clv","launch"]}
-          else if(col==="rendiciones"){if(rdv&&rdv.id===id){const k=rdd&&rdv.docs?Object.keys(rdv.docs).find(x=>rdv.docs[x]===rdd):null;rdv=rem;rdd=k&&rem.docs&&rem.docs[k]||null;if(view==="rdd"&&!rdd)view="rdv"}REND[id]=rem;vistas=["rd","rdv","rdd","rdm","launch"]}
-          else if(col==="conteos"){if(cbv&&cbv.id===id)cbv=rem;CONT[id]=rem;vistas=["cb","cbb","cbv","launch"]}
-          else{if(cur&&cur.id===id)cur=rem;ACTAS[id]=rem;vistas=["home","edit","axl","axe","launch"]}
-          delete LOCAL[id];await localDel(id);status();
-          const que={visitas:"La visita",rendiciones:"La rendición",conteos:"El conteo"}[col]||"El acta",de=col==="rendiciones"?rem.persona&&rem.persona.nombre:col==="conteos"?rem.bodega:rem.trabajador||rem.predio;
-          toast(`${que}${de?" de "+de:""} fue modificada después desde otro teléfono; se conservó esa versión más reciente.`);
-          if(vistas.includes(view))render();continue}
-        if(errSubida(e))break;continue}
-      if(LOCAL[id]===a&&a.actualizado===stamp&&!LT[id]){delete LOCAL[id];await localDel(id)}
-      status();
+      const a=LOCAL[id];if(!a)continue;const stamp=a.actualizado;const col=a._col||"actas";
+      /* v131 (C-01, C-03): se combina con lo de otros teléfonos; nunca se descarta lo de este */
+      let res;try{res=await TO(subirRegistro(col,id,a),45000)}catch(e){if(errSubida(e))break;continue}
+      try{await aplicarSubida(col,id,a,stamp,res)}catch(e){console.warn("después de subir",e)}status();
     }}
   }finally{syncing=false;status();if(view==="home"||view==="launch")render();if(again){again=false;schedSync(300)}else if(pend()&&!noWrite)schedSync(navigator.onLine?15000:30000)}
 }
 async function removeActa(id){
-  clearTimeout(LT[id]);delete LT[id];
+  clearTimeout(LT[id]);delete LT[id];const o=ACTAS[id];
   delete ACTAS[id];delete LOCAL[id];await localDel(id);
-  if(DB){DELQ.add(id);saveDQ();schedSync(200)}
+  if(DB){colaBorrar(id,o);schedSync(200)}
   status();return true;
 }
 async function eliminarActa(a){
@@ -2314,7 +2409,10 @@ async function subirExcel(clave,manual,fn){
   if(!DB||navigator.onLine===false){XPEND[clave]=1;xpendSave();if(manual)toast("Sin señal: el Excel se actualizará en OneDrive cuando haya conexión.");return false}
   if(manual)toast("Actualizando datos y generando el Excel…");
   /* Antes de escribir el Excel se bajan los últimos cambios de los demás teléfonos; si no se puede, no se sobrescribe */
-  try{let esp=0;while(pulling&&esp<40){await new Promise(r=>setTimeout(r,250));esp++}await pull(false);if(SYNC_INFO.error)throw{code:"sinDatos"}}
+  /* v131 (M-05): se espera a que termine la bajada en curso (hasta 2 minutos) y se exige una bajada completa; antes, a los 10 s
+     pull() volvía sin bajar nada y el Excel se escribía con lo que hubiera */
+  try{let esp=0;while(pulling&&esp<480){await new Promise(r=>setTimeout(r,250));esp++}if(pulling)throw{code:"sinDatos"};
+    const antes=SYNC_INFO.ultima;await pull(false);if(SYNC_INFO.error||!SYNC_INFO.ultima||SYNC_INFO.ultima===antes)throw{code:"sinDatos"}}
   catch(e){XPEND[clave]=1;xpendSave();if(manual)toast("No se actualizaron los datos desde OneDrive, así que no se reescribió el Excel. Se intentará de nuevo.");return false}
   if(pend()){try{await sync()}catch(e){}}
   try{await fn();delete XPEND[clave];xpendSave();if(manual)toast("Excel actualizado en OneDrive.");return true}
@@ -2930,31 +3028,31 @@ async function init(){
     ACTAS=Object.assign({},locA);VIS=Object.assign({},locV);CONT=Object.assign({},locC);REND=Object.assign({},locR);
     DB.collection("rendiciones").onSnapshot(sn=>{
       const n={};sn.docs.forEach(x=>{n[x.id]=Object.assign(JSON.parse(JSON.stringify(x.data()||{})),{id:x.id,_col:"rendiciones"})});
-      for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="rendiciones")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==rdv){delete LOCAL[id];localDel(id)}}
+      for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="rendiciones")continue;n[id]=l} /* v131: lo pendiente se combina al subir */
       DELQ.forEach(id=>{if(id.startsWith("rendiciones/"))delete n[id.slice(12)]});
-      if(rdv){if(editaPersona(rdv))n[rdv.id]=rdv;else if(n[rdv.id]){rdv=n[rdv.id];if(rdd)rdd=rdv.docs&&rdv.docs[rdd.k]||null}}REND=n;
+      let rAbierto=false;if(rdv){const r=n[rdv.id];if(!r||!sinPendiente(rdv)||r===rdv||r._etag===rdv._etag)n[rdv.id]=rdv;else{rdv=r;if(!rdv.docs)rdv.docs={};if(rdd){rdd=rdv.docs[rdd.k]||null;if(view==="rdd"&&!rdd)view="rdv"}rAbierto=true}}REND=n;if(rAbierto)abiertoAlDia(["rdv","rdd"]);
       if(loaded){if(view==="rd"||view==="launch"||view==="rdv"||view==="rdd"||view==="rdm")renderFondo();else status();abrirEnlace()}
     },e=>{});
     DB.collection("conteos").onSnapshot(sn=>{
       const n={};sn.docs.forEach(x=>{n[x.id]=Object.assign(JSON.parse(JSON.stringify(x.data()||{})),{id:x.id,_col:"conteos"})});
-      for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="conteos")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==cbv){delete LOCAL[id];localDel(id)}}
+      for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="conteos")continue;n[id]=l}
       DELQ.forEach(id=>{if(id.startsWith("conteos/"))delete n[id.slice(8)]});
-      if(cbv)n[cbv.id]=cbv;CONT=n;
+      let cAbierto=false;if(cbv){const r=n[cbv.id];if(!r||!sinPendiente(cbv)||r===cbv||r._etag===cbv._etag)n[cbv.id]=cbv;else{cbv=r;if(!cbv.items)cbv.items={};cAbierto=true}}CONT=n;if(cAbierto)abiertoAlDia(["cbv"]);
       if(loaded){if(view==="cb"||view==="cbb"||view==="launch")renderFondo();else status()}
     },e=>{});
     DB.collection("visitas").onSnapshot(sn=>{
       const n={};sn.docs.forEach(x=>{n[x.id]=Object.assign(JSON.parse(JSON.stringify(x.data()||{})),{id:x.id,_col:"visitas"})});
-      for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="visitas")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==clv){delete LOCAL[id];localDel(id)}}
+      for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="visitas")continue;n[id]=l}
       DELQ.forEach(id=>{if(id.startsWith("visitas/"))delete n[id.slice(8)]});
-      if(clv)n[clv.id]=clv;VIS=n;
+      let vAbierto=false;if(clv){const r=n[clv.id];if(!r||!sinPendiente(clv)||r===clv||r._etag===clv._etag)n[clv.id]=clv;else{clv=r;if(!clv.items)clv.items={};vAbierto=true}}VIS=n;if(vAbierto)abiertoAlDia(["clv"]);
       if(loaded){if(view==="cl"||view==="clp"||view==="launch")renderFondo();else status()}
     },e=>{});
     await new Promise(res=>{let first=true;const done=()=>{if(first){first=false;res()}};
       DB.collection("actas").onSnapshot(sn=>{
         const n={};sn.docs.forEach(x=>{n[x.id]=Object.assign(JSON.parse(JSON.stringify(x.data()||{})),{id:x.id})});
-        for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col==="visitas"||l._col==="conteos"||l._col==="rendiciones")continue;if(!n[id]||String(l.actualizado||"")>=String(n[id].actualizado||""))n[id]=l;else if(!LT[id]&&l!==cur){delete LOCAL[id];localDel(id)}}
+        for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col==="visitas"||l._col==="conteos"||l._col==="rendiciones")continue;n[id]=l}
         DELQ.forEach(id=>{if(!id.includes("/"))delete n[id]});
-        if(cur)n[cur.id]=cur;ACTAS=n;
+        let aAbierto=false;if(cur){const r=n[cur.id];if(!r||!sinPendiente(cur)||r===cur||r._etag===cur._etag)n[cur.id]=cur;else{cur=esAx(r)?prepAx(r):prepActa(r);aAbierto=true}}ACTAS=n;if(aAbierto)abiertoAlDia(["edit","axe"]);
         if(first)done();else if(["launch","home","axhub","axl","cl"].includes(view))renderFondo();else status(); /* v116: solo las pantallas que muestran actas */
       },e=>{done()});
       setTimeout(done,8000);
@@ -3004,10 +3102,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=130"></script>
-<script src="modulos/bodega.js?v=130"></script>
-<script src="modulos/rendiciones.js?v=130"></script>
-<script src="modulos/actas-entrega.js?v=130"></script>
+<script src="modulos/checklist.js?v=131"></script>
+<script src="modulos/bodega.js?v=131"></script>
+<script src="modulos/rendiciones.js?v=131"></script>
+<script src="modulos/actas-entrega.js?v=131"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
