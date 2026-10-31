@@ -1,0 +1,43 @@
+# Borra las ramas de trabajo ya juntadas en main (claude/… y vNN de versiones de prueba). Se ejecuta solo a mano (o la lanza Claude
+# desde una sesión): las sesiones en la nube no pueden borrar ramas directamente. Una rama con algún commit que no esté en main
+# no se borra.
+name: Limpiar ramas juntadas
+
+on:
+  workflow_dispatch:
+    inputs:
+      solo_mostrar:
+        description: "Solo mostrar qué ramas se borrarían, sin borrarlas"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Borrar ramas claude/… y vNN juntadas en main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SOLO_MOSTRAR: ${{ inputs.solo_mostrar }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$REPO/branches?per_page=100" --jq '.[].name' > ramas.txt
+          borradas=0; quedan=0
+          for rama in $(grep -E '^(claude/.+|v[0-9]+)$' ramas.txt || true); do
+            # commits de la rama que no están en main (0 = todo lo de la rama ya está en main)
+            fuera=$(gh api "repos/$REPO/compare/main...$rama" --jq '.ahead_by')
+            if [ "$fuera" != "0" ]; then
+              echo "Se deja $rama: tiene $fuera commits que no están en main"; quedan=$((quedan+1)); continue
+            fi
+            if [ "$SOLO_MOSTRAR" = "true" ]; then
+              echo "Se borraría $rama"
+            else
+              gh api -X DELETE "repos/$REPO/git/refs/heads/$rama" && echo "Borrada $rama"
+            fi
+            borradas=$((borradas+1))
+          done
+          echo "Juntadas: $borradas · con cambios sin juntar (se dejan): $quedan"
