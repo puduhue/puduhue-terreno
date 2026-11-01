@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-rfTO8Kd9UGcL1+GT1DnkZDTne37kC+0EAHl5GyciZv0=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Fggp4IjJa4x413Lg2xrXCntH1hRbSOY3DR90Ba2YzcE=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#8DB3E2">
-<link rel="stylesheet" href="estilos.css?v=141">
+<link rel="stylesheet" href="estilos.css?v=142">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="141";
+const APP_VER="142";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1017,7 +1017,9 @@ function admSaludHTML(){
   const s=ADM.salud;if(!s)return"";
   const fila=(t,ok,txt)=>`<div class="admst"><span class="admpt ${ok===true?"ok":ok===false?"no":""}" aria-hidden="true"></span><span>${t}</span><b>${esc(txt)}</b></div>`;
   const rec=s.recordatorios||{},ult=rec.ultimo;
-  return `<div class="admsts">${fila("Servidor",true,`activo · ${s.version||"?"}`)}${fila("Finnegans",!!s.credenciales,s.credenciales?"credenciales cargadas":"faltan credenciales")}${fila("Lectura de boletas",!!s.lecturaBoletas,s.lecturaBoletas?"activa":"sin clave")}${fila("Notificaciones",!!s.notificaciones,s.notificaciones?"activas":"no configuradas")}${fila("Recordatorios",ult?true:null,ult&&ult.hora?`último envío ${fdHora(ult.hora)}`:rec.agenda?`agenda del ${fdHora(rec.agenda)}`:"sin envíos todavía")}</div>`;
+  return `<div class="admsts">${fila("Servidor",true,`activo · ${s.version||"?"}`)}${fila("Finnegans",!!s.credenciales,s.credenciales?"credenciales cargadas":"faltan credenciales")}${(()=>{const c=s.claveClaude;if(!s.lecturaBoletas)return fila("Lectura de boletas",false,"sin clave");if(!c)return fila("Lectura de boletas",true,"activa");
+      /* v142: resultado de la revisión diaria de la clave de Claude */
+      return c.alerta?fila("Lectura de boletas",false,c.detalle):fila("Lectura de boletas",c.estado==="ok"?true:null,c.estado==="ok"?`activa · clave revisada el ${fmtD(c.fecha)}`:`revisión del ${fmtD(c.fecha)}: ${c.detalle}`)})()}${fila("Notificaciones",!!s.notificaciones,s.notificaciones?"activas":"no configuradas")}${fila("Recordatorios",ult?true:null,ult&&ult.hora?`último envío ${fdHora(ult.hora)}`:rec.agenda?`agenda del ${fdHora(rec.agenda)}`:"sin envíos todavía")}</div>`;
 }
 function renderADM(){
   const head=band("Administración");
@@ -3352,10 +3354,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=141"></script>
-<script src="modulos/bodega.js?v=141"></script>
-<script src="modulos/rendiciones.js?v=141"></script>
-<script src="modulos/actas-entrega.js?v=141"></script>
+<script src="modulos/checklist.js?v=142"></script>
+<script src="modulos/bodega.js?v=142"></script>
+<script src="modulos/rendiciones.js?v=142"></script>
+<script src="modulos/actas-entrega.js?v=142"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

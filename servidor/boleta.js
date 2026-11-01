@@ -94,6 +94,30 @@ export function revisarLectura(x, timbre, hoy, op) {
   return m;
 }
 /* lectura completa: primera pasada y, si hace falta, revisión con el modelo más capaz */
+/* v142: revisión diaria de la clave de Claude (la llama scheduled en worker.js). Devuelve { estado, detalle }:
+   ok, sin_clave, clave (401/403), modelo (404), creditos (402 o saldo agotado), temporal (429, 5xx, sin conexión) u otro. */
+export function clasificarClaude(s, tipo, mensaje, modelo) {
+  if (s === 401) return { estado: "clave", detalle: "La clave de Claude no es válida o fue borrada." };
+  if (s === 403) return { estado: "clave", detalle: "La clave de Claude no tiene permiso para usar los modelos." };
+  if (s === 402 || /credit balance|billing/i.test(mensaje || "") || tipo === "billing_error") return { estado: "creditos", detalle: "La cuenta de Claude no tiene créditos o tiene un problema de pago." };
+  if (s === 404) return { estado: "modelo", detalle: `El modelo ${modelo} ya no está disponible.` };
+  if (s === 429 || s >= 500) return { estado: "temporal", detalle: `Claude respondió ${s} (problema temporal).` };
+  return { estado: "otro", detalle: `Claude respondió ${s}${tipo ? " (" + tipo + ")" : ""}.` };
+}
+export async function revisarClaveClaude(env) {
+  if (!env.ANTHROPIC_API_KEY) return { estado: "sin_clave", detalle: "No hay clave de Claude cargada en el servidor." };
+  const h = { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" };
+  const modelos = [...new Set([env.MODELO_LECTURA || MODELO_LECTURA, env.MODELO_REVISION || MODELO_REVISION])];
+  const error = async (r, m) => { let j = null; try { j = await r.json(); } catch (e) {} const e = (j && j.error) || {}; return clasificarClaude(r.status, e.type || "", e.message || "", m); };
+  try {
+    for (const m of modelos) { const r = await fetch("https://api.anthropic.com/v1/models/" + encodeURIComponent(m), { headers: h }); if (!r.ok) return await error(r, m); }
+    const b = { model: modelos[0], max_tokens: 16, messages: [{ role: "user", content: "Responde solo: ok" }] };
+    if (/claude-haiku-5/.test(modelos[0])) b.thinking = { type: "disabled" };
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(b) });
+    if (!r.ok) return await error(r, modelos[0]);
+    return { estado: "ok", detalle: "La clave funciona." };
+  } catch (e) { return { estado: "temporal", detalle: "No se pudo conectar con Claude." }; }
+}
 export async function leerBoleta(env, { imagen, mime, tipos, timbre, escaneo }) {
   if (!env.ANTHROPIC_API_KEY) throw { status: 500, error: "La lectura automática no está configurada: falta ANTHROPIC_API_KEY en el servidor." };
   const t = limpiarTimbre(timbre), img = { type: "image", source: { type: "base64", media_type: mime || "image/jpeg", data: imagen } };
