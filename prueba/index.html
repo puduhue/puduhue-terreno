@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-wDFG1aqI9F6gV7Wy08TI5GU9lrL5UCSVZcJDpCioEho=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-mzPE3KVeaPi1H1ia2nisSG8cb0zKVreg/8c5fGW3rF4=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -11,8 +11,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Puduhue Prueba">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#F3F4F1">
-<link rel="stylesheet" href="estilos.css?v=143">
+<meta name="theme-color" content="#17375E">
+<link rel="stylesheet" href="estilos.css?v=144">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="143";
+const APP_VER="144";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -2353,7 +2353,7 @@ let RED="checking",REDMSG="";
 const TK="actas-tema";
 function temaActual(){const t=document.documentElement.dataset.theme;if(t)return t;return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}
 function aplicarTema(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;try{t?localStorage.setItem(TK,t):localStorage.removeItem(TK)}catch(e){}
-  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=temaActual()==="dark"?"#0B0E12":"#F3F4F1"}
+  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=temaActual()==="dark"?"#15304B":"#17375E"}
 try{const t=localStorage.getItem(TK);if(t)aplicarTema(t)}catch(e){}
 function cambiarTema(){aplicarTema(temaActual()==="dark"?"light":"dark");render()}
 async function checkRed(){
@@ -2446,7 +2446,7 @@ function renderLaunch(){
     <div><b>${nv}</b><span>${nv===1?"visita":"visitas"} de check list</span></div>
     <div class="${nh?"warn":""}"><b>${nh}</b><span>${nh===1?"hallazgo abierto":"hallazgos abiertos"}</span></div></div>${np?`<p class="lx-foot">${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir.</p>`:""}</section>`;
   const nb=todas.filter(a=>a.estado!=="cerrada").length,nbAx=todasAx.filter(a=>a.estado!=="cerrada").length;
-  return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${cont}
+  return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${(()=>{try{return typeof rdInicioFondo==="function"?rdInicioFondo():""}catch(e){console.warn("inicio fondo",e);return""}})()}${cont}
     <h2 class="lx-h2 lx-modh">Módulos</h2>
     <div class="lx-modes lx-mods lx-lista">
       ${permVe("ax")?`<button class="lx-mode off" data-a="axHub"><span class="lx-mi">${ICO.home}</span><span class="lx-mt">Actas</span><span class="lx-md">Viviendas, vehículos, activos fijos y capacitaciones: fotos, firmas y PDF.</span><span class="lx-ma">${todasAx.length?`${todasAx.length} ${todasAx.length===1?"acta":"actas"}${nbAx?` · ${nbAx} en borrador`:""}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
@@ -3065,7 +3065,7 @@ function paraHoyItems(){
     if(apC.length)L.push(phItem(ICO.receipt,`${apC.length} ${apC.length===1?"rendición":"rendiciones"} para revisión contable`,quienes(apC),`data-a="rdTabIr" data-t="cont"`,"urg"));
     const dev=misRend().filter(r=>r.estado==="observada"),devIds=new Set(dev.map(r=>r.id));
     dev.forEach(r=>L.push(phItem(ICO.receipt,`Te devolvieron la rendición de ${esc(rdTitulo(r).toLowerCase())}`,esc(r.comentario||"Corrige lo observado y vuelve a enviarla."),`data-a="rdAbrir" data-id="${esc(r.id)}"`,"urg")));
-    rdRecordatorios().filter(x=>!devIds.has(x.id)).forEach(x=>L.push(phItem(ICO.receipt,esc(x.m),"",`data-a="rdAbrir" data-id="${esc(x.id)}"`,x.n==="b"?"urg":"av")));
+    rdRecordatorios().filter(x=>!devIds.has(x.id)).forEach(x=>L.push(phItem(ICO.receipt,esc(x.t||x.m),x.t?esc(x.s||""):"",`data-a="rdAbrir" data-id="${esc(x.id)}"`,x.n==="b"?"urg":"av")));
     fdParaHoy().forEach(x=>L.push(x));
   }catch(e){console.warn("paraHoy",e)}
   return L;
@@ -3354,10 +3354,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=143"></script>
-<script src="modulos/bodega.js?v=143"></script>
-<script src="modulos/rendiciones.js?v=143"></script>
-<script src="modulos/actas-entrega.js?v=143"></script>
+<script src="modulos/checklist.js?v=144"></script>
+<script src="modulos/bodega.js?v=144"></script>
+<script src="modulos/rendiciones.js?v=144"></script>
+<script src="modulos/actas-entrega.js?v=144"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
