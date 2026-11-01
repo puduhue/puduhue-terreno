@@ -1913,7 +1913,7 @@ async function rdClick(A,b){
     if(!vuelveCont){rdv.jefatura=j;delete rdv.aprobJef}
     /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
     const directo=!vuelveCont&&!(j&&j.correo);
-    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;delete rdv.huellaDev;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada",cambio?"cambió documentos después de la devolución de Contabilidad":"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
+    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;delete rdv.huellaDev;D.forEach(d=>{d.estadoRev=undefined;d.obsRev=""});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada",cambio?"cambió documentos después de la devolución de Contabilidad":"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();esperarFotos(rdv.id);rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
   if(A==="rdRestaurar"){const r=rdv;if(!r||!r.anulada||!esContab())return true;
     if(!(await ask("¿Restaurar esta rendición?","Vuelve a las listas, al fondo por rendir y al Excel, en el estado que tenía. Queda registrado en el historial.","Restaurar")))return true;
     const x=r.anulada;delete r.anulada;rdHist(r,"restaurada",x&&x.motivo?"estaba "+(x.eliminada?"eliminada":"anulada")+": "+x.motivo:"");r.actualizado=new Date().toISOString();await saveRend(r);render();toast("Rendición restaurada.");
@@ -2190,4 +2190,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="138"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="139"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
