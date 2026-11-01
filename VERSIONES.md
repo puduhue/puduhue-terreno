@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 141.1 (solo servidor) | 2026-11-01 | [8a7a51a](https://github.com/puduhue/puduhue-terreno/tree/8a7a51a) | Servidor v141.1: cuenta cuántos pedidos llegan con el permiso propio de la app y cuántos con el de Graph, y lo muestra en /salud («sesiones», sin correos). La app sigue en la v141. |
 | 141 | 2026-11-01 | [1485160](https://github.com/puduhue/puduhue-terreno/tree/1485160) | Seguridad (auditoría M-26): la app le habla al servidor con un permiso propio (ámbito Acceso de su API en Entra) en vez del permiso de OneDrive; el servidor (v141) lo revisa él mismo. Se sigue aceptando el método anterior mientras los teléfonos se actualizan. Sin cambios visibles. |
 | 140 | 2026-11-01 | [9a39002](https://github.com/puduhue/puduhue-terreno/tree/9a39002) | Biblioteca de Excel SheetJS 0.20.3 (antes 0.18.5, con fallas conocidas al leer archivos; auditoría M-30), en lib/xlsx-0.20.3. Sin cambios visibles. |
 | 139 | 2026-11-01 | [e5eb6b0](https://github.com/puduhue/puduhue-terreno/tree/e5eb6b0) | Número de pendientes en el ícono de la app instalada (rendiciones por aprobar, por revisar o devueltas y lo sin subir del teléfono); cada notificación del servidor lleva ese número (servidor v139). Hoja «Subiendo fotos… N de M» al cerrar actas, visitas y conteos o al enviar una rendición. Rehecho del pull request #7 («v122», nunca publicado). |
