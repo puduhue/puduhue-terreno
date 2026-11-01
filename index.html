@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Adji/Oyq12B7Y46kOE/Fd3oYu4M0baWGb8XOk0utKxQ=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-rfTO8Kd9UGcL1+GT1DnkZDTne37kC+0EAHl5GyciZv0=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#8DB3E2">
-<link rel="stylesheet" href="estilos.css?v=140">
+<link rel="stylesheet" href="estilos.css?v=141">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="140";
+const APP_VER="141";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -2690,9 +2690,26 @@ async function rolesTraer(forzar){
     const antes=JSON.stringify([x.admin,x.contab,x.lista]);try{localStorage.setItem(ROLES_K,JSON.stringify(n))}catch(e){}
     if(antes!==JSON.stringify([n.admin,n.contab,n.lista])&&loaded)render();return true}
   catch(e){console.warn("roles",e);return false}finally{ROLES_PIDIENDO=false}}
+/* v141 (M-26): para hablar con el servidor, la app pide un token solo para él (ámbito «Acceso» de la API de la misma aplicación de
+   Entra), en vez de mandarle el de Microsoft Graph. Si no se puede (por ejemplo, el permiso todavía no está concedido), usa el de
+   Graph como antes y no vuelve a intentar por 30 min; si el servidor rechaza el token nuevo (401), repite una vez con el de Graph. */
+let API_NO=0;
+const apiAlcance=()=>"api://"+M365.client+"/Acceso";
+async function tokenServidor(){
+  if(MSAL&&CUENTA&&Date.now()-API_NO>30*60e3){
+    try{const t=await MSAL.acquireTokenSilent({scopes:[apiAlcance()],account:CUENTA});if(t&&t.accessToken)return{tok:t.accessToken,api:true}}
+    catch(e){API_NO=Date.now();console.warn("permiso del servidor",e&&(e.errorCode||e.message))}}
+  return{tok:await getToken(),api:false};
+}
+async function srvFetch(path,op){
+  op=op||{};const pedir=t=>fetch(WORKER+path,Object.assign({},op,{headers:Object.assign({},op.headers||{},{Authorization:"Bearer "+t})}));
+  const t=await tokenServidor();let r=await pedir(t.tok);
+  if(r.status===401&&t.api){API_NO=Date.now();r=await pedir(await getToken())}
+  return r;
+}
 async function workerFetch(path){
-  const tok=await getToken();let r;
-  try{r=await fetch(WORKER+path,{headers:{Authorization:"Bearer "+tok}})}catch(e){throw{error:"No se pudo conectar con el servidor de Puduhue. Revisa la señal."}}
+  let r;
+  try{r=await srvFetch(path)}catch(e){if(e&&e.code)throw e;throw{error:"No se pudo conectar con el servidor de Puduhue. Revisa la señal."}}
   let j;try{j=await r.json()}catch(e){j={error:"El servidor respondió algo que no es JSON (estado "+r.status+")."}}
   if(!r.ok)throw j;return j}
 const hace=d=>{const x=new Date();x.setDate(x.getDate()-d);return isoLocal(x)};
@@ -2775,8 +2792,7 @@ function pushInvitaHTML(){
   return `<div id="pushInvita" class="info pushc"><b><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span> Avisos en ${eqTxt()}</b><br>${txt}<div class="btns">${PUSH_ST==="ios"?`<button class="btn pri" data-a="pushAyuda">Cómo instalarla</button>`:`<button class="btn pri" data-a="pushOn">Activar notificaciones</button>`}<button class="btn" data-a="pushNo">Ahora no</button></div></div>`;
 }
 async function pushFetch(ruta,body){
-  const tok=await getToken();
-  const r=await fetch(WORKER+"/push/"+ruta,body===undefined?{headers:{Authorization:"Bearer "+tok}}:{method:"POST",headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const r=await srvFetch("/push/"+ruta,body===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); /* v141 (M-26) */
   const j=await r.json().catch(()=>null);if(!r.ok||!j)throw{code:"srv",status:r.status,error:j&&j.error};return j;
 }
 /* se llama directo desde el toque (sin esperas antes), porque iPhone solo pide permiso dentro del toque */
@@ -3336,10 +3352,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=140"></script>
-<script src="modulos/bodega.js?v=140"></script>
-<script src="modulos/rendiciones.js?v=140"></script>
-<script src="modulos/actas-entrega.js?v=140"></script>
+<script src="modulos/checklist.js?v=141"></script>
+<script src="modulos/bodega.js?v=141"></script>
+<script src="modulos/rendiciones.js?v=141"></script>
+<script src="modulos/actas-entrega.js?v=141"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
