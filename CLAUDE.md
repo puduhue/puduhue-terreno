@@ -16,7 +16,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
   - `actas-entrega.js` (~100 KB): Actas de entrega de vehículos y activos fijos (v72) y registro de capacitaciones (v109).
 - `sw.js`: service worker. Guarda la app para abrir sin señal (index.html, estilos.css y los módulos, en la caché de la versión),
   separa las bibliotecas en cachés propias y muestra las notificaciones.
-- `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.18.5 mini (Excel),
+- `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.20.3 mini (Excel; desde la v140, M-30; la carpeta de la 0.18.5 queda para los teléfonos sin actualizar),
   jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF), zxing-wasm 3.1.4 (código del SII) y heic2any 0.0.4
   (fotos HEIC a JPEG, desde la v125; se carga solo cuando hace falta, desde `compress()` en index.html). Además, `lib/marca-puduhue-1/marcas.js` define
   los logos en base64 (`MARCA`, `MARCA_HZ` y `LOGO`, este último para los PDF), desde la v101.
