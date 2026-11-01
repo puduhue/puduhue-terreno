@@ -111,6 +111,23 @@ export class Avisos extends DurableObject {
   async contarAntiguo(fecha) { const x = (await this.ctx.storage.get("antiguo")) || { total: 0, desde: fecha, dias: {} }; x.total++; x.ultimo = fecha; x.dias[fecha] = (x.dias[fecha] || 0) + 1;
     const ks = Object.keys(x.dias).sort(); while (ks.length > 30) delete x.dias[ks.shift()]; await this.ctx.storage.put("antiguo", x); return x.total; }
   async leerAntiguo() { const x = await this.ctx.storage.get("antiguo"); return x ? { total: x.total, desde: x.desde, ultimo: x.ultimo } : { total: 0 }; }
+  /* v141.1 (M-26): cómo llega la sesión (api: permiso propio; graph: token de Graph), por día, con huellas de correo (no correos) */
+  async contarSesion(modo, correo, fecha) {
+    if (modo !== "api" && modo !== "graph") return;
+    const h = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(correo || "").toLowerCase())))).slice(0, 6).map(b => b.toString(16).padStart(2, "0")).join("");
+    const x = (await this.ctx.storage.get("sesiones")) || { desde: fecha, api: {}, graph: {} };
+    const d = x[modo][fecha] || (x[modo][fecha] = { n: 0, p: [] }); d.n++; if (!d.p.includes(h)) d.p.push(h);
+    for (const m of ["api", "graph"]) { const ks = Object.keys(x[m]).sort(); while (ks.length > 30) delete x[m][ks.shift()]; }
+    await this.ctx.storage.put("sesiones", x);
+  }
+  async leerSesiones(hoy) {
+    const x = await this.ctx.storage.get("sesiones"); if (!x) return null;
+    const desde7 = new Date(Date.parse(hoy + "T12:00:00Z") - 6 * 864e5).toISOString().slice(0, 10), r = { desde: x.desde };
+    for (const m of ["api", "graph"]) { const ds = Object.keys(x[m]).filter(f => f >= desde7), p = new Set(); let n = 0;
+      ds.forEach(f => { n += x[m][f].n; x[m][f].p.forEach(h => p.add(h)); });
+      r[m] = { pedidos7: n, personas7: p.size, ultimo: Object.keys(x[m]).sort().pop() || null }; }
+    return r;
+  }
   /* v84: agenda de pendientes que deja la app y recordatorios diarios */
   async guardarAgenda(ag) { await this.ctx.storage.put("agenda", ag); return { aprobar: ag.aprobar.length, enviar: ag.enviar.length }; }
   async leerAgenda() { return (await this.ctx.storage.get("agenda")) || null; }
