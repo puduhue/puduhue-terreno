@@ -183,6 +183,22 @@ async function fdClick(A,b){
 }
 
 /* ---- «Para hoy»: fondo por rendir con 30 días o más sin rendir ---- */
+/* v144: tarjeta del fondo por rendir en el Inicio (solo con una persona en la cuenta y datos de Finnegans; los mismos que «Para hoy»).
+   Botones que ya existían: «Ver mis rendiciones» (rdTabIr) y «Movimientos» (fdMov). */
+function rdInicioFondo(){
+  if(!fdVisible()||!ME)return"";const cs=colabsDeCuenta().filter(c=>c.rut);if(cs.length!==1)return"";
+  fdAuto();const D=FD.p;if(!D)return"";const p=D.personas.find(x=>normRut(x.rut)===normRut(cs[0].rut));if(!p)return"";
+  const k=fdCalc(p),n=fdNivel(k),tot=Math.max(0,k.saldo),pc=x=>tot>0.5?Math.max(0,Math.min(100,Math.round(x/tot*100))):0;
+  const monto=k.porRendir>0.5?`<b class="ifdm">${fmtP(k.porRendir)}</b><span class="ifds">por rendir</span>`
+    :k.porRendir<-0.5?`<b class="ifdm">${fmtP(-k.porRendir)}</b><span class="ifds">a tu favor: rendiste más de lo que recibiste</span>`
+    :`<b class="ifdm ok">Estás al día</b><span class="ifds">no tienes fondos por rendir</span>`;
+  const st=[k.enTram>0.5?`<span><i class="t"></i>En revisión<b>${fmtP(k.enTram)}</b></span>`:"",k.enBorr>0.5?`<span><i class="b"></i>Sin enviar<b>${fmtP(k.enBorr)}</b></span>`:""].filter(Boolean);
+  return `<section class="ifd" aria-label="Tu fondo por rendir"><div class="ifdh"><b>Tu fondo por rendir</b>${k.porRendir>0.5&&n?`<span class="ifdc ${esc(n)}">${k.dias} días sin rendir</span>`:""}</div>
+    <div>${monto}</div>
+    ${st.length&&tot>0.5?`<div class="ifdb" aria-hidden="true">${k.enTram>0.5?`<i class="t" style="width:${pc(k.enTram)}%"></i>`:""}${k.enBorr>0.5?`<i class="b" style="width:${pc(k.enBorr)}%"></i>`:""}</div><div class="ifdst">${st.join("")}</div>`
+      :k.ent?`<p class="ifdn">Último fondo: <b>${fmtP(num(k.ent.m))}</b> el ${fdF(k.ent.f)}</p>`:""}
+    <div class="ifdbt"><button class="btn pri" data-a="rdTabIr" data-t="mias">Ver mis rendiciones</button><button class="btn" data-a="fdMov" data-k="${esc(normRut(cs[0].rut))}">Movimientos</button></div></section>`;
+}
 function fdParaHoy(){
   if(!fdVisible()||!ME)return[];const cs=colabsDeCuenta().filter(c=>c.rut);if(!cs.length)return[];
   fdAuto();const D=FD.p;if(!D)return[];
@@ -1313,11 +1329,14 @@ function renderRD(){
 function rdRecordatorios(){
   if(!ME)return[];const p=periodoActual(),[y,m]=p.split("-").map(Number),hoy=new Date(),ult=new Date(y,m,0).getDate(),quedan=ult-hoy.getDate();
   const out=[];misRend().filter(r=>rdEditable(r)&&docsDe(r).length).forEach(r=>{const n=docsDe(r).length,tot=fmtP(totalRend(r)),nom=colabsDeCuenta().length>1&&r.persona?` de ${r.persona.nombre}`:"";
-    if(r.periodo<p)out.push({n:"b",id:r.id,m:`La rendición de ${rdTitulo(r).toLowerCase()}${nom} sigue sin enviar (${n} ${n===1?"documento":"documentos"}, ${tot}). Envíala para que Contabilidad pueda cerrar ese mes.`});
-    else if(r.periodo===p&&quedan<=4)out.push({n:"r",id:r.id,m:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`})});
+    const nd=`${n} ${n===1?"documento":"documentos"}`; /* v144: t y s, texto corto para «Por resolver» y «Para hoy» */
+    if(r.periodo<p)out.push({n:"b",id:r.id,t:`${rdTitulo(r)}${nom} · sin enviar`,s:`${nd} · ${tot} · envíala para que Contabilidad cierre el mes`,m:`La rendición de ${rdTitulo(r).toLowerCase()}${nom} sigue sin enviar (${n} ${n===1?"documento":"documentos"}, ${tot}). Envíala para que Contabilidad pueda cerrar ese mes.`});
+    else if(r.periodo===p&&quedan<=4)out.push({n:"r",id:r.id,t:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}`,s:`Envía tu rendición${nom}: ${nd} · ${tot}`,m:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`})});
   return out;
 }
-const rdRecordatoriosHTML=()=>rdRecordatorios().map(x=>`<div class="info" style="border-left:5px solid var(${x.n==="b"?"--m-ink":"--r-ink"})"><button class="lnk" data-a="rdAbrir" data-id="${esc(x.id)}" style="text-align:left">${esc(x.m)}</button></div>`).join("");
+/* v144: bloque «Por resolver» con filas cortas (antes, un párrafo subrayado por recordatorio); cada fila abre la rendición, como antes */
+const rdRecordatoriosHTML=()=>{const L=rdRecordatorios();if(!L.length)return"";
+  return `<section class="rdpr" aria-label="Por resolver"><h2 class="rdprh">Por resolver</h2><div class="rdprl">${L.map(x=>`<button class="rdpri ${x.n==="b"?"b":"r"}" data-a="rdAbrir" data-id="${esc(x.id)}"><span class="rdpro" aria-hidden="true">${ICO.receipt}</span><span class="rdprx"><b>${esc(x.t||x.m)}</b>${x.t&&x.s?`<small>${esc(x.s)}</small>`:""}</span>${ICO.arrow}</button>`).join("")}</div></section>`};
 /* v77: revisión de datos — lo que conviene corregir en la lista de colaboradores, el catálogo y las rendiciones en curso antes de que llegue a Contabilidad */
 function rdRevisionDatos(){
   const out=[],A=(g,n,m,id)=>out.push({g,n,m,id});
@@ -2190,4 +2209,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="143"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="144"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

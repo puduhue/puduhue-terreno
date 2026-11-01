@@ -1450,3 +1450,92 @@ h2{font-weight:800;letter-spacing:-.015em}
 
 /* hojas que suben desde abajo: más redondeadas arriba */
 .sheet{border-top-left-radius:24px;border-top-right-radius:24px}
+
+/* v144: rediseño, etapa 2. Pedido de Benja: «con la barra de arriba blanca se ve todo sin color» y «tampoco tanto color, inspírate en
+   las mejores apps». Vuelve el azul de Puduhue arriba (barra de cada pantalla e Inicio, sólido, sin degradado ni cerros); el resto
+   sigue tranquilo como en la v143, con color solo donde dice algo (urgente, pendiente, al día). Además: tarjeta del fondo por rendir
+   en el Inicio, módulos en tarjetas y «Por resolver» en Rendiciones. */
+:root{--nb:#17375E;--nb-ink:#FFFFFF;--nb-sub:#CFE0F2;--lx-hero:#17375E;--lx-hero2:#17375E}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--nb:#15304B;--lx-hero:#15304B;--lx-hero2:#15304B}}
+:root[data-theme="dark"]{--nb:#15304B;--lx-hero:#15304B;--lx-hero2:#15304B}
+[data-theme="dark"]{--nb:#15304B}
+
+/* barra de arriba de cada pantalla: azul sólido, título en blanco */
+.top{background:linear-gradient(var(--nb),var(--nb)) top/100% var(--nb-h) no-repeat,var(--bg);border-bottom:1px solid var(--line)}
+.top .bar .ttl{color:var(--nb-ink)}
+.top .bar .back{color:var(--nb-sub)}
+.top .bar .back:focus-visible,.top .bar .est:focus-visible{outline-color:#FFFFFF}
+.top .bar .saved:not(.est){color:var(--nb-sub)}
+.est-ok{background:rgba(94,200,140,.20);color:#B4F0CC}
+.est-pend{background:rgba(242,190,80,.24);color:#FBDFA0}
+.est-off{background:rgba(255,255,255,.14);color:#E3ECF5}
+
+/* Inicio: bloque azul con esquinas redondeadas abajo (sin los cerros) */
+.lx-hero{background:var(--lx-hero);color:#F2F7FC;border-radius:0 0 28px 28px;padding-bottom:58px}
+.lx-main{margin-top:-38px}
+.lx-logo img{filter:none!important}
+.lx-date{color:rgba(242,247,252,.8)}
+.lx-h1{color:#FFFFFF}
+.lx-sub{color:rgba(242,247,252,.85)}
+.lx-tema{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.12);color:#F2F7FC}
+.lx-sig{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.12);color:#F2F7FC}
+.lx-sig.ok{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);color:#F2F7FC}
+.lx-sig.ok svg{color:#8FE0AE}
+.lx-sig.no{background:rgba(255,120,120,.18);border-color:rgba(255,160,160,.35);color:#FFD6D6}
+.lx-sig.chk{color:rgba(242,247,252,.8)}
+.lx-bus{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.12);color:rgba(242,247,252,.92)}
+.lx-bus:active{background:rgba(255,255,255,.2)}
+.lx-hoy{box-shadow:0 12px 30px rgba(16,24,40,.12)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .lx-hoy{box-shadow:0 12px 30px rgba(0,0,0,.45)}}
+:root[data-theme="dark"] .lx-hoy{box-shadow:0 12px 30px rgba(0,0,0,.45)}
+
+/* Inicio: tarjeta del fondo por rendir */
+.ifd{position:relative;display:flex;flex-direction:column;gap:12px;margin:0 0 14px;padding:18px 18px 16px;background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:0 12px 30px rgba(16,24,40,.14)}
+.ifdh{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ifdh>b{font-size:13.5px;font-weight:700;color:var(--muted)}
+.ifdc{flex:none;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--r-bg);color:var(--r-ink)}
+.ifdc.rr{background:var(--m-bg);color:var(--m-ink)}
+.ifdm{display:block;font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.ifdm.ok{font-size:26px;color:var(--b-ink)}
+.ifds{display:block;margin-top:4px;font-size:13.5px;color:var(--muted)}
+.ifdb{display:flex;gap:3px;height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
+.ifdb i{display:block;height:100%;border-radius:4px}
+.ifdb .t,.ifdst i.t{background:var(--act)}
+.ifdb .b,.ifdst i.b{background:#D9961A}
+.ifdst{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:var(--muted)}
+.ifdst i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:0}
+.ifdst b{display:block;margin-top:2px;font-size:16.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.ifdn{margin:0;font-size:13.5px;color:var(--muted)}.ifdn b{color:var(--ink)}
+.ifdbt{display:flex;gap:8px}
+.ifdbt .btn{flex:1;margin:0;padding:12px 14px;font-size:15px}
+.ifdbt .btn:not(.pri){flex:0 0 auto}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ifd{box-shadow:0 12px 30px rgba(0,0,0,.45)}}
+:root[data-theme="dark"] .ifd{box-shadow:0 12px 30px rgba(0,0,0,.45)}
+@media (min-width:760px){.ifdbt .btn.pri{flex:0 0 auto;min-width:220px}.ifdst{grid-template-columns:repeat(4,max-content);column-gap:40px}}
+
+/* Inicio: módulos en tarjetas, dos por fila (tres o cinco en el computador); íconos en el tono de la app */
+.lx-mods.lx-lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;background:none;border:0;border-radius:0;overflow:visible;box-shadow:none}
+.lx-mods.lx-lista .lx-mode,.lx-mods.lx-lista .lx-mode.off{grid-template-columns:minmax(0,1fr);grid-template-areas:"i" "t" "s";align-content:start;row-gap:3px;min-height:132px;padding:14px;border:1px solid var(--line)!important;border-radius:20px;background:var(--card)}
+.lx-mods.lx-lista .lx-mi{width:44px;height:44px;border-radius:13px;margin-bottom:8px}
+.lx-mods.lx-lista .lx-mt{font-size:16px;line-height:1.2}
+.lx-mods.lx-lista .lx-ma{font-size:13px}
+.lx-mods.lx-lista .lx-ma svg{display:none}
+@media (min-width:760px){.lx-mods.lx-lista{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1100px){.lx-mods.lx-lista{grid-template-columns:repeat(5,minmax(0,1fr))}}
+
+/* Rendiciones: «Por resolver» */
+.rdpr{margin:16px 0 8px}
+.rdprh{margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.rdprl{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.rdpri{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:0;border-top:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.rdpri:first-child{border-top:0}
+.rdpro{flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:13px}
+.rdpro svg{width:22px;height:22px}
+.rdpri.b .rdpro{background:var(--m-bg);color:var(--m-ink)}
+.rdpri.r .rdpro{background:var(--r-bg);color:var(--r-ink)}
+.rdprx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rdprx b{font-size:15.5px;line-height:1.3}
+.rdprx small{font-size:13px;line-height:1.35;color:var(--muted)}
+.rdpri>svg:last-child{flex:none;color:var(--muted)}
+.rdpri:active{background:var(--soft)}
+@media (hover:hover) and (pointer:fine){.rdpri:hover{background:var(--soft)}}
