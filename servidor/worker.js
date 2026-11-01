@@ -42,7 +42,7 @@
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
 import { rutasFondo, esContabSrv, contabDef } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
-import { leerBoleta, MODELO_LECTURA, MODELO_REVISION } from "./boleta.js";
+import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -96,7 +96,14 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v141.1"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
+const VERSION_SERVIDOR = "v142";
+/* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
+export async function revisionClaude(env, cuando) {
+  const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
+  if (prev && (prev.fecha === s.fecha || s.hora < 8)) return null;
+  const admins = String(env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(x => x.trim()).filter(Boolean);
+  return o.registrarClaude(await revisarClaveClaude(env), admins, sujetoDe(env), s.fecha);
+} /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
 
 /* ---- Lectura de boletas con Claude: ver boleta.js (desde la v98, con revisión y timbre del SII) ---- */
 const PARAMS_STOCK = "PARAMWEBREPORT_Empresa=2&PARAMWEBREPORT_tipoStock=0&PARAMWEBREPORT_soloStockNoCero=true&PARAMWEBREPORT_soloStockDebajoPtoReposicion=false&PARAMWEBREPORT_soloDepositos=0&PARAMWEBREPORT_TipoPrecio=0&PARAMWEBREPORT_AgruparPor=1";
@@ -158,7 +165,7 @@ export default {
     if (pide === "https://benjaminbarrientoscardenas-glitch.github.io" && env.AVISOS && url0(req).pathname !== "/salud") ctx.waitUntil(objetoAvisos(env).contarAntiguo(hoyChile()).catch(() => {}));
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
     const url = new URL(req.url);
-    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null });
+    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null });
 
     // Quién pide: se valida la sesión Microsoft que ya tiene la app
     const auth = req.headers.get("Authorization") || "";
@@ -235,5 +242,6 @@ export default {
   async scheduled(ev, env, ctx) {
     if (!env.AVISOS) return;
     ctx.waitUntil(objetoAvisos(env).correrRecordatorios(sujetoDe(env), ev.scheduledTime, false).then(r => console.log("recordatorios", JSON.stringify(r))).catch(e => console.error("recordatorios", e)));
+    ctx.waitUntil(revisionClaude(env, ev.scheduledTime).then(r => r && console.log("clave de Claude", JSON.stringify(r))).catch(e => console.error("clave de Claude", e))); /* v142 */
   }
 };

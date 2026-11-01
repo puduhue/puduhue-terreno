@@ -128,6 +128,20 @@ export class Avisos extends DurableObject {
       r[m] = { pedidos7: n, personas7: p.size, ultimo: Object.keys(x[m]).sort().pop() || null }; }
     return r;
   }
+  /* v142: resultado de la revisión diaria de la clave de Claude; aviso al administrador si falla (una vez al día) y al volver */
+  async leerClaude() { return (await this.ctx.storage.get("claude")) || null; }
+  async registrarClaude(res, admins, sujeto, fecha) {
+    const prev = await this.leerClaude();
+    const temporales = res.estado === "temporal" ? ((prev && prev.temporales) || 0) + 1 : 0;
+    const alerta = !["ok", "temporal"].includes(res.estado) || temporales >= 3;
+    const x = { estado: res.estado, detalle: res.detalle, fecha, hora: new Date().toISOString(), temporales, alerta, desde: alerta ? ((prev && prev.alerta && prev.desde) || fecha) : null };
+    let aviso = null;
+    if (alerta) aviso = { titulo: "Revisar la clave de Claude", texto: res.detalle + " Mientras tanto, la lectura de boletas no funciona." };
+    else if (prev && prev.alerta && res.estado === "ok") aviso = { titulo: "La clave de Claude volvió a funcionar", texto: "La lectura de boletas funciona de nuevo." };
+    if (aviso && admins.length) { try { const r = await this.enviar(admins, { ...aviso, url: "./", etiqueta: "clave-claude" }, sujeto); x.avisados = r.enviadas; } catch (e) { x.avisados = 0; } }
+    await this.ctx.storage.put("claude", x);
+    return x;
+  }
   /* v84: agenda de pendientes que deja la app y recordatorios diarios */
   async guardarAgenda(ag) { await this.ctx.storage.put("agenda", ag); return { aprobar: ag.aprobar.length, enviar: ag.enviar.length }; }
   async leerAgenda() { return (await this.ctx.storage.get("agenda")) || null; }
