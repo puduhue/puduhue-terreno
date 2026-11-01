@@ -58,8 +58,45 @@ export function tokenDePuduhue(auth, env) {
   const apps = String(env.CLIENT_ID || APP_ENTRA).split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
   return String(t.tid || "").toLowerCase() === tenant && apps.includes(String(t.appid || t.azp || "").toLowerCase());
 }
+/* v141 (M-26): token propio de la app para el servidor (ámbito «Acceso» de api://<id de la app>). Se revisa aquí, sin llamar a Graph:
+   firma RS256 con las llaves públicas de Microsoft, audiencia, emisor, organización, aplicación, ámbito y vigencia. */
+export const ALCANCE_API = "Acceso";
+const b64uBytes = s => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((String(s).length + 3) % 4)), c => c.charCodeAt(0));
+let LLAVES = { t: 0, tenant: "", k: {} };
+async function llavesMicrosoft(tenant, forzar) {
+  if (!forzar && LLAVES.tenant === tenant && Date.now() - LLAVES.t < 864e5 && Object.keys(LLAVES.k).length) return LLAVES.k;
+  const r = await fetch(`https://login.microsoftonline.com/${tenant}/discovery/v2.0/keys`);
+  if (!r.ok) throw new Error("llaves de Microsoft: " + r.status);
+  const j = await r.json(), k = {};
+  for (const x of (j && j.keys) || []) if (x && x.kid && x.kty === "RSA" && x.n && x.e) k[x.kid] = x;
+  LLAVES = { t: Date.now(), tenant, k }; return k;
+}
+export const audienciasApi = env => { const a = String(env.CLIENT_ID || APP_ENTRA).split(",")[0].trim().toLowerCase(); return ["api://" + a, a]; };
+export const esTokenApi = (auth, env) => { const t = datosToken(auth); return !!t && audienciasApi(env).includes(String(t.aud || "").toLowerCase()); };
+/* devuelve { correo, nombre } si el token es válido; null si no (y lanza un error solo si no se pudo consultar a Microsoft) */
+export async function verificarTokenApi(auth, env, ahora = Date.now()) {
+  const tok = String(auth || "").replace(/^Bearer\s+/i, ""), [h, p, f] = tok.split(".");
+  if (!h || !p || !f) return null;
+  let cab, t; try { cab = JSON.parse(new TextDecoder().decode(b64uBytes(h))); t = JSON.parse(new TextDecoder().decode(b64uBytes(p))); } catch (e) { return null; }
+  const tenant = String(env.TENANT_ID || TENANT_PUDUHUE).trim().toLowerCase();
+  const apps = String(env.CLIENT_ID || APP_ENTRA).split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (!cab || cab.alg !== "RS256" || !cab.kid) return null;
+  if (!audienciasApi(env).includes(String(t.aud || "").toLowerCase())) return null;
+  if (![`https://sts.windows.net/${tenant}/`, `https://login.microsoftonline.com/${tenant}/v2.0`].includes(String(t.iss || "").toLowerCase())) return null;
+  if (String(t.tid || "").toLowerCase() !== tenant || !apps.includes(String(t.appid || t.azp || "").toLowerCase())) return null;
+  if (!String(t.scp || "").split(" ").includes(ALCANCE_API)) return null;
+  const margen = 300e3;
+  if (!(+t.exp * 1000 + margen > ahora) || (t.nbf && +t.nbf * 1000 - margen > ahora)) return null;
+  let k = (await llavesMicrosoft(tenant))[cab.kid];
+  if (!k) k = (await llavesMicrosoft(tenant, true))[cab.kid];
+  if (!k) return null;
+  const llave = await crypto.subtle.importKey("jwk", { kty: "RSA", n: k.n, e: k.e, alg: "RS256", ext: true }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  if (!(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", llave, b64uBytes(f), new TextEncoder().encode(h + "." + p)))) return null;
+  const correo = String(t.preferred_username || t.upn || t.email || t.unique_name || "").toLowerCase();
+  return correo ? { correo, nombre: String(t.name || "") } : null;
+}
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v139"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
+const VERSION_SERVIDOR = "v141"; /* se publica sola desde GitHub (carpeta servidor del repositorio actas-vivienda) */
 
 /* ---- Lectura de boletas con Claude: ver boleta.js (desde la v98, con revisión y timbre del SII) ---- */
 const PARAMS_STOCK = "PARAMWEBREPORT_Empresa=2&PARAMWEBREPORT_tipoStock=0&PARAMWEBREPORT_soloStockNoCero=true&PARAMWEBREPORT_soloStockDebajoPtoReposicion=false&PARAMWEBREPORT_soloDepositos=0&PARAMWEBREPORT_TipoPrecio=0&PARAMWEBREPORT_AgruparPor=1";
@@ -128,8 +165,14 @@ export default {
     if (!auth.startsWith("Bearer ")) return json({ error: "Falta la sesión de Microsoft." }, 401);
     if (!tokenDePuduhue(auth, env)) return json({ error: "Solo cuentas de Puduhue, desde la app Puduhue Terreno." }, 403); /* v134 (A-08) */
     let yo;
-    try { const r = await fetch("https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,displayName", { headers: { Authorization: auth } }); if (!r.ok) return json({ error: "La sesión de Microsoft no es válida o venció." }, 401); yo = await r.json(); }
-    catch (e) { return json({ error: "No se pudo verificar la sesión." }, 502); }
+    if (esTokenApi(auth, env)) { /* v141 (M-26): token propio de la app, revisado aquí */
+      let v = null; try { v = await verificarTokenApi(auth, env); } catch (e) { return json({ error: "No se pudo verificar la sesión." }, 502); }
+      if (!v) return json({ error: "La sesión de Microsoft no es válida o venció." }, 401);
+      yo = { mail: v.correo, displayName: v.nombre };
+    } else { /* camino antiguo (token de Graph), para los teléfonos que todavía no tienen la v141; se quita en una versión aparte */
+      try { const r = await fetch("https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,displayName", { headers: { Authorization: auth } }); if (!r.ok) return json({ error: "La sesión de Microsoft no es válida o venció." }, 401); yo = await r.json(); }
+      catch (e) { return json({ error: "No se pudo verificar la sesión." }, 502); }
+    }
     const correo = String(yo.mail || yo.userPrincipalName || "").toLowerCase();
     if (!correo.endsWith("@" + (env.DOMINIO || "puduhue.cl").toLowerCase())) return json({ error: "Solo cuentas de Puduhue." }, 403);
     const permitidos = (env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);

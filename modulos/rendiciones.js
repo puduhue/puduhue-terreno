@@ -30,7 +30,7 @@ function fdPadronDatos(){return{personas:colabs().filter(c=>c.rut&&c.activo!==fa
 async function fdPadron(forzar){
   if(!esContab()||(!forzar&&Date.now()-FD_PADRON_OK<30*60e3))return;
   const d=fdPadronDatos();if(d.personas.length<3)return;
-  try{const tok=await getToken();const r=await fetch(WORKER+"/fondo/padron",{method:"POST",headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify(d)});if(r.ok)FD_PADRON_OK=Date.now();else console.warn("padrón",r.status)}
+  try{const r=await srvFetch("/fondo/padron",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}); /* v141 (M-26) */if(r.ok)FD_PADRON_OK=Date.now();else console.warn("padrón",r.status)}
   catch(e){console.warn("padrón",e)}
 }
 /* clave de cada ficha: el RUT, o la organización cuando en Finnegans no es una persona de la lista */
@@ -1164,11 +1164,11 @@ async function leerDoc(r,d){
     if(!dataURL||!dataURL.startsWith("data:")){let blob=null;if(IDB.db){const rec=await IDB.get("fotos",d.foto).catch(()=>null)||await IDB.get("cache",d.foto).catch(()=>null);blob=await recBlob(rec)}
       if(!blob&&dataURL){const rr=await fetch(dataURL);blob=await rr.blob()}
       if(!blob)throw{error:"No se encontró la foto en el teléfono."};dataURL=await blobToDataURL(blob)}
-    const tok=await getToken();
+    await getToken(); /* sesión al día antes de leer (v141: el token del servidor lo pone srvFetch) */
     const tipos=catalogo().filter(t=>!t.c&&!t.otro&&t.activo!==false).map(t=>({id:t.id,n:t.n}));
     /* v133 (B-12): una lectura que tarda más de 90 s se corta y queda como falla */
     const ac=window.AbortController?new AbortController():null,tope=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}},90000);let res,j;
-    try{res=await fetch(WORKER+"/boleta",{method:"POST",signal:ac?ac.signal:undefined,headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify({imagen:dataURL,mime:"image/jpeg",tipos,timbre:d.timbre||undefined,escaneo:d.deEscaneo||undefined})});
+    try{res=await srvFetch("/boleta",{method:"POST",signal:ac?ac.signal:undefined,headers:{"Content-Type":"application/json"},body:JSON.stringify({imagen:dataURL,mime:"image/jpeg",tipos,timbre:d.timbre||undefined,escaneo:d.deEscaneo||undefined})});
       j=await res.json().catch(e=>{if(e&&e.name==="AbortError")throw e;return{error:"Respuesta no válida del servidor."}})}
     catch(e){if(e&&e.name==="AbortError")throw{error:"La lectura tardó demasiado. Los datos quedan como los escribas."};throw e}
     finally{clearTimeout(tope)}
@@ -2190,4 +2190,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="140"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="141"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
