@@ -1336,3 +1336,11 @@ body.contab .sesbar{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 .xp.sug{background:var(--soft);color:var(--act)}
 .rdok-det{margin-top:4px;color:var(--muted)}
 .rdok-det summary{cursor:pointer;font-weight:700;color:var(--act);list-style-position:inside}
+
+/* v139: hoja «Subiendo fotos» al cerrar un registro */
+.esf h3{margin-bottom:10px}
+.esf-barra{height:8px;border-radius:999px;background:var(--soft);overflow:hidden;margin:4px 0 12px}
+.esf-barra i{display:block;height:100%;background:var(--act);border-radius:999px;transition:width .3s}
+.esf-nota{font-size:13px;color:var(--muted);margin:8px 0 0;text-align:center}
+.esf-ok{display:block;width:52px;height:52px;margin:4px auto 8px;fill:none;stroke:var(--b-ink);stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.esf .esf-ok+h3,.esf .esf-ok~p{text-align:center}

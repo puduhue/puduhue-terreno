@@ -84,13 +84,14 @@ export class Avisos extends DurableObject {
     if (l.length) await this.ctx.storage.put("s:" + correo, l); else await this.ctx.storage.delete("s:" + correo);
     return l.length;
   }
-  async enviar(correos, datos, sujeto) {
+  async enviar(correos, datos, sujeto, rd) {
     const c = await this.claves(); const res = { enviadas: 0, sinEquipos: [], fallas: [] };
+    const ag = await this.leerAgenda(); /* v139: cada notificación lleva el número del ícono de esa persona */
     for (const correo of correos) {
       const l = await this.equipos(correo); if (!l.length) { res.sinEquipos.push(correo); continue; }
-      const quedan = [];
+      const quedan = [], d = conInsignia(datos, insigniaDe(ag, correo, rd));
       for (const s of l) {
-        let r; try { r = await enviarUno(c, s, datos, sujeto); } catch (e) { r = { estado: 0, detalle: String(e && e.message || e) }; }
+        let r; try { r = await enviarUno(c, s, d, sujeto); } catch (e) { r = { estado: 0, detalle: String(e && e.message || e) }; }
         if (r.estado === 404 || r.estado === 410) continue;           // el equipo ya no existe: se borra
         quedan.push(s);
         if (r.estado >= 200 && r.estado < 300) res.enviadas++; else res.fallas.push({ correo, estado: r.estado, detalle: r.detalle });
@@ -141,6 +142,20 @@ export class Avisos extends DurableObject {
     return { agenda: ag ? { generado: ag.generado, aprobar: ag.aprobar.length, enviar: ag.enviar.length } : null, fecha: r.hoy.fecha, notificaciones: r.notificaciones };
   }
 }
+/* v139: número del ícono de la app: rendiciones que la persona debe aprobar o revisar, más las suyas devueltas, según la agenda
+   que publica Contabilidad (v84, v134). Como la agenda puede estar atrasada, la rendición de la notificación (rd: {rid, pendiente})
+   se cuenta como pendiente o se descuenta según el aviso. Sin agenda o con una de más de 7 días no se manda (null). */
+export function insigniaDe(ag, correo, rd) {
+  if (!ag || !(Date.now() - Date.parse(ag.generado) <= 7 * 864e5)) return null;
+  const c = String(correo || "").toLowerCase(), es = x => Array.isArray(x.para) && x.para.includes(c), ids = new Set();
+  (ag.aprobar || []).filter(es).forEach(x => ids.add(String(x.rid)));
+  (ag.enviar || []).filter(x => x.estado === "observada" && es(x)).forEach(x => ids.add(String(x.rid)));
+  if (rd && rd.rid) { if (rd.pendiente) ids.add(String(rd.rid)); else ids.delete(String(rd.rid)); }
+  return ids.size;
+}
+export const conInsignia = (datos, n) => n === null || n === undefined ? datos : { ...datos, insignia: n };
+/* títulos que piden algo a quien recibe la notificación (aprobar, revisar o corregir); «Tu rendición fue aprobada» solo informa */
+export const TITULOS_PENDIENTE = ["Rendición por aprobar", "Rendición corregida por aprobar", "Rendición para revisión contable", "Rendición corregida para revisión contable", "Tu rendición fue devuelta"];
 export const sujetoDe = () => "https://puduhue.github.io/puduhue-terreno/"; /* contacto que ven los servicios de notificaciones */
 export const objetoAvisos = env => env.AVISOS.get(env.AVISOS.idFromName("puduhue"));
 
@@ -189,7 +204,8 @@ export async function rutasPush(req, env, url, correo, json, admin, esContab) {
     { const tope = +env.LIMITE_NOTIFICACIONES || 40, u = await obj.usar("push", correo, tope, santiago().fecha);
       if (!u.ok) return json({ error: `Llegaste al límite de ${tope} notificaciones de hoy; los avisos por correo sí salen.` }, 429); }
     const u = String(b.url || "./"); const destino = /^\.\/(\?[\w=&%.-]*)?$/.test(u) ? u : "./";
-    const r = await obj.enviar(para, { titulo, texto, url: destino, etiqueta: String(b.etiqueta || "").slice(0, 60), de: correo }, sujeto);
+    const etiqueta = String(b.etiqueta || "").slice(0, 60), mr = /^rd-(.+)$/.exec(etiqueta); /* v139: la rendición avisada cuenta en el número del ícono */
+    const r = await obj.enviar(para, { titulo, texto, url: destino, etiqueta, de: correo }, sujeto, mr ? { rid: mr[1], pendiente: TITULOS_PENDIENTE.includes(titulo) } : null);
     return json({ ok: true, ...r });
   }
   return json({ error: "Ruta no encontrada." }, 404);

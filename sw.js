@@ -1,5 +1,5 @@
 /* Guarda la app en el teléfono para que abra sin señal. Cambia VER al publicar una versión nueva. */
-const VER="actas-v138";
+const VER="actas-v139";
 /* v100: la copia de prueba (carpeta prueba/) usa cachés con otro nombre y solo borra las suyas,
    para no tocar las de la app real (las cachés son comunes a todo puduhue.github.io). */
 const PRUEBA=self.registration.scope.includes("/prueba/"),PRE=PRUEBA?"prueba-":"";
@@ -41,8 +41,15 @@ self.addEventListener("push",e=>{
   let d={};try{d=e.data?e.data.json():{}}catch(x){d={texto:e.data?e.data.text():""}}
   const op={body:d.texto||"",icon:"icon-192.png",badge:"badge-96.png",lang:"es",data:{url:d.url||"./"}};
   if(d.etiqueta){op.tag=d.etiqueta;op.renotify=true}
-  e.waitUntil(self.registration.showNotification(d.titulo||"Puduhue Terreno",op));
+  const ps=[self.registration.showNotification(d.titulo||"Puduhue Terreno",op)];
+  if(typeof d.insignia==="number")ps.push(insLocal().then(l=>insPoner(Math.max(0,d.insignia|0)+l)));
+  e.waitUntil(Promise.all(ps));
 });
+/* v139: número en el ícono con la app cerrada: el servidor manda cuántas rendiciones tiene pendientes la persona (insignia)
+   y se le suma lo que la app dejó sin subir en este teléfono (base «puduhue-insignia», que escribe la app). */
+const insLocal=()=>new Promise(res=>{try{const q=indexedDB.open("puduhue-insignia",1);q.onupgradeneeded=()=>q.result.createObjectStore("v");q.onerror=()=>res(0);
+  q.onsuccess=()=>{try{const db=q.result,g=db.transaction("v").objectStore("v").get("local");g.onsuccess=()=>{db.close();res(+g.result||0)};g.onerror=()=>{db.close();res(0)}}catch(x){res(0)}}}catch(x){res(0)}});
+const insPoner=n=>{const nv=self.navigator;if(!nv||!nv.setAppBadge)return Promise.resolve();try{return (n>0?nv.setAppBadge(n):nv.clearAppBadge()).catch(()=>{})}catch(x){return Promise.resolve()}};
 self.addEventListener("notificationclick",e=>{
   e.notification.close();
   const url=new URL((e.notification.data&&e.notification.data.url)||"./",self.registration.scope).href;
