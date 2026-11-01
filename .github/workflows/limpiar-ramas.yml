@@ -1,6 +1,6 @@
 # Borra las ramas de trabajo ya juntadas en main (claude/… y vNN de versiones de prueba). Se ejecuta solo a mano (o la lanza Claude
 # desde una sesión): las sesiones en la nube no pueden borrar ramas directamente. Una rama con algún commit que no esté en main
-# no se borra.
+# no se borra, salvo que se nombre en «borrar_tambien» (revisada a mano; nunca main ni una con pull request abierto).
 name: Limpiar ramas juntadas
 
 on:
@@ -10,6 +10,10 @@ on:
         description: "Solo mostrar qué ramas se borrarían, sin borrarlas"
         type: boolean
         default: false
+      borrar_tambien:
+        description: "Ramas revisadas a mano que se borran aunque no estén juntadas (nombres exactos separados por espacio)"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -23,6 +27,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           SOLO_MOSTRAR: ${{ inputs.solo_mostrar }}
+          BORRAR_TAMBIEN: ${{ inputs.borrar_tambien }}
         run: |
           set -euo pipefail
           gh api --paginate "repos/$REPO/branches?per_page=100" --jq '.[].name' > ramas.txt
@@ -41,3 +46,12 @@ jobs:
             borradas=$((borradas+1))
           done
           echo "Juntadas: $borradas · con cambios sin juntar (se dejan): $quedan"
+          # Ramas revisadas a mano (su contenido ya está publicado o se pasó a main de otra forma): nunca main ni una rama con un pull
+          # request abierto
+          for rama in $BORRAR_TAMBIEN; do
+            if [ "$rama" = "main" ] || ! grep -qx "$rama" ramas.txt; then echo "No existe o no se puede borrar: $rama"; continue; fi
+            abiertos=$(gh api "repos/$REPO/pulls?state=open&head=${REPO%%/*}:$rama" --jq 'length')
+            if [ "$abiertos" != "0" ]; then echo "Se deja $rama: tiene un pull request abierto"; continue; fi
+            if [ "$SOLO_MOSTRAR" = "true" ]; then echo "Se borraría (revisada a mano) $rama"
+            else gh api -X DELETE "repos/$REPO/git/refs/heads/$rama" && echo "Borrada (revisada a mano) $rama"; fi
+          done
