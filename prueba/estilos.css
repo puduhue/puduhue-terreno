@@ -1531,3 +1531,42 @@ h2{font-weight:800;letter-spacing:-.015em}
 .rdpri>svg:last-child{flex:none;color:var(--muted)}
 .rdpri:active{background:var(--soft)}
 @media (hover:hover) and (pointer:fine){.rdpri:hover{background:var(--soft)}}
+
+/* v146: rediseño, etapa 3 (pantallas de adentro; solo apariencia y orden). Rendiciones con la tarjeta del fondo como la del Inicio
+   y las listas de rendiciones y documentos agrupadas como movimientos de banco; tarjetas de elegir (Actas, Check list, «Empezar la
+   rendición», Nuevo conteo…) sin la raya de color, con flecha; respuesta elegida del check list rellena con su color. */
+
+/* Rendiciones: tarjeta del fondo como la del Inicio */
+.fdc{border-radius:22px;padding:18px 18px 14px}
+.fdh>b{font-size:13.5px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.fdm b{font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.03em}
+.fdm span{font-size:13.5px}
+.fdal{border-radius:12px}
+
+/* listas de rendiciones y de documentos: un solo bloque con separadores, monto a la derecha */
+.list:has(>.rdc),.list:has(>.rdd){gap:0;background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.list>.rdc,.list>.rdd{border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
+.list>.rdc:first-child,.list>.rdd:first-child{border-top:0}
+.list>.rdc:active,.list>.rdd:active{background:var(--soft)}
+@media (hover:hover) and (pointer:fine){.list>.rdc:hover,.list>.rdd:hover{background:var(--soft)}}
+.rdth .th,.rdth .th img{width:52px;height:52px;border-radius:12px}
+.rdd .rdt{font-size:15.5px}
+.rdd .rdv b,.rdc .rdv b{font-size:16px;font-variant-numeric:tabular-nums}
+
+/* tarjetas para elegir (Actas, Check list, «Empezar la rendición», nuevo conteo o visita): sin la raya de color, con flecha */
+.start>.big{position:relative;border:1px solid var(--line)!important;border-radius:20px;padding:16px 46px 16px 18px;gap:5px}
+.start>.big::after{content:"";position:absolute;right:16px;top:50%;width:18px;height:18px;transform:translateY(-50%);background:var(--muted);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat}
+.start>.big strong{font-size:17px;letter-spacing:-.01em}
+.start>.big span b{color:var(--act);font-weight:700}
+.start>.big:active{background:var(--soft)}
+
+/* check list y actas: la respuesta elegida, rellena con su color (se distingue de un vistazo, también al sol) */
+.seg button[data-e="C"][aria-pressed="true"],.seg button[data-v="B"][aria-pressed="true"]{background:var(--b-ink);border-color:var(--b-ink);color:var(--card)}
+.seg button[data-e="P"][aria-pressed="true"],.seg button[data-v="R"][aria-pressed="true"]{background:var(--r-ink);border-color:var(--r-ink);color:var(--card)}
+.seg button[data-e="N"][aria-pressed="true"],.seg button[data-v="M"][aria-pressed="true"]{background:var(--m-ink);border-color:var(--m-ink);color:var(--card)}
+.seg button[data-e="NA"][aria-pressed="true"]{background:var(--muted);border-color:var(--muted);color:var(--card)}
+.seg.seg4 button{border-radius:14px;min-height:60px}
+
+/* documento leído: el monto más grande */
+.rdok{border-radius:22px}
+.rdok-tot{font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.03em}
