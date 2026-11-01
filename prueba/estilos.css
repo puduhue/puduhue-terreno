@@ -1451,7 +1451,7 @@ h2{font-weight:800;letter-spacing:-.015em}
 /* hojas que suben desde abajo: más redondeadas arriba */
 .sheet{border-top-left-radius:24px;border-top-right-radius:24px}
 
-/* v144: rediseño, etapa 2. Pedido de Benja: «con la barra de arriba blanca se ve todo sin color» y «tampoco tanto color, inspírate en
+/* v144: rediseño, etapa 2 (v145: sin las tarjetas de módulos). Pedido de Benja: «con la barra de arriba blanca se ve todo sin color» y «tampoco tanto color, inspírate en
    las mejores apps». Vuelve el azul de Puduhue arriba (barra de cada pantalla e Inicio, sólido, sin degradado ni cerros); el resto
    sigue tranquilo como en la v143, con color solo donde dice algo (urgente, pendiente, al día). Además: tarjeta del fondo por rendir
    en el Inicio, módulos en tarjetas y «Por resolver» en Rendiciones. */
@@ -1513,15 +1513,7 @@ h2{font-weight:800;letter-spacing:-.015em}
 :root[data-theme="dark"] .ifd{box-shadow:0 12px 30px rgba(0,0,0,.45)}
 @media (min-width:760px){.ifdbt .btn.pri{flex:0 0 auto;min-width:220px}.ifdst{grid-template-columns:repeat(4,max-content);column-gap:40px}}
 
-/* Inicio: módulos en tarjetas, dos por fila (tres o cinco en el computador); íconos en el tono de la app */
-.lx-mods.lx-lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;background:none;border:0;border-radius:0;overflow:visible;box-shadow:none}
-.lx-mods.lx-lista .lx-mode,.lx-mods.lx-lista .lx-mode.off{grid-template-columns:minmax(0,1fr);grid-template-areas:"i" "t" "s";align-content:start;row-gap:3px;min-height:132px;padding:14px;border:1px solid var(--line)!important;border-radius:20px;background:var(--card)}
-.lx-mods.lx-lista .lx-mi{width:44px;height:44px;border-radius:13px;margin-bottom:8px}
-.lx-mods.lx-lista .lx-mt{font-size:16px;line-height:1.2}
-.lx-mods.lx-lista .lx-ma{font-size:13px}
-.lx-mods.lx-lista .lx-ma svg{display:none}
-@media (min-width:760px){.lx-mods.lx-lista{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (min-width:1100px){.lx-mods.lx-lista{grid-template-columns:repeat(5,minmax(0,1fr))}}
+/* v145: los módulos del Inicio vuelven a la lista compacta de la v96 (se quitaron las tarjetas de la v144) */
 
 /* Rendiciones: «Por resolver» */
 .rdpr{margin:16px 0 8px}
