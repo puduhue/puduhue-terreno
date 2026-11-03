@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-K2Hi24uf5YMAMvVncivl/b8D2Q4cZLV+TTBqFN/8aI8=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nMAvdGbOpdp6P8OfZYrau4yZOdKvKpqCVaYyERgZzCE=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,10 +12,10 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=149">
+<link rel="stylesheet" href="estilos.css?v=151">
 </head>
 <body>
-<div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
+<div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
 
 <!-- v137 (M-27): las bibliotecas van después de «Cargando…» para que se vea mientras bajan (el orden de ejecución es el mismo) -->
 <script src="lib/msal-browser-3.30.0/msal-browser.min.js"></script>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="149";
+const APP_VER="151";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -220,6 +220,11 @@ function deshacer(msg,alDeshacer,alConfirmar){
 }
 function deshFin(){const Dx=DESH;if(!Dx)return;DESH=null;clearTimeout(Dx.id);Dx.t.remove();try{Dx.alConfirmar()}catch(e){console.warn(e)}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")deshFin()});
+/* v150: pequeñas animaciones al tocar (como el corazón de Instagram): la respuesta elegida da un salto y «Rendir» rebota */
+document.addEventListener("click",e=>{try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;const t=e.target.closest&&e.target.closest(".seg button,.fabb");if(!t)return;
+  if(t.classList.contains("fabb")){setTimeout(()=>{const n=document.querySelector(".fabb");if(n){n.classList.remove("rebota");void n.offsetWidth;n.classList.add("rebota")}},0);return} /* el botón se vuelve a dibujar al tocarlo */
+  const d=t.dataset,sel=".seg button"+["a","k","e","v","t"].filter(x=>d[x]!=null).map(x=>`[data-${x}="${CSS.escape(d[x])}"]`).join("");
+  setTimeout(()=>{const n=document.querySelector(sel);if(n&&n.getAttribute("aria-pressed")==="true"){n.classList.remove("pop");void n.offsetWidth;n.classList.add("pop")}},30)}catch(er){}},true);
 let toastT;function toast(m,ms){let t=$(".toast");if(!t){t=document.createElement("div");t.className="toast";t.setAttribute("role","status");document.body.appendChild(t)}t.textContent=m;clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),ms||3200)}
 /* Ventana de confirmación propia (el confirm() del navegador está bloqueado dentro de la app) */
 function ask(title,msg,ok,danger,extraHTML,cancelar){
@@ -897,7 +902,7 @@ const TB_USO_K="actas-uso-mod";
 const TB_ICO_ACTA=`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15.5" r="4"/><path d="M10.9 12.6L19 4.5"/><path d="M15.5 8l2.5 2.5"/><path d="M13.5 10l1.8 1.8"/></svg>`;
 const TB_MODS=[
   {k:"rd",a:"rd",t:"Rendiciones",tl:"Rendiciones",s:"Facturas y boletas",i:()=>ICO.receipt,ok:()=>true},
-  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas y camionetas",i:()=>ICO.check,ok:()=>permVe("cl")},
+  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas, camionetas y casas de huéspedes",i:()=>ICO.check,ok:()=>permVe("cl")},
   {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>permVe("ax")},
   {k:"cb",a:"cb",t:"Bodega",tl:"Control de bodega",s:"Conteo contra el stock del sistema",i:()=>ICO.clip,ok:()=>puedeContar()},
   {k:"stock",a:"stock",t:"Stock",tl:"Stock",s:"Existencias desde Finnegans",i:()=>ICO.box,ok:()=>puedeVerStock()},
@@ -1061,7 +1066,7 @@ function renderADM(){
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       ${lecAdminHTML(lect)}`)}
-    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
+    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button><button class="btn" data-a="admCat" data-t="huespedes">Check list de casas de huéspedes${cat("huespedes")!=null?` (${cat("huespedes")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
@@ -1070,7 +1075,7 @@ async function admClick(A,b){
   if(A==="adm"){go("adm");window.scrollTo(0,0);return true}
   if(A==="admSalud"){ADM.salud=null;await admSalud();return true}
   if(A==="admPerm"){permQ="";permSolo=false;go("perm");return true}
-  if(A==="admCat"){clTipo=["bodega","camionetas"].includes(b.dataset.t)?b.dataset.t:"visitas";await clClick("clCat",b);return true}
+  if(A==="admCat"){clTipo=["bodega","camionetas","huespedes"].includes(b.dataset.t)?b.dataset.t:"visitas";await clClick("clCat",b);return true}
   return false;
 }
 async function mnClick(A,b){
@@ -1328,7 +1333,7 @@ function disBusResultados(q){
   grupo("Vehículos, activos y capacitaciones",actas.filter(a=>esAx(a)&&hit(axTitulo(a),axQuien(a),axDonde(a),fmtD(a.fecha))).sort(rec),
     a=>disBusIt(`data-a="axOpen" data-id="${esc(a.id)}"`,TB_ICO_ACTA,`${esc(axTitulo(a))} · ${esc(axQuien(a))}`,esc([axDonde(a),fmtD(a.fecha)].filter(Boolean).join(" · ")),a.estado==="cerrada"?"":`<span class="xp neu">Borrador</span>`));
   grupo("Visitas",(permVe("cl")?Object.values(VIS):[]).filter(v=>v&&!v.anulada&&hit(v.predio,"visita "+v.n,v.revisor,CLK[tipoDe(v)]&&CLK[tipoDe(v)].titulo,fmtD(v.fecha))).sort(rec),
-    v=>{const sc=puntaje(v);return disBusIt(`data-a="clAbrir" data-id="${esc(v.id)}"`,tipoDe(v)==="bodega"?ICO.bodega:tipoDe(v)==="camionetas"?ICO.camioneta:ICO.check,`Visita ${esc(v.n)} · ${esc(v.predio)}`,esc([CLK[tipoDe(v)].titulo,fmtD(v.fecha),v.revisor].filter(Boolean).join(" · ")),v.estado!=="cerrada"?`<span class="xp neu">En curso</span>`:sc.pct!==null?`<b>${sc.pct} %</b>`:"")});
+    v=>{const sc=puntaje(v);return disBusIt(`data-a="clAbrir" data-id="${esc(v.id)}"`,tipoDe(v)==="bodega"?ICO.bodega:tipoDe(v)==="camionetas"?ICO.camioneta:tipoDe(v)==="huespedes"?ICO.home:ICO.check,`Visita ${esc(v.n)} · ${esc(v.predio)}`,esc([CLK[tipoDe(v)].titulo,fmtD(v.fecha),v.revisor].filter(Boolean).join(" · ")),v.estado!=="cerrada"?`<span class="xp neu">En curso</span>`:sc.pct!==null?`<b>${sc.pct} %</b>`:"")});
   const RV=disRendVisibles();
   grupo("Rendiciones",RV.filter(r=>hit(rdTitulo(r),r.persona&&r.persona.nombre,RD_ESTADO[r.estado])).sort(rec),
     r=>{const n=docsDe(r).length;return disBusIt(`data-a="rdAbrir" data-id="${esc(r.id)}"`,ICO.receipt,`${esc(rdTitulo(r))}${esPropia(r)?"":` · ${esc(r.persona?r.persona.nombre:"")}`}`,`${n} ${n===1?"documento":"documentos"} · ${esc(RD_ESTADO[r.estado]||r.estado)}`,`<b>${fmtP(totalRend(r))}</b>`)});
@@ -1393,18 +1398,18 @@ document.addEventListener("click",e=>{const c=e.target.closest&&e.target.closest
 /* ---- 3) gestos: tirar hacia abajo para sincronizar ---- */
 const PTR={y0:null,x0:0,d:0,act:false,carga:false},PTR_UMBRAL=64;
 function ptrEl(){let p=document.getElementById("ptr");if(!p){p=document.createElement("div");p.id="ptr";p.className="ptr";p.setAttribute("aria-hidden","true");
-  p.innerHTML=`<span class="ptri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v13"/><path d="M6.5 12.5L12 18l5.5-5.5"/></svg></span>`;document.body.appendChild(p)}return p}
+  p.innerHTML=`<span class="ptri"><img class="ptrl" src="icon-192.png" alt=""></span>`;document.body.appendChild(p)}return p}
 function ptrPuede(){try{return !ESCRITORIO()&&loaded&&CUENTA&&DB&&!!TB_RAIZ[view]&&!document.querySelector(".modal")&&!FAB_AB&&(window.scrollY||document.documentElement.scrollTop||0)<=0}catch(e){return false}}
 document.addEventListener("touchstart",e=>{if(PTR.carga||!e.touches||e.touches.length!==1||!ptrPuede()){PTR.y0=null;return}PTR.y0=e.touches[0].clientY;PTR.x0=e.touches[0].clientX;PTR.d=0;PTR.act=false},{passive:true});
 document.addEventListener("touchmove",e=>{
   if(PTR.y0==null||!e.touches||!e.touches[0])return;const dy=e.touches[0].clientY-PTR.y0,dx=e.touches[0].clientX-PTR.x0;
   if(!PTR.act){if(dy<0||Math.abs(dx)>Math.abs(dy)||(window.scrollY||0)>0){if(Math.abs(dx)>10||dy<-6)PTR.y0=null;return}if(dy<12)return;PTR.act=true}
   PTR.d=Math.max(0,Math.min(112,(dy-12)*.55));const p=ptrEl();p.classList.add("ver");p.classList.toggle("listo",PTR.d>=PTR_UMBRAL);
-  p.style.transform=`translate(-50%,${PTR.d}px)`;p.querySelector("svg").style.transform=`rotate(${PTR.d>=PTR_UMBRAL?180:Math.round(PTR.d*1.6)}deg)`;
+  p.style.transform=`translate(-50%,${PTR.d}px)`;p.querySelector(".ptrl").style.transform=`rotate(${Math.round(PTR.d*3.2)}deg)`; /* v150: el logo gira con el tirón */
 },{passive:true});
 document.addEventListener("touchend",async()=>{
   if(PTR.y0==null){return}PTR.y0=null;if(!PTR.act)return;PTR.act=false;const p=ptrEl();
-  const volver=()=>{p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector("svg");if(s)s.style.transform=""},240)};
+  const volver=()=>{p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector(".ptrl");if(s)s.style.transform=""},240)};
   if(PTR.d<PTR_UMBRAL){volver();return}
   PTR.carga=true;p.classList.add("carga");p.style.transform=`translate(-50%,${PTR_UMBRAL-6}px)`;try{if(navigator.vibrate)navigator.vibrate(10)}catch(e){}
   try{await flush();schedSync(100);await pull(true)}catch(e){console.warn("tirar para sincronizar",e)}
@@ -1431,9 +1436,9 @@ function disUnoHTML(v){
   const enArea=O.filter(x=>x.area===it.area),j=ix(enArea,it);
   return `<div class="uno${DIS_UNO_DIR?" entra-"+DIS_UNO_DIR:""}" id="uno">
     <p class="uno-pos">Punto ${j+1} de ${enArea.length} en ${esc(AREA_NAME[it.area]||"")}${falta?` · ${falta} sin revisar en total`:" · todo revisado"}</p>
-    <section class="sec"><h3>${esc(it.fam)} · ${esc(it.group)}</h3>${it.group==="Camionetas"?camionetasPanel(v):""}${clItemHTML(it)}</section>
+    ${it.area==="hu-ban"?chNotaHTML():""}<section class="sec"><h3>${it.sheet==="ch"?esc(it.fam):esc(it.fam)+" · "+esc(it.group)}</h3>${it.group==="Camionetas"?camionetasPanel(v):""}${clItemHTML(it)}</section>
     <div class="uno-nav"><button type="button" class="btn" data-a="disUno" data-d="-1" ${i<=0?"disabled":""}>Anterior</button><button type="button" class="btn pri" data-a="disUno" data-d="1">${i>=O.length-1?"Terminar":"Siguiente"}</button></div>
-    <p class="uno-ayuda">Al marcar Cumple o N/A pasa solo al siguiente punto. También puedes deslizar hacia los lados.</p>
+    <p class="uno-ayuda">Al marcar ${it.sheet==="ch"?"Sí":"Cumple"} o N/A pasa solo al siguiente punto. También puedes deslizar hacia los lados.</p>
   </div>`;
 }
 function disUnoMostrar(it){const v=clv;if(!v||!it)return;clFoco=it.key;clFocoV=v.id;clArea=it.area;clFiltro="all";render();DIS_UNO_DIR="";
@@ -1543,10 +1548,17 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}"${back?"":` aria-label="Volver al inicio" title="Volver al inicio"`}>${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${esc(MARCA)}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
 function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue()}}
+/* v150: esqueleto de carga (la forma del Inicio en gris, con un brillo) */
+function esqueletoHTML(){
+  const fila=`<div class="esqf"><span class="esq esq-ic"></span><span class="esqx"><span class="esq" style="width:78%"></span><span class="esq" style="width:52%"></span></span></div>`;
+  return `<header class="lx-hero"><div class="lx-top"><span class="lx-logo"><img src="${esc(MARCA_HZ)}" alt="Puduhue"></span></div><p class="lx-date">${esc(fechaLarga())}</p><div class="esq esq-h1"></div></header>
+  <main class="wrap lx-main" aria-busy="true" aria-label="Cargando"><div class="ifd esqc"><span class="esq" style="width:38%"></span><span class="esq esq-big"></span><span class="esq" style="width:66%"></span></div>
+  <section class="lx-sec lx-hoy esqc"><span class="esq" style="width:30%;height:16px;margin:6px 0 10px"></span>${fila+fila+fila}</section></main>`;
+}
 function renderPantalla(){
   if(UPD_READY&&!UPD_APLICANDO&&updSegura()){aplicarUpdate();return} /* v104: versión nueva pendiente: se actualiza al volver a una lista */
   const app=$("#app");
-  if(!loaded){app.innerHTML=band("Cargando actas…");return}
+  if(!loaded){app.innerHTML=esqueletoHTML();return} /* v150: esqueleto en vez de «Cargando actas…» */
   if(permFuera(view))app.innerHTML=permSinAccesoHTML(view); /* v121 */
   else if(view==="launch")app.innerHTML=renderLaunch();
   else if(view==="clhub")app.innerHTML=renderCLHub();
@@ -1929,7 +1941,7 @@ async function onClickAccion(ev,b,A){
   if(A==="pdf"||A==="dlActa"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await descargarActa(a);return}
   if(A==="informe"||A==="dlInf"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await descargarGeneral(a);return}
   if(A==="delFoto"){await quitarFoto(b.dataset.k,b.dataset.ref);return}
-  if(A==="foto"){verFoto(b.dataset.ref,b.dataset.k,b.dataset.own==="1");return}
+  if(A==="foto"){VIS_GAL=visGaleria(b);verFoto(b.dataset.ref,b.dataset.k,b.dataset.own==="1");return}
   if(A==="syncNow"){if(SES_VENCIDA){reautenticar();return}noWrite=false;sinAccesoReset();sync();return}
   if(A==="exportar"){await exportarActas();return}
   if(A==="quitarLost"){const L=lostRefs();if(!(await ask(`¿Quitar ${L.length} fotos no recuperables?`,"","Quitar",true)))return;L.forEach(([k,f])=>{const r=cur.items[k];r.fotos=r.fotos.filter(x=>x!==f);delete LOST[f];IDB.del("fotos",f).catch(()=>{})});touch();render();toast("Fotos quitadas. Ya puedes tomarlas de nuevo.");return}
@@ -2096,18 +2108,60 @@ async function quitarFoto(k,ref){
   deshacer("Foto eliminada.",()=>{if(cur!==a)return;const q=a.items[k]||{};q.fotos=q.fotos||[];if(!q.fotos.includes(ref))q.fotos.splice(Math.max(0,i),0,ref);a.items[k]=q;if(lost)LOST[ref]=lost;touch();refreshItem(a,k);refreshLost()},
     ()=>{borrarFotoRef(ref);if(ref.startsWith("q:"))IDB.del("fotos",ref).catch(()=>{})});
 }
+/* v150: visor de fotos a pantalla completa, como Instagram. VIS_GAL: las fotos de la misma fila de miniaturas (mismo ítem) */
+let VIS_GAL=null;
+const VIS_X=`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+function visGaleria(b){try{const c=b.closest(".strip")||b.parentElement;return {origen:b,lista:[...c.querySelectorAll('[data-a="foto"]')].filter(x=>x.dataset.k===b.dataset.k&&x.dataset.own===b.dataset.own&&!x.classList.contains("miss")).map(x=>x.dataset.ref)}}catch(e){return null}}
+function visorAbrir(o){
+  const G=VIS_GAL;VIS_GAL=null;
+  const lista=(G&&G.lista&&G.lista.includes(o.ref)?G.lista:[o.ref]).filter(r=>r===o.ref||fotoSrc(r));let i=Math.max(0,lista.indexOf(o.ref));
+  const red=matchMedia("(prefers-reduced-motion: reduce)").matches,varias=lista.length>1;
+  const m=document.createElement("div");m.className="modal visor";
+  m.innerHTML=`<div class="vis viewer${varias?" varias":""}" role="dialog" aria-modal="true" aria-label="${esc(o.aria||"Foto")}">
+    <div class="vis-top"><button type="button" class="vis-x" data-m="close" aria-label="Cerrar">${VIS_X}</button><div class="vis-t">${o.titulo?`<b>${esc(o.titulo)}</b>`:""}${o.sub?`<small>${esc(o.sub)}</small>`:""}</div><span class="vis-n" aria-live="polite"></span></div>
+    <div class="vis-area"><button type="button" class="vis-ant" data-m="ant" aria-label="Foto anterior">‹</button><div class="vis-img"></div><button type="button" class="vis-sig" data-m="sig" aria-label="Foto siguiente">›</button></div>
+    <div class="vis-dots" aria-hidden="true"></div>${o.pie?`<div class="vis-pie">${o.pie}</div>`:""}</div>`;
+  document.body.appendChild(m);document.body.style.overflow="hidden";
+  const area=m.querySelector(".vis-area"),box=m.querySelector(".vis-img"),dots=m.querySelector(".vis-dots"),nn=m.querySelector(".vis-n");
+  const pintar=dir=>{box.innerHTML=`<img src="${esc(fotoSrc(lista[i]))}" alt="${esc(o.alt||"Foto")}">`;try{hacerZoom(box.querySelector("img"))}catch(e){}
+    nn.textContent=varias?`${i+1} de ${lista.length}`:"";dots.innerHTML=varias?lista.map((_,j)=>`<i class="${j===i?"on":""}"></i>`).join(""):"";
+    box.classList.remove("vis-de","vis-iz");if(dir&&!red){void box.offsetWidth;box.classList.add(dir>0?"vis-de":"vis-iz")}};
+  pintar(0);
+  if(!red){try{const r=G&&G.origen&&document.body.contains(G.origen)?G.origen.getBoundingClientRect():null,ra=area.getBoundingClientRect();
+    if(r)area.style.transformOrigin=`${r.left+r.width/2-ra.left}px ${r.top+r.height/2-ra.top}px`;m.classList.add("vis-abre")}catch(e){}}
+  const cerrar=()=>{if(m._cerrando)return;m._cerrando=1;const fin=()=>{document.removeEventListener("keydown",tecla);m.remove();if(!document.querySelector(".modal"))document.body.style.overflow=""};if(red){fin();return}m.classList.add("vis-cierra");setTimeout(fin,190)};
+  const ir=d=>{const j=i+d;if(j<0||j>=lista.length)return false;i=j;pintar(d);return true};
+  const tecla=e=>{if(!document.body.contains(m)){document.removeEventListener("keydown",tecla);return}if([...document.querySelectorAll(".modal")].pop()!==m)return;
+    if(e.key==="ArrowLeft"){e.preventDefault();ir(-1)}else if(e.key==="ArrowRight"){e.preventDefault();ir(1)}};document.addEventListener("keydown",tecla);
+  m.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest("[data-m]"),a=t&&t.dataset.m;if(!a)return;
+    if(a==="close"){cerrar();return}if(a==="ant"){ir(-1);return}if(a==="sig"){ir(1);return}if(o.accion)o.accion(a,lista[i],cerrar,m)});
+  /* gestos: de lado cambia de foto; hacia abajo cierra (solo si la foto no está ampliada) */
+  let g=null;const amp=()=>{const z=area.querySelector(".zoomw");return !!(z&&z.classList.contains("ampliada"))};
+  area.addEventListener("touchstart",e=>{g=null;if(!e.touches||e.touches.length!==1||amp())return;const t=e.touches[0];g={x0:t.clientX,y0:t.clientY,t0:Date.now(),h:null,dx:0,dy:0}},{passive:true});
+  area.addEventListener("touchmove",e=>{if(!g)return;if(!e.touches||e.touches.length!==1||amp()){box.style.transform="";m.style.backgroundColor="";g=null;return}
+    const t=e.touches[0];g.dx=t.clientX-g.x0;g.dy=t.clientY-g.y0;
+    if(g.h===null){if(Math.abs(g.dx)<10&&Math.abs(g.dy)<10)return;g.h=Math.abs(g.dx)>Math.abs(g.dy)?"x":(g.dy>0?"y":null);if(!g.h){g=null;return}}
+    if(e.cancelable)e.preventDefault();
+    if(g.h==="x"){const borde=(g.dx>0&&i===0)||(g.dx<0&&i===lista.length-1);box.style.transform=`translateX(${g.dx*(borde?.25:1)}px)`}
+    else{const d=Math.max(0,g.dy);box.style.transform=`translateY(${d}px) scale(${1-Math.min(.18,d/1800)})`;m.style.backgroundColor=`rgba(0,0,0,${Math.max(.25,1-d/480).toFixed(3)})`}},{passive:false});
+  area.addEventListener("touchend",()=>{if(!g||!g.h){g=null;return}const x=g;g=null;const rap=Date.now()-x.t0<300;
+    const volver=()=>{box.style.transition="transform .18s ease";box.style.transform="";m.style.backgroundColor="";setTimeout(()=>{box.style.transition=""},200)};
+    if(x.h==="x"){if((Math.abs(x.dx)>70||(rap&&Math.abs(x.dx)>30))&&ir(x.dx<0?1:-1)){box.style.transform=""}else volver()}
+    else if(x.dy>110||(rap&&x.dy>50))cerrar();else volver()},{passive:true});
+  return m;
+}
 function verFoto(ref,k,own){
   if(view==="axe"){axVerFoto(ref,k);return}
   if(view==="rdd"||view==="rdv"){const src=fotoSrc(ref);if(!src){toast("La foto todavía se está descargando.");return}
     const dp=view==="rdd"&&rdd&&rdd.foto===ref&&rdd.pdf?rdd:null;
-    const m=document.createElement("div");m.className="modal";m.innerHTML=`<div class="sheet viewer" role="dialog" aria-modal="true" aria-label="Documento"><img src="${esc(src)}" alt="" style="width:100%;border-radius:10px"><div class="btns">${dp?`<button class="btn" data-m="pdf">Ver PDF original</button>`:""}<button class="btn pri" data-m="close" style="flex:1">Cerrar</button></div></div>`;
-    document.body.appendChild(m);m.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.m;if(e.target===m||a==="close")m.remove();if(a==="pdf"){m.remove();rdAbrirPdf(rdv,dp)}});return}
+    /* v150: visor a pantalla completa */
+    VIS_GAL=null;const dd=rdv&&Object.values(rdv.docs||{}).find(x=>x.foto===ref);
+    visorAbrir({ref,aria:"Documento",alt:"Documento",titulo:"Documento",sub:(dd&&dd.emisor)||"",pie:dp?`<div class="btns"><button class="btn" data-m="pdf">Ver PDF original</button></div>`:"",
+      accion:(a,r,cerrar)=>{if(a==="pdf"){cerrar();rdAbrirPdf(rdv,dp)}}});return}
   if(view==="cbv"){const l=cbv&&cbv.lineas[k];const src=fotoSrc(ref);if(!src){toast("La foto todavía se está descargando.");return}
-    const m=document.createElement("div");m.className="modal";m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Foto"><h3>${esc(l?l.prod:"Foto")}</h3><img src="${esc(src)}" alt="" style="width:100%;border-radius:10px"><div class="btns"><button class="btn pri" data-m="close" style="flex:1">Cerrar</button></div></div>`;
-    document.body.appendChild(m);m.addEventListener("click",e=>{if(e.target===m||(e.target.dataset&&e.target.dataset.m==="close"))m.remove()});return}
+    visorAbrir({ref,titulo:l?l.prod:"Foto",alt:l?l.prod:"Foto"});return} /* v150 */
   if(view==="clv"){const it=itemDe(clv,k);const src=fotoSrc(ref);if(!src){toast(LOST[ref]?"Esta foto no se pudo recuperar.":"La foto todavía se está descargando.");return}
-    const m=document.createElement("div");m.className="modal";m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="Foto"><h3>${esc(it?codigo(it)+" · "+it.areaName:"Foto")}</h3><img src="${esc(src)}" alt="" style="width:100%;border-radius:10px"><div class="btns"><button class="btn pri" data-m="close" style="flex:1">Cerrar</button></div></div>`;
-    document.body.appendChild(m);m.addEventListener("click",e=>{if(e.target===m||(e.target.dataset&&e.target.dataset.m==="close"))m.remove()});return}
+    visorAbrir({ref,titulo:it?codigo(it)+" · "+it.areaName:"Foto",sub:it?it.txt:"",alt:it?it.txt:"Foto"});return} /* v150 */
   const it=ITEMS.find(i=>i.k===k);
   if(LOST[ref]||!fotoSrc(ref)){
     const msg=LOST[ref]?"Esta foto no se pudo recuperar del teléfono. Quítala y vuelve a tomarla.":"Esta foto todavía no se envía desde el teléfono donde se tomó. Si la tomaste en este teléfono y no aparece, quítala y vuelve a tomarla.";
@@ -2117,15 +2171,11 @@ function verFoto(ref,k,own){
     m.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.m;if(e.target===m||a==="close")m.remove();if(a==="del"){m.remove();quitarFoto(k,ref)}});
     return;
   }
-  const m=document.createElement("div");m.className="modal";
-  m.innerHTML=`<div class="sheet viewer" role="dialog" aria-modal="true" aria-label="Foto"><h3>${esc(SECC[it.s].t)}: ${esc(it.n)}</h3><p>${own?(cur.tipo==="devolucion"&&cur.entregaId?"En la devolución":"Foto del ítem"):"En la entrega"}</p>
-   <img src="${esc(fotoSrc(ref))}" alt="Foto de ${esc(it.n)}">${own&&!ro()?`<div class="f" style="margin:12px 0 0"><label for="mv">¿La foto está en el ítem equivocado? Muévela a:</label><div style="display:flex;gap:8px"><select id="mv" data-mvsel="1" style="flex:1"><option value="">Elige el ítem correcto</option>${SECC.map((sc,si)=>`<optgroup label="${si+1}. ${esc(sc.t)}">${ITEMS.filter(i=>i.s===si&&i.k!==k).map(i=>`<option value="${esc(i.k)}">${esc(i.n)}</option>`).join("")}</optgroup>`).join("")}</select><button class="btn" data-m="mv">Mover</button></div></div>`:""}
-   <div class="btns">${own&&!ro()?`<button class="btn danger" data-m="del">Eliminar foto</button>`:""}<button class="btn pri" data-m="close" style="flex:1">Cerrar</button></div></div>`;
-  document.body.appendChild(m);document.body.style.overflow="hidden";
-  const close=()=>{m.remove();document.body.style.overflow=""};
-  m.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.m;if(e.target===m||a==="close")close();
-    if(a==="del"){close();quitarFoto(k,ref)}
-    if(a==="mv"){const nk=m.querySelector("[data-mvsel]").value;if(!nk){toast("Elige el ítem al que va la foto.");return}close();moverFoto(k,ref,nk)}});
+  /* v150: visor a pantalla completa; «Mover» y «Eliminar foto» se aplican a la foto que se está viendo */
+  visorAbrir({ref,titulo:`${SECC[it.s].t}: ${it.n}`,sub:own?(cur.tipo==="devolucion"&&cur.entregaId?"En la devolución":"Foto del ítem"):"En la entrega",alt:`Foto de ${it.n}`,
+    pie:own&&!ro()?`<div class="f" style="margin:12px 0 0"><label for="mv">¿La foto está en el ítem equivocado? Muévela a:</label><div style="display:flex;gap:8px"><select id="mv" data-mvsel="1" style="flex:1"><option value="">Elige el ítem correcto</option>${SECC.map((sc,si)=>`<optgroup label="${si+1}. ${esc(sc.t)}">${ITEMS.filter(i=>i.s===si&&i.k!==k).map(i=>`<option value="${esc(i.k)}">${esc(i.n)}</option>`).join("")}</optgroup>`).join("")}</select><button class="btn" data-m="mv">Mover</button></div></div><div class="btns"><button class="btn danger" data-m="del">Eliminar foto</button></div>`:"",
+    accion:(a,r,cerrar,m)=>{if(a==="del"){cerrar();quitarFoto(k,r)}
+      if(a==="mv"){const nk=m.querySelector("[data-mvsel]").value;if(!nk){toast("Elige el ítem al que va la foto.");return}cerrar();moverFoto(k,r,nk)}}});
 }
 async function moverFoto(k,ref,nk){
   if(!cur||ro())return;
@@ -2468,7 +2518,7 @@ function renderLaunch(){
   /* v127: en «Para hoy» solo lo que creó la persona (tbMio); antes salía también lo abierto por otras personas */
   const borr=todas.filter(a=>a.estado!=="cerrada"&&tbMio(a)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
   const visAbL=Object.values(VIS).filter(v=>v.estado!=="cerrada"&&!v.anulada&&tbMio(v)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")));
-  const visAbs=["visitas","bodega","camionetas"].map(t=>visAbL.find(v=>tipoDe(v)===t)).filter(Boolean);
+  const visAbs=["visitas","bodega","camionetas","huespedes"].map(t=>visAbL.find(v=>tipoDe(v)===t)).filter(Boolean);
   const on=RED==="ok",chk=RED==="checking";
   const sig=chk?`<span class="lx-sig chk">${ICO.wifi}<span>Comprobando señal<i class="dots"></i></span></span>`
            :on?`<span class="lx-sig ok">${ICO.wifi}<span>Con señal</span></span>`
@@ -2503,7 +2553,7 @@ function renderLaunch(){
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${esc(a.id)}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
   cont=`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy${ph.length?`<span class="cnt">${ph.length}</span>`:""}</h2>${ph.length?`<div class="lx-conts">${disPh(ph)}</div>`:`<div class="ph-aldia">${EST_ICO.ok}<span>No tienes nada pendiente.</span></div>`}</section>`;
-  const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=prediosCL().reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length,0)+unidadesCL("camionetas").reduce((n,p)=>n+abiertos(p,"camionetas").length,0);
+  const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=prediosCL().reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length+abiertos(p,"huespedes").length,0)+unidadesCL("camionetas").reduce((n,p)=>n+abiertos(p,"camionetas").length,0);
   const resumen=`<section class="lx-sec"><h2 class="lx-h2">Resumen</h2><div class="lx-stats">
     <div><b>${todasAx.length}</b><span>${todasAx.length===1?"acta de entrega":"actas de entrega"}</span></div>
     <div><b>${nv}</b><span>${nv===1?"visita":"visitas"} de check list</span></div>
@@ -2516,7 +2566,7 @@ function renderLaunch(){
       <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
       ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
       ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      ${permVe("cl")?`<button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios, bodegas y camionetas, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>`:""}
+      ${permVe("cl")?`<button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios, bodegas, camionetas y casas de huéspedes, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>`:""}
     </div>
   </main>`;
 }
@@ -2664,7 +2714,7 @@ async function subirExcel(clave,manual,fn){
 }
 async function reintentarExcel(){
   if(!DB||navigator.onLine===false||syncing)return;const ks=Object.keys(XPEND);if(!ks.length)return;
-  for(const k of ks){if(k==="stock"){delete XPEND.stock;xpendSave();await stockExcel();continue}if(k==="actas")await subirExcel("actas",false,actasXlsxUpload);else if(k.startsWith("ax:"))await subirExcel(k,false,()=>axXlsxUpload(k.slice(3)));else if(k.startsWith("visitas:"))await subirExcel(k,false,()=>clXlsxUpload(k.slice(8),"visitas"));else if(k.startsWith("bodega:"))await subirExcel(k,false,()=>clXlsxUpload(k.slice(7),"bodega"));else if(k.startsWith("rend:"))await subirExcel(k,false,()=>rdXlsxUpload(k.slice(5)))}
+  for(const k of ks){if(k==="stock"){delete XPEND.stock;xpendSave();await stockExcel();continue}if(k==="actas")await subirExcel("actas",false,actasXlsxUpload);else if(k.startsWith("ax:"))await subirExcel(k,false,()=>axXlsxUpload(k.slice(3)));else if(/^(visitas|bodega|camionetas|huespedes):/.test(k)){const t=k.slice(0,k.indexOf(":"));await subirExcel(k,false,()=>clXlsxUpload(k.slice(t.length+1),t))} /* v151: también camionetas y casas de huéspedes */else if(k.startsWith("rend:"))await subirExcel(k,false,()=>rdXlsxUpload(k.slice(5)))}
 }
 /* ---------- Excel consolidado de actas de vivienda ---------- */
 function actasXlsxBuild(){
@@ -3170,7 +3220,7 @@ function clColapsado(v,k){const r=v.items[k]||{};return (r.e==="C"||r.e==="NA")&
 function clItemCortoHTML(it){
   const v=clv,r=v.items[it.key]||{},prev=visitaAnterior(v),pr=prev&&prev.items&&prev.items[it.key];
   const mejor=pr&&pr.e&&esHallazgo(pr.e)&&r.e==="C",nf=(r.fotos||[]).length;
-  return `<button class="it cli cli-corto" id="cli-${it.key}" data-a="clAbrirIt" data-k="${esc(it.key)}" aria-label="${esc(codigo(it)+": "+it.txt+". "+CL_LABEL[r.e]+". Toca para abrir.")}"><span class="cod">${codigo(it)}${it.star?' <span class="star" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.8z"/></svg></span>':""}</span><span class="cc-tx">${esc(it.txt)}</span>${nf?`<span class="cc-f" title="${nf} ${nf===1?"foto":"fotos"}">${ICO_CAM}${nf}</span>`:""}${r.obs?`<span class="cc-o" title="Tiene observación">Obs.</span>`:""}${mejor?`<span class="cc-m">Corregido</span>`:""}<span class="cc-e e-${r.e}">${CL_LABEL[r.e]}</span></button>`;
+  return `<button class="it cli cli-corto" id="cli-${it.key}" data-a="clAbrirIt" data-k="${esc(it.key)}" aria-label="${esc(codigo(it)+": "+it.txt+". "+lblE(r.e,it)+". Toca para abrir.")}"><span class="cod">${codigo(it)}${it.star?' <span class="star" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.8z"/></svg></span>':""}</span><span class="cc-tx">${esc(it.txt)}</span>${nf?`<span class="cc-f" title="${nf} ${nf===1?"foto":"fotos"}">${ICO_CAM}${nf}</span>`:""}${r.obs?`<span class="cc-o" title="Tiene observación">Obs.</span>`:""}${mejor?`<span class="cc-m">Corregido</span>`:""}<span class="cc-e e-${r.e}">${lblE(r.e,it)}</span></button>`;
 }
 /* el punto en el que se está trabajando queda abierto; el anterior, si quedó en Cumple o N/A, se achica sin mover la pantalla */
 function clFocoA(k){
@@ -3191,11 +3241,18 @@ function clAbrirIt(k){
 /* datos de la visita: abiertos al empezar; después, una línea con «Editar» */
 function clEncHTML(v,ro,KV){
   const ab=!ro&&(clEncAb[v.id]!==undefined?clEncAb[v.id]:puntaje(v).rev===0);
+  /* v151: casas de huéspedes: casa, capacidad, tipo de uso y ocupación */
+  const CHX=tipoDe(v)==="huespedes",opc=(k,L)=>`<option value="">Elige</option>${L.map(x=>`<option ${v[k]===x?"selected":""}>${esc(x)}</option>`).join("")}`;
   if(ab)return `<div class="enc"><div class="f"><label for="clfecha">Fecha de la visita</label><input id="clfecha" type="date" data-clenc="fecha" value="${esc(v.fecha)}"></div>
-      <div class="f"><label for="clrev">Revisor(es)</label><input id="clrev" data-clenc="revisor" value="${esc(v.revisor||"")}"></div>
-      <div class="f"><label for="cladm">${KV.acomp}</label><input id="cladm" data-clenc="administrador" value="${esc(v.administrador||"")}" placeholder="${esc(KV.acompPh)}"></div></div>
+      <div class="f"><label for="clrev">${esc(KV.rev||"Revisor(es)")}</label><input id="clrev" data-clenc="revisor" value="${esc(v.revisor||"")}"></div>
+      <div class="f"><label for="cladm">${KV.acomp}</label><input id="cladm" data-clenc="administrador" value="${esc(v.administrador||"")}" placeholder="${esc(KV.acompPh)}"></div>
+      ${CHX?`<div class="f"><label for="chcasa">Casa</label><input id="chcasa" data-clenc="casa" value="${esc(v.casa||"")}" placeholder="Si el predio tiene más de una, cuál es"></div>
+      <div class="f"><label for="chcap">Capacidad (personas)</label><input id="chcap" data-clenc="capacidad" inputmode="numeric" value="${esc(v.capacidad||"")}" placeholder="Ej.: 6"></div>
+      <div class="grid2"><div class="f"><label for="chuso">Tipo de uso</label><select id="chuso" data-clenc="uso">${opc("uso",["Huéspedes","Trabajadores","Mixto"])}</select></div>
+      <div class="f"><label for="chocu">Ocupación</label><select id="chocu" data-clenc="ocup">${opc("ocup",["Hombres","Mujeres","Mixta"])}</select></div></div>`:""}</div>
     <div class="cl-enc-ok"><button class="btn" data-a="clEncOk">Listo</button></div>`;
-  return `<div class="cl-datos"><span class="cld-tx"><b>${esc(fmtD(v.fecha))}</b> · ${esc(v.revisor||"Sin revisor")}${v.administrador?` · ${esc(KV.acompX)}: ${esc(v.administrador)}`:""}</span>${ro?"":`<button class="lnk" data-a="clEncEd">Editar</button>`}</div>`;
+  const chTx=CHX?[v.casa,v.capacidad?v.capacidad+" personas":"",v.uso,v.ocup].filter(Boolean).map(esc).join(" · "):"";
+  return `<div class="cl-datos"><span class="cld-tx"><b>${esc(fmtD(v.fecha))}</b> · ${esc(v.revisor||"Sin revisor")}${v.administrador?` · ${esc(KV.acompX)}: ${esc(v.administrador)}`:""}${chTx?` · ${chTx}`:""}</span>${ro?"":`<button class="lnk" data-a="clEncEd">Editar</button>`}</div>`;
 }
 /* pestañas: flecha cuando hay más áreas hacia el lado, y la pestaña elegida siempre a la vista */
 function clTabsAjustar(){
@@ -3417,10 +3474,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=149"></script>
-<script src="modulos/bodega.js?v=149"></script>
-<script src="modulos/rendiciones.js?v=149"></script>
-<script src="modulos/actas-entrega.js?v=149"></script>
+<script src="modulos/checklist.js?v=151"></script>
+<script src="modulos/bodega.js?v=151"></script>
+<script src="modulos/rendiciones.js?v=151"></script>
+<script src="modulos/actas-entrega.js?v=151"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

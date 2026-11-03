@@ -43,6 +43,9 @@ const CM_ITEMS=[
   ["cm-uso-siniestros",1,"Choques o daños avisados de inmediato a la jefatura, con la documentación del siniestro dentro de 24 horas (sin daños: N/A)","puntos 2.9 y 2.13"],
   ["cm-uso-preop",0,"Chequeo diario preoperacional: niveles, neumáticos, luces, frenos, cinturones, parabrisas y alarma de retroceso","punto 2.5"],
   ["cm-uso-interior",0,"Sin señales de fumar o vapear; carga amarrada y bien estibada, sin personas en la pickup","puntos 2.4 y 2.7"]]]];
+/* v151: ítems del Check list de casas de huéspedes: [clave, clave?, texto, referencia, cómo verificar, grupo, área] */
+const CH_ITEMS=[["ch-1", 0, "Las camas son suficientes para la capacidad definida y se encuentran firmes y en buen estado.", "Punto 1.1", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-2", 0, "Colchones y almohadas están limpios, secos y sin deterioro.", "Punto 1.2", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-3", 0, "Existe ropa de cama limpia y en condiciones adecuadas.", "Punto 1.3", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-4", 0, "El dormitorio cuenta con ventilación natural o sistema de ventilación operativo.", "Punto 1.4", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-5", 0, "Existe iluminación suficiente y segura.", "Punto 1.5", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-6", 0, "Pisos, muros, cielos y puertas se encuentran en buen estado, sin humedad, filtraciones ni daños relevantes.", "Punto 1.6", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-7", 0, "Se dispone de espacio suficiente para circular y guardar pertenencias sin obstruir accesos.", "Punto 1.7", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-8", 0, "Se mantiene limpieza general y no se observan plagas, roedores ni evidencia de infestación.", "Punto 1.8", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-9", 0, "Las ventanas y puertas cierran correctamente y permiten resguardar la privacidad.", "Punto 1.9", "", "Dormitorios y habitabilidad", "hu-dor"], ["ch-10", 0, "Hay baños suficientes para la cantidad de personas que utilizan la casa.", "Punto 2.1", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-11", 0, "Cuando corresponda por uso mixto de trabajadores, existen servicios higiénicos independientes y separados para hombres y mujeres; verificar la excepción legal de hasta 10 trabajadores indicada en la nota normativa.", "Punto 2.2", "Ver la nota normativa (D.S. N.º 594/1999, art. 21 y 22)", "Baños y servicios higiénicos", "hu-ban"], ["ch-12", 0, "Los baños cuentan con excusado (WC) y lavamanos operativos.", "Punto 2.3", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-13", 0, "Las duchas funcionan y disponen de agua fría y caliente cuando corresponda.", "Punto 2.4", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-14", 0, "Existe agua potable disponible para higiene personal.", "Punto 2.5", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-15", 0, "Hay jabón líquido, papel higiénico y elementos desechables para secado de manos en cantidad suficiente.", "Punto 2.6", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-16", 0, "Los baños cuentan con ventilación natural o artificial.", "Punto 2.7", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-17", 0, "Puertas, pestillos y cierres permiten privacidad y funcionan correctamente.", "Punto 2.8", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-18", 0, "Artefactos sanitarios, griferías y desagües están limpios, sin fugas ni obstrucciones.", "Punto 2.9", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-19", 0, "No se observan filtraciones, malos olores persistentes, hongos ni presencia de vectores.", "Punto 2.10", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-20", 0, "Existe una rutina de limpieza y reposición de insumos.", "Punto 2.11", "", "Baños y servicios higiénicos", "hu-ban"], ["ch-21", 0, "La cocina se encuentra limpia, ordenada y libre de plagas.", "Punto 3.1", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-22", 0, "Mesones y superficies de preparación son lavables y están en buen estado.", "Punto 3.2", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-23", 0, "El refrigerador funciona correctamente y se mantiene limpio.", "Punto 3.3", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-24", 0, "Existe lavaplatos operativo y disponibilidad de agua potable.", "Punto 3.4", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-25", 0, "Los alimentos se almacenan protegidos y separados de productos químicos.", "Punto 3.5", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-26", 0, "Los utensilios y equipos se encuentran limpios y en condiciones de uso.", "Punto 3.6", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-27", 0, "El comedor dispone de mesas y sillas en buen estado y superficies de fácil limpieza.", "Punto 3.7", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-28", 0, "Los residuos se depositan en recipientes adecuados, con retiro periódico.", "Punto 3.8", "", "Cocina, comedor y alimentación", "hu-coc"], ["ch-29", 0, "Instalación eléctrica, enchufes e interruptores están en buen estado, sin cables expuestos.", "Punto 4.1", "", "Instalaciones y seguridad", "hu-ins"], ["ch-30", 0, "Calefacción y equipos de agua caliente son seguros y cuentan con ventilación o evacuación de gases cuando corresponda.", "Punto 4.2", "", "Instalaciones y seguridad", "hu-ins"], ["ch-31", 0, "Extintor disponible, vigente, señalizado y de fácil acceso.", "Punto 4.3", "", "Instalaciones y seguridad", "hu-ins"], ["ch-32", 0, "Vías de circulación y salidas se encuentran despejadas.", "Punto 4.4", "", "Instalaciones y seguridad", "hu-ins"], ["ch-33", 0, "Existe señalización básica de emergencia y números de contacto visibles.", "Punto 4.5", "", "Instalaciones y seguridad", "hu-ins"], ["ch-34", 0, "Escaleras, barandas, pisos y accesos no presentan riesgos evidentes de caída.", "Punto 4.6", "", "Instalaciones y seguridad", "hu-ins"], ["ch-35", 0, "Productos de limpieza y sustancias químicas se guardan identificados y fuera del alcance de alimentos.", "Punto 4.7", "", "Instalaciones y seguridad", "hu-ins"], ["ch-36", 0, "Se cuenta con iluminación exterior suficiente en accesos y zonas de circulación.", "Punto 4.8", "", "Instalaciones y seguridad", "hu-ins"], ["ch-37", 0, "El suministro de agua para consumo e higiene es potable y está disponible.", "Punto 5.1", "", "Agua, residuos y mantención", "hu-agu"], ["ch-38", 0, "Si existe sistema particular de agua, se dispone de antecedentes de control o autorización sanitaria cuando corresponda.", "Punto 5.2", "", "Agua, residuos y mantención", "hu-agu"], ["ch-39", 0, "Las aguas servidas se conducen a alcantarillado o a un sistema particular autorizado y operativo.", "Punto 5.3", "", "Agua, residuos y mantención", "hu-agu"], ["ch-40", 0, "Los basureros están disponibles, limpios y con retiro frecuente.", "Punto 5.4", "", "Agua, residuos y mantención", "hu-agu"], ["ch-41", 0, "El patio y el entorno inmediato se mantienen ordenados, sin acumulación de basura, maleza o elementos en desuso.", "Punto 5.5", "", "Agua, residuos y mantención", "hu-agu"], ["ch-42", 0, "No hay aguas estancadas ni condiciones que favorezcan vectores.", "Punto 5.6", "", "Agua, residuos y mantención", "hu-agu"], ["ch-43", 0, "Se registran y atienden oportunamente las fallas de infraestructura y mantención.", "Punto 5.7", "", "Agua, residuos y mantención", "hu-agu"]];
+const CH_NOTA="El D.S. N.º 594/1999 del Ministerio de Salud regula las condiciones sanitarias y ambientales básicas en los lugares de trabajo. Sus artículos 21 y 22 establecen servicios higiénicos con excusado y lavatorio y, cuando en el lugar de trabajo laboran hombres y mujeres, servicios higiénicos independientes y separados. El artículo 22 contempla una excepción: si el total de trabajadores y trabajadoras es de diez o menos, el empleador puede habilitar un servicio higiénico de uso universal, con cierre interior y cumpliendo las demás condiciones del artículo. Por tanto, no debe afirmarse que toda casa de huéspedes mixta está obligada automáticamente a tener un baño exclusivo de hombres y otro de mujeres: la exigencia citada aplica a servicios higiénicos en lugares de trabajo y debe analizarse según quiénes los utilizan y la situación concreta. Este check list es una herramienta de control interno y no reemplaza una revisión de la autoridad sanitaria ni asesoría legal.";
 const CM_EVID={"Accesorios":"Revisión de la camioneta","Documentación":"Documentos en la camioneta (fechas de vencimiento)","Estado general":"Revisión de la camioneta con fotos","Uso y responsabilidades del conductor":"Entrevista al conductor y registros"};
 const AREAS=[
 {id:"oficina",name:"Oficina",blocks:[
@@ -172,7 +175,13 @@ const AREAS=[
   ["Ganado",[
    [52,0,"Conteo físico de ganado cuadra con inventario AgroApp","AgroApp / 47. Disposición de Cadáveres","Acta de conteo"],
    [53,0,"Ventas de ganado con planilla de control y guía de despacho, cuadradas con AgroApp","51. Venta de Ganado","Planilla Anexo + guías"]]]]}]},
-{id:"camioneta",name:"Camioneta",blocks:[]} /* v113: Check list de camionetas (ítems en CM_ITEMS, por la tanda de CL_NUEVOS) */
+{id:"camioneta",name:"Camioneta",blocks:[]}, /* v113: Check list de camionetas (ítems en CM_ITEMS, por la tanda de CL_NUEVOS) */
+/* v151: Check list de casas de huéspedes: una área por sección del check list de Benja (ítems en CH_ITEMS, por la tanda de CL_NUEVOS) */
+{id:"hu-dor",name:"Dormitorios y habitabilidad",blocks:[]},
+{id:"hu-ban",name:"Baños y servicios higiénicos",blocks:[]},
+{id:"hu-coc",name:"Cocina, comedor y alimentación",blocks:[]},
+{id:"hu-ins",name:"Instalaciones y seguridad",blocks:[]},
+{id:"hu-agu",name:"Agua, residuos y mantención",blocks:[]}
 ];
 // índice plano
 const CL_ITEMS=[]; const CL_BYKEY={}; const CL_DEFAULT=[];
@@ -182,8 +191,9 @@ AREAS.forEach(a=>a.blocks.forEach(b=>b.groups.forEach(([g,list])=>list.forEach(r
 /* ===== Catálogo del check list: vive en OneDrive (_config/Catalogo_check_list.xlsx); el de arriba es el valor inicial ===== */
 const AREA_NAME={};AREAS.forEach(a=>AREA_NAME[a.id]=a.name);
 const OA_CODE={oficina:"of",sala:"so",ternerera:"te",bodega:"bo",predio:"pr",camioneta:"cm"};
+const esAreaHu=a=>/^hu-/.test(String(a||"")); /* v151: áreas de casas de huéspedes */
 /* hoja de un ítem de Control y gestión según su área: «cm» en camionetas (códigos CM-NN), «cl» en las demás */
-const hojaCG=area=>area==="camioneta"?"cm":"cl";
+const hojaCG=area=>area==="camioneta"?"cm":esAreaHu(area)?"ch":"cl";
 const CATK="actas-cl-catalogo";let CAT_ETAG="",CAT_ORIGEN="inicial";
 /* v71: ítems que se agregan una sola vez al catálogo (también al que está en OneDrive), sin tocar los existentes.
    Si alguno de una tanda ya está en el catálogo (aunque esté retirado), la tanda no se vuelve a agregar. */
@@ -200,7 +210,9 @@ const CL_NUEVOS=[{tanda:"v71-camionetas",area:"predio",group:"Camionetas",despue
  {tanda:"v112-estado-camionetas",area:"predio",group:"Camionetas",despues:"cl-cam8",items:[
  ["cl-cam9",0,"Estado general de cada camioneta: carrocería, neumáticos, luces, parabrisas y limpieza interior (marcar las patentes con problemas y anotar el kilometraje en la observación)","Acta de entrega de vehículo, puntos 2.5 y 2.13","Revisión de la camioneta con fotos"]]},
  /* v113: el Check list de camionetas (aparte); al agregarse, retira del check list de visitas el grupo Camionetas */
- {tanda:"v113-check-list-camionetas",area:"camioneta",sheet:"cm",grupos:CM_ITEMS,retira:["cl-cam1","cl-cam2","cl-cam3","cl-cam4","cl-cam5","cl-cam6","cl-cam7","cl-cam8","cl-cam9"]}];
+ {tanda:"v113-check-list-camionetas",area:"camioneta",sheet:"cm",grupos:CM_ITEMS,retira:["cl-cam1","cl-cam2","cl-cam3","cl-cam4","cl-cam5","cl-cam6","cl-cam7","cl-cam8","cl-cam9"]},
+ /* v151: Check list de casas de huéspedes (cada ítem trae su área) */
+ {tanda:"v151-casas-de-huespedes",area:"hu-agu",sheet:"ch",fam:"Casa de huéspedes",items:CH_ITEMS}];
 let CAT_AGREGADO=false;
 function agregarNuevos(lista){let out=lista.map(i=>Object.assign({},i)),add=false;
   for(const t of CL_NUEVOS){const sh=t.sheet||"cl";
@@ -211,7 +223,7 @@ function agregarNuevos(lista){let out=lista.map(i=>Object.assign({},i)),add=fals
     const ord=out.sort((a,b)=>(a.orden||0)-(b.orden||0));
     let pos=ord.findIndex(i=>i.key===t.despues);
     if(pos<0){const ps=ord.map((i,k)=>i.area===t.area?k:-1).filter(k=>k>=0);pos=ps.length?ps[ps.length-1]:ord.length-1}
-    ord.splice(pos+1,0,...filas.map(x=>({key:x[0],area:t.area,sheet:sh,fam:"Control y gestión",group:x[5]||t.group,n:++n,txt:x[2],prot:x[3],evid:x[4],star:!!x[1]})));
+    ord.splice(pos+1,0,...filas.map(x=>({key:x[0],area:x[6]||t.area,sheet:sh,fam:t.fam||"Control y gestión",group:x[5]||t.group,n:++n,txt:x[2],prot:x[3],evid:x[4],star:!!x[1]})));
     (t.retira||[]).forEach(k=>{const i=ord.find(x=>x.key===k);if(i)i.retirado=true});
     ord.forEach((i,k)=>i.orden=k);out=ord;add=true}
   return {lista:out,add}}
@@ -229,11 +241,16 @@ const CLK={
   /* v113: la carpeta de OneDrive se busca (o se crea) junto a la de visitas la primera vez (root:null).
      v118: las tres están en «Check list de cumplimiento» y se llaman como en la app (Visitas a predios, Bodegas, Camionetas) */
   camionetas:{tipo:"camionetas",act:"clc",titulo:"Check list de camionetas",root:null,carpeta:"Camionetas",acomp:"Conductor(a)",acompPh:"Quien usa la camioneta",acompX:"Conductor",pdf:"Check list de camioneta · Acta de entrega de vehículo",archivo:"camioneta",excel:"Check_list_camioneta_",
-    uni:"camioneta",unis:"camionetas",Unis:"Camionetas"}
+    uni:"camioneta",unis:"camionetas",Unis:"Camionetas"},
+  /* v151: casas de huéspedes, por predio; la carpeta se busca o se crea junto a la de visitas (como camionetas) */
+  huespedes:{tipo:"huespedes",act:"clh",titulo:"Check list de casas de huéspedes",root:null,carpeta:"Casas de huéspedes",acomp:"Encargado(a) de la casa",acompPh:"Quien acompaña la revisión",acompX:"Encargado de la casa",pdf:"Check list de inspección · Casas de huéspedes",archivo:"casa_huespedes",excel:"Check_list_casa_huespedes_",
+    uni:"predio",unis:"predios",Unis:"Predios",rev:"Responsable de inspección"}
 };
 ["visitas","bodega"].forEach(t=>Object.assign(CLK[t],{uni:"predio",unis:"predios",Unis:"Predios"}));
-const tipoDe=v=>v&&v.tipo==="bodega"?"bodega":v&&v.tipo==="camionetas"?"camionetas":"visitas";
-const enTipo=(tipo,area)=>tipo==="bodega"?area==="bodega":tipo==="camionetas"?area==="camioneta":area!=="bodega"&&area!=="camioneta";
+const tipoDe=v=>v&&v.tipo==="bodega"?"bodega":v&&v.tipo==="camionetas"?"camionetas":v&&v.tipo==="huespedes"?"huespedes":"visitas";
+/* v151: el check list al que pertenece cada área */
+const tipoArea=a=>a==="bodega"?"bodega":a==="camioneta"?"camionetas":esAreaHu(a)?"huespedes":"visitas";
+const enTipo=(tipo,area)=>tipoArea(area)===tipo;
 let clTipo="visitas";const KC=()=>CLK[clTipo];
 const areasDe=tipo=>AREAS.filter(a=>enTipo(tipo,a.id));
 /* Cómo se nombra un ítem en listas: por área en el check list de visitas; por grupo en el de bodega (tiene una sola área) */
@@ -289,6 +306,14 @@ async function guardarCatalogo(manual){
 let CAT_PEND=false;
 function itemConHistorial(key){return Object.values(VIS).some(v=>v.items&&v.items[key]&&v.items[key].e)}
 const CL_LABEL={C:"Cumple",P:"Parcial",N:"No cumple",NA:"N/A"};
+/* v151: en casas de huéspedes las respuestas son Sí / No / N/A (se guardan como C / N / NA) */
+const CH_LABEL={C:"Sí",P:"Parcial",N:"No",NA:"N/A"};
+const lblE=(e,it)=>((it&&it.sheet==="ch")?CH_LABEL:CL_LABEL)[e];
+const lblT=(e,t)=>(t==="huespedes"?CH_LABEL:CL_LABEL)[e];
+/* resultado de la inspección: lo propone la app y quien revisa lo puede cambiar */
+const CH_RES={conf:"Conforme",obs:"Conforme con observaciones",no:"No conforme / requiere medidas inmediatas"};
+const chResProp=v=>itemsDe(v).some(i=>((v.items||{})[i.key]||{}).e==="N")?"obs":"conf";
+const chRes=v=>CH_RES[v.resultado]?v.resultado:chResProp(v);
 const SCORE={C:1,P:.5,N:0};
 
 
@@ -302,7 +327,7 @@ const CL={root:"01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS",datos:"_datos"}; /* carpeta 
 const esAdmin=()=>!!(ME&&ME.correo&&rolesSrv().admin);
 const RESP=["Administrador del campo","RR.HH.","Prevención de Riesgos","Finanzas","Control y Gestión"];
 const respDe=t=>t==="bodega"?["Encargado de bodega"].concat(RESP):RESP;
-const codigo=it=>(it.sheet==="cl"?"CG-":it.sheet==="cm"?"CM-":"OA-")+String(it.n).padStart(2,"0");
+const codigo=it=>(it.sheet==="cl"?"CG-":it.sheet==="cm"?"CM-":it.sheet==="ch"?"CH-":"OA-")+String(it.n).padStart(2,"0");
 let VIS={},clv=null,clPredio=null,clArea="oficina",clFiltro="all";
 const esHallazgo=e=>e==="P"||e==="N";
 /* v112: ítems con patentes (estado de las camionetas): se marcan las que tienen problemas; van en la observación del PDF,
@@ -363,6 +388,7 @@ const abiertos=(predio,tipo)=>Object.values(hallazgos(predio,tipo)).filter(h=>h.
 function nuevaVisita(predio,tipo){tipo=tipo||clTipo;
   const vs=visitasDe(predio,tipo),n=(vs.length?Math.max(...vs.map(v=>v.n||0)):0)+1;
   const v={id:uid(),_col:"visitas",predio,n,fecha:today(),revisor:ME?ME.nombre:"",estado:"abierta",items:{},catalogo:catalogoActivo().filter(i=>enTipo(tipo,i.area)).map(compactar),creadoPor:yo(),creado:new Date().toISOString(),actualizado:new Date().toISOString()};if(tipo==="bodega")v.tipo="bodega";
+  if(tipo==="huespedes")v.tipo="huespedes";
   if(tipo==="camionetas"){v.tipo="camionetas";const a=actaPatente(predio);if(a){v.administrador=a.conductor||"";v.predioCampo=predioDe(a)||""}}
   /* el plan de acción de los hallazgos abiertos viene prellenado para no reescribirlo */
   Object.values(hallazgos(predio,tipo)).forEach(h=>{if(h.estado==="abierto")v.items[h.key]={acc:h.plan.acc,resp:h.plan.resp,plazo:h.plan.plazo}});
@@ -478,7 +504,8 @@ function semListaHTML(){
 /* v113: «Check list de cumplimiento»: un solo módulo con los tres check list (pedido por Benja el 19-10-2026) */
 const CL_HUB=[["visitas","cl","Visitas a predios","Control y Gestión en cada predio: casas, oficina, seguridad, medio ambiente y más."],
   ["bodega","clb","Bodegas","Orden, aseo y seguridad de la bodega de cada predio."],
-  ["camionetas","clc","Camionetas","Revisión de cada camioneta con los puntos del acta de entrega: accesorios, documentos, estado y uso."]];
+  ["camionetas","clc","Camionetas","Revisión de cada camioneta con los puntos del acta de entrega: accesorios, documentos, estado y uso."],
+  ["huespedes","clh","Casas de huéspedes","Dormitorios, baños, cocina, instalaciones y agua de la casa de huéspedes de cada predio."]];
 /* resumen de un check list (t) o de todos (null): visitas, en curso y hallazgos abiertos */
 function clHubCnt(t){const T=t?[t]:CL_HUB.map(x=>x[0]);const vs=Object.values(VIS).filter(v=>!v.anulada&&T.includes(tipoDe(v)));const ab=vs.filter(v=>v.estado!=="cerrada").length;
   const ha=T.reduce((n,x)=>n+unidadesCL(x).reduce((m,p)=>m+abiertos(p,x).length,0),0);
@@ -499,7 +526,7 @@ function renderCL(){
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${K.titulo}</h1>
     ${semListaHTML()}
-    <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:`Control y Gestión: ${nAct} ítems por predio.`} Cada visita compara con la anterior y los hallazgos quedan en seguimiento hasta que se corrigen.</p>
+    <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:clTipo==="huespedes"?`Inspección de la casa de huéspedes de cada predio: ${nAct} puntos con Sí, No o N/A.`:`Control y Gestión: ${nAct} ítems por predio.`} Cada visita compara con la anterior y los hallazgos quedan en seguimiento hasta que se corrigen.</p>
     ${clTipo==="camionetas"?`<div class="btns"><button class="btn" data-a="clcOtra">+ Camioneta sin acta en la app</button></div>`:""}
     ${esAdmin()?`<p class="note">Catálogo: ${nAct} ítems activos${nTot-nAct?` y ${nTot-nAct} retirados`:""} · <button class="lnk" data-a="clCat">Editar catálogo</button></p>`:""}
     <p class="note">Versión ${APP_VER}</p>
@@ -527,8 +554,8 @@ function hzPlazo(h){const pz=h.plan&&h.plan.plazo||"",hoy=today();
 const hzSinPlan=h=>!(h.plan&&(h.plan.acc||h.plan.resp||h.plan.plazo));
 const HZ_FILTROS=[["todos","Todos",()=>true],["venc","Vencidos",h=>hzPlazo(h).k==="venc"],["sem","Vencen esta semana",h=>hzPlazo(h).k==="sem"],["sinplan","Sin plan de acción",hzSinPlan]];
 function hzFilaHTML(h){const pz=hzPlazo(h);
-  const q=hzNorm([codigo(h.it),etqIt(h.it),h.it.txt,h.plan&&h.plan.resp,h.plan&&h.plan.acc,h.ultima&&h.ultima.obs,CL_LABEL[h.ultima.e]].join(" "));
-  return `<button class="it hz hzb hzr ${h.ultima.e}" data-a="clHall" data-k="${esc(h.key)}" data-q="${esc(q)}"${hzCoincide(clHzQ,q)?"":" hidden"}><div class="nm"><span>${esc(etqIt(h.it))} · ${codigo(h.it)}</span><span class="chip ${h.ultima.e==="N"?"M":"R"}">${CL_LABEL[h.ultima.e]}</span></div>
+  const q=hzNorm([codigo(h.it),etqIt(h.it),h.it.txt,h.plan&&h.plan.resp,h.plan&&h.plan.acc,h.ultima&&h.ultima.obs,lblE(h.ultima.e,h.it)].join(" "));
+  return `<button class="it hz hzb hzr ${h.ultima.e}" data-a="clHall" data-k="${esc(h.key)}" data-q="${esc(q)}"${hzCoincide(clHzQ,q)?"":" hidden"}><div class="nm"><span>${esc(etqIt(h.it))} · ${codigo(h.it)}</span><span class="chip ${h.ultima.e==="N"?"M":"R"}">${lblE(h.ultima.e,h.it)}</span></div>
     <div class="hzt">${esc(h.it.txt)}</div>
     <div class="hzq">${hzSinPlan(h)?`<span class="pz sinplan">Sin plan de acción</span>`:`<span class="pz ${pz.k}">${pz.t}</span>${h.plan.resp?`<span>${esc(h.plan.resp)}</span>`:""}`}${h.visitas>1?`<span>${h.visitas} visitas seguidas</span>`:""}</div></button>`;
 }
@@ -576,17 +603,17 @@ function renderCLPredio(){
   ha.sort((a,b)=>(orden(a)-orden(b))||String(a.plan.plazo||"9").localeCompare(String(b.plan.plazo||"9"))||String(codigo(a.it)).localeCompare(String(codigo(b.it))));
   const f=HZ_FILTROS.find(x=>x[0]===clHzF)||HZ_FILTROS[0],cuenta=x=>ha.filter(x[2]).length;
   const hzVis=ha.filter(f[2]);
-  const nVis=hzVis.filter(h=>hzCoincide(clHzQ,hzNorm([codigo(h.it),etqIt(h.it),h.it.txt,h.plan&&h.plan.resp,h.plan&&h.plan.acc,h.ultima&&h.ultima.obs,CL_LABEL[h.ultima.e]].join(" ")))).length;
+  const nVis=hzVis.filter(h=>hzCoincide(clHzQ,hzNorm([codigo(h.it),etqIt(h.it),h.it.txt,h.plan&&h.plan.resp,h.plan&&h.plan.acc,h.ultima&&h.ultima.obs,lblE(h.ultima.e,h.it)].join(" ")))).length;
   const panelHz=ha.length?`${ha.length>8?`<div class="hzbus"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="hzbus" type="search" value="${esc(clHzQ)}" placeholder="Buscar: texto, código o responsable" aria-label="Buscar hallazgo" autocomplete="off" enterkeyhint="search"></div>`:""}${ha.length>3?`<div class="hzfs" role="group" aria-label="Filtrar hallazgos">${HZ_FILTROS.filter(x=>x[0]==="todos"||cuenta(x)||x[0]===f[0]).map(x=>`<button class="hzf${x[0]==="venc"?" rr":x[0]==="sem"?" aa":""}" data-a="clHzF" data-f="${x[0]}" aria-pressed="${x[0]===f[0]}">${x[1]} <b>${cuenta(x)}</b></button>`).join("")}</div>`:""}
       ${hzVis.map(hzFilaHTML).join("")}${hzVis.length?`<div class="empty" id="hznada"${nVis?" hidden":""}>Ningún hallazgo coincide con la búsqueda.</div>`:`<div class="empty">No hay hallazgos en este filtro.</div>`}
-      <p class="note">Ítems en Parcial o No cumple en la última visita cerrada. Se cierran solos cuando en una visita posterior quedan en Cumple.${cerr?` Ya se han corregido ${cerr}.`:""}</p>`
+      <p class="note">${clTipo==="huespedes"?"Puntos en «No» en la última visita cerrada. Se cierran solos cuando en una visita posterior quedan en «Sí».":"Ítems en Parcial o No cumple en la última visita cerrada. Se cierran solos cuando en una visita posterior quedan en Cumple."}${cerr?` Ya se han corregido ${cerr}.`:""}</p>`
     :`<div class="empty">${vv.filter(v=>v.estado==="cerrada").length?`No hay hallazgos abiertos.${cerr?` Se han corregido ${cerr}.`:""}`:"Aún no hay visitas cerradas."}</div>`;
   const panelVis=`${evolHTML(vv)}${visitasListaHTML(p,vs)}
     <h2>Archivos en OneDrive</h2>
     <p class="note" style="margin-top:0">Carpeta <b>Check list de cumplimiento / ${KC().carpeta} / ${esc(p)}</b>: un Excel con todas las visitas (una columna por visita, hoja de hallazgos y hoja de fotos con enlaces) y una carpeta por visita con sus fotos y el informe PDF. El Excel se actualiza solo al cerrar una visita.</p>
     <div class="btns" style="margin-top:8px"><button class="btn" data-a="clXlsx" data-p="${esc(p)}" ${vv.some(v=>v.estado==="cerrada")&&DB?"":"disabled"}>Actualizar Excel ahora</button></div>
     ${esAdmin()?`${disTip("mnvis","En el «⋯» de una visita cerrada puedes <b>anularla</b>: deja de contar para los hallazgos y el porcentaje, pero queda registrada. Se puede restaurar.")}`:""}`;
-  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="${KC().act}">${KC().Unis}</button><div class="ttl">${clTipo==="bodega"?"Bodega · ":clTipo==="camionetas"?"Camioneta · ":""}${esc(p)}</div>${estadoChip()}</div></div></div>
+  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="${KC().act}">${KC().Unis}</button><div class="ttl">${clTipo==="bodega"?"Bodega · ":clTipo==="camionetas"?"Camioneta · ":clTipo==="huespedes"?"Casa de huéspedes · ":""}${esc(p)}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(p)}</h1>${clTipo==="camionetas"?`<p class="lead" style="margin-top:-6px">${esc(cmDesc(p))}</p>`:""}
     <div class="start" style="grid-template-columns:1fr">
@@ -604,7 +631,7 @@ function clItemHTML(it){
   const v=clv,r=v.items[it.key]||{},prev=visitaAnterior(v),pr=prev&&prev.items&&prev.items[it.key],ro=clRO();
   const antes=pr&&pr.e?pr:null;
   const mejor=antes&&r.e&&esHallazgo(antes.e)&&r.e==="C",peor=antes&&r.e&&antes.e==="C"&&esHallazgo(r.e),sigue=antes&&r.e&&esHallazgo(antes.e)&&esHallazgo(r.e);
-  const prevHTML=antes?`<div class="prev ${antes.e}"><span class="chip ${antes.e==="N"?"M":antes.e==="P"?"R":antes.e==="C"?"B":"none"}">Visita ${esc(prev.n)}: ${CL_LABEL[antes.e]}</span>${antes.obs?`<span class="pobs">${esc(antes.obs)}</span>`:""}${(antes.fotos||[]).length?`<div class="strip">${antes.fotos.map(f=>thumb(f,it.key,false,true)).join("")}</div>`:""}${mejor?`<span class="res ok">Corregido</span>`:peor?`<span class="res bad">Empeoró</span>`:sigue?`<span class="res bad">Sigue sin corregirse</span>`:""}</div>`:"";
+  const prevHTML=antes?`<div class="prev ${antes.e}"><span class="chip ${antes.e==="N"?"M":antes.e==="P"?"R":antes.e==="C"?"B":"none"}">Visita ${esc(prev.n)}: ${lblE(antes.e,it)}</span>${antes.obs?`<span class="pobs">${esc(antes.obs)}</span>`:""}${(antes.fotos||[]).length?`<div class="strip">${antes.fotos.map(f=>thumb(f,it.key,false,true)).join("")}</div>`:""}${mejor?`<span class="res ok">Corregido</span>`:peor?`<span class="res bad">Empeoró</span>`:sigue?`<span class="res bad">Sigue sin corregirse</span>`:""}</div>`:"";
   const fotos=(r.fotos||[]);const canAdd=!ro&&fotos.length<MAXF;
   const plan=(esHallazgo(r.e)||(!r.e&&(r.acc||r.resp||r.plazo)))?`<div class="plan">
     <input class="obs" data-clf="acc" data-k="${esc(it.key)}" value="${esc(r.acc)}" placeholder="Acción correctiva" ${ro?"disabled":""}>
@@ -617,7 +644,7 @@ function clItemHTML(it){
     ${prevHTML}
     ${CL_PAT.includes(it.key)?clPatHTML(v,it,r,ro):""}
     ${(()=>{const en=tipoDe(v)==="camionetas"?cmEntrega(v,it.key):null;if(en===null)return"";return `<div class="cment"><span class="chip ${en==="si"?"B":en==="no"?"M":"none"}">Acta de entrega: ${en==="si"?"Sí":en==="no"?"No":"sin dato"}</span>${en==="no"?`<span class="note" style="margin:0">No se entregó: si sigue sin estar, marca N/A.</span>`:""}</div>`})()}
-    <div class="seg seg4" role="group">${["C","P","N","NA"].map(e=>`<button data-a="clRate" data-k="${esc(it.key)}" data-e="${esc(e)}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${CL_LABEL[e]}</span></button>`).join("")}</div>
+    <div class="seg seg4${it.sheet==="ch"?" s3":""}" role="group">${(it.sheet==="ch"?["C","N","NA"]:["C","P","N","NA"]).map(e=>`<button data-a="clRate" data-k="${esc(it.key)}" data-e="${esc(e)}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${lblE(e,it)}</span></button>`).join("")}</div>
     ${fotos.length?`<div class="fotos"><div class="strip">${fotos.map(f=>ro?thumb(f,it.key,true,false):`<span class="thw">${thumb(f,it.key,true,false)}<button class="thx" data-a="clDelFoto" data-ref="${esc(f)}" data-k="${esc(it.key)}" aria-label="Eliminar foto">✕</button></span>`).join("")}</div></div>`:""}
     ${r.e||r.obs||ro?`<input class="obs" data-clf="obs" data-k="${esc(it.key)}" value="${esc(r.obs)}" placeholder="Observación" ${ro?"disabled":""}>`:""}
     ${plan}
@@ -641,7 +668,7 @@ function renderCLV(){
   const tabs=AR.map(a=>{const sc=puntaje(v,i=>i.area===a.id);const tot=TODOS.filter(i=>i.area===a.id).length;return `<button class="tab${tot&&sc.rev===tot?" lista":""}" data-a="clArea" data-area="${esc(a.id)}" aria-selected="${a.id===clArea}">${esc(a.name)}<small>${tot&&sc.rev===tot?"✓ ":""}${sc.rev}/${tot}</small></button>`}).join("");
   const nHall=areaItems.filter(it=>hzAb(it.key)).length;
   const groups=[];items.forEach(it=>{const g=groups.find(x=>x.b===it.sheet&&x.g===it.group);if(g)g.items.push(it);else groups.push({b:it.sheet,fam:it.fam,g:it.group,items:[it]})});
-  const body=groups.map(g=>`<section class="sec"><h3>${g.b==="cm"?"":esc(g.fam)+" · "}${esc(g.g)}</h3>${g.g==="Camionetas"?camionetasPanel(v):""}${g.items.map(clItemHTML).join("")}</section>`).join("")||`<div class="empty">${clFiltro==="pend"?"Todo revisado en esta área.":clFiltro==="hall"?"No hay hallazgos de la visita anterior en esta área.":"Nada que mostrar."}</div>`;
+  const body=(clArea==="hu-ban"?chNotaHTML():"")+groups.map(g=>`<section class="sec">${g.b==="ch"?"":`<h3>${g.b==="cm"?"":esc(g.fam)+" · "}${esc(g.g)}</h3>`}${g.g==="Camionetas"?camionetasPanel(v):""}${g.items.map(clItemHTML).join("")}</section>`).join("")||`<div class="empty">${clFiltro==="pend"?"Todo revisado en esta área.":clFiltro==="hall"?"No hay hallazgos de la visita anterior en esta área.":"Nada que mostrar."}</div>`;
   return `<div class="top"><div class="in">
     <div class="bar"><button class="back" data-a="clPredioBack">${esc(v.predio)}</button><div class="ttl">Visita ${esc(v.n)}</div>${estadoChip()}</div>
     ${AR.length>1?`<nav class="tabs">${tabs}</nav>`:""}</div></div>
@@ -653,20 +680,28 @@ function renderCLV(){
     ${prev?`<p class="note" style="margin-top:0">Comparando con la visita ${esc(prev.n)} (${fmtD(prev.fecha)}).</p>`:`<p class="note" style="margin-top:0">Primera visita a ${tipoDe(v)==="camionetas"?"esta camioneta":"este predio"}: no hay comparación anterior.</p>`}
     ${clProgHTML()}
     ${ro?"":disUnoSwitchHTML()}
-    <div class="filt"${DIS.uno&&!ro?" hidden":""}>${[["all","Todos"],["pend",`Sin revisar${(()=>{const n=areaItems.filter(i=>!(v.items[i.key]||{}).e).length;return n?` (${n})`:""})()}`],["hall",`Hallazgos anteriores${nHall?` (${nHall})`:""}`],["mal","Parcial / No cumple"]].map(([k,t])=>`<button class="fb" data-a="clFiltro" data-f="${esc(k)}" aria-pressed="${clFiltro===k}">${t}</button>`).join("")}</div>
+    <div class="filt"${DIS.uno&&!ro?" hidden":""}>${[["all","Todos"],["pend",`Sin revisar${(()=>{const n=areaItems.filter(i=>!(v.items[i.key]||{}).e).length;return n?` (${n})`:""})()}`],["hall",`Hallazgos anteriores${nHall?` (${nHall})`:""}`],["mal",tipoDe(v)==="huespedes"?"En «No»":"Parcial / No cumple"]].map(([k,t])=>`<button class="fb" data-a="clFiltro" data-f="${esc(k)}" aria-pressed="${clFiltro===k}">${t}</button>`).join("")}</div>
     <h1 style="font-size:22px">${esc(AREA_NAME[clArea])}</h1>
     ${DIS.uno&&!ro?disUnoHTML(v):body}
+    ${tipoDe(v)==="huespedes"?chResHTML(v,ro):""}
     <div class="btns">${ro?`<button class="btn" data-a="clPdf" data-id="${esc(v.id)}">Informe PDF</button><button class="btn pri" data-a="clPredioBack">Volver al predio</button>`:`<button class="btn" data-a="clPdf" data-id="${esc(v.id)}">Informe PDF (borrador)</button><button class="btn pri" data-a="clCerrar">Cerrar visita</button>`}</div>
     ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn danger" data-a="clDel" data-id="${esc(v.id)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar esta visita</button></div>${disTip("cldel",`Si la abriste por error, elimínala: se borran sus respuestas y fotos. Para salir sin cerrar, usa «${esc(v.predio)}» arriba; la visita queda en curso.`)}`}
   </main>${clBarHTML()}`;
 }
 function clRefreshItem(v,k){if(clv!==v||view!=="clv")return;const el=$("#cli-"+k);const it=itemDe(v,k);if(el&&it)el.outerHTML=clItemHTML(it);const p=$("#clprog");if(p)p.outerHTML=clProgHTML();const cb=$("#clbar");if(cb)cb.outerHTML=clBarHTML();const fp=document.querySelector('[data-a="clFiltro"][data-f="pend"]');if(fp){const n=itemsDe(v).filter(i=>i.area===clArea&&!(v.items[i.key]||{}).e).length;fp.textContent="Sin revisar"+(n?` (${n})`:"")}}
 
+/* v151: nota normativa (área de baños) y resultado de la inspección de una casa de huéspedes */
+function chNotaHTML(){return `<details class="info chnota"><summary><b>Nota normativa: baños separados para hombres y mujeres</b></summary><p>${esc(CH_NOTA)}</p></details>`}
+function chResHTML(v,ro){const r=chRes(v),pr=chResProp(v),elegido=CH_RES[v.resultado]&&v.resultado!==pr;
+  const nN=itemsDe(v).filter(i=>((v.items||{})[i.key]||{}).e==="N").length;
+  return `<section class="sec chres" id="chres"><h3>Resultado de inspección</h3>
+    <div class="reps chreps" role="group" aria-label="Resultado de inspección">${Object.entries(CH_RES).map(([k,t])=>`<button data-a="clRes" data-r="${k}" aria-pressed="${r===k}" class="chr-${k}" ${ro?"disabled":""}>${esc(t)}</button>`).join("")}</div>
+    <p class="note" style="margin:6px 0 0">${elegido?`Elegido por quien revisa. La app propone «${esc(CH_RES[pr])}». ${ro?"":`<button class="lnk" data-a="clRes" data-r="">Usar lo que propone la app</button>`}`:`Propuesto por la app: ${nN?`hay ${nN} ${nN===1?"punto":"puntos"} en «No»`:"ningún punto en «No»"}. Si hay riesgos que requieren medidas inmediatas, elige «No conforme».`}</p></section>`}
 /* ---------- Detalle de un hallazgo ---------- */
 function clHallazgoModal(p,k){
   const H=hallazgos(p)[k];const it=(H&&H.it)||CL_BYKEY[k];if(!it)return;const vs=visitasDe(p).filter(v=>v.estado==="cerrada");const ab=visitaAbierta(p);
   const hist=vs.map(v=>{const r=v.items&&v.items[k];if(!r||!r.e)return"";const fotos=(r.fotos||[]);const cls=r.e==="N"?"M":r.e==="P"?"R":r.e==="C"?"B":"none";
-    return `<div class="hh ${r.e}"><div class="hhl"><span class="chip ${cls}">${CL_LABEL[r.e]}</span><b>Visita ${esc(v.n)}</b><span class="hhd">${fmtD(v.fecha)}${v.revisor?` · ${esc(v.revisor)}`:""}</span></div>
+    return `<div class="hh ${r.e}"><div class="hhl"><span class="chip ${cls}">${lblE(r.e,it)}</span><b>Visita ${esc(v.n)}</b><span class="hhd">${fmtD(v.fecha)}${v.revisor?` · ${esc(v.revisor)}`:""}</span></div>
       ${clObs(r)?`<div class="hho">${esc(clObs(r))}</div>`:""}
       ${(r.acc||r.resp||r.plazo)&&esHallazgo(r.e)?`<div class="hhp">${r.acc?`<b>Acción:</b> ${esc(r.acc)}. `:""}${r.resp?`<b>Resp.:</b> ${esc(r.resp)}. `:""}${r.plazo?`<b>Plazo:</b> ${fmtD(r.plazo)}`:""}</div>`:""}
       ${fotos.length?`<div class="strip">${fotos.map(f=>thumb(f,k,false,false)).join("")}</div>`:""}
@@ -687,6 +722,7 @@ function clHallazgoModal(p,k){
   const close=()=>{m.remove();document.body.style.overflow=""};
   m.addEventListener("click",async e=>{const t=e.target.closest("[data-m],[data-a]");if(e.target===m){close();return}if(!t)return;
     if(t.dataset.a==="foto"){e.stopPropagation();const src=fotoSrc(t.dataset.ref);if(!src){toast("La foto todavía se está descargando.");return}
+      if(typeof visorAbrir==="function"){VIS_GAL=visGaleria(t);visorAbrir({ref:t.dataset.ref,titulo:codigo(it),sub:it.txt,alt:it.txt});return} /* v151: visor de la v150 */
       const z=document.createElement("div");z.className="modal";z.style.zIndex="60";z.innerHTML=`<div class="sheet"><img src="${esc(src)}" alt="" style="width:100%;border-radius:10px"><div class="btns"><button class="btn pri" data-z="c" style="flex:1">Cerrar</button></div></div>`;document.body.appendChild(z);z.addEventListener("click",ev=>{if(ev.target===z||(ev.target.dataset&&ev.target.dataset.z))z.remove()});return}
     const a=t.dataset.m;if(a==="close")close();
     if(a==="visita"){close();const v=VIS[t.dataset.id];if(!v)return;clTipo=tipoDe(v);clv=v;clPredio=v.predio;if(!clv.items)clv.items={};clArea=it.area;clFiltro="all";go("clv");setTimeout(()=>{const el=$("#cli-"+k);if(el){el.scrollIntoView({block:"center"});el.classList.add("hl");setTimeout(()=>el.classList.remove("hl"),2200)}},80)}
@@ -733,7 +769,7 @@ function catInput(ev){const t=ev.target;
   if(t.dataset.catq!==undefined){catQ=t.value;clearTimeout(catqT);catqT=setTimeout(()=>{render();const i=$("[data-catq]");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250);return true}
   if(t.dataset.nuevo){catNuevo=catNuevo||{};catNuevo[t.dataset.nuevo]=t.type==="checkbox"?t.checked:t.value;return true}
   if(t.dataset.cat){const it=CL_BYKEY[t.dataset.k];if(!it)return true;const f=t.dataset.cat;
-    if(f==="star")it.star=t.checked;else if(f==="area"){it.area=t.value;it.areaName=AREA_NAME[t.value];if(it.sheet!=="cl")it.sheet="oa-"+OA_CODE[t.value]}else it[f]=t.value;
+    if(f==="star")it.star=t.checked;else if(f==="area"){it.area=t.value;it.areaName=AREA_NAME[t.value];if(/^oa-/.test(it.sheet)&&OA_CODE[t.value])it.sheet="oa-"+OA_CODE[t.value]} /* v151: solo los de Orden y aseo cambian de hoja */else it[f]=t.value;
     catTocado();if(f==="area")render();return true}
   return false}
 async function catClick(A,b){
@@ -746,7 +782,7 @@ async function catClick(A,b){
     const esOA=nv.fam==="Orden y aseo";const sheet=esOA?"oa-"+OA_CODE[catArea]:hojaCG(catArea);const nums=CL_ITEMS.filter(i=>i.sheet===sheet).map(i=>+i.n||0);const n=(nums.length?Math.max(...nums):0)+1;
     let key=sheet+"-"+n;while(CL_BYKEY[key])key+="-x";
     const group=(nv.group||"").trim()||"General";const mismo=CL_ITEMS.filter(i=>i.area===catArea&&i.sheet===sheet&&i.group===group);const orden=mismo.length?Math.max(...mismo.map(i=>i.orden))+0.5:CL_ITEMS.length;
-    const it={key,area:catArea,sheet,fam:esOA?"Orden y aseo":"Control y gestión",group,n,txt:nv.txt.trim(),prot:(nv.prot||"").trim(),evid:(nv.evid||"").trim(),star:!!nv.star,retirado:false,orden};
+    const it={key,area:catArea,sheet,fam:esOA?"Orden y aseo":esAreaHu(catArea)?"Casa de huéspedes":"Control y gestión",group,n,txt:nv.txt.trim(),prot:(nv.prot||"").trim(),evid:(nv.evid||"").trim(),star:!!nv.star,retirado:false,orden};
     catalogoSet(CL_ITEMS.concat([it]));catNuevo=null;catTocado();render();toast(`Ítem ${codigo(it)} agregado.`);setTimeout(()=>{const e=$("#cat-"+CSS.escape(key));if(e)e.scrollIntoView({block:"center"})},60);return true}
   if(A==="clCatRet"){const it=CL_BYKEY[b.dataset.k];if(!it)return true;if(!(await ask(`¿Retirar ${codigo(it)}?`,"Dejará de aparecer en las visitas nuevas. Las visitas que ya lo evaluaron lo conservan, igual que su historial. Se puede volver a activar.","Retirar",true)))return true;it.retirado=true;catTocado();render();return true}
   if(A==="clCatRest"){const it=CL_BYKEY[b.dataset.k];if(it){it.retirado=false;catTocado();render()}return true}
@@ -760,7 +796,8 @@ async function clClick(A,b){
   if(A.startsWith("clCat")){return catClick(A,b)}
   if(A==="clHall"){clHallazgoModal(clPredio,b.dataset.k);return true}
   if(A==="clHub"){await flush();clv=null;go("clhub");return true}
-  if(A==="cl"||A==="clb"||A==="clc"){await flush();clv=null;clTipo=A==="clb"?"bodega":A==="clc"?"camionetas":"visitas";go("cl");return true}
+  if(A==="cl"||A==="clb"||A==="clc"||A==="clh"){await flush();clv=null;clTipo=A==="clb"?"bodega":A==="clc"?"camionetas":A==="clh"?"huespedes":"visitas";go("cl");return true}
+  if(A==="clRes"){if(clRO()||tipoDe(clv)!=="huespedes")return true;const r=b.dataset.r;if(CH_RES[r]&&r!==chResProp(clv))clv.resultado=r;else delete clv.resultado;clTouch();const s=$("#chres");if(s)s.outerHTML=chResHTML(clv,false);return true}
   if(A==="clcOtra"){const o=await askVal("Camioneta sin acta","Escribe la patente. Conviene registrar también su acta de entrega en Actas → Entrega y devolución de vehículos.","Seguir",`<div class="f"><label for="cmPatIn">Patente</label><input id="cmPatIn" data-v="pat" autocapitalize="characters" autocomplete="off" placeholder="Ej.: WBHD30"></div>`);
     const p=normPat(o&&o.pat);if(!p)return true;clPredio=p;clPTab=null;clHzF="todos";clHzQ="";go("clp");window.scrollTo(0,0);return true}
   if(A==="clPredio"){clPredio=b.dataset.p;clPTab=null;clHzF="todos";clHzQ="";go("clp");window.scrollTo(0,0);return true}
@@ -779,7 +816,7 @@ async function clClick(A,b){
   if(A==="clPat"){if(clRO())return true;const k=b.dataset.k,p=b.dataset.v,r=clv.items[k]||{};const S=new Set(r.pat||[]);S.has(p)?S.delete(p):S.add(p);r.pat=[...S].sort();if(!r.pat.length)delete r.pat;clv.items[k]=r;clTouch();clRefreshItem(clv,k);return true}
   if(A==="clPatOtra"){if(clRO())return true;const k=b.dataset.k;const o=await askVal("Otra patente","Escribe la patente de la camioneta.","Agregar",`<div class="f"><label for="clPatIn">Patente</label><input id="clPatIn" data-v="pat" autocapitalize="characters" autocomplete="off" placeholder="Ej.: WBHD30"></div>`);
     const p=normPat(o&&o.pat);if(!p)return true;const r=clv.items[k]||{};r.pat=[...new Set((r.pat||[]).concat([p]))].sort();clv.items[k]=r;clTouch();clRefreshItem(clv,k);return true}
-  if(A==="clRate"){if(clRO())return true;const k=b.dataset.k,e=b.dataset.e;const r=clv.items[k]||{};r.e=r.e===e?undefined:e;if(!r.e)delete r.e;clv.items[k]=r;clTouch();clFocoA(k);clRefreshItem(clv,k);if(DIS.uno&&(r.e==="C"||r.e==="NA"))disUnoAuto(k);return true}
+  if(A==="clRate"){if(clRO())return true;const k=b.dataset.k,e=b.dataset.e;const r=clv.items[k]||{};r.e=r.e===e?undefined:e;if(!r.e)delete r.e;clv.items[k]=r;clTouch();clFocoA(k);clRefreshItem(clv,k);{const s=$("#chres");if(s)s.outerHTML=chResHTML(clv,false)}if(DIS.uno&&(r.e==="C"||r.e==="NA"))disUnoAuto(k);return true}
   if(A==="clAbrirIt"){clAbrirIt(b.dataset.k);return true}
   if(A==="clEncEd"){clEncAb[clv.id]=true;render();const f=$("#clfecha");if(f)f.focus();return true}
   if(A==="clEncOk"){clEncAb[clv.id]=false;render();return true}
@@ -798,7 +835,8 @@ async function clClick(A,b){
     if(!clv.fecha){toast("No se puede cerrar: falta la fecha de la visita.");return true}
     if(!String(clv.revisor||"").trim()){toast("No se puede cerrar: falta quién hizo la revisión (revisor).");return true}
     const falt=itemsDe(clv).filter(it=>{const r=clv.items[it.key];return r&&esHallazgo(r.e)&&(!r.acc||!r.resp||!r.plazo)}).length;
-    const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, los ítems en Parcial o No cumple quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
+    const CHX=tipoDe(clv)==="huespedes";
+    const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${CHX?` Resultado: «${CH_RES[chRes(clv)]}».`:""}${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, ${CHX?"los puntos en «No»":"los ítems en Parcial o No cumple"} quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
     if(!(await ask("¿Cerrar la visita?",msg,"Cerrar visita")))return true;
     clv.estado="cerrada";clv.cerrada=today();clv.actualizado=new Date().toISOString();if(ME)clv.cerradoPor=yo();await saveVis(clv);
     const vv=clv,p=clv.predio;exito("Visita cerrada","Los hallazgos quedaron en seguimiento.");esperarFotos(vv.id);clv=null;clPredio=p;go("clp");
@@ -821,6 +859,7 @@ async function clClick(A,b){
 function clInput(ev){
   const t=ev.target;if(!clv||clRO())return;
   if(t.dataset.clenc==="km"){clv.km=String(t.value).replace(/[^0-9]/g,"");clTouch();const n=$("#cmkmtx");if(n)n.textContent=cmKmTxt(cmKmInfo(clv));return}
+  if(t.dataset.clenc==="capacidad"){clv.capacidad=String(t.value).replace(/[^0-9]/g,"");clTouch();return}
   if(t.dataset.clenc){clv[t.dataset.clenc]=t.value;clTouch();return}
   if(t.dataset.clf){const k=t.dataset.k,r=clv.items[k]||{};r[t.dataset.clf]=t.value;clv.items[k]=r;clTouch();return}
 }
@@ -873,24 +912,24 @@ function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   const H=hallazgos(p,tipo);
   const head=["Área","Tipo","Código","Ítem","Referencia","Cómo verificar"].concat(vs.map(v=>`V${esc(v.n)} ${fmtD(v.fecha)}`)).concat(["Estado hallazgo","Abierto desde","Acción","Responsable","Plazo","Última observación"]);
   const rows=[head];const UNION=catalogoUnion(vs,tipo);const SEC=seccionesDe(tipo,UNION);
-  UNION.forEach(it=>{const h=H[it.key];rows.push([it.areaName,it.fam,codigo(it)+(it.star?" ★":"")+(it.retirado?" (retirado)":""),it.txt,it.prot,it.evid].concat(vs.map(v=>{const r=v.items&&v.items[it.key];return r&&r.e?CL_LABEL[r.e]:""})).concat([h?(h.estado==="abierto"?"Abierto":h.estado==="cerrado"?`Corregido en V${h.cerrado.v}`:"OK"):"",h&&h.estado==="abierto"?`V${h.desde.v} ${fmtD(h.desde.fecha)}`:"",h&&h.estado==="abierto"?h.plan.acc:"",h&&h.estado==="abierto"?h.plan.resp:"",h&&h.estado==="abierto"?fmtD(h.plan.plazo):"",h&&h.ultima?h.ultima.obs:""]))});
+  UNION.forEach(it=>{const h=H[it.key];rows.push([it.areaName,it.fam,codigo(it)+(it.star?" ★":"")+(it.retirado?" (retirado)":""),it.txt,it.prot,it.evid].concat(vs.map(v=>{const r=v.items&&v.items[it.key];return r&&r.e?lblE(r.e,it):""})).concat([h?(h.estado==="abierto"?"Abierto":h.estado==="cerrado"?`Corregido en V${h.cerrado.v}`:"OK"):"",h&&h.estado==="abierto"?`V${h.desde.v} ${fmtD(h.desde.fecha)}`:"",h&&h.estado==="abierto"?h.plan.acc:"",h&&h.estado==="abierto"?h.plan.resp:"",h&&h.estado==="abierto"?fmtD(h.plan.plazo):"",h&&h.ultima?h.ultima.obs:""]))});
   const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:14},{wch:16},{wch:9},{wch:60},{wch:32},{wch:30}].concat(vs.map(()=>({wch:14}))).concat([{wch:18},{wch:16},{wch:40},{wch:22},{wch:12},{wch:40}]);ws["!freeze"]={xSplit:4,ySplit:1};
   XLSX.utils.book_append_sheet(wb,ws,"Check list");
   /* Resumen por visita y área */
-  const CMX=tipo==="camionetas";
-  const res=[["Visita","Fecha","Revisor",CLK[tipo].acompX].concat(SEC.map(a=>a.name)).concat(["Total","Ítems revisados","Hallazgos (P/N)"]).concat(CMX?["Predio","Kilometraje","Recorrido desde la entrega"]:[])];
-  vs.forEach(v=>{const t=puntaje(v),ki=CMX?cmKmInfo(v):null;res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",v.administrador||""].concat(SEC.map(a=>{const s=puntaje(v,a.f);return s.pct===null?"":s.pct/100})).concat([t.pct===null?"":t.pct/100,t.rev,itemsDe(v).filter(i=>{const r=v.items&&v.items[i.key];return r&&esHallazgo(r.e)}).length]).concat(CMX?[v.predioCampo||"",ki?ki.k:"",ki&&ki.rec!=null?ki.rec:""]:[]))});
+  const CMX=tipo==="camionetas",CHX=tipo==="huespedes";
+  const res=[["Visita","Fecha",CHX?CLK[tipo].rev:"Revisor",CLK[tipo].acompX].concat(SEC.map(a=>a.name)).concat(["Total","Ítems revisados",CHX?"Puntos en No":"Hallazgos (P/N)"]).concat(CMX?["Predio","Kilometraje","Recorrido desde la entrega"]:[]).concat(CHX?["Resultado de inspección","Casa","Capacidad (personas)","Tipo de uso","Ocupación"]:[])];
+  vs.forEach(v=>{const t=puntaje(v),ki=CMX?cmKmInfo(v):null;res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",v.administrador||""].concat(SEC.map(a=>{const s=puntaje(v,a.f);return s.pct===null?"":s.pct/100})).concat([t.pct===null?"":t.pct/100,t.rev,itemsDe(v).filter(i=>{const r=v.items&&v.items[i.key];return r&&esHallazgo(r.e)}).length]).concat(CMX?[v.predioCampo||"",ki?ki.k:"",ki&&ki.rec!=null?ki.rec:""]:[]).concat(CHX?[CH_RES[chRes(v)],v.casa||"",v.capacidad?+v.capacidad:"",v.uso||"",v.ocup||""]:[]))});
   const wr=XLSX.utils.aoa_to_sheet(res);for(let r=1;r<res.length;r++)for(let c=4;c<4+SEC.length+1;c++){const cell=wr[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z="0%"}
   if(anul.length){res.push([]);res.push(["Visitas anuladas (no cuentan)"]);anul.forEach(v=>res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",`Anulada el ${fmtD(v.anulada.fecha)} por ${quien(v.anulada.por)}${v.anulada.motivo?": "+v.anulada.motivo:""}`]))}
   XLSX.utils.book_append_sheet(wb,wr,"Resumen");
   /* Hallazgos abiertos */
   const hz=[["Área","Código","Ítem","Estado","Abierto desde","Visitas seguidas","Última observación","Acción","Responsable","Plazo","Vencido"]];
-  Object.values(H).filter(h=>h.estado==="abierto").forEach(h=>hz.push([h.it.areaName,codigo(h.it),h.it.txt,CL_LABEL[h.ultima.e],`V${h.desde.v} ${fmtD(h.desde.fecha)}`,h.visitas,h.ultima.obs,h.plan.acc,h.plan.resp,fmtD(h.plan.plazo),h.plan.plazo&&h.plan.plazo<today()?"Sí":""]));
+  Object.values(H).filter(h=>h.estado==="abierto").forEach(h=>hz.push([h.it.areaName,codigo(h.it),h.it.txt,lblE(h.ultima.e,h.it),`V${h.desde.v} ${fmtD(h.desde.fecha)}`,h.visitas,h.ultima.obs,h.plan.acc,h.plan.resp,fmtD(h.plan.plazo),h.plan.plazo&&h.plan.plazo<today()?"Sí":""]));
   const wh=XLSX.utils.aoa_to_sheet(hz);wh["!cols"]=[{wch:14},{wch:9},{wch:60},{wch:12},{wch:18},{wch:9},{wch:40},{wch:40},{wch:22},{wch:12},{wch:8}];
   XLSX.utils.book_append_sheet(wb,wh,"Hallazgos abiertos");
   /* Fotos con enlace */
   const fr=[["Visita","Fecha","Área","Código","Ítem","Resultado","Observación","Foto"]];const links=[];
-  vs.forEach(v=>itemsDe(v).forEach(it=>{const r=v.items&&v.items[it.key];if(!r||!(r.fotos||[]).length)return;r.fotos.forEach(f=>{const u=v.fotoUrl&&v.fotoUrl[f];fr.push([`V${esc(v.n)}`,fmtD(v.fecha),it.areaName,codigo(it),it.txt,r.e?CL_LABEL[r.e]:"",r.obs||"",u?"Abrir foto":"(pendiente de subir)"]);if(u)links.push([fr.length-1,u])})}));
+  vs.forEach(v=>itemsDe(v).forEach(it=>{const r=v.items&&v.items[it.key];if(!r||!(r.fotos||[]).length)return;r.fotos.forEach(f=>{const u=v.fotoUrl&&v.fotoUrl[f];fr.push([`V${esc(v.n)}`,fmtD(v.fecha),it.areaName,codigo(it),it.txt,r.e?lblE(r.e,it):"",r.obs||"",u?"Abrir foto":"(pendiente de subir)"]);if(u)links.push([fr.length-1,u])})}));
   const wf=XLSX.utils.aoa_to_sheet(fr);wf["!cols"]=[{wch:8},{wch:12},{wch:14},{wch:9},{wch:50},{wch:12},{wch:40},{wch:14}];
   links.forEach(([r,u])=>{const c=wf[XLSX.utils.encode_cell({r,c:7})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});
   XLSX.utils.book_append_sheet(wb,wf,"Fotos");
@@ -920,7 +959,9 @@ async function clPdf(v,subir){
   /* encabezado */
   const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
   d.setFont("helvetica","bold");{let fs=15;d.setFontSize(fs);while(d.getTextWidth(KV.pdf)>W-30&&fs>10){fs-=0.5;d.setFontSize(fs)}}d.setTextColor(...AZ);d.text(KV.pdf,L+28,y+9);d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+28,y+16);d.setTextColor(0);d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
-  d.setFontSize(9.5);d.text(`Revisor(es): ${v.revisor||"-"}`,L,y);d.text(`${KV.acomp}: ${v.administrador||"-"}`,L+95,y);y+=5;
+  d.setFontSize(9.5);d.text(`${KV.rev||"Revisor(es)"}: ${v.revisor||"-"}`,L,y);d.text(`${KV.acomp}: ${v.administrador||"-"}`,L+95,y);y+=5;
+  if(TV==="huespedes"){d.text(`Casa: ${v.casa||"-"} · Capacidad: ${v.capacidad?v.capacidad+" personas":"-"} · Tipo de uso: ${v.uso||"-"} · Ocupación: ${v.ocup||"-"}`,L,y);y+=5;
+    const rr=chRes(v),rc=rr==="conf"?[30,110,50]:rr==="obs"?[150,110,20]:[170,40,40];d.setFont("helvetica","bold");d.text("Resultado de inspección:",L,y);const xr=L+d.getTextWidth("Resultado de inspección: ");d.setTextColor(...rc);d.text(CH_RES[rr]+(v.resultado&&v.resultado!==chResProp(v)?" (elegido por quien revisa)":""),xr,y);d.setTextColor(0);d.setFont("helvetica","normal");y+=5}
   if(TV==="camionetas"){const a=actaPatente(v.predio),ve=(a&&a.veh)||{},ki=cmKmInfo(v);
     d.text(`Camioneta: ${[ve.tipoVeh,ve.marca,ve.modelo,ve.anio].filter(Boolean).join(" ")||"-"} · Predio: ${v.predioCampo||"-"}${a?` · Acta de entrega del ${fmtD(a.fecha)}`:" · sin acta de entrega en la app"}`,L,y);y+=5;
     d.text(`Kilometraje: ${ki?ki.k.toLocaleString("es-CL")+" km":"-"}${ki?" · "+cmKmTxt(ki):""}`,L,y);y+=5}
@@ -941,14 +982,15 @@ async function clPdf(v,subir){
   }
   /* 1. resumen por área */
   titulo("Resumen");d.setFontSize(8.5);
-  const colsR=prev?[42,17,17,21,20,26,18,19]:[60,24,24,24,24,24];const SECV=seccionesDe(TV,ITV);const headR=[SECV.col,"Cumple","Parcial","No cumple","Evaluados","Cumplimiento"].concat(prev?[`Visita ${esc(prev.n)}`,"Cambio"]:[]);
+  const CH3=TV==="huespedes"; /* v151: Sí / No, sin Parcial */
+  const colsR=CH3?(prev?[60,18,18,22,26,18,18]:[76,26,26,26,26]):prev?[42,17,17,21,20,26,18,19]:[60,24,24,24,24,24];const SECV=seccionesDe(TV,ITV);const headR=[SECV.col].concat(CH3?["Sí","No"]:["Cumple","Parcial","No cumple"]).concat(["Evaluados","Cumplimiento"]).concat(prev?[`Visita ${esc(prev.n)}`,"Cambio"]:[]);
   const dl=(a,b)=>a===null||b===null?"-":{t:b===a?"igual":(b-a>0?"+":"")+(b-a)+" pts",c:b-a>0?COL.C:b-a<0?COL.N:[90,90,90]};
   const sinAplicar=SECV.filter(a=>ITV.some(a.f)&&!ITA.some(a.f)).map(a=>a.name);
   const fila=(cells,bold,fill)=>{chk(7);let x=L;if(fill){d.setFillColor(...fill);d.rect(L,y-4.2,W,6.5,"F")}d.setFont("helvetica",bold?"bold":"normal");cells.forEach((c,i)=>{if(c&&typeof c==="object"){d.setTextColor(...c.c);d.text(String(c.t),x+1.5,y);d.setTextColor(0)}else d.text(String(c),x+1.5,y);x+=colsR[i]});y+=6.5};
   fila(headR,true,[228,234,248]);
   const cnt=(f,e)=>ITV.filter(i=>f(i)&&v.items&&v.items[i.key]&&v.items[i.key].e===e).length;
-  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);const s0=prev?puntaje(prev,f).pct:null;fila([a.name,cnt(f,"C"),cnt(f,"P"),cnt(f,"N"),s.n,s.pct===null?"-":s.pct+" %"].concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
-  const T=puntaje(v);fila(["Total",cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N"),T.n,T.pct===null?"-":T.pct+" %"].concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
+  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);const s0=prev?puntaje(prev,f).pct:null;fila([a.name].concat(CH3?[cnt(f,"C"),cnt(f,"N")]:[cnt(f,"C"),cnt(f,"P"),cnt(f,"N")]).concat([s.n,s.pct===null?"-":s.pct+" %"]).concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
+  const T=puntaje(v);fila(["Total"].concat(CH3?[cnt(()=>true,"C"),cnt(()=>true,"N")]:[cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N")]).concat([T.n,T.pct===null?"-":T.pct+" %"]).concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
   y+=5;
   /* 2. check list completo: cada punto con su resultado */
   titulo(`Check list (${ITA.length} ${ITA.length===1?"punto que aplica":"puntos que aplican"})`);
@@ -958,14 +1000,14 @@ async function clPdf(v,subir){
   const cmp=!!prev;
   const cols=cmp?[{t:"Código",w:15},{t:"Punto revisado",w:101},{t:`Visita ${esc(prev.n)}`,w:32,c:1},{t:`Visita ${esc(v.n)} (actual)`,w:32,c:1,a:1}]:[{t:"Código",w:15},{t:"Punto revisado",w:133},{t:`Visita ${esc(v.n)} (actual)`,w:32,c:1,a:1}];
   const thead=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);let x=L;cols.forEach(c=>{if(c.a)d.setTextColor(44,76,164);if(c.c)d.text(c.t,x+c.w/2,y,{align:"center"});else d.text(c.t,x+1.5,y);d.setTextColor(0);x+=c.w});d.setFont("helvetica","normal");y+=4};
-  const chip=(e,x,w,yy)=>{const t=e?CL_LABEL[e]:"Sin revisar";const fc=e?FILL[e]:[245,245,245],tc=e?COL[e]:[130,130,130];d.setFillColor(...fc);d.roundedRect(x+1,yy-3.6,w-2,5,1.2,1.2,"F");d.setFont("helvetica","bold");d.setFontSize(7.8);d.setTextColor(...tc);d.text(t,x+w/2,yy,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal")};
+  const chip=(e,x,w,yy)=>{const t=e?lblT(e,TV):"Sin revisar";const fc=e?FILL[e]:[245,245,245],tc=e?COL[e]:[130,130,130];d.setFillColor(...fc);d.roundedRect(x+1,yy-3.6,w-2,5,1.2,1.2,"F");d.setFont("helvetica","bold");d.setFontSize(7.8);d.setTextColor(...tc);d.text(t,x+w/2,yy,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal")};
   SECV.forEach(a=>{
     const its=ITA.filter(a.f);if(!its.length)return;
     chk(16);d.setFont("helvetica","bold");d.setFontSize(10);d.setFillColor(242,245,248);d.rect(L,y,W,6.5,"F");d.text(a.name,L+2,y+4.6);y+=10.5;thead();
     let grupo="";
     its.forEach(it=>{
       const r=(v.items||{})[it.key]||{},pr=prev&&prev.items&&prev.items[it.key];
-      if(it.group!==grupo){grupo=it.group;chk(10);d.setFont("helvetica","bolditalic");d.setFontSize(8);d.setTextColor(90);d.text(`${it.fam} · ${it.group}`,L+1.5,y+3);d.setTextColor(0);y+=5}
+      if(it.group!==grupo&&it.sheet!=="ch"){grupo=it.group;chk(10);d.setFont("helvetica","bolditalic");d.setFontSize(8);d.setTextColor(90);d.text(`${it.fam} · ${it.group}`,L+1.5,y+3);d.setTextColor(0);y+=5}
       d.setFontSize(8.3);const tl=d.splitTextToSize((it.star?"(Clave) ":"")+it.txt,cols[1].w-3);
       const ob=clObs(r);const ol=ob?d.splitTextToSize("Obs.: "+ob,cols[1].w-3):[];
       const mk=cmp?CK[it.key]:"";const h=Math.max(mk==="emp"||mk==="corr"||mk==="mej"?9:6,tl.length*3.6+ol.length*3.3+2.4);
@@ -985,15 +1027,15 @@ async function clPdf(v,subir){
   const hall=ITA.filter(it=>{const r=v.items&&v.items[it.key];return r&&esHallazgo(r.e)});
   const corr=prev?ITA.filter(it=>{const r=v.items&&v.items[it.key],pr=prev.items&&prev.items[it.key];return r&&r.e==="C"&&pr&&esHallazgo(pr.e)}):[];
   titulo(`Hallazgos y plan de acción (${hall.length})`);
-  if(!hall.length){d.setFont("helvetica","normal");d.setFontSize(9.5);d.text("Sin puntos en Parcial o No cumple.",L,y);y+=7}
+  if(!hall.length){d.setFont("helvetica","normal");d.setFontSize(9.5);d.text(TV==="huespedes"?"Sin puntos en «No».":"Sin puntos en Parcial o No cumple.",L,y);y+=7}
   hall.forEach(it=>{const r=v.items[it.key];const pr=prev&&prev.items&&prev.items[it.key];const hh=H[it.key];
     d.setFontSize(8.8);const lines=d.splitTextToSize(it.txt,W-34);
-    const meta=[];if(pr&&pr.e)meta.push(`Visita ${esc(prev.n)}: ${CL_LABEL[pr.e]}${{emp:" (empeoró)",mej:" (mejoró, sigue abierto)",sig:" (sigue abierto)"}[CK[it.key]]||" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
+    const meta=[];if(pr&&pr.e)meta.push(`Visita ${esc(prev.n)}: ${lblE(pr.e,it)}${{emp:" (empeoró)",mej:" (mejoró, sigue abierto)",sig:" (sigue abierto)"}[CK[it.key]]||" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
     const plan=[r.acc?"Acción: "+r.acc:"",r.resp?"Responsable: "+r.resp:"",r.plazo?"Plazo: "+fmtD(r.plazo):""].filter(Boolean).join("   ");
     const pl=plan?d.splitTextToSize(plan,W-6):[d.splitTextToSize("Sin plan de acción definido.",W-6)[0]];
     const h=5+lines.length*4+(meta.length?4.5:0)+pl.length*4+3;chk(h+2);
     d.setFillColor(...FILL[r.e]);d.roundedRect(L,y-1,W,h,1.5,1.5,"F");
-    d.setFont("helvetica","bold");d.setFontSize(8.8);d.text(`${codigo(it)} · ${etqIt(it,TV)}`,L+2,y+3);d.setTextColor(...COL[r.e]);d.text(CL_LABEL[r.e],L+W-2,y+3,{align:"right"});d.setTextColor(0);let yy=y+7.5;
+    d.setFont("helvetica","bold");d.setFontSize(8.8);d.text(`${codigo(it)} · ${etqIt(it,TV)}`,L+2,y+3);d.setTextColor(...COL[r.e]);d.text(lblE(r.e,it),L+W-2,y+3,{align:"right"});d.setTextColor(0);let yy=y+7.5;
     d.setFont("helvetica","normal");d.text(lines,L+2,yy,{lineHeightFactor:1.25});yy+=lines.length*4;
     if(meta.length){d.setFontSize(8);if(CK[it.key]==="emp"){d.setFont("helvetica","bold");d.setTextColor(...COL.N)}else d.setTextColor(90);d.text(meta.join("   "),L+2,yy);d.setTextColor(0);d.setFont("helvetica","normal");yy+=4.5}
     d.setFontSize(8.3);d.setFont("helvetica",plan?"bold":"italic");d.text(pl,L+2,yy,{lineHeightFactor:1.2});d.setFont("helvetica","normal");
@@ -1009,13 +1051,17 @@ async function clPdf(v,subir){
       chk(8+tl.length*4.2+ol.length*4+(filasF?MH+4:0));
       d.setDrawColor(200);d.line(L,y-2,L+W,y-2);d.setDrawColor(0);
       d.setFont("helvetica","bold");d.setFontSize(9);d.text(`${codigo(it)} · ${etqIt(it,TV)}`,L,y+2);
-      if(r.e){d.setTextColor(...COL[r.e]);d.text(CL_LABEL[r.e],L+W,y+2,{align:"right"});d.setTextColor(0)}
+      if(r.e){d.setTextColor(...COL[r.e]);d.text(lblE(r.e,it),L+W,y+2,{align:"right"});d.setTextColor(0)}
       y+=6.5;d.setFont("helvetica","normal");d.text(tl,L,y,{lineHeightFactor:1.25});y+=tl.length*4.2;
       if(ol.length){d.setFont("helvetica","italic");d.setFontSize(8.8);d.setTextColor(60);d.text(ol,L,y+0.5,{lineHeightFactor:1.25});d.setTextColor(0);d.setFont("helvetica","normal");y+=ol.length*4+1.5}
       if(fs.length){let x=L,n=0;fs.slice(0,6).forEach((im,i)=>{if(i===3){y+=MH+3;chk(MH+4);x=L}let w=IW,hh=w*im.h/im.w;if(hh>MH){hh=MH;w=hh*im.w/im.h}try{d.addImage(im.data,"JPEG",x+(IW-w)/2,y,w,hh)}catch(e){}x+=IW+4;n=i});y+=MH+4;if(fs.length>6){d.setFontSize(7.5);d.setTextColor(110);d.text(`(${fs.length-6} fotos más en la carpeta de OneDrive)`,L,y);d.setTextColor(0);y+=4}}
       else if((r.fotos||[]).length){d.setFontSize(8);d.setTextColor(110);d.text("Las fotos no se pudieron cargar; están en la carpeta de OneDrive.",L,y+1);d.setTextColor(0);y+=5}
       y+=5});
   }
+  /* v151: casas de huéspedes: fecha de cierre y nota normativa al final */
+  if(TV==="huespedes"){chk(40);y+=4;d.setFont("helvetica","normal");d.setFontSize(9.5);d.text(`Fecha de cierre: ${v.estado==="cerrada"&&v.cerrada?fmtD(v.cerrada):"-"}`,L,y);y+=9;
+    titulo("Referencia normativa y aclaración sobre baños mixtos");d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(60);const nl=d.splitTextToSize(CH_NOTA,W);chk(nl.length*3.8+8);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*3.8+3;
+    d.text("Texto vigente consultado: D.S. N.º 594/1999, Biblioteca del Congreso Nacional (Ley Chile).",L,y);d.setTextColor(0);y+=6}
   const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});const a=autoriaTxt(v);if(a)d.text(d.splitTextToSize("Registro en la app: "+a.charAt(0).toLowerCase()+a.slice(1),150)[0],15,289);d.setTextColor(0)}
   const name=`Informe_${KV.archivo}_${esc(v.n)}_${v.predio.replace(/\s+/g,"_")}_${fmtD(v.fecha)}.pdf`;
   if(subir){try{await clSubir(carpetaVisita(v),name,d.output("blob"),"application/pdf",TV)}catch(e){console.warn(e)}return}
@@ -1024,4 +1070,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="151"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

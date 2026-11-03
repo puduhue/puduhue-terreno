@@ -536,10 +536,9 @@ function axChange(ev){
 }
 function axVerFoto(ref,k){
   const src=fotoSrc(ref);if(!src){toast(LOST[ref]?"Esta foto no se pudo recuperar.":"La foto todavía se está descargando.");return}
-  const m=document.createElement("div");m.className="modal";
-  m.innerHTML=`<div class="sheet viewer" role="dialog" aria-modal="true" aria-label="Foto"><h3>Foto</h3><img src="${esc(src)}" alt="Foto del acta"><div class="btns">${!ro()?`<button class="btn danger" data-m="del">Eliminar foto</button>`:""}<button class="btn pri" data-m="close" style="flex:1">Cerrar</button></div></div>`;
-  document.body.appendChild(m);document.body.style.overflow="hidden";const close=()=>{m.remove();document.body.style.overflow=""};
-  m.addEventListener("click",e=>{const x=e.target.dataset&&e.target.dataset.m;if(e.target===m||x==="close")close();if(x==="del"){close();axClick("axDelFoto",{dataset:{k,ref}})}});
+  /* v150: visor a pantalla completa; «Eliminar foto» se aplica a la foto que se está viendo */
+  visorAbrir({ref,titulo:"Foto",alt:"Foto del acta",pie:!ro()?`<div class="btns"><button class="btn danger" data-m="del">Eliminar foto</button></div>`:"",
+    accion:(a,r,cerrar)=>{if(a==="del"){cerrar();axClick("axDelFoto",{dataset:{k,ref:r}})}}});
 }
 
 /* ---------- PDF ---------- */
@@ -825,4 +824,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="151"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
