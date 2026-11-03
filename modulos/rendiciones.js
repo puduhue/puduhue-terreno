@@ -82,7 +82,7 @@ function fdTarjeta(){
   fdAuto();
   const D=FD.p;
   if(!D)return `<section class="fdc" aria-label="Fondo por rendir"><div class="fdh"><b>${cs.length>1?"Fondos por rendir":"Tu fondo por rendir"}</b></div>
-    <p class="fdn">${FD.cargando?`Consultando Finnegans<span class="dots"></span>`:FD.err?`${esc(FD.err)} <button class="lnk" data-a="fdActMio">Reintentar</button>`:navigator.onLine===false?"Sin señal: el saldo aparece al volver la conexión.":`<button class="lnk" data-a="fdActMio">Consultar el saldo</button>`}</p></section>`;
+    <p class="fdn">${FD.cargando?`<span class="esqc" role="status" aria-label="Consultando Finnegans"><span class="esq esq-big" style="width:55%"></span><span class="esq" style="width:78%"></span></span>`:FD.err?`${esc(FD.err)} <button class="lnk" data-a="fdActMio">Reintentar</button>`:navigator.onLine===false?"Sin señal: el saldo aparece al volver la conexión.":`<button class="lnk" data-a="fdActMio">Consultar el saldo</button>`}</p></section>`;
   const pie=`<span class="fdhr">${FD.cargando===1?`Actualizando<span class="dots"></span>`:`Finnegans ${esc(fdHora(D.hora))}`}</span>`;
   const per=c=>D.personas.find(x=>normRut(x.rut)===normRut(c.rut))||null;
   if(!cs.some(per))return `<section class="fdc" aria-label="Fondo por rendir"><div class="fdh"><b>${cs.length>1?"Fondos por rendir":"Tu fondo por rendir"}</b></div><p class="fdn">${esc(D.aviso||"Todavía no hay datos de tu fondo en Finnegans.")} Si crees que es un error, avísale a Contabilidad.</p></section>`;
@@ -138,7 +138,7 @@ function renderFDL(){
   const cfg=`<div class="fdcfg"><span><b>Mostrar a cada persona su saldo</b><small>Aparece en «Mis rendiciones». Actívalo cuando en Finnegans la 110106 tenga a la persona en todas sus líneas.</small></span><button class="fdsw" role="switch" aria-checked="${fdVisible()}" data-a="fdMostrar" aria-label="Mostrar a cada persona su saldo"><i></i></button></div>
     ${fdConf().por?`<p class="note">${fdVisible()?"Activado":"Desactivado"} por ${esc(quien(fdConf().por))} el ${fmtD(String(fdConf().hora||"").slice(0,10))}.</p>`:""}`;
   if(!L)return head+`<main class="wrap"><h1>Fondos por rendir</h1><p class="lead">Saldo de la cuenta 110106 por persona.</p>
-    <div class="empty">${FD.cargando?`Consultando Finnegans<span class="dots"></span>`:FD.errT?`${esc(FD.errT)}<div class="btns" style="justify-content:center"><button class="btn" data-a="fdActualizar">Reintentar</button></div>`:navigator.onLine===false?"Se necesita señal para consultar Finnegans.":`<button class="btn" data-a="fdActualizar">Consultar Finnegans</button>`}</div>${cfg}</main>`;
+    <div class="empty">${FD.cargando?`<span class="esqc" role="status" aria-label="Consultando Finnegans">${'<span class="esqf"><span class="esqx"><span class="esq" style="width:70%"></span><span class="esq" style="width:45%"></span></span></span>'.repeat(3)}</span>`:FD.errT?`${esc(FD.errT)}<div class="btns" style="justify-content:center"><button class="btn" data-a="fdActualizar">Reintentar</button></div>`:navigator.onLine===false?"Se necesita señal para consultar Finnegans.":`<button class="btn" data-a="fdActualizar">Consultar Finnegans</button>`}</div>${cfg}</main>`;
   const con=L.filter(x=>x.porRendir>0.5),alDia=L.filter(x=>Math.abs(x.porRendir)<=0.5),favor=L.filter(x=>x.porRendir<-0.5);
   const tot=con.reduce((s,x)=>s+x.porRendir,0),nA=con.filter(x=>x.dias>=FD_DIAS_A).length,tram=L.reduce((s,x)=>s+x.enTram,0);
   const ord={saldo:(a,b)=>b.porRendir-a.porRendir,dias:(a,b)=>b.dias-a.dias||b.porRendir-a.porRendir,nom:(a,b)=>cmpEs(a.nom,b.nom)}[fdOrd]||((a,b)=>b.porRendir-a.porRendir);
@@ -187,7 +187,8 @@ async function fdClick(A,b){
    Botones que ya existían: «Ver mis rendiciones» (rdTabIr) y «Movimientos» (fdMov). */
 function rdInicioFondo(){
   if(!fdVisible()||!ME)return"";const cs=colabsDeCuenta().filter(c=>c.rut);if(cs.length!==1)return"";
-  fdAuto();const D=FD.p;if(!D)return"";const p=D.personas.find(x=>normRut(x.rut)===normRut(cs[0].rut));if(!p)return"";
+  fdAuto();const D=FD.p;if(!D)return FD.cargando?`<section class="ifd esqc" role="status" aria-label="Consultando Finnegans"><span class="esq" style="width:38%"></span><span class="esq esq-big"></span><span class="esq" style="width:66%"></span></section>`:"";/* v150: esqueleto mientras consulta */
+  const p=D.personas.find(x=>normRut(x.rut)===normRut(cs[0].rut));if(!p)return"";
   const k=fdCalc(p),n=fdNivel(k),tot=Math.max(0,k.saldo),pc=x=>tot>0.5?Math.max(0,Math.min(100,Math.round(x/tot*100))):0;
   const monto=k.porRendir>0.5?`<b class="ifdm">${fmtP(k.porRendir)}</b><span class="ifds">por rendir</span>`
     :k.porRendir<-0.5?`<b class="ifdm">${fmtP(-k.porRendir)}</b><span class="ifds">a tu favor: rendiste más de lo que recibiste</span>`
@@ -2211,4 +2212,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="151"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
