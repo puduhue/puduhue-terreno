@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nMAvdGbOpdp6P8OfZYrau4yZOdKvKpqCVaYyERgZzCE=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ttxQ7SDUXdrk1X0veL6RF+YUQm1AvNxhcVnnzgsj910=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=151">
+<link rel="stylesheet" href="estilos.css?v=152">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="151";
+const APP_VER="152";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -902,7 +902,7 @@ const TB_USO_K="actas-uso-mod";
 const TB_ICO_ACTA=`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15.5" r="4"/><path d="M10.9 12.6L19 4.5"/><path d="M15.5 8l2.5 2.5"/><path d="M13.5 10l1.8 1.8"/></svg>`;
 const TB_MODS=[
   {k:"rd",a:"rd",t:"Rendiciones",tl:"Rendiciones",s:"Facturas y boletas",i:()=>ICO.receipt,ok:()=>true},
-  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas, camionetas y casas de huéspedes",i:()=>ICO.check,ok:()=>permVe("cl")},
+  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas y camionetas",i:()=>ICO.check,ok:()=>permVe("cl")},
   {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>permVe("ax")},
   {k:"cb",a:"cb",t:"Bodega",tl:"Control de bodega",s:"Conteo contra el stock del sistema",i:()=>ICO.clip,ok:()=>puedeContar()},
   {k:"stock",a:"stock",t:"Stock",tl:"Stock",s:"Existencias desde Finnegans",i:()=>ICO.box,ok:()=>puedeVerStock()},
@@ -1066,7 +1066,7 @@ function renderADM(){
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       ${lecAdminHTML(lect)}`)}
-    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button><button class="btn" data-a="admCat" data-t="huespedes">Check list de casas de huéspedes${cat("huespedes")!=null?` (${cat("huespedes")})`:""}</button></div></div>`)}
+    ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
@@ -1436,7 +1436,7 @@ function disUnoHTML(v){
   const enArea=O.filter(x=>x.area===it.area),j=ix(enArea,it);
   return `<div class="uno${DIS_UNO_DIR?" entra-"+DIS_UNO_DIR:""}" id="uno">
     <p class="uno-pos">Punto ${j+1} de ${enArea.length} en ${esc(AREA_NAME[it.area]||"")}${falta?` · ${falta} sin revisar en total`:" · todo revisado"}</p>
-    ${it.area==="hu-ban"?chNotaHTML():""}<section class="sec"><h3>${it.sheet==="ch"?esc(it.fam):esc(it.fam)+" · "+esc(it.group)}</h3>${it.group==="Camionetas"?camionetasPanel(v):""}${clItemHTML(it)}</section>
+    ${it.area==="hu-ban"||(it.area==="casa"&&it.group==="Baños y servicios higiénicos")?chNotaHTML():""}<section class="sec"><h3>${it.sheet==="ch"?esc(it.area==="casa"?it.group:it.fam):esc(it.fam)+" · "+esc(it.group)}</h3>${it.group==="Camionetas"?camionetasPanel(v):""}${clItemHTML(it)}</section>
     <div class="uno-nav"><button type="button" class="btn" data-a="disUno" data-d="-1" ${i<=0?"disabled":""}>Anterior</button><button type="button" class="btn pri" data-a="disUno" data-d="1">${i>=O.length-1?"Terminar":"Siguiente"}</button></div>
     <p class="uno-ayuda">Al marcar ${it.sheet==="ch"?"Sí":"Cumple"} o N/A pasa solo al siguiente punto. También puedes deslizar hacia los lados.</p>
   </div>`;
@@ -2566,7 +2566,7 @@ function renderLaunch(){
       <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
       ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
       ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      ${permVe("cl")?`<button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios, bodegas, camionetas y casas de huéspedes, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>`:""}
+      ${permVe("cl")?`<button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios (con la casa de huéspedes), bodegas y camionetas, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>`:""}
     </div>
   </main>`;
 }
@@ -3474,10 +3474,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=151"></script>
-<script src="modulos/bodega.js?v=151"></script>
-<script src="modulos/rendiciones.js?v=151"></script>
-<script src="modulos/actas-entrega.js?v=151"></script>
+<script src="modulos/checklist.js?v=152"></script>
+<script src="modulos/bodega.js?v=152"></script>
+<script src="modulos/rendiciones.js?v=152"></script>
+<script src="modulos/actas-entrega.js?v=152"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

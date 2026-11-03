@@ -1722,3 +1722,8 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 .chres .chreps button.chr-obs[aria-pressed="true"]{background:var(--r-ink);border-color:var(--r-ink);color:var(--card)}
 .chres .chreps button.chr-no[aria-pressed="true"]{background:var(--m-ink);border-color:var(--m-ink);color:var(--card)}
 @media (min-width:760px){.chres .chreps{grid-template-columns:repeat(3,1fr)}.chres .chreps button{text-align:center}}
+
+/* v152: casa de huéspedes como sección de Visitas a predios: datos de la casa y aviso «no tiene casa». */
+.chcasa{margin:0 0 14px;padding:12px 14px 4px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+.chcasa .btns .btn{width:100%}
+.chsin{margin:0 0 14px}
