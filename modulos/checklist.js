@@ -783,7 +783,11 @@ async function clClick(A,b){
   if(A==="clAbrirIt"){clAbrirIt(b.dataset.k);return true}
   if(A==="clEncEd"){clEncAb[clv.id]=true;render();const f=$("#clfecha");if(f)f.focus();return true}
   if(A==="clEncOk"){clEncAb[clv.id]=false;render();return true}
-  if(A==="clDelFoto"){if(clRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=clv.items[k];if(r&&r.fotos){r.fotos=r.fotos.filter(x=>x!==ref)}borrarFotoRef(ref);clTouch();clRefreshItem(clv,k);return true}
+  if(A==="clDelFoto"){if(clRO())return true;const k=b.dataset.k,ref=b.dataset.ref;const v=clv,r=v.items[k];
+    if(!r||!r.fotos){borrarFotoRef(ref);clTouch();clRefreshItem(v,k);return true}
+    /* v148: deshacer en vez de confirmar */
+    const i=r.fotos.indexOf(ref);r.fotos=r.fotos.filter(x=>x!==ref);clTouch();clRefreshItem(v,k);
+    deshacer("Foto eliminada.",()=>{if(clv!==v)return;if(!r.fotos.includes(ref))r.fotos.splice(Math.max(0,i),0,ref);clTouch();clRefreshItem(v,k)},()=>borrarFotoRef(ref));return true}
   if(A==="clDel"){const v=VIS[b.dataset.id];if(!v||v.estado==="cerrada")return true;if(!puedeBorrar(v)){toast(NO_BORRAR);return true}
     if(!(await ask("¿Eliminar esta visita?",`Visita ${esc(v.n)} a ${v.predio}. Se borran las respuestas y las fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     clearTimeout(LT[v.id]);delete LT[v.id];delete VIS[v.id];delete LOCAL[v.id];await localDel(v.id);if(DB){colaBorrar("visitas/"+v.id,v);schedSync(200)}
@@ -1020,4 +1024,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

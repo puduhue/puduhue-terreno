@@ -1921,7 +1921,9 @@ async function rdClick(A,b){
   if(A==="rdIrDoc"){await rdIrDoc(b.dataset.k);return true}
   if(A==="rdVolver"){await flush();rdd=null;RD_COLA=null;go("rdv");return true}
   if(A==="rdReleer"){if(!rdd||!editaPersona(rdv))return true;rdd.revisadoManual=false;await leerDoc(rdv,rdd);return true}
-  if(A==="rdDelDoc"){if(!editaPersona(rdv))return true;const d=rdv.docs[b.dataset.k];if(!d)return true;if(!(await ask("¿Eliminar este documento?",d.pdf?"Se borran la imagen, el PDF y los datos.":"Se borra la foto y los datos.","Eliminar",true)))return true;if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d);delete rdv.docs[d.k];rdd=null;rdTouch();go("rdv");return true}
+  if(A==="rdDelDoc"){if(!editaPersona(rdv))return true;const d=rdv.docs[b.dataset.k];if(!d)return true;/* v148: deshacer en vez de confirmar; la foto y el PDF se borran de verdad al terminar el plazo */
+    const r=rdv;delete r.docs[d.k];rdd=null;rdTouch();go("rdv");
+    deshacer("Documento eliminado.",()=>{if(rdv!==r||view!=="rdv")return;r.docs[d.k]=d;rdTouch();render()},()=>{if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d)});return true}
   if(A==="rdEnviar"){if(!editaPersona(rdv))return true;const D=docsDe(rdv);if(!D.length)return true;const inc=D.filter(d=>!docCompleto(rdv,d)).length;if(inc){toast(`Faltan datos en ${inc} ${inc===1?"documento":"documentos"}.`);return true}
     const c=colabDe(rdv);let j=c?jefaturaDe(c):null;if(j&&j.correo&&(j.correo===meCorreo()||correosDe(c).includes(j.correo)))j=null;
     const devCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&!!rdv.aprobJef,cambio=devCont&&rdCambioDesdeDev(rdv); /* v133 (M-14) */
@@ -2209,4 +2211,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

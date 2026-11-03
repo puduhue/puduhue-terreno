@@ -302,7 +302,11 @@ async function cbClick(A,b){
   if(A==="cbNuevoAdd"){const n=cbNuevoProd||{};if(!(n.prod||"").trim()){toast("Escribe el nombre del producto.");return true}
     const k="m"+uid();cbv.lineas[k]={k,cod:(n.cod||"").trim(),prod:n.prod.trim(),fam:"",un:(n.un||"").trim(),sis:0,pu:0,manual:true,orden:9999};cbNuevoProd=null;cbFiltro="all";cbQ="";cbTouch();render();
     setTimeout(()=>{const e=$("#cbo-"+CSS.escape(k));if(e){e.scrollIntoView({block:"center"});e.focus()}},60);return true}
-  if(A==="cbDelFoto"){if(cbRO())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;const r=cbv.items[k];if(r&&r.fotos)r.fotos=r.fotos.filter(x=>x!==ref);borrarFotoRef(ref);cbTouch();cbRefresh(k);return true}
+  if(A==="cbDelFoto"){if(cbRO())return true;const k=b.dataset.k,ref=b.dataset.ref;const c=cbv,r=c.items[k];
+    if(!r||!r.fotos){borrarFotoRef(ref);cbTouch();cbRefresh(k);return true}
+    /* v148: deshacer en vez de confirmar */
+    const i=r.fotos.indexOf(ref);r.fotos=r.fotos.filter(x=>x!==ref);cbTouch();cbRefresh(k);
+    deshacer("Foto eliminada.",()=>{if(cbv!==c)return;if(!r.fotos.includes(ref))r.fotos.splice(Math.max(0,i),0,ref);cbTouch();cbRefresh(k)},()=>borrarFotoRef(ref));return true}
   if(A==="cbDel"){const c=CONT[b.dataset.id];if(!c||c.estado==="cerrado")return true;if(!puedeBorrar(c)){toast(NO_BORRAR);return true}
     if(!(await ask("¿Eliminar este conteo?",`Conteo ${esc(c.n)} de ${c.bodega}. Se borran las cantidades, comentarios y fotos. No se puede deshacer.`,"Eliminar",true)))return true;
     clearTimeout(LT[c.id]);delete LT[c.id];delete CONT[c.id];delete LOCAL[c.id];await localDel(c.id);if(DB){colaBorrar("conteos/"+c.id,c);schedSync(200)}
@@ -417,4 +421,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

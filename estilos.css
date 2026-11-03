@@ -1570,3 +1570,47 @@ h2{font-weight:800;letter-spacing:-.015em}
 /* documento leído: el monto más grande */
 .rdok{border-radius:22px}
 .rdok-tot{font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.03em}
+
+/* v148: «Deshacer» al quitar una foto o un documento y transiciones entre pantallas (el modo sol se quitó antes de publicar). */
+
+/* aviso con «Deshacer» (mismo lugar que los avisos de siempre, encima de la barra de abajo) */
+:root{--desh:#9CC3F5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--desh:#17375E}}
+:root[data-theme="dark"]{--desh:#17375E}
+.tdesh{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:61;display:flex;align-items:center;gap:14px;width:max-content;max-width:calc(100% - 32px);padding:6px 6px 6px 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-size:15px;line-height:1.3;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:tdeshIn .18s ease-out both}
+.tdeshb{flex:none;min-height:40px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:var(--desh);font:inherit;font-weight:800;cursor:pointer}
+.tdeshb:active{background:rgba(127,127,127,.18)}
+@keyframes tdeshIn{from{opacity:0;transform:translate(-50%,8px)}}
+@media (prefers-reduced-motion:reduce){.tdesh{animation:none}}
+@media (max-width:759px){.tdesh{bottom:calc(var(--tb-top,84px) + 12px)}}
+
+/* transición al cambiar de pantalla (solo movimiento; con left, no transform, para no mover lo que está fijo) */
+#app{overflow-x:clip}   /* durante el deslizamiento no aparece desplazamiento horizontal (clip no rompe la barra de arriba fija) */
+@keyframes pantAde{from{opacity:0;left:28px}to{opacity:1;left:0}}
+@keyframes pantAtr{from{opacity:0;left:-28px}to{opacity:1;left:0}}
+@keyframes pantTab{from{opacity:0}to{opacity:1}}
+#app > main.pant-ade{position:relative;animation:pantAde .24s cubic-bezier(.2,.8,.2,1) both}
+#app > main.pant-atr{position:relative;animation:pantAtr .24s cubic-bezier(.2,.8,.2,1) both}
+#app > main.pant-tab{animation:pantTab .18s ease-out both}
+@media (prefers-reduced-motion:reduce){#app > main.pant-ade,#app > main.pant-atr,#app > main.pant-tab{animation:none}}
+
+/* v149: transiciones que se ven también en pantallas pesadas: el contenido espera invisible a que la pantalla esté lista y el
+   movimiento es algo más largo y amplio */
+@keyframes pantAde2{from{opacity:0;left:40px}to{opacity:1;left:0}}
+@keyframes pantAtr2{from{opacity:0;left:-40px}to{opacity:1;left:0}}
+#app > main.pant-pre{opacity:0}
+#app > main.pant-ade{animation:pantAde2 .3s cubic-bezier(.2,.8,.2,1) both}
+#app > main.pant-atr{animation:pantAtr2 .3s cubic-bezier(.2,.8,.2,1) both}
+#app > main.pant-tab{animation-duration:.2s}
+@media (prefers-reduced-motion:reduce){#app > main.pant-pre{opacity:1}#app > main.pant-ade,#app > main.pant-atr,#app > main.pant-tab{animation:none}}
+
+/* barra de abajo: indicador que se desliza hasta la pestaña elegida y el ícono que palpita */
+.tabbar .tbind{position:absolute;left:0;z-index:0;border-radius:24px;background:var(--soft);pointer-events:none}
+.tabbar .tbind.anda{transition:transform .32s cubic-bezier(.3,1.25,.5,1)}
+.tabbar.con-ind button.on{background:transparent}
+.tabbar.con-ind button.on .tbi{background:transparent}
+.tabbar button{z-index:1}
+@keyframes tbPal{0%{transform:scale(1)}30%{transform:scale(.8)}65%{transform:scale(1.14)}100%{transform:scale(1)}}
+.tabbar .tbi.palpita{animation:tbPal .42s cubic-bezier(.3,1.4,.5,1)}
+@media (min-width:760px){.tabbar .tbind{border-radius:22px}}
+@media (prefers-reduced-motion:reduce){.tabbar .tbind.anda{transition:none}.tabbar .tbi.palpita{animation:none}}
