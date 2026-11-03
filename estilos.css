@@ -1727,3 +1727,7 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 .chcasa{margin:0 0 14px;padding:12px 14px 4px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
 .chcasa .btns .btn{width:100%}
 .chsin{margin:0 0 14px}
+
+/* v153: sin la franja bajo la barra de abajo (Benja, 03-11-2026: «se ve blanco un espacio abajo»). La prolongación de la v119 era para
+   la barra pegada al borde; desde la v143 la barra flota y esa prolongación quedaba a la vista bajo la píldora. */
+@media (max-width:759px){.tabbar::after{content:none;display:none}}
