@@ -382,9 +382,9 @@ async function cbPdf(c,subir){
   const L=lineasDe(c),R=resumenConteo(c);
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const X=15,W=180;let y=10;
   const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
-  d.setFillColor(141,179,226);d.rect(X,y,W,21,"F");try{d.addImage(LOGO,"JPEG",X+2,y+1.5,20,18)}catch(e){}
-  d.setFont("helvetica","bold");d.setFontSize(14);d.setTextColor(15,39,64);d.text("Control de bodega · Conteo físico",X+26,y+9);d.setFontSize(10);d.setFont("helvetica","normal");
-  d.text(`${c.bodega} · Conteo ${esc(c.n)} · ${fmtD(c.fecha)}${c.anulado?" · ANULADO":c.estado!=="cerrado"?" · BORRADOR":""}`,X+26,y+16);d.setTextColor(0);y+=27;
+  const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{d.addImage(MARCA,"PNG",X,y,22.5,20.3)}catch(e){}
+  d.setFont("helvetica","bold");d.setFontSize(15);d.setTextColor(...AZ);d.text("Control de bodega · Conteo físico",X+28,y+9);d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");
+  d.text(`${c.bodega} · Conteo ${esc(c.n)} · ${fmtD(c.fecha)}${c.anulado?" · ANULADO":c.estado!=="cerrado"?" · BORRADOR":""}`,X+28,y+16);d.setTextColor(0);d.setFillColor(...AZ);d.rect(X,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(X+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(X+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
   d.setFontSize(9.5);d.text(`Responsable: ${c.responsable||"-"}`,X,y);d.text(`Acompañante: ${c.acompanante||"-"}`,X+95,y);y+=5;
   d.text(`Stock del sistema al: ${fmtFecha(c.stockAl)}${c.ciego?" · conteo ciego":""} · ${c.porPartida?"por partida":"por producto"} · tolerancia ${c.tol==null?2:c.tol} %`,X,y);y+=5;
   d.text(`${c.familias?"Alcance: "+c.familias.join(", ")+" · ":"Alcance: toda la bodega · "}Inicio ${fmtFecha(c.creado)}${c.cerrado&&c.actualizado?` · Término ${fmtFecha(c.actualizado)}`:""}`,X,y);y+=8;
@@ -417,4 +417,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="146"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
