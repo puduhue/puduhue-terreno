@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-CljIt4aV6Fzxxf72KacDowHTGOw1bKslvz0XEWCSkf0=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bnf2V1I/rkHuaCjc0Bpg39OW4N7JHe5I0mskKbjouPg=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=154">
+<link rel="stylesheet" href="estilos.css?v=155">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="154";
+const APP_VER="155";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1397,24 +1397,39 @@ document.addEventListener("click",e=>{const c=e.target.closest&&e.target.closest
 
 /* ---- 3) gestos: tirar hacia abajo para sincronizar ---- */
 const PTR={y0:null,x0:0,d:0,act:false,carga:false},PTR_UMBRAL=64;
+const PTR_MAX=2500; /* v155: lo más que se queda el logo de «tirar para actualizar» */
+async function ptrSincronizar(){await flush();schedSync(100);await pull(true)}
 function ptrEl(){let p=document.getElementById("ptr");if(!p){p=document.createElement("div");p.id="ptr";p.className="ptr";p.setAttribute("aria-hidden","true");
   p.innerHTML=`<span class="ptri"><img class="ptrl" src="icon-192.png" alt=""></span>`;document.body.appendChild(p)}return p}
 function ptrPuede(){try{return !ESCRITORIO()&&loaded&&CUENTA&&DB&&!!TB_RAIZ[view]&&!document.querySelector(".modal")&&!FAB_AB&&(window.scrollY||document.documentElement.scrollTop||0)<=0}catch(e){return false}}
-document.addEventListener("touchstart",e=>{if(PTR.carga||!e.touches||e.touches.length!==1||!ptrPuede()){PTR.y0=null;return}PTR.y0=e.touches[0].clientY;PTR.x0=e.touches[0].clientX;PTR.d=0;PTR.act=false},{passive:true});
-document.addEventListener("touchmove",e=>{
+/* v155: si la pantalla se vuelve a dibujar en medio del tirón (pasa mientras sincroniza), el toque queda en un elemento que ya no está
+   y su final no llega al documento: el logo quedaba arriba («listo») para siempre. Ahora el elemento tocado también avisa el movimiento
+   y el final, y si en 4 s no llega el final del toque, el logo vuelve solo. */
+let PTR_T=null,PTR_VIG=null;
+function ptrMovT(e){if(!this.isConnected)ptrMover(e)}
+function ptrFinT(e){if(!this.isConnected)ptrSoltar(e)}
+function ptrSuelta(){if(PTR_T){PTR_T.removeEventListener("touchmove",ptrMovT);PTR_T.removeEventListener("touchend",ptrFinT);PTR_T.removeEventListener("touchcancel",ptrFinT);PTR_T=null}}
+document.addEventListener("touchstart",e=>{ptrSuelta();if(PTR.carga||!e.touches||e.touches.length!==1||!ptrPuede()){PTR.y0=null;return}PTR.y0=e.touches[0].clientY;PTR.x0=e.touches[0].clientX;PTR.d=0;PTR.act=false;
+  const t=e.target;if(t&&t.addEventListener){PTR_T=t;t.addEventListener("touchmove",ptrMovT,{passive:true});t.addEventListener("touchend",ptrFinT,{passive:true});t.addEventListener("touchcancel",ptrFinT,{passive:true})}},{passive:true});
+function ptrMover(e){
   if(PTR.y0==null||!e.touches||!e.touches[0])return;const dy=e.touches[0].clientY-PTR.y0,dx=e.touches[0].clientX-PTR.x0;
   if(!PTR.act){if(dy<0||Math.abs(dx)>Math.abs(dy)||(window.scrollY||0)>0){if(Math.abs(dx)>10||dy<-6)PTR.y0=null;return}if(dy<12)return;PTR.act=true}
   PTR.d=Math.max(0,Math.min(112,(dy-12)*.55));const p=ptrEl();p.classList.add("ver");p.classList.toggle("listo",PTR.d>=PTR_UMBRAL);
   p.style.transform=`translate(-50%,${PTR.d}px)`;p.querySelector(".ptrl").style.transform=`rotate(${Math.round(PTR.d*3.2)}deg)`; /* v150: el logo gira con el tirón */
-},{passive:true});
-document.addEventListener("touchend",async()=>{
+  clearTimeout(PTR_VIG);PTR_VIG=setTimeout(()=>{if(PTR.act)ptrSoltar({type:"touchcancel"})},4000);
+}
+document.addEventListener("touchmove",e=>ptrMover(e),{passive:true});
+async function ptrSoltar(e){
+  clearTimeout(PTR_VIG);ptrSuelta();
   if(PTR.y0==null){return}PTR.y0=null;if(!PTR.act)return;PTR.act=false;const p=ptrEl();
   const volver=()=>{p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector(".ptrl");if(s)s.style.transform=""},240)};
-  if(PTR.d<PTR_UMBRAL){volver();return}
-  PTR.carga=true;p.classList.add("carga");p.style.transform=`translate(-50%,${PTR_UMBRAL-6}px)`;try{if(navigator.vibrate)navigator.vibrate(10)}catch(e){}
-  try{await flush();schedSync(100);await pull(true)}catch(e){console.warn("tirar para sincronizar",e)}
+  if(PTR.d<PTR_UMBRAL||(e&&e.type==="touchcancel")){volver();return}
+  PTR.carga=true;p.classList.add("carga");p.style.transform=`translate(-50%,${PTR_UMBRAL-6}px)`;try{if(navigator.vibrate)navigator.vibrate(10)}catch(er){}
+  try{await Promise.race([ptrSincronizar(),new Promise(r=>setTimeout(r,PTR_MAX))])}catch(er){console.warn("tirar para sincronizar",er)} /* v155: el logo se va a los 2,5 s aunque la sincronización siga */
   volver();setTimeout(()=>{PTR.carga=false},260);
-},{passive:true});
+}
+document.addEventListener("touchend",e=>ptrSoltar(e),{passive:true});
+document.addEventListener("touchcancel",e=>ptrSoltar(e),{passive:true});
 
 /* ---- 1) el botón se achica al bajar y vuelve al subir ---- */
 let disSY=0;
@@ -3562,10 +3577,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=154"></script>
-<script src="modulos/bodega.js?v=154"></script>
-<script src="modulos/rendiciones.js?v=154"></script>
-<script src="modulos/actas-entrega.js?v=154"></script>
+<script src="modulos/checklist.js?v=155"></script>
+<script src="modulos/bodega.js?v=155"></script>
+<script src="modulos/rendiciones.js?v=155"></script>
+<script src="modulos/actas-entrega.js?v=155"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
