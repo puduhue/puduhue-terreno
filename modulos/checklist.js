@@ -912,24 +912,39 @@ async function clPdf(v,subir){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const L=15,W=180;let y=10;
   const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
   const COL={C:[30,110,50],P:[150,110,20],N:[170,40,40],NA:[110,110,110]};const FILL={C:[226,240,224],P:[244,236,206],N:[246,222,222],NA:[236,238,240]};
-  const titulo=t=>{chk(14);d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(15,39,64);d.text(t,L,y);d.setTextColor(0);y+=6.5};
+  const titulo=t=>{chk(14);d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(44,76,164);d.text(t,L,y);d.setTextColor(0);y+=6.5};
   /* encabezado */
-  d.setFillColor(141,179,226);d.rect(L,y,W,21,"F");try{d.addImage(LOGO,"JPEG",L+2,y+1.5,20,18)}catch(e){}
-  d.setFont("helvetica","bold");d.setFontSize(14);d.setTextColor(15,39,64);d.text(KV.pdf,L+26,y+9);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+26,y+16);d.setTextColor(0);y+=27;
+  const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
+  d.setFont("helvetica","bold");{let fs=15;d.setFontSize(fs);while(d.getTextWidth(KV.pdf)>W-30&&fs>10){fs-=0.5;d.setFontSize(fs)}}d.setTextColor(...AZ);d.text(KV.pdf,L+28,y+9);d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+28,y+16);d.setTextColor(0);d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
   d.setFontSize(9.5);d.text(`Revisor(es): ${v.revisor||"-"}`,L,y);d.text(`${KV.acomp}: ${v.administrador||"-"}`,L+95,y);y+=5;
   if(TV==="camionetas"){const a=actaPatente(v.predio),ve=(a&&a.veh)||{},ki=cmKmInfo(v);
     d.text(`Camioneta: ${[ve.tipoVeh,ve.marca,ve.modelo,ve.anio].filter(Boolean).join(" ")||"-"} · Predio: ${v.predioCampo||"-"}${a?` · Acta de entrega del ${fmtD(a.fecha)}`:" · sin acta de entrega en la app"}`,L,y);y+=5;
     d.text(`Kilometraje: ${ki?ki.k.toLocaleString("es-CL")+" km":"-"}${ki?" · "+cmKmTxt(ki):""}`,L,y);y+=5}
   d.text(`Comparado con: ${prev?`visita ${esc(prev.n)} del ${fmtD(prev.fecha)}`:"sin visita anterior"}`,L,y);y+=8;
+  const EV=it=>{const r=v.items&&v.items[it.key];return r&&r.e},PV=it=>{const r=prev&&prev.items&&prev.items[it.key];return r&&r.e},RK={C:0,P:1,N:2};
+  const CK={};if(prev)ITA.forEach(it=>{const a=PV(it),b=EV(it);let k="";if(a&&a!=="NA"&&b&&b!=="NA"){if(esHallazgo(a)&&b==="C")k="corr";else if(RK[b]>RK[a])k="emp";else if(esHallazgo(a)&&esHallazgo(b))k=RK[b]<RK[a]?"mej":"sig"}else if(b&&esHallazgo(b))k="nue";CK[it.key]=k});
+  const nK=(...ks)=>Object.values(CK).filter(k=>ks.includes(k)).length;
+  const P0=prev?puntaje(prev).pct:null,P1=puntaje(v).pct;
+  if(prev){chk(34);d.setFillColor(242,245,248);d.roundedRect(L,y-2,W,27,2,2,"F");
+    d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(90);d.text("Cumplimiento",L+4,y+3);
+    d.setFont("helvetica","bold");d.setFontSize(22);d.setTextColor(44,76,164);d.text(P1===null?"-":P1+" %",L+4,y+13);
+    if(P0!==null&&P1!==null){const df=P1-P0;d.setFontSize(8.5);d.setTextColor(...(df>0?COL.C:df<0?COL.N:[90,90,90]));d.text(`Visita ${esc(prev.n)}: ${P0} % · ${df>0?"sube "+df:df<0?"baja "+(-df):"igual"}${df?(Math.abs(df)===1?" punto":" puntos"):""}`,L+4,y+20)}
+    const K=[["Corregidos",nK("corr"),COL.C],["Empeoraron",nK("emp"),COL.N],["Siguen abiertos",nK("sig","mej"),COL.P],["Nuevos",nK("nue"),[90,90,90]]];
+    K.forEach(([t,nn,c],i)=>{const x=L+62+i*29.5;d.setFillColor(255);d.roundedRect(x,y,27.5,21,1.5,1.5,"F");d.setFont("helvetica","bold");d.setFontSize(17);d.setTextColor(...c);d.text(String(nn),x+13.75,y+10,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(70);d.text(t,x+13.75,y+16.5,{align:"center"})});
+    d.setTextColor(0);y+=29;
+    const hist=validas(v.predio,TV).filter(x=>!x.anulada&&(x.estado==="cerrada"||x.id===v.id)&&(+x.n||0)<=(+v.n||0)).sort((a,b)=>(+a.n||0)-(+b.n||0)).slice(-6);
+    if(hist.length>1){d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(70);d.text("Últimas visitas: "+hist.map(x=>`visita ${esc(x.n)} ${puntaje(x).pct===null?"-":puntaje(x).pct+" %"}`).join("  ->  "),L,y);d.setTextColor(0);y+=7}
+  }
   /* 1. resumen por área */
   titulo("Resumen");d.setFontSize(8.5);
-  const colsR=[60,24,24,24,24,24];const SECV=seccionesDe(TV,ITV);const headR=[SECV.col,"Cumple","Parcial","No cumple","Evaluados","Cumplimiento"];
+  const colsR=prev?[42,17,17,21,20,26,18,19]:[60,24,24,24,24,24];const SECV=seccionesDe(TV,ITV);const headR=[SECV.col,"Cumple","Parcial","No cumple","Evaluados","Cumplimiento"].concat(prev?[`Visita ${esc(prev.n)}`,"Cambio"]:[]);
+  const dl=(a,b)=>a===null||b===null?"-":{t:b===a?"igual":(b-a>0?"+":"")+(b-a)+" pts",c:b-a>0?COL.C:b-a<0?COL.N:[90,90,90]};
   const sinAplicar=SECV.filter(a=>ITV.some(a.f)&&!ITA.some(a.f)).map(a=>a.name);
-  const fila=(cells,bold,fill)=>{chk(7);let x=L;if(fill){d.setFillColor(...fill);d.rect(L,y-4.2,W,6.5,"F")}d.setFont("helvetica",bold?"bold":"normal");cells.forEach((c,i)=>{d.text(String(c),x+1.5,y);x+=colsR[i]});y+=6.5};
-  fila(headR,true,[221,235,247]);
+  const fila=(cells,bold,fill)=>{chk(7);let x=L;if(fill){d.setFillColor(...fill);d.rect(L,y-4.2,W,6.5,"F")}d.setFont("helvetica",bold?"bold":"normal");cells.forEach((c,i)=>{if(c&&typeof c==="object"){d.setTextColor(...c.c);d.text(String(c.t),x+1.5,y);d.setTextColor(0)}else d.text(String(c),x+1.5,y);x+=colsR[i]});y+=6.5};
+  fila(headR,true,[228,234,248]);
   const cnt=(f,e)=>ITV.filter(i=>f(i)&&v.items&&v.items[i.key]&&v.items[i.key].e===e).length;
-  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);fila([a.name,cnt(f,"C"),cnt(f,"P"),cnt(f,"N"),s.n,s.pct===null?"-":s.pct+" %"],false,null)});
-  const T=puntaje(v);fila(["Total",cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N"),T.n,T.pct===null?"-":T.pct+" %"],true,[242,245,248]);
+  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);const s0=prev?puntaje(prev,f).pct:null;fila([a.name,cnt(f,"C"),cnt(f,"P"),cnt(f,"N"),s.n,s.pct===null?"-":s.pct+" %"].concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
+  const T=puntaje(v);fila(["Total",cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N"),T.n,T.pct===null?"-":T.pct+" %"].concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
   y+=5;
   /* 2. check list completo: cada punto con su resultado */
   titulo(`Check list (${ITA.length} ${ITA.length===1?"punto que aplica":"puntos que aplican"})`);
@@ -937,8 +952,8 @@ async function clPdf(v,subir){
     d.setFont("helvetica","italic");d.setFontSize(8.5);d.setTextColor(90);const l=d.splitTextToSize(`No se incluyen ${nNA===1?"el punto marcado":"los "+nNA+" puntos marcados"} como N/A (no aplica).${q}`,W);d.text(l,L,y-1);y+=l.length*3.8+2.5;d.setTextColor(0);d.setFont("helvetica","normal")}
   if(!ITA.length){d.setFontSize(9.5);d.text("Ningún punto aplicaba en esta visita.",L,y+2);y+=8}
   const cmp=!!prev;
-  const cols=cmp?[{t:"Código",w:15},{t:"Punto revisado",w:105},{t:`Visita ${esc(prev.n)}`,w:28},{t:"Resultado",w:32}]:[{t:"Código",w:15},{t:"Punto revisado",w:133},{t:"Resultado",w:32}];
-  const thead=()=>{chk(8);d.setFillColor(221,235,247);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);let x=L;cols.forEach(c=>{d.text(c.t,x+1.5,y);x+=c.w});d.setFont("helvetica","normal");y+=4};
+  const cols=cmp?[{t:"Código",w:15},{t:"Punto revisado",w:101},{t:`Visita ${esc(prev.n)}`,w:32,c:1},{t:`Visita ${esc(v.n)} (actual)`,w:32,c:1,a:1}]:[{t:"Código",w:15},{t:"Punto revisado",w:133},{t:`Visita ${esc(v.n)} (actual)`,w:32,c:1,a:1}];
+  const thead=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);let x=L;cols.forEach(c=>{if(c.a)d.setTextColor(44,76,164);if(c.c)d.text(c.t,x+c.w/2,y,{align:"center"});else d.text(c.t,x+1.5,y);d.setTextColor(0);x+=c.w});d.setFont("helvetica","normal");y+=4};
   const chip=(e,x,w,yy)=>{const t=e?CL_LABEL[e]:"Sin revisar";const fc=e?FILL[e]:[245,245,245],tc=e?COL[e]:[130,130,130];d.setFillColor(...fc);d.roundedRect(x+1,yy-3.6,w-2,5,1.2,1.2,"F");d.setFont("helvetica","bold");d.setFontSize(7.8);d.setTextColor(...tc);d.text(t,x+w/2,yy,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal")};
   SECV.forEach(a=>{
     const its=ITA.filter(a.f);if(!its.length)return;
@@ -949,10 +964,10 @@ async function clPdf(v,subir){
       if(it.group!==grupo){grupo=it.group;chk(10);d.setFont("helvetica","bolditalic");d.setFontSize(8);d.setTextColor(90);d.text(`${it.fam} · ${it.group}`,L+1.5,y+3);d.setTextColor(0);y+=5}
       d.setFontSize(8.3);const tl=d.splitTextToSize((it.star?"(Clave) ":"")+it.txt,cols[1].w-3);
       const ob=clObs(r);const ol=ob?d.splitTextToSize("Obs.: "+ob,cols[1].w-3):[];
-      const h=Math.max(6,tl.length*3.6+ol.length*3.3+2.4);
+      const mk=cmp?CK[it.key]:"";const h=Math.max(mk==="emp"||mk==="corr"||mk==="mej"?9:6,tl.length*3.6+ol.length*3.3+2.4);
       if(y+h>282){nueva();thead()}
       d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);
-      let x=L;d.setFont("helvetica","normal");d.setFontSize(8);d.setTextColor(31,78,121);d.text(codigo(it),x+1.5,y+3.8);d.setTextColor(0);x+=cols[0].w;
+      let x=L;d.setFont("helvetica","normal");d.setFontSize(8);d.setTextColor(31,78,121);d.text(codigo(it),x+1.5,y+3.8);d.setTextColor(0);if(mk==="emp"||mk==="corr"||mk==="mej"){d.setFont("helvetica","bold");d.setFontSize(6.6);d.setTextColor(...(mk==="emp"?COL.N:mk==="mej"?COL.P:COL.C));d.text(mk==="emp"?"Empeoró":mk==="mej"?"Mejoró":"Corregido",x+1.5,y+7.3);d.setTextColor(0);d.setFont("helvetica","normal");d.setFontSize(8)}x+=cols[0].w;
       d.setFontSize(8.3);d.text(tl,x+1.5,y+3.8,{lineHeightFactor:1.25});
       if(ol.length){d.setFont("helvetica","italic");d.setFontSize(7.6);d.setTextColor(90);d.text(ol,x+1.5,y+3.8+tl.length*3.6,{lineHeightFactor:1.2});d.setTextColor(0);d.setFont("helvetica","normal")}
       x+=cols[1].w;
@@ -969,14 +984,14 @@ async function clPdf(v,subir){
   if(!hall.length){d.setFont("helvetica","normal");d.setFontSize(9.5);d.text("Sin puntos en Parcial o No cumple.",L,y);y+=7}
   hall.forEach(it=>{const r=v.items[it.key];const pr=prev&&prev.items&&prev.items[it.key];const hh=H[it.key];
     d.setFontSize(8.8);const lines=d.splitTextToSize(it.txt,W-34);
-    const meta=[];if(pr&&pr.e)meta.push(`Visita ${esc(prev.n)}: ${CL_LABEL[pr.e]}${esHallazgo(pr.e)?" (sigue abierto)":" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
+    const meta=[];if(pr&&pr.e)meta.push(`Visita ${esc(prev.n)}: ${CL_LABEL[pr.e]}${{emp:" (empeoró)",mej:" (mejoró, sigue abierto)",sig:" (sigue abierto)"}[CK[it.key]]||" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
     const plan=[r.acc?"Acción: "+r.acc:"",r.resp?"Responsable: "+r.resp:"",r.plazo?"Plazo: "+fmtD(r.plazo):""].filter(Boolean).join("   ");
     const pl=plan?d.splitTextToSize(plan,W-6):[d.splitTextToSize("Sin plan de acción definido.",W-6)[0]];
     const h=5+lines.length*4+(meta.length?4.5:0)+pl.length*4+3;chk(h+2);
     d.setFillColor(...FILL[r.e]);d.roundedRect(L,y-1,W,h,1.5,1.5,"F");
     d.setFont("helvetica","bold");d.setFontSize(8.8);d.text(`${codigo(it)} · ${etqIt(it,TV)}`,L+2,y+3);d.setTextColor(...COL[r.e]);d.text(CL_LABEL[r.e],L+W-2,y+3,{align:"right"});d.setTextColor(0);let yy=y+7.5;
     d.setFont("helvetica","normal");d.text(lines,L+2,yy,{lineHeightFactor:1.25});yy+=lines.length*4;
-    if(meta.length){d.setFontSize(8);d.setTextColor(90);d.text(meta.join("   "),L+2,yy);d.setTextColor(0);yy+=4.5}
+    if(meta.length){d.setFontSize(8);if(CK[it.key]==="emp"){d.setFont("helvetica","bold");d.setTextColor(...COL.N)}else d.setTextColor(90);d.text(meta.join("   "),L+2,yy);d.setTextColor(0);d.setFont("helvetica","normal");yy+=4.5}
     d.setFontSize(8.3);d.setFont("helvetica",plan?"bold":"italic");d.text(pl,L+2,yy,{lineHeightFactor:1.2});d.setFont("helvetica","normal");
     y+=h+3});
   if(corr.length){y+=2;titulo(`Corregidos desde la visita anterior (${corr.length})`);d.setFont("helvetica","normal");d.setFontSize(8.8);
@@ -1005,4 +1020,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="146"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

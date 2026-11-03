@@ -2183,8 +2183,8 @@ async function rdPdf(r,subir){
   const D=docsDe(r);const IM={};for(const d of D)if(d.foto)IM[d.foto]=await pdfImg(d.foto);
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const X=15,W=180;let y=10;
   const nueva=()=>{doc.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
-  doc.setFillColor(141,179,226);doc.rect(X,y,W,21,"F");try{doc.addImage(LOGO,"JPEG",X+2,y+1.5,20,18)}catch(e){}
-  doc.setFont("helvetica","bold");doc.setFontSize(14);doc.setTextColor(15,39,64);doc.text("Rendición de gastos",X+26,y+9);doc.setFontSize(10);doc.setFont("helvetica","normal");doc.text(`${r.persona?r.persona.nombre:""}${r.persona&&r.persona.rut?" · "+r.persona.rut:""} · ${rdTitulo(r)} · ${RD_ESTADO[r.estado]||r.estado}`,X+26,y+16);doc.setTextColor(0);y+=27;
+  const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{doc.addImage(MARCA,"PNG",X,y,22.5,20.3)}catch(e){}
+  doc.setFont("helvetica","bold");doc.setFontSize(15);doc.setTextColor(...AZ);doc.text("Rendición de gastos",X+28,y+9);doc.setTextColor(90);doc.setFontSize(10);doc.setFont("helvetica","normal");doc.text(`${r.persona?r.persona.nombre:""}${r.persona&&r.persona.rut?" · "+r.persona.rut:""} · ${rdTitulo(r)} · ${RD_ESTADO[r.estado]||r.estado}`,X+28,y+16);doc.setTextColor(0);doc.setFillColor(...AZ);doc.rect(X,y+23.5,W*0.5,1.6,"F");doc.setFillColor(...VE);doc.rect(X+W*0.5,y+23.5,W*0.3,1.6,"F");doc.setFillColor(...CA);doc.rect(X+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
   doc.setFontSize(9.5);doc.text(`Documentos: ${D.length} · Total: ${fmtP(totalRend(r))}${r.enviada?` · Enviada: ${fmtD(r.enviada)}`:""}`,X,y);y+=5;
   const apr=[r.aprobJef?`Jefatura: ${quien(r.aprobJef.por)} el ${fmtD(r.aprobJef.fecha)}`:"",r.aprobCont?`Contabilidad: ${quien(r.aprobCont.por)} el ${fmtD(r.aprobCont.fecha)}`:"",r.contab&&r.contab.asiento?`Asiento FinnegansGO N° ${r.contab.asiento}`:""].filter(Boolean).join(" · ");
   if(apr){doc.text(doc.splitTextToSize(apr,W)[0],X,y);y+=5}y+=3;
@@ -2209,4 +2209,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="146"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
