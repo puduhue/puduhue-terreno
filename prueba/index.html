@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-9w8tae7Cc8eQ4wI59OIjD7IUKyExjhC3cSbK0YLTZ/Q=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-K2Hi24uf5YMAMvVncivl/b8D2Q4cZLV+TTBqFN/8aI8=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Prueba">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=148">
+<link rel="stylesheet" href="estilos.css?v=149">
 </head>
 <body>
 <div id="app"><div class="band"><div class="in"><b>PUDUHUE</b><span>Cargando…</span></div></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="148";
+const APP_VER="149";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -949,7 +949,20 @@ function tbSync(){
   n.innerHTML=b("launch","Inicio",ICO.home,act==="inicio")
     +els.map(m=>b(m.a,m.t,m.i(),act===m.k,m.k==="rd"&&pend?`<span class="tbb" aria-label="${pend} pendientes">${pend>99?"99+":pend}</span>`:"")).join("")
     +b("tbMas","Más",TB_MAS_ICO,act==="mas");
+  tbIndicador(n);
 }
+/* v149: indicador que se desliza hasta la pestaña elegida y el ícono que «palpita» al tocarla o al llegar a ella; TB_DIR guarda hacia
+   qué lado se movió (para que el contenido entre desde ese lado) */
+let TB_IND=null,TB_DIR=0;
+function tbIndicador(n){try{const on=n.querySelector("button.on");const ind=document.createElement("span");ind.className="tbind";ind.setAttribute("aria-hidden","true");n.prepend(ind);n.classList.add("con-ind");
+  if(!on){ind.style.opacity="0";TB_IND=null;return}
+  const r=on.getBoundingClientRect(),rn=n.getBoundingClientRect(),x=r.left-rn.left,y=r.top-rn.top,red=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cambio=!!(TB_IND&&Math.abs(TB_IND.x-x)>1);TB_DIR=cambio?(x>TB_IND.x?1:-1):0;
+  ind.style.width=r.width+"px";ind.style.height=r.height+"px";ind.style.top=y+"px";ind.style.transform=`translateX(${cambio&&!red?TB_IND.x:x}px)`;
+  if(cambio&&!red){void ind.offsetWidth;ind.classList.add("anda");ind.style.transform=`translateX(${x}px)`}
+  const toco=Date.now()-NAV_ULT.t<500&&NAV_ULT.tab;
+  if((cambio||toco)&&!red){const i=on.querySelector(".tbi");if(i)i.classList.add("palpita")}
+  TB_IND={x}}catch(e){}}
 function tbMas(){
   document.querySelectorAll(".tbsheet").forEach(x=>x.remove());
   const els=tbElegidos().map(m=>m.k),resto=TB_MODS.filter(m=>{try{return m.ok()}catch(e){return false}}).filter(m=>!els.includes(m.k));
@@ -962,7 +975,6 @@ function tbMas(){
     <h3>Tu cuenta</h3>
     ${disLetraHTML()}
     ${op("tema",temaActual()==="dark"?ICO.sun:ICO.moon,temaActual()==="dark"?"Modo día":"Modo noche","")}
-    ${solFilaHTML()}
     ${pushFilaHTML()}
     ${op("logout",`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg>`,"Cerrar sesión",ME?(ME.nombre||ME.correo):"")}
     <p class="note tbver lx-ver">Puduhue Terreno · versión ${APP_VER} · <button class="lnk" data-a="buscarUpd">Buscar actualización</button>${instPieHTML()}</p></div>`;
@@ -1770,10 +1782,35 @@ document.addEventListener("click",e=>{const t=e.target&&e.target.closest&&e.targ
 let PANT=null;
 function pantPoner(m,c,desde){if(desde)m.style.animationDelay=-desde+"ms";m.classList.add(c);m.addEventListener("animationend",()=>{m.classList.remove(c);m.style.animationDelay=""},{once:true})}
 function animarPantalla(v){try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;const m=document.querySelector("#app > main");if(!m)return;
-  const n=Date.now()-NAV_ULT.t<1000?NAV_ULT:{},c=n.tab?"pant-tab":(n.atras||v==="launch")?"pant-atr":"pant-ade";
-  PANT={c,t:Date.now(),fin:Date.now()+250};pantPoner(m,c,0)}catch(e){}}
+  const n=Date.now()-NAV_ULT.t<1000?NAV_ULT:{},c=n.tab?(TB_DIR>0?"pant-ade":TB_DIR<0?"pant-atr":"pant-tab"):(n.atras||v==="launch")?"pant-atr":"pant-ade";
+  /* v149: al cambiar de pestaña, el contenido entra desde el lado de la pestaña nueva; el movimiento arranca cuando la pantalla ya está lista para mostrarse (antes, en pantallas pesadas terminaba antes de verse);
+     mientras tanto el contenido queda invisible, con respaldo de 0,4 s para que nunca quede así */
+  const P={c,pre:true,t:0,fin:0};PANT=P;m.classList.add("pant-pre");
+  const arranca=()=>{if(PANT!==P||!P.pre)return;P.pre=false;P.t=Date.now();P.fin=P.t+320;const mm=document.querySelector("#app > main");if(!mm)return;mm.classList.remove("pant-pre");pantPoner(mm,c,0)};
+  requestAnimationFrame(()=>requestAnimationFrame(arranca));setTimeout(arranca,400)}catch(e){}}
+/* v149: deslizar entre secciones (las pantallas de la barra de abajo), como en Instagram: equivale a tocar la pestaña vecina */
+const SWT={x0:null};
+function swtVecino(dir){const tb=document.getElementById("tabbar");if(!tb||tb.hidden)return null;const bs=[...tb.querySelectorAll("button[data-a]")].filter(b=>b.dataset.a!=="tbMas");
+  const i=bs.findIndex(b=>b.classList.contains("on"));return i<0?null:(bs[i+dir]||null)}
+function swtPuede(e){try{if(ESCRITORIO()||!loaded||!TB_RAIZ[view]||!e.touches||e.touches.length!==1||document.querySelector(".modal")||(typeof FAB_AB!=="undefined"&&FAB_AB))return false;
+  const tb=document.getElementById("tabbar");if(!tb||tb.hidden)return false;const t=e.target;
+  if(!t.closest||t.closest("input,select,textarea,[contenteditable],.mcard,.vcard,.strip,.tabs,.filt,.tscroll,.asw,.sheet,#uno,#tabbar"))return false;
+  for(let el=t;el&&el!==document.body;el=el.parentElement){if(el.scrollWidth>el.clientWidth+2){const ox=getComputedStyle(el).overflowX;if(ox==="auto"||ox==="scroll")return false}}
+  const x=e.touches[0].clientX;return x>=24&&x<=innerWidth-24}catch(er){return false}}
+function swtSoltar(m,ok){if(!m)return;if(ok){m.style.left="";m.style.opacity="";m.style.position="";return}
+  m.style.transition="left .2s ease,opacity .2s ease";m.style.left="0px";m.style.opacity="";setTimeout(()=>{m.style.transition="";m.style.left="";m.style.position=""},220)}
+document.addEventListener("touchstart",e=>{SWT.x0=null;if(!swtPuede(e))return;const t=e.touches[0];SWT.x0=t.clientX;SWT.y0=t.clientY;SWT.t0=Date.now();SWT.h=null;SWT.dx=0},{passive:true});
+document.addEventListener("touchmove",e=>{if(SWT.x0==null||!e.touches||!e.touches[0])return;const t=e.touches[0],dx=t.clientX-SWT.x0,dy=t.clientY-SWT.y0;
+  if(SWT.h===null){if(Math.abs(dx)<12&&Math.abs(dy)<12)return;SWT.h=Math.abs(dx)>Math.abs(dy)*1.6;if(!SWT.h){SWT.x0=null;return}}
+  const m=document.querySelector("#app > main");if(!m)return;SWT.dx=dx;const hay=!!swtVecino(dx<0?1:-1),d=Math.max(-90,Math.min(90,dx*(hay?.45:.12)));
+  m.style.position="relative";m.style.left=d+"px";m.style.opacity=String(1-Math.min(.35,Math.abs(d)/260))},{passive:true});
+document.addEventListener("touchend",()=>{if(SWT.x0==null)return;const h=SWT.h,dx=SWT.dx,t0=SWT.t0;SWT.x0=null;const m=document.querySelector("#app > main");
+  if(!h){swtSoltar(m,false);return}
+  const b=(Math.abs(dx)>=80||(Math.abs(dx)>=40&&Date.now()-t0<300))?swtVecino(dx<0?1:-1):null;
+  if(!b){swtSoltar(m,false);return}swtSoltar(m,true);b.click()},{passive:true});
 /* si la pantalla se vuelve a dibujar en medio del movimiento (por ejemplo, el Inicio al revisar la señal), sigue desde donde iba */
-function pantSigue(){try{if(!PANT||Date.now()>=PANT.fin)return;const m=document.querySelector("#app > main");if(m&&!m.classList.contains(PANT.c))pantPoner(m,PANT.c,Date.now()-PANT.t)}catch(e){}}
+function pantSigue(){try{if(!PANT)return;const m=document.querySelector("#app > main");if(!m)return;if(PANT.pre){m.classList.add("pant-pre");return}
+  if(Date.now()>=PANT.fin)return;if(!m.classList.contains(PANT.c))pantPoner(m,PANT.c,Date.now()-PANT.t)}catch(e){}}
 
 document.addEventListener("click",ev=>{onClick(ev).catch(e=>{console.error(e);toast("Error: "+((e&&(e.message||e.code))||"desconocido"))})});
 /* v80: computador. ESCRITORIO = mouse y sin pantalla táctil (ahí la cámara no aplica: se sube la foto desde el computador) */
@@ -1834,7 +1871,6 @@ async function onClickAccion(ev,b,A){
   if(A==="launch"){await flush();cur=null;go("launch");checkRed();return}
   if(A==="tbMas"){tbMas();return}
   if(A==="tema"){cambiarTema();return}
-  if(A==="solT"){solPoner(!solOn());render();return} /* v148 */
   if(A==="login"){iniciarSesion();return}
   if(A==="logout"){await cerrarSesion();return}
   if(A==="reauth"){reautenticar();return} /* v132 (A-04) */
@@ -2380,16 +2416,9 @@ let RED="checking",REDMSG="";
 const TK="actas-tema";
 function temaActual(){const t=document.documentElement.dataset.theme;if(t)return t;return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}
 function aplicarTema(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;try{t?localStorage.setItem(TK,t):localStorage.removeItem(TK)}catch(e){}
-  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=solOn()?"#0B2A4F":temaActual()==="dark"?"#15304B":"#17375E"}
+  const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=temaActual()==="dark"?"#15304B":"#17375E"}
 try{const t=localStorage.getItem(TK);if(t)aplicarTema(t)}catch(e){}
-/* v148: modo sol (más contraste para leer al aire libre): tema de día con data-sol="1"; se guarda en este teléfono */
-const SOL_K="actas-sol";
-function solOn(){return document.documentElement.dataset.sol==="1"}
-function solPoner(on,sinTema){if(on){document.documentElement.dataset.sol="1";aplicarTema("light")}else{delete document.documentElement.dataset.sol;if(!sinTema)aplicarTema(document.documentElement.dataset.theme)}
-  try{on?localStorage.setItem(SOL_K,"1"):localStorage.removeItem(SOL_K)}catch(e){}}
-try{if(localStorage.getItem(SOL_K)==="1")solPoner(true)}catch(e){}
-function solFilaHTML(){return `<div class="tbop tbnot"><span class="tboi">${ICO.sun}</span><span class="tbnot-t"><b id="solT">Modo sol</b><small>Más contraste para leer al aire libre</small></span><button type="button" class="sw-t" role="switch" aria-checked="${solOn()}" aria-labelledby="solT" data-a="solT"><i></i></button></div>`}
-function cambiarTema(){solPoner(false,true);aplicarTema(temaActual()==="dark"?"light":"dark");render()}
+function cambiarTema(){aplicarTema(temaActual()==="dark"?"light":"dark");render()}
 async function checkRed(){
   RED="checking";if(view==="launch")render();
   let ok=false;REDMSG="";
@@ -3388,10 +3417,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=148"></script>
-<script src="modulos/bodega.js?v=148"></script>
-<script src="modulos/rendiciones.js?v=148"></script>
-<script src="modulos/actas-entrega.js?v=148"></script>
+<script src="modulos/checklist.js?v=149"></script>
+<script src="modulos/bodega.js?v=149"></script>
+<script src="modulos/rendiciones.js?v=149"></script>
+<script src="modulos/actas-entrega.js?v=149"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
