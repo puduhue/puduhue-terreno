@@ -1710,3 +1710,15 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ptr{background:#fff;border:0}}
 :root[data-theme="dark"] .ptr{background:#fff;border:0}
 @media (prefers-reduced-motion:reduce){.ptr.carga .ptrl{animation-duration:2s}}
+
+/* v151: check list de casas de huéspedes: respuestas Sí / No / N/A, nota normativa y resultado de la inspección. */
+.seg.seg4.s3{grid-template-columns:repeat(3,1fr)}
+.chnota{margin:0 0 12px}
+.chnota summary{cursor:pointer;list-style-position:outside;padding:2px 0}
+.chnota p{margin:8px 0 0;font-size:14px;line-height:1.45}
+.chres .chreps{grid-template-columns:1fr;gap:8px;margin-bottom:0}
+.chres .chreps button{text-align:left;padding:13px 14px;font-size:15px;border-radius:12px}
+.chres .chreps button.chr-conf[aria-pressed="true"]{background:var(--b-ink);border-color:var(--b-ink);color:var(--card)}
+.chres .chreps button.chr-obs[aria-pressed="true"]{background:var(--r-ink);border-color:var(--r-ink);color:var(--card)}
+.chres .chreps button.chr-no[aria-pressed="true"]{background:var(--m-ink);border-color:var(--m-ink);color:var(--card)}
+@media (min-width:760px){.chres .chreps{grid-template-columns:repeat(3,1fr)}.chres .chreps button{text-align:center}}
