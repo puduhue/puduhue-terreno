@@ -34,6 +34,7 @@
     LIMITE_NOTIFICACIONES (texto) opcional (v134). Notificaciones que envía cada persona al día; por defecto 40
   Notificaciones (v83): no requieren variables. Los equipos registrados y las claves de envío se guardan en el
   Durable Object AVISOS (ver push.js y wrangler.toml); se crea solo al publicar.
+  Firma por link (v154): ver firma.js. Usa el mismo Durable Object AVISOS; no requiere variables.
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
   Recordatorios (v84): una tarea programada cada hora (wrangler.toml, [triggers]); a las 9:00 de Santiago en
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
@@ -43,6 +44,7 @@ import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
 import { rutasFondo, esContabSrv, contabDef } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
+import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -96,7 +98,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v142";
+const VERSION_SERVIDOR = "v154";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -165,7 +167,11 @@ export default {
     if (pide === "https://benjaminbarrientoscardenas-glitch.github.io" && env.AVISOS && url0(req).pathname !== "/salud") ctx.waitUntil(objetoAvisos(env).contarAntiguo(hoyChile()).catch(() => {}));
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
     const url = new URL(req.url);
-    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null });
+    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null, firmaPorLink: !!env.AVISOS });
+    /* v154: firma por link: la persona que firma abre /f/<link> sin cuenta (el link es la autorización) */
+    if (url.pathname.startsWith("/f/")) { const av = env.AVISOS ? objetoAvisos(env) : null;
+      const r = await rutasFirmaPublica(req, env, ctx, url, av, av ? (m, t) => av.enviar([m.por], { titulo: "Firma recibida", texto: `${(m.acta && m.acta.nombre) || "La persona"} firmó: ${(m.acta && m.acta.titulo) || "el documento"}.`, url: "./", etiqueta: "fl-" + t.slice(0, 10) }, sujetoDe(env)) : null);
+      if (r) return r; }
 
     // Quién pide: se valida la sesión Microsoft que ya tiene la app
     const auth = req.headers.get("Authorization") || "";
@@ -194,6 +200,8 @@ export default {
       if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env) });
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)
       const rp = await rutasPush(req, env, url, correo, json, autorizado, esContab); if (rp) return rp;
+      // /firma/... → firma por link (v154; cualquier cuenta de Puduhue)
+      const rfl = await rutasFirma(req, env, url, correo, json, env.AVISOS ? objetoAvisos(env) : null, env.AVISOS ? c => objetoAvisos(env).usar("firma", c, +env.LIMITE_FIRMAS || FL_LIMITE, santiago().fecha) : null); if (rfl) return rfl;
       // /fondo → saldo del fondo por rendir (110106) desde el Libro Mayor de Finnegans (v94)
       const rf = await rutasFondo(req, env, ctx, url, correo, json, permitidos.includes(correo), env.AVISOS ? objetoAvisos(env) : null, reporte); if (rf) return rf;
       // /boleta → lectura de un documento con IA (cualquier cuenta de Puduhue)

@@ -60,7 +60,17 @@ const MAX_EQUIPOS = 8;
 const okEndpoint = u => { try { const x = new URL(u); return x.protocol === "https:"; } catch (e) { return false; } };
 
 /* Almacenamiento: un solo objeto para toda la empresa (el volumen es bajo) */
+import { flCrear, flLeer, flPdf, flFirmar, flEstado, flAnular, flRecibida, flLimpiar } from "./firma.js";
 export class Avisos extends DurableObject {
+  /* v154: firma por link (ver firma.js) */
+  async flCrear(d) { return flCrear(this.ctx.storage, d); }
+  async flLeer(t) { return flLeer(this.ctx.storage, t); }
+  async flPdf(t) { return flPdf(this.ctx.storage, t); }
+  async flFirmar(t, d, ahora) { return flFirmar(this.ctx.storage, t, d, ahora); }
+  async flEstado(links) { return flEstado(this.ctx.storage, links); }
+  async flAnular(t) { return flAnular(this.ctx.storage, t); }
+  async flRecibida(t) { return flRecibida(this.ctx.storage, t); }
+  async flLimpiar() { return flLimpiar(this.ctx.storage); }
   async claves() {
     let c = await this.ctx.storage.get("vapid");
     if (!c) {
