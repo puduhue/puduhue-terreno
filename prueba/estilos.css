@@ -1571,7 +1571,7 @@ h2{font-weight:800;letter-spacing:-.015em}
 .rdok{border-radius:22px}
 .rdok-tot{font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.03em}
 
-/* v148: «Deshacer» al quitar una foto o un documento, y modo sol (más contraste para leer al aire libre). */
+/* v148: «Deshacer» al quitar una foto o un documento y transiciones entre pantallas (el modo sol se quitó antes de publicar). */
 
 /* aviso con «Deshacer» (mismo lugar que los avisos de siempre, encima de la barra de abajo) */
 :root{--desh:#9CC3F5}
@@ -1584,23 +1584,6 @@ h2{font-weight:800;letter-spacing:-.015em}
 @media (prefers-reduced-motion:reduce){.tdesh{animation:none}}
 @media (max-width:759px){.tdesh{bottom:calc(var(--tb-top,84px) + 12px)}}
 
-/* modo sol: tema de día con data-sol="1" (blanco y negro puros, letras más gruesas, bordes marcados y estados más intensos) */
-:root[data-sol="1"]{
-  --bg:#FFFFFF;--card:#FFFFFF;--ink:#000000;--muted:#1F2933;--line:#4B5563;
-  --act:#0B2A4F;--act-ink:#FFFFFF;--soft:#DDE6F1;
-  --b-bg:#CFEBD8;--b-ink:#0A4D25;--r-bg:#F6E2B8;--r-ink:#5C2E00;--m-bg:#F9D3CE;--m-ink:#7F1007;
-  --nb:#0B2A4F;--lx-hero:#0B2A4F;--lx-hero2:#0B2A4F;--tbar:#FFFFFF;--tb-sh:none;--sheet:#FFFFFF;
-  --sm-a-ink:#5C2E00;--sm-v:#0A4D25;--sm-a:#8A5A00;--sm-r:#7F1007;--sm-ab:#F6E2B8;--desh:#9CC3F5;
-}
-:root[data-sol="1"] body{font-weight:500}
-:root[data-sol="1"] :is(.lx-hoy,.ifd,.fdc,.rdprl,.lx-cont,.rdd,.bod,.row,.big,.skr,.vcard,.permtab,.search,.sheet,.seg button,.btn,.tabbar,.lx-mods.lx-lista .lx-mode,.list:has(>.rdc),.list:has(>.rdd),.f input,.f select,.f textarea){border-width:1.5px}
-:root[data-sol="1"] :is(.lx-hoy,.ifd,.tabbar,.lx-mods.lx-lista){box-shadow:none}
-:root[data-sol="1"] .lx-cw,:root[data-sol="1"] .rdm,:root[data-sol="1"] .lx-ma,:root[data-sol="1"] .rdprx small{font-weight:500}
-:root[data-sol="1"] .tabbar{-webkit-backdrop-filter:none;backdrop-filter:none}
-:root[data-sol="1"] .tabbar button{color:var(--muted)}
-:root[data-sol="1"] .tabbar button.on{color:var(--act)}
-:root[data-sol="1"] .xp,:root[data-sol="1"] .chip{font-weight:800}
-
 /* transición al cambiar de pantalla (solo movimiento; con left, no transform, para no mover lo que está fijo) */
 #app{overflow-x:clip}   /* durante el deslizamiento no aparece desplazamiento horizontal (clip no rompe la barra de arriba fija) */
 @keyframes pantAde{from{opacity:0;left:28px}to{opacity:1;left:0}}
@@ -1610,3 +1593,24 @@ h2{font-weight:800;letter-spacing:-.015em}
 #app > main.pant-atr{position:relative;animation:pantAtr .24s cubic-bezier(.2,.8,.2,1) both}
 #app > main.pant-tab{animation:pantTab .18s ease-out both}
 @media (prefers-reduced-motion:reduce){#app > main.pant-ade,#app > main.pant-atr,#app > main.pant-tab{animation:none}}
+
+/* v149: transiciones que se ven también en pantallas pesadas: el contenido espera invisible a que la pantalla esté lista y el
+   movimiento es algo más largo y amplio */
+@keyframes pantAde2{from{opacity:0;left:40px}to{opacity:1;left:0}}
+@keyframes pantAtr2{from{opacity:0;left:-40px}to{opacity:1;left:0}}
+#app > main.pant-pre{opacity:0}
+#app > main.pant-ade{animation:pantAde2 .3s cubic-bezier(.2,.8,.2,1) both}
+#app > main.pant-atr{animation:pantAtr2 .3s cubic-bezier(.2,.8,.2,1) both}
+#app > main.pant-tab{animation-duration:.2s}
+@media (prefers-reduced-motion:reduce){#app > main.pant-pre{opacity:1}#app > main.pant-ade,#app > main.pant-atr,#app > main.pant-tab{animation:none}}
+
+/* barra de abajo: indicador que se desliza hasta la pestaña elegida y el ícono que palpita */
+.tabbar .tbind{position:absolute;left:0;z-index:0;border-radius:24px;background:var(--soft);pointer-events:none}
+.tabbar .tbind.anda{transition:transform .32s cubic-bezier(.3,1.25,.5,1)}
+.tabbar.con-ind button.on{background:transparent}
+.tabbar.con-ind button.on .tbi{background:transparent}
+.tabbar button{z-index:1}
+@keyframes tbPal{0%{transform:scale(1)}30%{transform:scale(.8)}65%{transform:scale(1.14)}100%{transform:scale(1)}}
+.tabbar .tbi.palpita{animation:tbPal .42s cubic-bezier(.3,1.4,.5,1)}
+@media (min-width:760px){.tabbar .tbind{border-radius:22px}}
+@media (prefers-reduced-motion:reduce){.tabbar .tbind.anda{transition:none}.tabbar .tbi.palpita{animation:none}}
