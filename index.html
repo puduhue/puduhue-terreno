@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-x03LXqf0z3DEsJ/1piNEOIKzeRol1HTGZ6VMvAQPuOk=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-CljIt4aV6Fzxxf72KacDowHTGOw1bKslvz0XEWCSkf0=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=153">
+<link rel="stylesheet" href="estilos.css?v=154">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="153";
+const APP_VER="154";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1547,7 +1547,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}"${back?"":` aria-label="Volver al inicio" title="Volver al inicio"`}>${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${esc(MARCA)}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
-function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue()}}
+function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue();flDecorar()}}
 /* v150: esqueleto de carga (la forma del Inicio en gris, con un brillo) */
 function esqueletoHTML(){
   const fila=`<div class="esqf"><span class="esq esq-ic"></span><span class="esqx"><span class="esq" style="width:78%"></span><span class="esq" style="width:52%"></span></span></div>`;
@@ -1918,6 +1918,9 @@ async function onClickAccion(ev,b,A){
     cur.firmas.empresa=f;touch();const keep=window.scrollY;render();window.scrollTo(0,keep);
     if(v==="otro"){const i=document.querySelector('[data-sn="empresa"]');if(i)i.focus({preventScroll:true})}return}
   if(A==="casa"){if(ro()||!cur)return;cur.casa=b.dataset.v;touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return} /* v122 */
+  if(A==="flPedir"){flPedir(b.dataset.r);return} /* v154: firma por link */
+  if(A==="flVer"){flCompartir(cur,b.dataset.r);return}
+  if(A==="flAnular"){flAnular(b.dataset.r);return}
   if(A==="sign"){if(ro())return;openSign(b.dataset.r);return}
   if(A==="del"){await eliminarActa(cur);return}
   if(A==="delId"){await eliminarActa(ACTAS[b.dataset.id]);return}
@@ -1975,6 +1978,90 @@ function firmaNombreCambio(f){
   if(!f||!f.img||!f.nombreFirma)return false;if(String(f.nombre||"").trim()===f.nombreFirma)return false;
   delete f.img;delete f.fechaFirma;delete f.nombreFirma;toast("Cambió el nombre de quien firmó: la firma se borró y debe volver a firmar.",5000);
   setTimeout(()=>{if(typeof sinPerderFoco==="function")sinPerderFoco(render);else render()},50);return true}
+/* ---------- v154: firma por link ----------
+   La otra persona (no quien firma por la empresa) puede firmar desde su celular con un link que vence a los 7 días. Ver servidor/firma.js.
+   firmas[rol].link = {t, url, vence, creado, por, huella} mientras espera; al llegar la firma: img, fechaFirma y viaLink {fecha, cambio}. */
+const FL_EMPRESA=k=>k==="empresa"||k==="entrega";
+const flPuede=(a,k)=>!!a&&!!k&&!FL_EMPRESA(k)&&rolesDe(a).some(r=>r[0]===k);
+const flVencido=L=>!L||!L.vence||Date.parse(L.vence)<=Date.now();
+const flFechaHora=iso=>{try{return new Date(iso).toLocaleString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).replace(",","")}catch(e){return String(iso||"").slice(0,16)}};
+const flDia=iso=>{try{return fmtD(isoLocal(new Date(iso)))}catch(e){return String(iso||"").slice(0,10)}};
+function flTitulo(a){if(a.tipo==="vehiculo")return a.mov==="devolucion"?"Acta de devolución de vehículo":"Acta de entrega de vehículo";
+  if(a.tipo==="activo")return a.mov==="devolucion"?"Acta de devolución de activos fijos":"Acta de entrega de activos fijos";
+  if(a.tipo==="capacitacion")return "Registro de capacitación"+(a.tema?": "+a.tema:"");
+  return a.tipo==="devolucion"?"Acta de devolución de vivienda":"Acta de entrega de vivienda"}
+function flDetalle(a){const pr=a.predio==="Otro"?a.predioOtro:a.predio;return [pr||(a.predios||[]).join(", "),a.vivienda,(a.veh||{}).patente,a.fecha?fmtD(a.fecha):""].filter(Boolean).join(" · ")}
+/* huella del contenido (sin firmas ni datos de registro): si cambia después de enviar el link, se avisa al recibir la firma */
+function flHuella(a){const o={};Object.keys(a||{}).sort().forEach(k=>{if(!/^(firmas|actualizado|modificadoPor|creado|creadoPor|fotoUrl|pdfs|pdfsAnul|estado|cerrada|cerradoPor|_.*)$/.test(k))o[k]=a[k]});
+  const s=JSON.stringify(o);let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return String(h)}
+/* el documento como va, en PDF y sin fotos (en una capacitación, solo con la fila de esa persona) */
+async function flPdf(a,k){if(!window.jspdf)throw new Error("sin jsPDF");let doc;
+  if(esAx(a)){prepAx(a);let x=a;if(a.tipo==="capacitacion"&&/^p_/.test(k)){const id=k.slice(2);x=Object.assign({},a,{participantes:(a.participantes||[]).filter(p=>p.id===id)})}doc=buildAx(x,{})}
+  else doc=buildActa(prepActa(a));
+  return doc.output("datauristring").replace(/^data:[^,]*,/,"")}
+const flPost=(ruta,o)=>srvFetch(ruta,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(o)});
+function flRedibujar(){const keep=window.scrollY;render();window.scrollTo(0,keep)}
+async function flPedir(k){
+  const a=cur;if(!a||ro()||!flPuede(a,k))return;const f=a.firmas[k]=a.firmas[k]||{};
+  if(f.img){toast("Esta firma ya está.");return}
+  if(!String(f.nombre||"").trim()){toast("Escribe primero el nombre de quien firma.");return}
+  if(f.link&&!flVencido(f.link)){flCompartir(a,k);return}
+  if(!DB||navigator.onLine===false){toast("Para pedir la firma por link necesitas señal.");return}
+  toast("Preparando el link…",9000);let pdf;
+  try{await flush();pdf=await flPdf(a,k)}catch(e){console.error(e);toast("No se pudo preparar el documento.");return}
+  const rr=rolesDe(a).find(r=>r[0]===k)||[k,"Firma",""];let j;
+  try{const r=await flPost("/firma/crear",{pdf,acta:{titulo:flTitulo(a),detalle:flDetalle(a),rol:rr[1]+" · "+rr[2],nombre:String(f.nombre).trim()}});j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw j}
+  catch(e){toast((e&&e.error)||"No se pudo crear el link. Revisa la señal.",6000);return}
+  {const tt=$(".toast");if(tt)tt.remove();clearTimeout(toastT)} /* el aviso «Preparando…» no queda encima de la hoja */
+  f.link={t:j.link,url:j.url,vence:j.vence,creado:new Date().toISOString(),por:ME?ME.nombre:"",huella:flHuella(a)};delete f.linkFin;
+  touch();if(esAx(a)&&typeof axUpdClose==="function")try{axUpdClose()}catch(e){}flRedibujar();flCompartir(a,k)}
+function flCompartir(a,k){const f=((a&&a.firmas)||{})[k]||{},L=f.link;if(!L)return;
+  const nom=String(f.nombre||"").trim().split(/\s+/)[0]||"";const txt=`Hola${nom?" "+nom:""}: para firmar el documento «${flTitulo(a)}» de Puduhue, abre este link: ${L.url} (vence el ${flDia(L.vence)}).`;
+  const m=document.createElement("div");m.className="modal";
+  m.innerHTML=`<div class="sheet flsheet" role="dialog" aria-modal="true" aria-label="Link de firma"><h3>Link para que ${esc(f.nombre||"la persona")} firme</h3>
+    <p>Mándale este link. Lo abre en su celular, revisa el documento y firma con el dedo. La firma llega sola a este documento.</p>
+    <input class="flurl" readonly value="${esc(L.url)}" aria-label="Link de firma"><p class="note" style="margin:6px 0 0">Vence el ${esc(flDia(L.vence))} y sirve una sola vez. Si cambias el documento, anula el link y pide uno nuevo.</p>
+    <div class="btns">${navigator.share?`<button class="btn pri" data-m="share">Compartir</button>`:""}<button class="btn${navigator.share?"":" pri"}" data-m="wa">WhatsApp</button><button class="btn" data-m="copy">Copiar link</button><button class="btn" data-m="close">Listo</button></div></div>`;
+  document.body.appendChild(m);document.body.style.overflow="hidden";const close=()=>{m.remove();if(!document.querySelector(".modal"))document.body.style.overflow=""};
+  m.addEventListener("click",async e=>{const x=e.target.closest&&e.target.closest("[data-m]"),q=x&&x.dataset.m;if(e.target===m||q==="close"){close();return}
+    if(q==="share"){try{await navigator.share({title:"Firma de documento · Puduhue",text:txt.replace(" "+L.url,""),url:L.url})}catch(er){}return}
+    if(q==="wa"){window.open("https://wa.me/?text="+encodeURIComponent(txt),"_blank","noopener");return}
+    if(q==="copy"){const i=m.querySelector(".flurl");try{await navigator.clipboard.writeText(L.url);toast("Link copiado.")}catch(er){try{i.select();document.execCommand("copy");toast("Link copiado.")}catch(e2){toast("Mantén presionado el link para copiarlo.")}}}})}
+async function flAnular(k){const a=cur;if(!a||ro())return;const f=(a.firmas||{})[k];if(!f||!f.link)return;
+  if(!(await ask("¿Anular el link?",`${esc(f.nombre||"La persona")} ya no podrá firmar con ese link. Puedes pedir uno nuevo.`,"Anular",true)))return;
+  let j=null;try{const r=await flPost("/firma/anular",{link:f.link.t});j=await r.json().catch(()=>null);if(!r.ok)throw j}catch(e){toast((e&&e.error)||"No se pudo anular el link. Revisa la señal.");return}
+  if(j&&j.estado==="firmada"){toast("Ya había firmado: trayendo la firma…");flRevisar(true);return}
+  delete f.link;f.linkFin={estado:"anulada",fecha:new Date().toISOString()};touch();flRedibujar();toast("Link anulado.")}
+let FL_ULT=0,FL_CORRE=false;
+function flPendientes(){const L=[];Object.values(ACTAS||{}).forEach(a=>{if(!a||a.estado==="cerrada"||a.anulada||!a.firmas)return;Object.entries(a.firmas).forEach(([k,f])=>{if(f&&f.link&&f.link.t)L.push({a,k,f})})});return L}
+function flGuardar(a){a.actualizado=new Date().toISOString();if(ME)a.modificadoPor=yo();saveActa(a,true);if(cur===a&&esAx(a)&&typeof axUpdClose==="function")try{axUpdClose()}catch(e){}}
+async function flRevisar(forzar){
+  if(FL_CORRE||!DB||!CUENTA||navigator.onLine===false)return;if(!forzar&&Date.now()-FL_ULT<45e3)return;
+  const P=flPendientes();if(!P.length)return;FL_CORRE=true;FL_ULT=Date.now();let cambio=false;
+  try{
+    for(const x of P.filter(x=>x.f.img)){try{await flPost("/firma/anular",{link:x.f.link.t})}catch(e){}delete x.f.link;flGuardar(x.a);cambio=true} /* se firmó en el teléfono */
+    const Q=P.filter(x=>!x.f.img);if(Q.length){
+      const r=await flPost("/firma/estado",{links:Q.map(x=>x.f.link.t)});const j=await r.json().catch(()=>null);
+      if(r.ok&&j&&j.links)for(const x of Q){const s=j.links[x.f.link.t];if(!s)continue;const L=x.f.link;
+        if(s.estado==="firmada"&&s.firma&&/^data:image\/png;base64,/.test(s.firma.img||"")){
+          Object.assign(x.f,{img:s.firma.img,fechaFirma:s.firma.fecha,viaLink:{fecha:s.firma.fecha,cambio:L.huella&&L.huella!==flHuella(x.a)?1:0}});
+          if(String(x.f.nombre||"").trim())x.f.nombreFirma=String(x.f.nombre).trim();delete x.f.link;flGuardar(x.a);cambio=true;
+          toast(`Llegó la firma de ${x.f.nombre||"la persona"} (${flTitulo(x.a)}).`,6000);flPost("/firma/recibida",{link:L.t}).catch(()=>{})}
+        else if(s.estado==="vencida"||s.estado==="anulada"||s.estado==="noexiste"){x.f.linkFin={estado:s.estado==="noexiste"?"anulada":s.estado,fecha:new Date().toISOString()};delete x.f.link;flGuardar(x.a);cambio=true}}}
+  }catch(e){console.warn("firma por link",e)}finally{FL_CORRE=false}
+  if(cambio&&cur&&(view==="edit"||view==="axe"))flRedibujar()}
+setInterval(()=>{if(!document.hidden)flRevisar(false)},60e3);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)flRevisar(true)});
+/* junto a cada firma de la otra persona: «Pedir firma por link» o el estado del link */
+function flDecorar(){try{const a=cur;if(!a||!a.firmas||!(view==="edit"||view==="axe"))return;
+  document.querySelectorAll('button.pad[data-a="sign"]').forEach(b=>{const k=b.dataset.r;if(!flPuede(a,k))return;const f=a.firmas[k]||{};
+    const sig=b.nextElementSibling;if(sig&&sig.classList.contains("flbox"))sig.remove();const d=document.createElement("div");d.className="flbox";
+    if(f.img){if(!f.viaLink)return;d.classList.add("flok");d.innerHTML=`<span class="flest">Firmó por link el ${esc(flFechaHora(f.viaLink.fecha))}</span>${f.viaLink.cambio?`<span class="flest flojo">El documento cambió después de enviar el link.</span>`:""}`}
+    else if(ro()||f.noFirmo)return;
+    else if(f.link&&!flVencido(f.link))d.innerHTML=`<span class="flest fles">Esperando la firma por link · vence el ${esc(flDia(f.link.vence))}</span><span class="flacc"><button type="button" class="lnk" data-a="flVer" data-r="${esc(k)}">Compartir el link</button><button type="button" class="lnk" data-a="flAnular" data-r="${esc(k)}">Anular</button></span>`;
+    else d.innerHTML=`${f.link||f.linkFin?`<span class="flest">El link anterior ${f.link||(f.linkFin&&f.linkFin.estado==="vencida")?"venció":"se anuló"}.</span>`:""}<button type="button" class="lnk" data-a="flPedir" data-r="${esc(k)}">${f.link||f.linkFin?"Pedir otro link":"Pedir firma por link"}</button>`;
+    b.after(d)});
+  if(flPendientes().length)flRevisar(false)}catch(e){console.warn("firma por link",e)}}
 function openSign(role){
   const rr=rolesDe(cur).find(r=>r[0]===role)||[role,"Firma",""];const l=rr[1]+" · "+rr[2];const f=cur.firmas[role]||{};
   const m=document.createElement("div");m.className="modal";
@@ -2367,6 +2454,7 @@ function secActa(d,a,K){
     if(f.nombre){d.setFontSize(8);d.text(f.nombre,L+94,lineY+4.6,{align:"center"})}
     const cg=k==="empresa"?(f.cargo||(f.nombre?"Administración":"")):k==="trabajador"&&a.rut?"RUT "+rutFmt(a.rut):"";
     if(cg){d.setFontSize(7.5);d.setTextColor(90);d.text(cg,L+94,lineY+8.2,{align:"center"});d.setTextColor(0)}
+    if(f.img&&f.viaLink){d.setFontSize(7);d.setTextColor(90);d.text("Firmó por link el "+flFechaHora(f.viaLink.fecha),L+94,lineY+(cg?11.4:8.2),{align:"center"});d.setTextColor(0);d.setFontSize(9.5)} /* v154 */
     y+=30;
   });
   y+=4;d.setFontSize(9.5);d.text("Fecha de toma de conocimiento: "+(fmtD(a.fechaConoc)||"__________________"),L,y);y+=14;
@@ -3474,10 +3562,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=153"></script>
-<script src="modulos/bodega.js?v=153"></script>
-<script src="modulos/rendiciones.js?v=153"></script>
-<script src="modulos/actas-entrega.js?v=153"></script>
+<script src="modulos/checklist.js?v=154"></script>
+<script src="modulos/bodega.js?v=154"></script>
+<script src="modulos/rendiciones.js?v=154"></script>
+<script src="modulos/actas-entrega.js?v=154"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

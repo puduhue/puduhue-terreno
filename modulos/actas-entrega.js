@@ -628,6 +628,7 @@ function firmasPDF(d,a,K){
     if(f.nombre){d.text(f.nombre,x+w/2,yy,{align:"center"});yy+=3.8}
     const ex=k==="conductor"&&a.rut?"RUT "+rutFmt(a.rut):k==="recibe"?[a.rutRecibe?"RUT "+rutFmt(a.rutRecibe):"",a.cargo].filter(Boolean).join(" · "):(f.cargo||sub);
     if(ex){d.setTextColor(90);d.setFontSize(7.5);d.text(ex,x+w/2,yy,{align:"center"});d.setTextColor(0)}
+    if(f.img&&f.viaLink){d.setTextColor(90);d.setFontSize(7);d.text("Firmó por link el "+flFechaHora(f.viaLink.fecha),x+w/2,yy+(ex?3.3:0),{align:"center"});d.setTextColor(0)} /* v154 */
   });
   K.y+=40;
 }
@@ -824,4 +825,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="153"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="154"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
