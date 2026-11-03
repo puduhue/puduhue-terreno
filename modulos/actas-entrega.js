@@ -473,8 +473,10 @@ async function axClick(A,b){
     await removeActa(a.id);Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>borrarFotoRef(f)));
     if(esDev(a)&&a.entregaId&&ACTAS[a.entregaId]&&ACTAS[a.entregaId].devolucionId===a.id){const e=ACTAS[a.entregaId];delete e.devolucionId;e.actualizado=new Date().toISOString();await saveActa(e)}
     if(cur&&cur.id===a.id)cur=null;axTipo=a.tipo;go("axl");toast("Borrador eliminado.");if(DB&&navigator.onLine!==false)setTimeout(()=>axXlsx(a.tipo,false),1500);/* v130: sin su fila */return true}
-  if(A==="axDelFoto"){if(!cur||ro())return true;const k=b.dataset.k,ref=b.dataset.ref;if(!(await ask("¿Eliminar esta foto?","","Eliminar",true)))return true;
-    const r=cur.items[k]||{};r.fotos=(r.fotos||[]).filter(x=>x!==ref);delete LOST[ref];borrarFotoRef(ref);touch();const keep=window.scrollY;render();window.scrollTo(0,keep);toast("Foto eliminada.");return true}
+  if(A==="axDelFoto"){if(!cur||ro())return true;const k=b.dataset.k,ref=b.dataset.ref;
+    /* v148: deshacer en vez de confirmar */
+    const a=cur,r=a.items[k]||{},i=(r.fotos||[]).indexOf(ref),lost=LOST[ref];r.fotos=(r.fotos||[]).filter(x=>x!==ref);a.items[k]=r;delete LOST[ref];touch();const keep=window.scrollY;render();window.scrollTo(0,keep);
+    deshacer("Foto eliminada.",()=>{if(cur!==a)return;const q=a.items[k]||{};q.fotos=q.fotos||[];if(!q.fotos.includes(ref))q.fotos.splice(Math.max(0,i),0,ref);a.items[k]=q;if(lost)LOST[ref]=lost;touch();const y=window.scrollY;render();window.scrollTo(0,y)},()=>borrarFotoRef(ref));return true}
   if(A==="axPdf"){const a=b.dataset.id?ACTAS[b.dataset.id]:cur;if(a)await axDescargar(a);return true}
   if(A==="axXlsx"){await axXlsx(axTipo,true);return true}
   if(A==="axClose"){if(!cur||ro())return true;const m=axFaltantes(cur);
@@ -823,4 +825,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="147"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="149"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
