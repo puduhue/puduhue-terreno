@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 159 | 2026-11-04 | [e716390](https://github.com/puduhue/puduhue-terreno/tree/e716390) | Incluye la v156 a la v158 (no se publicaron por separado). Barra de abajo: al deslizar el dedo, la marca de la pestaña lo sigue y al soltar se abre la pestaña que quedó debajo (como Instagram). El logo de «tirar para actualizar» se va apenas se suelta (la sincronización sigue y la barra de arriba la muestra) y ya no puede quedar pegado. |
 | 155 | 2026-11-03 | [07a7929](https://github.com/puduhue/puduhue-terreno/tree/07a7929) | El logo de «tirar para actualizar» ya no queda pegado arriba: el final del toque llega aunque la pantalla se redibuje mientras sincroniza, y el logo se va a los 2,5 s como máximo (la sincronización sigue). |
 | 154 | 2026-11-03 | [fdb50f7](https://github.com/puduhue/puduhue-terreno/tree/fdb50f7) | Firma por link en todos los documentos con firma (actas de vivienda, vehículos y activos fijos, y capacitaciones): junto a la firma de la otra persona, «Pedir firma por link»; la persona firma desde su celular sin cuenta y la firma llega sola al documento, con la fecha y la hora. El link vence a los 7 días. Servidor v154 (servidor/firma.js, publicado con el #63). |
 | 153 | 2026-11-03 | [c31d1a0](https://github.com/puduhue/puduhue-terreno/tree/c31d1a0) | Se quita la franja blanca (de noche, gris) que quedaba debajo de la barra de abajo flotante en el teléfono. |
