@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JwrOgol8vCyTc9P7CaD2iicJxuLomh42ZKxMj+rIPDc=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-03oD2wNkJX9T53zwZpwdvHfxDEc9M9ZdOjQRGiQtC1M=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Prueba">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=157">
+<link rel="stylesheet" href="estilos.css?v=158">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="157";
+const APP_VER="158";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1422,7 +1422,7 @@ document.addEventListener("click",e=>{const c=e.target.closest&&e.target.closest
 
 /* ---- 3) gestos: tirar hacia abajo para sincronizar ---- */
 const PTR={y0:null,x0:0,d:0,act:false,carga:false},PTR_UMBRAL=64;
-const PTR_MAX=1000; /* v155: lo más que se queda el logo de «tirar para actualizar» (v156: 1 s; antes 2,5 s) */
+const PTR_MAX=600; /* v155: lo más que se queda el logo de «tirar para actualizar» (v158: 0,6 s; v156: 1 s; v155: 2,5 s) */
 async function ptrSincronizar(){await flush();schedSync(100);await pull(true)}
 function ptrEl(){let p=document.getElementById("ptr");if(!p){p=document.createElement("div");p.id="ptr";p.className="ptr";p.setAttribute("aria-hidden","true");
   p.innerHTML=`<span class="ptri"><img class="ptrl" src="icon-192.png" alt=""></span>`;document.body.appendChild(p)}return p}
@@ -1441,12 +1441,12 @@ function ptrMover(e){
   if(!PTR.act){if(dy<0||Math.abs(dx)>Math.abs(dy)||(window.scrollY||0)>0){if(Math.abs(dx)>10||dy<-6)PTR.y0=null;return}if(dy<12)return;PTR.act=true}
   PTR.d=Math.max(0,Math.min(112,(dy-12)*.55));const p=ptrEl();p.classList.add("ver");p.classList.toggle("listo",PTR.d>=PTR_UMBRAL);
   p.style.transform=`translate(-50%,${PTR.d}px)`;p.querySelector(".ptrl").style.transform=`rotate(${Math.round(PTR.d*3.2)}deg)`; /* v150: el logo gira con el tirón */
-  clearTimeout(PTR_VIG);PTR_VIG=setTimeout(()=>{if(PTR.act)ptrSoltar({type:"touchcancel"})},4000);
+  clearTimeout(PTR_VIG);PTR_VIG=setTimeout(()=>{if(PTR.act)ptrSoltar({type:"touchcancel"})},2000); /* v158: 2 s (antes 4) */
 }
 document.addEventListener("touchmove",e=>ptrMover(e),{passive:true});
 async function ptrSoltar(e){
   clearTimeout(PTR_VIG);ptrSuelta();
-  if(PTR.y0==null){return}PTR.y0=null;if(!PTR.act)return;PTR.act=false;const p=ptrEl();
+  if(PTR.y0==null){ptrEsconder();return}PTR.y0=null;if(!PTR.act){ptrEsconder();return}PTR.act=false;const p=ptrEl(); /* v158: si el logo quedó a la vista sin gesto, se esconde */
   const volver=()=>{p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector(".ptrl");if(s)s.style.transform=""},240)};
   if(PTR.d<PTR_UMBRAL||(e&&e.type==="touchcancel")){volver();return}
   PTR.carga=true;p.classList.add("carga");p.style.transform=`translate(-50%,${PTR_UMBRAL-6}px)`;try{if(navigator.vibrate)navigator.vibrate(10)}catch(er){}
@@ -1455,6 +1455,11 @@ async function ptrSoltar(e){
 }
 document.addEventListener("touchend",e=>ptrSoltar(e),{passive:true});
 document.addEventListener("touchcancel",e=>ptrSoltar(e),{passive:true});
+/* v158: cada medio segundo se esconde el logo si quedó a la vista sin gesto ni sincronización (no se usan los eventos de puntero: el
+   navegador los cancela apenas empieza a mover la página con el dedo) */
+function ptrEsconder(){const p=document.getElementById("ptr");if(!p||!p.classList.contains("ver")||PTR.carga||PTR.act||p.classList.contains("vuelve"))return;
+  p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{if(PTR.act||PTR.carga)return;p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector(".ptrl");if(s)s.style.transform=""},240)}
+setInterval(()=>{if(!PTR.act&&!PTR.carga)ptrEsconder()},500);
 
 /* ---- 1) el botón se achica al bajar y vuelve al subir ---- */
 let disSY=0;
@@ -3602,10 +3607,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=157"></script>
-<script src="modulos/bodega.js?v=157"></script>
-<script src="modulos/rendiciones.js?v=157"></script>
-<script src="modulos/actas-entrega.js?v=157"></script>
+<script src="modulos/checklist.js?v=158"></script>
+<script src="modulos/bodega.js?v=158"></script>
+<script src="modulos/rendiciones.js?v=158"></script>
+<script src="modulos/actas-entrega.js?v=158"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
