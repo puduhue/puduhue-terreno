@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-bnf2V1I/rkHuaCjc0Bpg39OW4N7JHe5I0mskKbjouPg=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-q5bn8uA6TNFiDLKPR0BsRQCFJtI3LWaE5nv/bXtynZA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=155">
+<link rel="stylesheet" href="estilos.css?v=159">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="155";
+const APP_VER="159";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -962,12 +962,37 @@ let TB_IND=null,TB_DIR=0;
 function tbIndicador(n){try{const on=n.querySelector("button.on");const ind=document.createElement("span");ind.className="tbind";ind.setAttribute("aria-hidden","true");n.prepend(ind);n.classList.add("con-ind");
   if(!on){ind.style.opacity="0";TB_IND=null;return}
   const r=on.getBoundingClientRect(),rn=n.getBoundingClientRect(),x=r.left-rn.left,y=r.top-rn.top,red=matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const cambio=!!(TB_IND&&Math.abs(TB_IND.x-x)>1);TB_DIR=cambio?(x>TB_IND.x?1:-1):0;
+  const arr=TBD.dir!=null&&Date.now()-TBD.suelto<1500?TBD.dir:null;if(arr!=null){TBD.dir=null;TB_IND={x}} /* v157: llegó arrastrando: la marca ya está ahí */
+  const cambio=!!(TB_IND&&Math.abs(TB_IND.x-x)>1);TB_DIR=arr!=null?arr:cambio?(x>TB_IND.x?1:-1):0;
   ind.style.width=r.width+"px";ind.style.height=r.height+"px";ind.style.top=y+"px";ind.style.transform=`translateX(${cambio&&!red?TB_IND.x:x}px)`;
   if(cambio&&!red){void ind.offsetWidth;ind.classList.add("anda");ind.style.transform=`translateX(${x}px)`}
   const toco=Date.now()-NAV_ULT.t<500&&NAV_ULT.tab;
   if((cambio||toco)&&!red){const i=on.querySelector(".tbi");if(i)i.classList.add("palpita")}
   TB_IND={x}}catch(e){}}
+/* v157: arrastrar el dedo por la barra de abajo: la marca sigue al dedo y al soltar se abre la pestaña que quedó debajo (como Instagram).
+   Escuchadores en document (fase de captura) y captura del puntero en la barra, para que el movimiento no se pierda aunque la barra se dibuje. */
+const TBD={id:null,dir:null,suelto:0};
+function tbBajo(n,x){let m=null,d=1e9;n.querySelectorAll("button[data-a]").forEach(b=>{const r=b.getBoundingClientRect(),dd=Math.abs(x-(r.left+r.width/2));if(dd<d){d=dd;m=b}});return m}
+document.addEventListener("pointerdown",e=>{try{if(e.pointerType==="mouse"||!e.isPrimary)return;const n=e.target.closest&&e.target.closest("#tabbar");if(!n||n.hidden)return;
+  const ind=n.querySelector(".tbind");if(!ind)return;Object.assign(TBD,{id:e.pointerId,n,ind,x0:e.clientX,y0:e.clientY,arr:false,bajo:null})}catch(er){}},true);
+document.addEventListener("pointermove",e=>{try{if(TBD.id!==e.pointerId)return;const n=TBD.n,ind=TBD.ind,dx=e.clientX-TBD.x0,dy=e.clientY-TBD.y0;
+  if(!TBD.arr){if(Math.abs(dx)<8)return;if(Math.abs(dy)>Math.abs(dx)*1.3){TBD.id=null;return}
+    TBD.arr=true;try{n.setPointerCapture(e.pointerId)}catch(er){}n.classList.add("arrastra");ind.classList.remove("anda");ind.style.opacity=""}
+  const rn=n.getBoundingClientRect(),w=ind.offsetWidth,x=Math.max(4,Math.min(rn.width-4-w,e.clientX-rn.left-w/2));
+  ind.style.transform=`translateX(${x}px) scale(1.06)`;const b=tbBajo(n,e.clientX);
+  if(b!==TBD.bajo){if(TBD.bajo){TBD.bajo.classList.remove("bajo");try{if(navigator.vibrate)navigator.vibrate(6)}catch(er){}}if(b)b.classList.add("bajo");TBD.bajo=b}}catch(er){}},true);
+function tbSoltar(e,cancela){try{if(TBD.id!==e.pointerId)return;TBD.id=null;if(!TBD.arr)return;TBD.arr=false;TBD.suelto=Date.now();
+  const n=TBD.n,ind=TBD.ind,on=n.querySelector("button.on"),b=cancela?on:(TBD.bajo||on);
+  n.classList.remove("arrastra");n.querySelectorAll(".bajo").forEach(x=>x.classList.remove("bajo"));
+  if(!b){ind.style.transform="";return}
+  const rn=n.getBoundingClientRect(),r=b.getBoundingClientRect(),x=r.left-rn.left;
+  void ind.offsetWidth;ind.classList.add("anda");ind.style.transform=`translateX(${x}px)`;
+  if(b===on)return;const r0=on?on.getBoundingClientRect().left-rn.left:x;
+  TBD.dir=x>r0?1:x<r0?-1:0;setTimeout(()=>b.click(),0)}catch(er){}}
+document.addEventListener("pointerup",e=>tbSoltar(e,false),true);
+document.addEventListener("pointercancel",e=>tbSoltar(e,true),true);
+/* el «clic» que manda el navegador al soltar después de arrastrar no cuenta (el de la pestaña elegida lo da la app) */
+document.addEventListener("click",e=>{if(e.isTrusted&&Date.now()-TBD.suelto<450&&e.target&&e.target.closest&&e.target.closest("#tabbar")){e.stopPropagation();e.preventDefault()}},true);
 function tbMas(){
   document.querySelectorAll(".tbsheet").forEach(x=>x.remove());
   const els=tbElegidos().map(m=>m.k),resto=TB_MODS.filter(m=>{try{return m.ok()}catch(e){return false}}).filter(m=>!els.includes(m.k));
@@ -1397,7 +1422,7 @@ document.addEventListener("click",e=>{const c=e.target.closest&&e.target.closest
 
 /* ---- 3) gestos: tirar hacia abajo para sincronizar ---- */
 const PTR={y0:null,x0:0,d:0,act:false,carga:false},PTR_UMBRAL=64;
-const PTR_MAX=2500; /* v155: lo más que se queda el logo de «tirar para actualizar» */
+const PTR_MAX=0; /* v155: lo más que se queda el logo de «tirar para actualizar» (v159: se va al soltar; v158: 0,6 s; v156: 1 s; v155: 2,5 s) */
 async function ptrSincronizar(){await flush();schedSync(100);await pull(true)}
 function ptrEl(){let p=document.getElementById("ptr");if(!p){p=document.createElement("div");p.id="ptr";p.className="ptr";p.setAttribute("aria-hidden","true");
   p.innerHTML=`<span class="ptri"><img class="ptrl" src="icon-192.png" alt=""></span>`;document.body.appendChild(p)}return p}
@@ -1416,20 +1441,25 @@ function ptrMover(e){
   if(!PTR.act){if(dy<0||Math.abs(dx)>Math.abs(dy)||(window.scrollY||0)>0){if(Math.abs(dx)>10||dy<-6)PTR.y0=null;return}if(dy<12)return;PTR.act=true}
   PTR.d=Math.max(0,Math.min(112,(dy-12)*.55));const p=ptrEl();p.classList.add("ver");p.classList.toggle("listo",PTR.d>=PTR_UMBRAL);
   p.style.transform=`translate(-50%,${PTR.d}px)`;p.querySelector(".ptrl").style.transform=`rotate(${Math.round(PTR.d*3.2)}deg)`; /* v150: el logo gira con el tirón */
-  clearTimeout(PTR_VIG);PTR_VIG=setTimeout(()=>{if(PTR.act)ptrSoltar({type:"touchcancel"})},4000);
+  clearTimeout(PTR_VIG);PTR_VIG=setTimeout(()=>{if(PTR.act)ptrSoltar({type:"touchcancel"})},2000); /* v158: 2 s (antes 4) */
 }
 document.addEventListener("touchmove",e=>ptrMover(e),{passive:true});
 async function ptrSoltar(e){
   clearTimeout(PTR_VIG);ptrSuelta();
-  if(PTR.y0==null){return}PTR.y0=null;if(!PTR.act)return;PTR.act=false;const p=ptrEl();
+  if(PTR.y0==null){ptrEsconder();return}PTR.y0=null;if(!PTR.act){ptrEsconder();return}PTR.act=false;const p=ptrEl(); /* v158: si el logo quedó a la vista sin gesto, se esconde */
   const volver=()=>{p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector(".ptrl");if(s)s.style.transform=""},240)};
   if(PTR.d<PTR_UMBRAL||(e&&e.type==="touchcancel")){volver();return}
   PTR.carga=true;p.classList.add("carga");p.style.transform=`translate(-50%,${PTR_UMBRAL-6}px)`;try{if(navigator.vibrate)navigator.vibrate(10)}catch(er){}
-  try{await Promise.race([ptrSincronizar(),new Promise(r=>setTimeout(r,PTR_MAX))])}catch(er){console.warn("tirar para sincronizar",er)} /* v155: el logo se va a los 2,5 s aunque la sincronización siga */
+  try{await Promise.race([ptrSincronizar(),new Promise(r=>setTimeout(r,PTR_MAX))])}catch(er){console.warn("tirar para sincronizar",er)} /* v155: el logo se va a tiempo (PTR_MAX) aunque la sincronización siga */
   volver();setTimeout(()=>{PTR.carga=false},260);
 }
 document.addEventListener("touchend",e=>ptrSoltar(e),{passive:true});
 document.addEventListener("touchcancel",e=>ptrSoltar(e),{passive:true});
+/* v158: cada medio segundo se esconde el logo si quedó a la vista sin gesto ni sincronización (no se usan los eventos de puntero: el
+   navegador los cancela apenas empieza a mover la página con el dedo) */
+function ptrEsconder(){const p=document.getElementById("ptr");if(!p||!p.classList.contains("ver")||PTR.carga||PTR.act||p.classList.contains("vuelve"))return;
+  p.classList.add("vuelve");p.style.transform="";setTimeout(()=>{if(PTR.act||PTR.carga)return;p.classList.remove("ver","vuelve","listo","carga");const s=p.querySelector(".ptrl");if(s)s.style.transform=""},240)}
+setInterval(()=>{if(!PTR.act&&!PTR.carga)ptrEsconder()},500);
 
 /* ---- 1) el botón se achica al bajar y vuelve al subir ---- */
 let disSY=0;
@@ -3577,10 +3607,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=155"></script>
-<script src="modulos/bodega.js?v=155"></script>
-<script src="modulos/rendiciones.js?v=155"></script>
-<script src="modulos/actas-entrega.js?v=155"></script>
+<script src="modulos/checklist.js?v=159"></script>
+<script src="modulos/bodega.js?v=159"></script>
+<script src="modulos/rendiciones.js?v=159"></script>
+<script src="modulos/actas-entrega.js?v=159"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
