@@ -1750,3 +1750,23 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 .tabbar button.bajo{color:var(--act)}
 .tabbar button.bajo .tbi{transform:scale(1.08);transition:transform .15s ease}
 @media (prefers-reduced-motion:reduce){.tabbar button.bajo .tbi{transform:none}}
+
+/* v160: personas en la casa de huéspedes (pestaña «Casa de huéspedes» de una visita). */
+.chocup{margin:14px 0 4px;padding-top:12px;border-top:1px solid var(--line)}
+.chocup h4{margin:0 0 4px;font-size:16px}
+.chop{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.chop:first-of-type{border-top:0}
+.chop-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.chop-t b{font-size:15px;line-height:1.3}
+.chop-t small{color:var(--muted);font-size:13px;line-height:1.3}
+.chop-av{font-size:13px;line-height:1.35;color:var(--m-ink);font-weight:600}
+.chop-av.sin{color:var(--r-ink)}
+.chop-e{flex:none;grid-template-columns:auto auto;margin:0}
+.chop-e button{padding:9px 10px;font-size:13.5px}
+.chop-e button[data-e="si"][aria-pressed="true"]{background:var(--b-ink);border-color:var(--b-ink);color:var(--card)}
+.chop-e button[data-e="no"][aria-pressed="true"]{background:var(--m-ink);border-color:var(--m-ink);color:var(--card)}
+.chop.fuera .chop-t b{color:var(--muted)}
+.chop-q{flex:none}
+.chop-res{margin:6px 0 0;font-size:14px;color:var(--muted)}
+.chop-mas{color:var(--m-ink)}
+.chocup .btns .btn{width:100%}
