@@ -98,7 +98,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v154";
+const VERSION_SERVIDOR = "v160.1";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -173,7 +173,7 @@ export default {
       const r = await rutasFirmaPublica(req, env, ctx, url, av, av ? (m, t) => av.enviar([m.por], { titulo: "Firma recibida", texto: `${(m.acta && m.acta.nombre) || "La persona"} firmó: ${(m.acta && m.acta.titulo) || "el documento"}.`, url: "./", etiqueta: "fl-" + t.slice(0, 10) }, sujetoDe(env)) : null);
       if (r) return r; }
 
-    // Quién pide: se valida la sesión Microsoft que ya tiene la app
+    // Quién pide: se valida la sesión Microsoft que ya tiene la app (token propio de la app, revisado aquí; desde la v160.1, solo ese)
     const auth = req.headers.get("Authorization") || "";
     if (!auth.startsWith("Bearer ")) return json({ error: "Falta la sesión de Microsoft." }, 401);
     if (!tokenDePuduhue(auth, env)) return json({ error: "Solo cuentas de Puduhue, desde la app Puduhue Terreno." }, 403); /* v134 (A-08) */
@@ -182,13 +182,12 @@ export default {
       let v = null; try { v = await verificarTokenApi(auth, env); } catch (e) { return json({ error: "No se pudo verificar la sesión." }, 502); }
       if (!v) return json({ error: "La sesión de Microsoft no es válida o venció." }, 401);
       yo = { mail: v.correo, displayName: v.nombre };
-    } else { /* camino antiguo (token de Graph), para los teléfonos que todavía no tienen la v141; se quita en una versión aparte */
-      try { const r = await fetch("https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,displayName", { headers: { Authorization: auth } }); if (!r.ok) return json({ error: "La sesión de Microsoft no es válida o venció." }, 401); yo = await r.json(); }
-      catch (e) { return json({ error: "No se pudo verificar la sesión." }, 502); }
+    } else { /* v160.1 (M-26, segunda parte): ya no se acepta el token de Graph (el servidor no llama a Graph para saber quién pide) */
+      return json({ error: "La sesión no sirve para el servidor: abre la app con señal para que se actualice o vuelve a iniciar sesión." }, 401);
     }
     const correo = String(yo.mail || yo.userPrincipalName || "").toLowerCase();
     if (!correo.endsWith("@" + (env.DOMINIO || "puduhue.cl").toLowerCase())) return json({ error: "Solo cuentas de Puduhue." }, 403);
-    if (env.AVISOS) ctx.waitUntil(objetoAvisos(env).contarSesion(esTokenApi(auth, env) ? "api" : "graph", correo, hoyChile()).catch(() => {})); /* v141.1 (M-26) */
+    if (env.AVISOS) ctx.waitUntil(objetoAvisos(env).contarSesion("api", correo, hoyChile()).catch(() => {})); /* v141.1 (M-26) */
     const permitidos = (env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
     const autorizado = permitidos.includes(correo); // v132 (M-22): con CORREOS_ACTUALIZAR vacía no queda nadie autorizado (antes, todos)
     if (url.pathname === "/reporte" && !autorizado) return json({ error: "Tu cuenta no está autorizada para consultar reportes de Finnegans." }, 403);
