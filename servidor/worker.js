@@ -35,8 +35,9 @@
   Notificaciones (v83): no requieren variables. Los equipos registrados y las claves de envío se guardan en el
   Durable Object AVISOS (ver push.js y wrangler.toml); se crea solo al publicar.
   Firma por link (v154): ver firma.js. Usa el mismo Durable Object AVISOS; no requiere variables.
-  Consulta de un asiento genérico (v162.1, temporal, solo lectura): ver asientoprueba.js. Se usa desde la pantalla de prueba de
-  Finnegans de la app (reporte «asientoGenerico»), solo el administrador.
+  Pruebas con la API asientoGenerico (v162.1 consulta de solo lectura; v162.2 envío de un asiento descuadrado a propósito, solo con
+  prueba=descuadrado): ver asientoprueba.js. Se usan desde la pantalla de prueba de Finnegans de la app (reporte «asientoGenerico»),
+  solo el administrador. Temporales.
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
   Recordatorios (v84): una tarea programada cada hora (wrangler.toml, [triggers]); a las 9:00 de Santiago en
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
@@ -101,7 +102,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v162.1";
+const VERSION_SERVIDOR = "v162.2";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -238,7 +239,7 @@ export default {
       // /reporte?nombre=X&PARAMWEBREPORT_...=... → solo reportes autorizados en FINN_REPORTES
       if (url.pathname === "/reporte") {
         const pedido = (url.searchParams.get("nombre") || "").trim();
-        /* v162.1: «asientoGenerico» → último asiento de rendición, pedido con GET (solo lectura, solo el administrador; ver asientoprueba.js) */
+        /* v162.1-v162.2: «asientoGenerico» → último asiento de rendición (GET) y, con prueba=descuadrado, un POST que Finnegans debería rechazar (solo el administrador; ver asientoprueba.js) */
         if (pedido.toLowerCase() === "asientogenerico") return json({ ...(await pruebaAsiento(env, url.searchParams, { reporte, tokenFinnegans, FINN })), consultadoPor: correo });
         const lista = (env.FINN_REPORTES || "").split(",").map(s => s.trim()).filter(Boolean).concat(env.FINN_REPORTE_STOCK ? [env.FINN_REPORTE_STOCK.trim()] : []);
         const nombre = lista.find(n => n.toLowerCase() === pedido.toLowerCase());
