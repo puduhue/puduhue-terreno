@@ -444,6 +444,12 @@ function traspasarBodega(){
       saveVis(b)}
     if(abierta){ks.forEach(k=>delete v.items[k]);v.actualizado=ahora;saveVis(v)}
     n++}
+  /* v162: visita reabierta y vuelta a cerrar: su copia en el check list de bodega toma lo de bodega (cuando las fotos ya se subieron) */
+  for(const v of Object.values(VIS)){if(!v||!v.bodPend||v.estado!=="cerrada"||tipoDe(v)!=="visitas")continue;const b=VIS["bod-"+v.id];
+    if(!b){delete v.bodPend;saveVis(v);continue}const ks=clavesBodega(v);if(ks.some(k=>(v.items[k].fotos||[]).some(f=>!/^a:/.test(f))))continue;
+    ks.forEach(k=>{b.items[k]=JSON.parse(JSON.stringify(v.items[k]));(v.items[k].fotos||[]).forEach(f=>{if(v.fotoUrl&&v.fotoUrl[f])(b.fotoUrl=b.fotoUrl||{})[f]=v.fotoUrl[f]})});
+    b.fecha=v.fecha;b.revisor=v.revisor||"";b.administrador=v.administrador||"";if(v.cerrada)b.cerrada=v.cerrada;if(v.cerradoPor)b.cerradoPor=v.cerradoPor;b.actualizado=new Date().toISOString();saveVis(b);
+    delete v.bodPend;v.actualizado=b.actualizado;saveVis(v);n++;if(DB&&navigator.onLine!==false)setTimeout(()=>clXlsx(b.predio,false,"bodega").catch(()=>{}),3000)}
   if(n&&(view==="cl"||view==="clp"||view==="launch"))render();
   return n}
 function saveVis(v,deb){
@@ -591,7 +597,7 @@ function visitaFilaHTML(v){const sc=puntaje(v);const c=v.estado==="cerrada",an=!
 }
 /* «⋯» de una visita: informe PDF y, según el caso, eliminar, anular o restaurar */
 function clVMenu(v){if(!v)return;const c=v.estado==="cerrada",an=!!v.anulada;
-  const ops=[["clPdf","Informe PDF"]];if(!c)ops.push(["clDel","Eliminar visita",1]);if(c&&esAdmin())ops.push(an?["clRestaurar","Restaurar visita"]:["clAnular","Anular visita",1]);
+  const ops=[["clPdf","Informe PDF"]];if(!c)ops.push(["clDel","Eliminar visita",1]);if(c&&esAdmin()&&!an)ops.push(["clReabrir","Reabrir visita"]);if(c&&esAdmin())ops.push(an?["clRestaurar","Restaurar visita"]:["clAnular","Anular visita",1]); /* v162: reabrir */
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet vmsheet" role="dialog" aria-modal="true" aria-label="Visita ${esc(v.n)}"><h3>Visita ${esc(v.n)} · ${fmtD(v.fecha)}</h3><div class="vmops">${ops.map(o=>`<button class="btn${o[2]?" danger":""}" data-x="${o[0]}">${o[1]}</button>`).join("")}<button class="btn cancel" data-x="no">Cancelar</button></div></div>`;
   document.body.appendChild(m);
@@ -685,6 +691,7 @@ function renderCLV(){
     ${AR.length>1?`<nav class="tabs">${tabs}</nav>`:""}</div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     ${v.anulada?`<div class="info netbox"><b>Visita anulada</b> el ${fmtD(v.anulada.fecha)} por ${esc(quien(v.anulada.por))}${v.anulada.motivo?`: ${esc(v.anulada.motivo)}`:""}. No cuenta para los hallazgos ni el porcentaje.</div>`:ro?`<div class="info lock">Visita cerrada el ${fmtD(v.cerrada)}. Ya no se puede modificar.</div>`:""}
+    ${!v.anulada&&v.estado!=="cerrada"&&v.reabierta&&v.reabierta.length?(()=>{const r=v.reabierta[v.reabierta.length-1];return `<div class="info">Visita reabierta el ${fmtD(r.fecha)} por ${esc(quien(r.por))}${r.motivo?`: ${esc(r.motivo)}`:""}. Al cerrarla de nuevo se actualizan el informe PDF y el Excel.</div>`})():""}
     ${v.traspaso?`<div class="info">Traspasada desde la visita ${esc(v.traspaso.n)} del Check list de visitas, donde se revisó la bodega.</div>`:VIS["bod-"+v.id]?`<div class="info">Lo revisado de bodega en esta visita está ahora en el Check list de bodega (visita ${VIS["bod-"+v.id].n}). <button class="lnk" data-a="clAbrir" data-id="bod-${esc(v.id)}">Abrir</button></div>`:""}
     ${clEncHTML(v,ro,KV)}
     ${tipoDe(v)==="camionetas"?cmInfoHTML(v,ro):""}
@@ -897,6 +904,7 @@ async function clClick(A,b){
     const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${CHX?` ${tipoDe(clv)==="huespedes"?"Resultado":"Casa de huéspedes"}: «${CH_RES[chRes(clv)]}».`:""}${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, ${tipoDe(clv)==="huespedes"?"los puntos en «No»":"los ítems en Parcial, No cumple o No"} quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
     if(!(await ask("¿Cerrar la visita?",msg,"Cerrar visita")))return true;
     if(tipoDe(clv)==="visitas"&&!clv.sinCasa&&chItems(clv).length)clv.huespFoto=chOcupantes(clv).map(x=>({nombre:x.nombre,rut:x.rut,vivienda:x.vivienda,desde:x.desde,actaId:x.actaId||"",esta:x.esta,sinActa:x.sinActa})); /* v160 */
+    if(clv.reabierta&&VIS["bod-"+clv.id])clv.bodPend=true; /* v162: la copia en el check list de bodega se actualiza (traspasarBodega) */
     clv.estado="cerrada";clv.cerrada=today();clv.actualizado=new Date().toISOString();if(ME)clv.cerradoPor=yo();await saveVis(clv);
     const vv=clv,p=clv.predio;exito("Visita cerrada","Los hallazgos quedaron en seguimiento.");esperarFotos(vv.id);clv=null;clPredio=p;go("clp");
     if(DB&&navigator.onLine!==false)clTrasCierre(p,vv);return true}
@@ -906,6 +914,17 @@ async function clClick(A,b){
     v.anulada={por:yo(),fecha:today(),motivo:mot.trim()};v.actualizado=new Date().toISOString();await saveVis(v);
     {const bo=VIS["bod-"+v.id];if(bo&&!bo.anulada){bo.anulada=Object.assign({},v.anulada);bo.actualizado=v.actualizado;await saveVis(bo);if(DB&&navigator.onLine!==false)clXlsx(bo.predio,false,"bodega")}} /* v136 (M-11) */
     render();toast(`Visita ${esc(v.n)} anulada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
+  /* v162: reabrir una visita cerrada (solo el administrador, la última del predio y sin otra en curso; con motivo) */
+  if(A==="clReabrir"){const v=VIS[b.dataset.id];if(!v||!esAdmin()||v.estado!=="cerrada"||v.anulada)return true;
+    const T=tipoDe(v),ult=validas(v.predio,T).filter(x=>x.estado==="cerrada").sort((a,b)=>(+b.n||0)-(+a.n||0))[0],ab=visitaAbierta(v.predio,T);
+    if(v.traspaso&&VIS[v.traspaso.visita]){toast(`Esta visita viene de la visita ${esc(v.traspaso.n)} de Visitas a predios: reabre esa.`,6000);return true}
+    if(ab){toast(`Ya hay una visita en curso (visita ${esc(ab.n)}). Ciérrala o elimínala antes de reabrir esta.`,6000);return true}
+    if(ult&&ult.id!==v.id){toast(`Solo se puede reabrir la última visita (la visita ${esc(ult.n)}).`,6000);return true}
+    const ok=await ask(`¿Reabrir la visita ${esc(v.n)} a ${v.predio}?`,"Vuelve a quedar en curso para corregirla. Al cerrarla de nuevo se actualizan el informe PDF y el Excel. Queda anotado el motivo y tu nombre.","Reabrir",false,`<div class="f"><label for="motAn">Motivo</label><input id="motAn" data-obl="3" placeholder="Ej.: corregir un ítem mal marcado"></div>`);
+    if(!ok)return true;const mot=((document.querySelector("#motAn")||{}).value||"").trim();
+    v.reabierta=(v.reabierta||[]).concat([{por:yo(),fecha:today(),motivo:mot,cerrada:v.cerrada||"",cerradoPor:v.cerradoPor||null}]);
+    v.estado="abierta";delete v.cerrada;delete v.cerradoPor;delete v.huespFoto;v.actualizado=new Date().toISOString();await saveVis(v);
+    clTipo=T;clv=v;clPredio=v.predio;if(!clv.items)clv.items={};clFiltro="all";go("clv");toast(`Visita ${esc(v.n)} reabierta. Cuando termines, ciérrala de nuevo.`,5000);return true}
   if(A==="clRestaurar"){const v=VIS[b.dataset.id];if(!v||!esAdmin())return true;
     if(!(await ask(`¿Restaurar la visita ${esc(v.n)}?`,"Volverá a contar para los hallazgos y el porcentaje.","Restaurar")))return true;
     delete v.anulada;v.actualizado=new Date().toISOString();await saveVis(v);
@@ -999,8 +1018,8 @@ function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   XLSX.utils.book_append_sheet(wb,ws,"Check list");
   /* Resumen por visita y área */
   const CMX=tipo==="camionetas",CHX=tipo==="huespedes",CHV=tipo==="visitas"&&vs.some(chEval); /* v152: casa de huéspedes en visitas */
-  const res=[["Visita","Fecha",CHX?CLK[tipo].rev:"Revisor",CLK[tipo].acompX].concat(SEC.map(a=>a.name)).concat(["Total","Ítems revisados",CHX?"Puntos en No":"Hallazgos (P/N)"]).concat(CMX?["Predio","Kilometraje","Recorrido desde la entrega"]:[]).concat(CHX?["Resultado de inspección","Casa","Capacidad (personas)","Tipo de uso","Ocupación"]:[]).concat(CHV?["Casa de huéspedes: resultado","Casa","Capacidad (personas)","Tipo de uso","Ocupación"]:[]).concat(CHV?["Personas en la casa"]:[])];
-  vs.forEach(v=>{const t=puntaje(v),ki=CMX?cmKmInfo(v):null;res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",v.administrador||""].concat(SEC.map(a=>{const s=puntaje(v,a.f);return s.pct===null?"":s.pct/100})).concat([t.pct===null?"":t.pct/100,t.rev,itemsDe(v).filter(i=>{const r=v.items&&v.items[i.key];return r&&esHallazgo(r.e)}).length]).concat(CMX?[v.predioCampo||"",ki?ki.k:"",ki&&ki.rec!=null?ki.rec:""]:[]).concat(CHX?[CH_RES[chRes(v)],v.casa||"",v.capacidad?+v.capacidad:"",v.uso||"",v.ocup||""]:[]).concat(CHV?(chEval(v)?[CH_RES[chRes(v)],v.casa||"",v.capacidad?+v.capacidad:"",v.uso||"",v.ocup||""]:[v.sinCasa?"No tiene":"","","","",""]):[]).concat(CHV?[Array.isArray(v.huespFoto)?v.huespFoto.filter(x=>x.esta!==false).length:""]:[]))});
+  const res=[["Visita","Fecha",CHX?CLK[tipo].rev:"Revisor",CLK[tipo].acompX].concat(SEC.map(a=>a.name)).concat(["Total","Ítems revisados",CHX?"Puntos en No":"Hallazgos (P/N)"]).concat(CMX?["Predio","Kilometraje","Recorrido desde la entrega"]:[]).concat(CHX?["Resultado de inspección","Casa","Capacidad (personas)","Tipo de uso","Ocupación"]:[]).concat(CHV?["Casa de huéspedes: resultado","Casa","Capacidad (personas)","Tipo de uso","Ocupación"]:[]).concat(CHV?["Personas en la casa"]:[]).concat(["Reabierta"])]; /* v162 */
+  vs.forEach(v=>{const t=puntaje(v),ki=CMX?cmKmInfo(v):null;res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",v.administrador||""].concat(SEC.map(a=>{const s=puntaje(v,a.f);return s.pct===null?"":s.pct/100})).concat([t.pct===null?"":t.pct/100,t.rev,itemsDe(v).filter(i=>{const r=v.items&&v.items[i.key];return r&&esHallazgo(r.e)}).length]).concat(CMX?[v.predioCampo||"",ki?ki.k:"",ki&&ki.rec!=null?ki.rec:""]:[]).concat(CHX?[CH_RES[chRes(v)],v.casa||"",v.capacidad?+v.capacidad:"",v.uso||"",v.ocup||""]:[]).concat(CHV?(chEval(v)?[CH_RES[chRes(v)],v.casa||"",v.capacidad?+v.capacidad:"",v.uso||"",v.ocup||""]:[v.sinCasa?"No tiene":"","","","",""]):[]).concat(CHV?[Array.isArray(v.huespFoto)?v.huespFoto.filter(x=>x.esta!==false).length:""]:[]).concat([v.reabierta&&v.reabierta.length?(r=>`${fmtD(r.fecha)} por ${quien(r.por)}${r.motivo?": "+r.motivo:""}`)(v.reabierta[v.reabierta.length-1]):""]))});
   const wr=XLSX.utils.aoa_to_sheet(res);for(let r=1;r<res.length;r++)for(let c=4;c<4+SEC.length+1;c++){const cell=wr[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z="0%"}
   if(anul.length){res.push([]);res.push(["Visitas anuladas (no cuentan)"]);anul.forEach(v=>res.push([`V${esc(v.n)}`,fmtD(v.fecha),v.revisor||"",`Anulada el ${fmtD(v.anulada.fecha)} por ${quien(v.anulada.por)}${v.anulada.motivo?": "+v.anulada.motivo:""}`]))}
   XLSX.utils.book_append_sheet(wb,wr,"Resumen");
@@ -1046,6 +1065,7 @@ async function clPdf(v,subir){
   const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
   d.setFont("helvetica","bold");{let fs=15;d.setFontSize(fs);while(d.getTextWidth(KV.pdf)>W-30&&fs>10){fs-=0.5;d.setFontSize(fs)}}d.setTextColor(...AZ);d.text(KV.pdf,L+28,y+9);d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+28,y+16);d.setTextColor(0);d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
   d.setFontSize(9.5);d.text(`${KV.rev||"Revisor(es)"}: ${v.revisor||"-"}`,L,y);d.text(`${KV.acomp}: ${v.administrador||"-"}`,L+95,y);y+=5;
+  if(v.reabierta&&v.reabierta.length){const r=v.reabierta[v.reabierta.length-1];d.setFontSize(8.5);d.setTextColor(90);const ls=d.splitTextToSize(`Reabierta el ${fmtD(r.fecha)} por ${quien(r.por)}${r.motivo?": "+r.motivo:""}${v.reabierta.length>1?` (reabierta ${v.reabierta.length} veces)`:""}.`,175);d.text(ls,L,y);y+=ls.length*3.8+1;d.setTextColor(0);d.setFontSize(9.5)} /* v162 */
   const CHP=TV==="huespedes"||chEval(v); /* v152: también en Visitas a predios, si se revisó la casa */
   if(CHP){d.text(`${TV==="huespedes"?"":"Casa de huéspedes: "}Casa: ${v.casa||"-"} · Capacidad: ${v.capacidad?v.capacidad+" personas":"-"} · Tipo de uso: ${v.uso||"-"} · Ocupación: ${v.ocup||"-"}`,L,y);y+=5;
     const rr=chRes(v),rc=rr==="conf"?[30,110,50]:rr==="obs"?[150,110,20]:[170,40,40];d.setFont("helvetica","bold");const rt=TV==="huespedes"?"Resultado de inspección:":"Casa de huéspedes, resultado:";d.text(rt,L,y);const xr=L+d.getTextWidth(rt+" ");d.setTextColor(...rc);d.text(CH_RES[rr]+(v.resultado&&v.resultado!==chResProp(v)?" (elegido por quien revisa)":""),xr,y);d.setTextColor(0);d.setFont("helvetica","normal");y+=5}
@@ -1165,4 +1185,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="161"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="162"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
