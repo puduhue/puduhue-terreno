@@ -1,23 +1,25 @@
 /*
-  v162.1 · Consulta de SOLO LECTURA de un asiento genérico de Finnegans (temporal)
-  ---------------------------------------------------------------------------------
-  Para preparar «Contabilizar en FinnegansGO» (enviar el asiento de una rendición con la API asientoGenerico) hace falta ver
-  cómo guarda Finnegans un asiento de rendición ya cargado: códigos de empresa, tipo de documento, talonario, organización,
-  dimensiones y el número que devuelve. Esta consulta busca el último asiento de rendición en el Libro Mayor de la 110106 y lo
-  pide a la API con GET. No crea, cambia ni borra nada en Finnegans.
-
-  Uso: Administración → Servidor y Finnegans → Conexión con Finnegans, reporte «asientoGenerico» (solo el administrador, igual
-  que /reporte). Parámetros opcionales, uno por línea: id=<identificador del asiento> (lo pide directo) y dias=<días hacia atrás
-  en el Libro Mayor; por defecto 60>. La respuesta usa el formato de /reporte (filas «paso · resultado · detalle») para que la
-  pantalla de prueba de la app la muestre sin cambios; en el computador se copia con Ctrl+A y Ctrl+C.
-  La clave de Finnegans nunca va en la respuesta. Quitar este archivo cuando la versión con el botón esté publicada.
+  v162.1-v162.2 · Pruebas temporales con la API asientoGenerico de Finnegans (para preparar «Contabilizar en FinnegansGO»)
+  ------------------------------------------------------------------------------------------------------------------------
+  Uso: Administración → Servidor y Finnegans → Conexión con Finnegans, reporte «asientoGenerico» (solo el administrador, igual que
+  /reporte). Parámetros opcionales, uno por línea:
+    id=<IdentificacionExterna>   pide ese asiento directo (por ejemplo «AG - 3865»)
+    dias=<n>                     días hacia atrás en el Libro Mayor de la 110106 (por defecto 60)
+    prueba=descuadrado           (v162.2) además envía con POST un asiento DESCUADRADO A PROPÓSITO (debe $1, haber $2), armado con
+                                 los códigos del último asiento de rendición. Finnegans debería rechazarlo por no cuadrar: así se
+                                 sabe si las credenciales pueden crear asientos sin crear ninguno. Si Finnegans lo aceptara, la
+                                 respuesta lo dice y Contabilidad lo anula (descripción «PRUEBA API - ANULAR»).
+  Sin «prueba=descuadrado» todo es solo lectura (GET). Lo que se sabe desde la v162.1: el GET de un asiento va por su
+  IdentificacionExterna («AG - 3865») y no existe el listado (405 «No se puede hacer list sobre una transaccion»).
+  La respuesta usa el formato de /reporte (filas «paso · resultado · detalle») para que la pantalla de prueba de la app la muestre
+  sin cambios; en el computador se copia con Ctrl+A y Ctrl+C. La clave de Finnegans nunca va en la respuesta.
+  Quitar este archivo cuando la versión con el botón esté publicada.
 */
 import { columnas, numero, fechaISO } from "./fondo.js";
 
 const ENTIDAD = "asientoGenerico";
 const MAX_FILAS = 15; // la pantalla de prueba muestra hasta 15 filas
 const filasDe = d => Array.isArray(d) ? d : d && Array.isArray(d.data) ? d.data : d && Array.isArray(d.datos) ? d.datos : d && Array.isArray(d.rows) ? d.rows : [];
-const ddmmaaaa = iso => { const [y, m, d] = iso.split("-"); return `${d}-${m}-${y}`; };
 const isoHace = (dias, hoy) => new Date(new Date(hoy + "T12:00:00Z").getTime() - dias * 864e5).toISOString().slice(0, 10);
 
 /* JSON sin lo vacío (null, "", listas y objetos vacíos), para que se lea fácil */
@@ -31,22 +33,26 @@ const js = x => { const c = compacto(x); return c === undefined ? "" : JSON.stri
 /* nunca mostrar la clave de Finnegans */
 const sinClave = (s, tok) => { let t = String(s == null ? "" : s); if (tok) t = t.split(tok).join("***"); return t.replace(/ACCESS_TOKEN=[^&\s"]+/gi, "ACCESS_TOKEN=***"); };
 
-async function pedirFinn(base, ruta, params, tok) {
+async function pedirFinn(base, ruta, tok, op = {}) {
   const u = new URL(`${base}/${ruta}`);
-  for (const [k, v] of params) u.searchParams.set(k, v);
   u.searchParams.set("ACCESS_TOKEN", tok);
   let r, t;
-  try { r = await fetch(u.toString(), { headers: { Accept: "application/json" } }); t = await r.text(); }
-  catch (e) { return { estado: "sin conexión", datos: null, texto: "" }; }
+  try {
+    r = await fetch(u.toString(), op.cuerpo ? { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(op.cuerpo) } : { headers: { Accept: "application/json" } });
+    t = await r.text();
+  } catch (e) { return { estado: "sin conexión", datos: null, texto: "" }; }
   let datos = null; try { datos = JSON.parse(t); } catch (e) {}
   return { estado: r.status, ok: r.ok, datos, texto: t };
 }
+const esAsiento = d => !!d && typeof d === "object" && !Array.isArray(d) && (Array.isArray(d.AsientoItems) || d.TransaccionID != null || d.EmpresaID != null);
+const unAsiento = d => esAsiento(d) ? d : Array.isArray(d) && d.length === 1 && esAsiento(d[0]) ? d[0] : null;
 
-/* posibles identificadores de un registro (fila del Libro Mayor o ítem del listado) */
+/* posibles identificadores de un registro; primero la IdentificacionExterna, que es la que sirve para el GET (v162.1) */
 export function candidatosId(f) {
   const out = [];
   if (!f || typeof f !== "object") return out;
-  for (const [k, v] of Object.entries(f)) {
+  const ent = Object.entries(f), ext = ent.filter(([k]) => /identificacionexterna/i.test(k)), resto = ent.filter(([k]) => !/identificacionexterna/i.test(k));
+  for (const [k, v] of [...ext, ...resto]) {
     if (v == null || v === "" || typeof v === "object") continue;
     const n = String(k).toLowerCase();
     if (/(^id$|id$|^id|transaccion|numerointerno|identificacion|comprobante|^numero)/.test(n) && !/organizacion|cuenta|moneda|empresa|usuario|estado|producto|dimension/.test(n)) {
@@ -66,6 +72,26 @@ export function ultimoAsientoRendicion(datos) {
   return { fila: L.length ? L[L.length - 1] : null, total: L.length, C };
 }
 
+/* v162.2: asiento descuadrado a propósito (debe 1, haber 2), con los códigos de un asiento real; nada de datos fijos en el código */
+export function asientoDescuadrado(base, hoy, marca) {
+  const items = Array.isArray(base && base.AsientoItems) ? base.AsientoItems : [];
+  const d = items.find(x => x && x.DebeHaber === 1), h = items.find(x => x && x.DebeHaber === -1);
+  if (!d || !h) return null;
+  const desc = "PRUEBA API - DESCUADRADO A PROPOSITO - ANULAR";
+  const linea = (x, dh, monto) => compacto({
+    DebeHaber: dh, CuentaID: x.CuentaID, ProductoID: x.ProductoID, OrganizacionID: x.OrganizacionID, Descripcion: desc,
+    MonedaIDTransaccion: x.MonedaIDTransaccion || "PES", CotizacionMonTransaccion: 1, ImporteMonTransaccion: monto, ImporteMonPrincipal: monto,
+    FechaVto: dh === -1 ? hoy : undefined,
+    DimensionDistribucion: Array.isArray(x.DimensionDistribucion) ? x.DimensionDistribucion.map(z => ({ dimensionCodigo: z.dimensionCodigo, distribucionItems: (z.distribucionItems || []).map(i => ({ codigo: i.codigo, porcentaje: i.porcentaje })) })) : undefined,
+  });
+  return compacto({
+    EmpresaID: base.EmpresaID, TransaccionTipoID: base.TransaccionTipoID, TransaccionSubtipoID: base.TransaccionSubtipoID, MonedaID: base.MonedaID || "PES",
+    Fecha: hoy, FechaComprobante: hoy, Descripcion: desc, IdentificacionExterna: `PRUEBA-API-${marca}`,
+    AsientoGenericoCotizaciones: [{ MonedaID: base.MonedaID || "PES", Cotizacion: 1 }],
+    AsientoItems: [linea(d, 1, 1), linea(h, -1, 2)],
+  });
+}
+
 export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
   const filas = [], fila = (paso, resultado, detalle = "") => filas.push({ paso, resultado, detalle });
   const tok = await tokenFinnegans(env);
@@ -73,7 +99,8 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const dias = Math.min(366, Math.max(1, parseInt(q.get("dias"), 10) || 60));
   const desde = isoHace(dias, hoy);
-  let ids = [], desc = "", fechaMayor = "";
+  const prueba = String(q.get("prueba") || "").trim().toLowerCase() === "descuadrado";
+  let ids = [];
   const idPedido = String(q.get("id") || "").trim();
 
   if (idPedido) { ids = [idPedido]; fila("1. Asiento pedido", `id ${idPedido}`); }
@@ -83,57 +110,51 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
     p.set("PARAMWEBREPORT_FechaDesde", desde); p.set("PARAMWEBREPORT_FechaHasta", hoy); p.set("PARAMWEBREPORT_cuenta", (env.FONDO_CUENTA || "110106").trim());
     let mayor;
     try { mayor = await reporte(env, "libroMayor", p); }
-    catch (e) { fila("1. Libro Mayor 110106", "error", sinClave(`${e.error || ""} ${e.detalle || ""}`, tok)); return salida(filas); }
+    catch (e) { fila("1. Libro Mayor 110106", "error", sinClave(`${e.error || ""} ${e.detalle || ""}`, tok)); return salida(filas, prueba); }
     const u = ultimoAsientoRendicion(mayor);
-    if (!u.fila) { fila("1. Libro Mayor 110106", `sin asientos de rendición desde el ${desde}`, `Filas: ${filasDe(mayor).length}. Prueba con dias=180.`); return salida(filas); }
-    desc = String(u.fila[u.C.desc] || ""); fechaMayor = fechaISO(u.fila[u.C.fecha]);
+    if (!u.fila) { fila("1. Libro Mayor 110106", `sin asientos de rendición desde el ${desde}`, `Filas: ${filasDe(mayor).length}. Prueba con dias=180.`); return salida(filas, prueba); }
     ids = candidatosId(u.fila);
-    fila("1. Libro Mayor 110106", `último asiento de rendición: ${fechaMayor} · ${desc}`.slice(0, 160), sinClave(js(u.fila), tok));
-
-    // 2. Listado de asientos genéricos (solo lectura), para encontrar el identificador del asiento
-    let listado = null;
-    for (const base of bases) {
-      for (const params of [[["updatedSince", ddmmaaaa(fechaMayor || desde)]], [["FechaDesde", ddmmaaaa(fechaMayor || desde)], ["FechaHasta", ddmmaaaa(hoy)]], []]) {
-        const r = await pedirFinn(base, `${ENTIDAD}/list`, params, tok);
-        const L = filasDe(r.datos);
-        const nombre = `2. GET ${base.includes("teamplace") ? "teamplace" : "api"}/${ENTIDAD}/list${params.length ? "?" + params.map(([k, v]) => `${k}=${v}`).join("&") : ""}`;
-        if (!r.ok) { fila(nombre, `estado ${r.estado}`, sinClave(r.texto.slice(0, 300), tok)); continue; }
-        if (!L.length) { fila(nombre, `estado ${r.estado} · 0 registros`, sinClave(String(r.texto).slice(0, 300), tok)); continue; }
-        listado = L;
-        const dn = desc.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
-        const igual = L.filter(x => dn && Object.values(x || {}).some(v => typeof v === "string" && v.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim() === dn));
-        const elegidos = igual.length ? igual : L.slice(-1);
-        for (const x of elegidos) for (const c of candidatosId(x)) if (!ids.includes(c)) ids.unshift(c);
-        fila(nombre, `estado ${r.estado} · ${L.length} registros${igual.length ? ` · ${igual.length} con la misma descripción` : " · ninguno con la misma descripción (se usa el último)"}`, sinClave(js(elegidos[elegidos.length - 1]), tok).slice(0, 1500));
-        break;
-      }
-      if (listado) break;
-    }
+    fila("1. Libro Mayor 110106", `último asiento de rendición: ${fechaISO(u.fila[u.C.fecha])} · ${String(u.fila[u.C.desc] || "")}`.slice(0, 160), prueba ? "" : sinClave(js(u.fila), tok));
   }
 
-  // 3. GET del asiento por cada identificador posible, hasta que uno responda
-  let asiento = null, intentos = [];
+  // 2. GET del asiento por cada identificador posible, hasta que uno responda (solo lectura)
+  let asiento = null; const intentos = [];
   for (const id of ids.slice(0, 6)) {
     for (const base of bases) {
-      const r = await pedirFinn(base, `${ENTIDAD}/${encodeURIComponent(id)}`, [], tok);
-      const d = r.datos && !Array.isArray(r.datos) && typeof r.datos === "object" ? r.datos : Array.isArray(r.datos) && r.datos.length === 1 ? r.datos[0] : null;
+      const r = await pedirFinn(base, `${ENTIDAD}/${encodeURIComponent(id)}`, tok);
       intentos.push(`${id} (${base.includes("teamplace") ? "teamplace" : "api"}): ${r.estado}`);
-      if (r.ok && d && (Array.isArray(d.AsientoItems) || d.TransaccionID != null || d.EmpresaID != null)) { asiento = d; break; }
+      if (r.ok && unAsiento(r.datos)) { asiento = unAsiento(r.datos); break; }
     }
     if (asiento) break;
   }
-  fila(`3. GET ${ENTIDAD}/<id>`, asiento ? "asiento encontrado" : ids.length ? "ningún identificador sirvió" : "no hay identificadores para probar", sinClave(intentos.join(" · "), tok));
-  if (!asiento) return salida(filas);
+  fila(`2. GET ${ENTIDAD}/<id>`, asiento ? `asiento encontrado: ${asiento.Nombre || asiento.IdentificacionExterna || ""}` : ids.length ? "ningún identificador sirvió" : "no hay identificadores para probar", sinClave(intentos.join(" · "), tok));
+  if (!asiento) { if (prueba) fila("3. POST descuadrado", "no se envió", "Sin un asiento de rendición del que copiar los códigos."); return salida(filas, prueba); }
 
-  // 4. El asiento: cabecera y cada línea (sin campos vacíos)
-  const { AsientoItems, ...cab } = asiento;
-  fila("4. Cabecera del asiento", `${asiento.Descripcion || desc || ""}`.slice(0, 120), sinClave(js(cab), tok));
+  if (prueba) {
+    // 3. POST de un asiento descuadrado a propósito: Finnegans debería rechazarlo
+    const marca = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+    const cuerpo = asientoDescuadrado(asiento, hoy, marca);
+    if (!cuerpo) { fila("3. POST descuadrado", "no se envió", "El asiento de base no tiene una línea al debe y una al haber."); return salida(filas, prueba); }
+    fila("3. Asiento enviado (POST)", "debe $1 · haber $2 (descuadrado a propósito)", sinClave(JSON.stringify(cuerpo), tok));
+    const r = await pedirFinn(FINN, ENTIDAD, tok, { cuerpo });
+    const sinPermiso = r.estado === 401 || r.estado === 403;
+    fila("4. Respuesta de Finnegans", r.ok ? `estado ${r.estado}: ¡LO ACEPTÓ! Hay que anularlo en FinnegansGO` : sinPermiso ? `estado ${r.estado}: sin permiso para crear asientos` : `estado ${r.estado}: rechazado (no se creó)`, sinClave(String(r.texto || "").slice(0, 2000), tok));
+    // 5. Revisión: ¿quedó creado? (GET por la IdentificacionExterna de la prueba)
+    const v = await pedirFinn(FINN, `${ENTIDAD}/${encodeURIComponent(cuerpo.IdentificacionExterna)}`, tok);
+    const creado = v.ok && unAsiento(v.datos);
+    fila("5. ¿Quedó creado?", creado ? `SÍ: ${creado.Nombre || cuerpo.IdentificacionExterna} · avisar a Contabilidad para anularlo` : `no (GET ${cuerpo.IdentificacionExterna}: ${v.estado})`, creado ? sinClave(js({ Nombre: creado.Nombre, NumeroInterno: creado.NumeroInterno, IdentificacionExterna: creado.IdentificacionExterna, EstadoID: creado.EstadoID }), tok) : sinClave(String(v.texto || "").slice(0, 300), tok));
+    return salida(filas, prueba);
+  }
+
+  // 3. El asiento: cabecera y cada línea (sin campos vacíos)
+  const { AsientoItems, AsientoItemsAjuste, ...cab } = asiento;
+  fila("3. Cabecera del asiento", `${asiento.Descripcion || ""}`.slice(0, 120), sinClave(js(cab), tok));
   const items = Array.isArray(AsientoItems) ? AsientoItems : [];
   const libres = MAX_FILAS - filas.length;
   items.forEach((it, i) => {
-    if (i < libres - 1 || items.length <= libres) fila(`5. Línea ${i + 1} de ${items.length}`, `${it.DebeHaber === -1 ? "haber" : "debe"} ${it.CuentaID || ""} ${it.ImporteMonPrincipal ?? ""}`.trim(), sinClave(js(it), tok));
+    if (i < libres - 1 || items.length <= libres) fila(`4. Línea ${i + 1} de ${items.length}`, `${it.DebeHaber === -1 ? "haber" : "debe"} ${it.CuentaID || ""} ${it.ImporteMonPrincipal ?? ""}`.trim(), sinClave(js(it), tok));
   });
-  if (items.length > libres) fila(`5. Líneas ${libres} a ${items.length}`, "resto de las líneas", sinClave(js(items.slice(libres - 1)), tok));
-  return salida(filas);
+  if (items.length > libres) fila(`4. Líneas ${libres} a ${items.length}`, "resto de las líneas", sinClave(js(items.slice(libres - 1)), tok));
+  return salida(filas, prueba);
 }
-const salida = filas => ({ ok: true, reporte: `${ENTIDAD} (solo lectura)`, hora: new Date().toISOString(), datos: filas });
+const salida = (filas, prueba) => ({ ok: true, reporte: `${ENTIDAD} (${prueba ? "prueba de envío descuadrado" : "solo lectura"})`, hora: new Date().toISOString(), datos: filas });
