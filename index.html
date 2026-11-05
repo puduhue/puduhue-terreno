@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OPWlaL+TROO8bqd6uT9G5sBfEWLwzcke7hComtRLWxs=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ePWmuoW6RHXLnBTGqgn0FBT0TwfXhnFrWUV5oL3jd0Y=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=162">
+<link rel="stylesheet" href="estilos.css?v=163">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="162";
+const APP_VER="163";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -36,7 +36,9 @@ const PREDIOS=["Bellavista","Cadenasso","Casa Anita","Ciruelillo","Coipomó","Mi
 /* v105: Valle Verde salió de la lista (es una planta lechera que recibe leche, no un predio). Un registro antiguo con un predio
    que ya no está en la lista lo sigue mostrando: en las actas, como opción elegida; en el Check list, mientras tenga visitas.
    v124: con un tipo de check list, solo los de ese tipo (una bodega como Corte Alto no aparece en «Visitas a predios»). */
-const prediosCL=t=>{const x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&(t?tipoDe(v)===t:v.tipo!=="camionetas")&&!PREDIOS.includes(v.predio))x.add(v.predio)});return PREDIOS.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
+/* v163: «Cadenasso Crianza» solo en Visitas a predios (y en el Inicio, que suma todos), no en Bodegas, Actas ni Rendiciones */
+const PREDIOS_VIS=PREDIOS.flatMap(p=>p==="Cadenasso"?[p,"Cadenasso Crianza"]:[p]);
+const prediosCL=t=>{const B=!t||t==="visitas"?PREDIOS_VIS:PREDIOS,x=new Set();Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.predio&&(t?tipoDe(v)===t:v.tipo!=="camionetas")&&!B.includes(v.predio))x.add(v.predio)});return B.concat([...x].sort((a,b)=>a.localeCompare(b,"es")))};
 const optPredioAntiguo=(p,lista)=>p&&p!=="Otro"&&!lista.includes(p)?`<option selected>${esc(p)}</option>`:"";
 /* Cada ítem tiene una clave fija (k) para que las actas guardadas no cambien si se reordena el check list */
 const SECC=[
@@ -1485,7 +1487,7 @@ function disUnoHTML(v){
     <p class="uno-pos">Punto ${j+1} de ${enArea.length} en ${esc(AREA_NAME[it.area]||"")}${falta?` · ${falta} sin revisar en total`:" · todo revisado"}</p>
     ${it.area==="hu-ban"||(it.area==="casa"&&it.group==="Baños y servicios higiénicos")?chNotaHTML():""}<section class="sec"><h3>${it.sheet==="ch"?esc(it.area==="casa"?it.group:it.fam):esc(it.fam)+" · "+esc(it.group)}</h3>${it.group==="Camionetas"?camionetasPanel(v):""}${clItemHTML(it)}</section>
     <div class="uno-nav"><button type="button" class="btn" data-a="disUno" data-d="-1" ${i<=0?"disabled":""}>Anterior</button><button type="button" class="btn pri" data-a="disUno" data-d="1">${i>=O.length-1?"Terminar":"Siguiente"}</button></div>
-    <p class="uno-ayuda">Al marcar ${it.sheet==="ch"?"Sí":"Cumple"} o N/A pasa solo al siguiente punto. También puedes deslizar hacia los lados.</p>
+    <p class="uno-ayuda">Al marcar Cumple o N/A pasa solo al siguiente punto. También puedes deslizar hacia los lados.</p>
   </div>`;
 }
 function disUnoMostrar(it){const v=clv;if(!v||!it)return;clFoco=it.key;clFocoV=v.id;clArea=it.area;clFiltro="all";render();DIS_UNO_DIR="";
@@ -3674,10 +3676,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=162"></script>
-<script src="modulos/bodega.js?v=162"></script>
-<script src="modulos/rendiciones.js?v=162"></script>
-<script src="modulos/actas-entrega.js?v=162"></script>
+<script src="modulos/checklist.js?v=163"></script>
+<script src="modulos/bodega.js?v=163"></script>
+<script src="modulos/rendiciones.js?v=163"></script>
+<script src="modulos/actas-entrega.js?v=163"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

@@ -1712,7 +1712,6 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 @media (prefers-reduced-motion:reduce){.ptr.carga .ptrl{animation-duration:2s}}
 
 /* v151: check list de casas de huéspedes: respuestas Sí / No / N/A, nota normativa y resultado de la inspección. */
-.seg.seg4.s3{grid-template-columns:repeat(3,1fr)}
 .chnota{margin:0 0 12px}
 .chnota summary{cursor:pointer;list-style-position:outside;padding:2px 0}
 .chnota p{margin:8px 0 0;font-size:14px;line-height:1.45}
