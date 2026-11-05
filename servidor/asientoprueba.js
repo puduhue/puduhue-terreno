@@ -141,8 +141,8 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
     const n = String(asiento.NumeroInterno ?? String(asiento.Nombre || "")).replace(/\D/g, "");
     const a = armarAsiento({ idExt: "RD-PRUEBA" + (n || "0000000"), asiento: { fecha: asiento.Fecha, desc: `PRUEBA API - ELIMINAR - ${asiento.Descripcion || ""}`, lineas } }, env);
     if (a.error) { fila("3. Asiento para la prueba", "no se envió", a.error); return salida(filas, modo); }
-    fila("3. Asiento enviado (POST)", `copia de ${asiento.Nombre || "el asiento"}: ${lineas.length} líneas, debe $${a.debe}`, sinClave(JSON.stringify(a.cuerpo), tok));
-    const [r] = await enviarAsiento(env, a, { tokenFinnegans, FINN });
+    const [r] = await enviarAsiento(env, a, { tokenFinnegans, FINN, reporte });
+    fila("3. Asiento enviado (POST)", `copia de ${asiento.Nombre || "el asiento"}: ${lineas.length} líneas, debe $${a.debe}${r.dolar ? `, dólar ${r.dolar}` : ""}`, sinClave(JSON.stringify(a.cuerpo), tok));
     fila("4. Resultado", r.ok ? (r.ya ? `ya existía: ${r.numero} (no se creó otro)` : `CREADO: ${r.numero}${r.sinConfirmar ? " (sin confirmar con GET)" : ""} · eliminarlo en FinnegansGO`) : `no se creó: ${r.error || ""}`, sinClave(JSON.stringify(r), tok));
     return salida(filas, modo);
   }

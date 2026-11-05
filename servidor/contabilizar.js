@@ -13,7 +13,11 @@
   Probado en la v162.1-v162.2: el GET va por IdentificacionExterna; con las credenciales del servidor se puede crear; el formato de
   abajo (sin talonario ni cotización en dólares) pasa todas las validaciones salvo la del cuadre.
   Variables opcionales en Cloudflare: FINN_EMPRESA (por defecto "2", la de CAPAC SPA, como el Excel).
+  v163.2: FinnegansGO exige también la cotización del dólar («Debe indicar la cotización para la moneda DOLARES», prueba del
+  05-11-2026); el Excel no la lleva porque el importador la pone solo. Se lee del reporte MONEDACOTIZACION («Cotizaciones de
+  Monedas»: PAIS, MONEDA, COTIZACION, FECHA, CODIGO) la última del dólar con fecha hasta la del asiento. Sin ella no se envía nada.
 */
+import { numero, fechaISO as fechaRep } from "./fondo.js";
 const ENTIDAD = "asientoGenerico";
 const MAX_LINEAS = 300;
 
@@ -58,6 +62,30 @@ export function armarAsiento(body, env = {}) {
     AsientoGenericoCotizaciones: [{ MonedaID: "PES", Cotizacion: 1 }], AsientoItems: items } };
 }
 
+/* v163.2: cotización del dólar a una fecha (AAAA-MM-DD), del reporte MONEDACOTIZACION; se guarda 10 minutos */
+const COT = new Map();
+export function cotizacionDe(filas, fecha) {
+  const L = (Array.isArray(filas) ? filas : []).filter(f => f && typeof f === "object").map(f => {
+    const k = Object.fromEntries(Object.entries(f).map(([a, b]) => [String(a).toUpperCase(), b]));
+    return { cod: String(k.CODIGO || "").trim().toUpperCase(), mon: String(k.MONEDA || "").toUpperCase(), pais: String(k.PAIS || "").toUpperCase(), f: fechaRep(k.FECHA), c: numero(k.COTIZACION) };
+  }).filter(x => (x.cod === "DOL" || (!x.cod && /D[OÓ]LAR/.test(x.mon))) && x.c > 0 && x.f && x.f <= fecha);
+  const ch = L.filter(x => /CHILE/.test(x.pais)), M = ch.length ? ch : L;
+  M.sort((a, b) => a.f.localeCompare(b.f));
+  return M.length ? { cotizacion: M[M.length - 1].c, fecha: M[M.length - 1].f } : null;
+}
+export async function cotizacionDolar(env, fecha, reporte) {
+  const c = COT.get(fecha); if (c && Date.now() - c.t < 600e3) return c.v;
+  const desde = new Date(new Date(fecha + "T12:00:00Z").getTime() - 45 * 864e5).toISOString().slice(0, 10);
+  const intentos = [new URLSearchParams(), new URLSearchParams({ PARAMWEBREPORT_FechaDesde: desde, PARAMWEBREPORT_FechaHasta: fecha })];
+  let v = null, err = "";
+  for (const p of intentos) {
+    try { v = cotizacionDe(await reporte(env, "MONEDACOTIZACION", p), fecha); if (v) break; }
+    catch (e) { err = `${e.error || ""} ${e.detalle || ""}`.trim(); }
+  }
+  if (v) COT.set(fecha, { t: Date.now(), v });
+  return v || (err ? { error: err } : null);
+}
+
 async function finn(FINN, ruta, tok, cuerpo) {
   const u = new URL(`${FINN}/${ruta}`); u.searchParams.set("ACCESS_TOKEN", tok);
   let r, t;
@@ -78,7 +106,7 @@ export function motivoFinn(r, tok) {
 }
 
 /* revisar si ya está, enviar y confirmar; devuelve [cuerpo de la respuesta, estado]. Lo usa también la prueba de asientoprueba.js (v163.1) */
-export async function enviarAsiento(env, a, { tokenFinnegans, FINN }) {
+export async function enviarAsiento(env, a, { tokenFinnegans, FINN, reporte }) {
   const tok = await tokenFinnegans(env);
   const ruta = `${ENTIDAD}/${encodeURIComponent(a.idExt)}`;
   // 1. ¿Ya está cargada?
@@ -86,24 +114,28 @@ export async function enviarAsiento(env, a, { tokenFinnegans, FINN }) {
   let x = g.ok ? asientoDe(g.datos) : null;
   if (x) return [{ ok: true, ya: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt }, 200];
   if (g.estado !== 404) return [{ error: "No se pudo revisar en FinnegansGO si la rendición ya estaba cargada. No se envió nada; intenta de nuevo.", detalle: motivoFinn(g, tok) }, 502];
+  // v163.2: cotización del dólar (FinnegansGO la exige)
+  const cot = await cotizacionDolar(env, a.cuerpo.Fecha, reporte);
+  if (!cot || cot.error) return [{ error: `No se encontró en FinnegansGO la cotización del dólar al ${a.cuerpo.Fecha}. No se envió nada.`, detalle: cot && cot.error ? cot.error.slice(0, 300) : "El reporte de cotizaciones no trae el dólar para esa fecha." }, 502];
+  a.cuerpo.AsientoGenericoCotizaciones = [{ MonedaID: "PES", Cotizacion: 1 }, { MonedaID: "DOL", Cotizacion: cot.cotizacion }];
   // 2. Enviar
   const p = await finn(FINN, ENTIDAD, tok, a.cuerpo);
   // 3. Confirmar (también si el POST falló: puede haber quedado creado)
   g = await finn(FINN, ruta, tok);
   x = g.ok ? asientoDe(g.datos) : null;
-  if (x) return [{ ok: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt, debe: a.debe }, 200];
-  if (!p.ok) return [{ error: "FinnegansGO no aceptó el asiento.", detalle: motivoFinn(p, tok), estado: p.estado }, p.estado === 401 || p.estado === 403 ? 403 : 422];
+  if (x) return [{ ok: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt, debe: a.debe, dolar: cot.cotizacion }, 200];
+  if (!p.ok) return [{ error: "FinnegansGO no aceptó el asiento.", detalle: motivoFinn(p, tok), estado: p.estado, dolar: cot.cotizacion }, p.estado === 401 || p.estado === 403 ? 403 : 422];
   // el POST dijo que sí pero el GET aún no lo encuentra: se toma lo que devolvió el POST
   const y = asientoDe(p.datos);
   return [{ ok: true, numero: y ? numeroDe(y) : "", interno: y ? y.NumeroInterno ?? null : null, idExt: a.idExt, debe: a.debe, sinConfirmar: true }, 200];
 }
 
-export async function contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN }) {
+export async function contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN, reporte }) {
   if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
   if (!(await esContab())) return json({ error: "Solo Contabilidad o el administrador contabilizan en FinnegansGO." }, 403);
   let body; try { body = await req.json(); } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }
   const a = armarAsiento(body, env);
   if (a.error) return json({ error: a.error }, 400);
-  const [r, st] = await enviarAsiento(env, a, { tokenFinnegans, FINN });
+  const [r, st] = await enviarAsiento(env, a, { tokenFinnegans, FINN, reporte });
   return json(r.ok ? { ...r, por: correo } : r, st);
 }
