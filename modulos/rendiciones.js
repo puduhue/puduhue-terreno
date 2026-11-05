@@ -1343,7 +1343,7 @@ function renderRD(){
     const porCrear={};todas.filter(r=>["enviada","revcont","aprobada"].includes(r.estado)).forEach(r=>rdAsiento(r).al.filter(a=>a.n==="p").forEach(a=>{const k=normRut(a.rut);const x=porCrear[k]=porCrear[k]||{rut:a.rut,nombre:a.nombre,tipo:a.tipo,quien:new Set()};x.quien.add(r.persona&&r.persona.nombre||"")}));
     const PC=Object.values(porCrear).sort((a,b)=>cmpEs(a.nombre,b.nombre));
     body=`${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
-    <div class="btns" style="margin-top:8px"><button class="btn" data-a="rdMae">Maestros contables</button><button class="btn" data-a="rdXlsxMes" data-p="${periodoActual()}">Excel de documentos del mes</button><button class="btn" data-a="fdl">Fondos por rendir</button></div>
+    <div class="btns" style="margin-top:8px"><button class="btn" data-a="rdMae">Maestros contables</button><button class="btn" data-a="rdXlsxMes" data-p="${periodoActual()}">Excel de documentos del mes</button><button class="btn" data-a="rdXlsxRango">Excel de rendiciones</button><button class="btn" data-a="fdl">Fondos por rendir</button></div>
     ${PC.length?`<h2>Por crear en Finnegans<span class="cnt">${PC.length}</span></h2><div class="info" style="border-left:5px solid var(--act)">Créalos en Finnegans con este RUT; la app los detecta sola. Mientras tanto se pueden aprobar, pero su Excel espera.<ul>${PC.map(x=>`<li><b>${esc(x.nombre)}</b> · RUT ${esc(x.rut)} · ${esc(x.tipo)} · rendición de ${esc([...x.quien].filter(Boolean).join(", "))}</li>`).join("")}</ul></div><div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Ya los creé: revisar en Finnegans"}</button></div>`:""}
     <h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>
     ${sinJ.length?`<h2>Sin jefatura asignada<span class="cnt">${sinJ.length}</span></h2><p class="note">Quien rinde no tiene jefatura en la lista de colaboradores: Contabilidad aprueba ambos pasos.</p><div class="list">${sinJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
@@ -2026,6 +2026,21 @@ async function rdClick(A,b){
   if(A==="rdImpTodas"){if(!esContab())return true;const L=Object.values(REND).filter(r=>!r.anulada&&r.estado==="aprobada"&&!r.exportada&&!rdAsiento(r).bloq).sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));await rdExportarListas(L,true,true);return true}
   if(A==="rdPdf"){const r=REND[b.dataset.id];if(r)await rdPdf(r);return true}
   if(A==="rdXlsx"){const r=REND[b.dataset.id];if(!r)return true;await flush();const buf=rdXlsxBuild(r.periodo,r.id);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Rendicion_${r.periodo}_${limpiaNombre(r.persona?r.persona.nombre:"").replace(/\s+/g,"_")}${(r.n||1)>1?"_"+r.n:""}.xlsx`,"Excel listo.",carpetaRend(r));return true}
+  /* v166: Excel de todas las rendiciones de un rango de meses (Contabilidad) */
+  if(A==="rdXlsxRango"){if(!esContab())return true;
+    const pers=[...new Set(Object.values(REND).filter(r=>r&&!r.anulada&&/^\d{4}-\d{2}$/.test(String(r.periodo||""))).map(r=>r.periodo))].sort();
+    if(!pers.length){toast("Todavía no hay rendiciones.");return true}
+    const p0=pers[0],p1=pers[pers.length-1];
+    const o=await askVal("Excel de rendiciones","Todas las rendiciones de esos meses, de todas las personas, con quién las aprobó y cómo se contabilizaron.","Armar Excel",
+      `<div class="btns" style="gap:10px"><div class="f" style="flex:1"><label for="rxDesde">Desde</label><input id="rxDesde" type="month" data-v="desde" value="${p0}" min="${p0}" max="${p1}"></div><div class="f" style="flex:1"><label for="rxHasta">Hasta</label><input id="rxHasta" type="month" data-v="hasta" value="${p1}" min="${p0}" max="${p1}"></div></div><p class="note">Por defecto, de la primera a la última rendición que hay en la app (${periodoTxt(p0)} a ${periodoTxt(p1)}).</p>`);
+    if(!o)return true;
+    let d=/^\d{4}-\d{2}$/.test(o.desde||"")?o.desde:p0,h=/^\d{4}-\d{2}$/.test(o.hasta||"")?o.hasta:p1;if(d>h)[d,h]=[h,d];
+    toast("Revisando los últimos cambios en OneDrive…");const alDia=await rdTraerUltimo();{const t=$(".toast");if(t)t.remove()}
+    await flush();
+    const RS=Object.values(REND).filter(r=>r&&!r.anulada&&r.periodo>=d&&r.periodo<=h);
+    if(!RS.length){toast("No hay rendiciones en esos meses.");return true}
+    const nom=d===h?`Rendiciones_${d}.xlsx`:`Rendiciones_${d}_a_${h}.xlsx`;
+    await compartirBlob(new Blob([rdXlsxLibro(RS)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),nom,`Excel listo: ${RS.length} ${RS.length===1?"rendición":"rendiciones"} de ${d===h?periodoTxt(d):periodoTxt(d)+" a "+periodoTxt(h)}.${alDia?"":" No se pudieron traer los últimos cambios de OneDrive."}`,["Informes"]);return true}
   if(A==="rdXlsxMes"){const p=b.dataset.p;await flush();const buf=rdXlsxBuild(p);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Rendiciones_${p}.xlsx`,"Excel listo.",[p]);return true}
   return false;
 }
@@ -2198,17 +2213,28 @@ async function rdCarpeta(segs){let parent=RD.root,path="";
     RDPATH[path]=id;parent=id}return parent}
 const carpetaRend=r=>[r.periodo,limpiaNombre(r.persona?r.persona.nombre:"Sin nombre")];
 async function rdSubir(segs,name,blob,type){const f=await rdCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10): PDF de hasta 15 MB, por partes */
-function rdXlsxBuild(periodo,soloId){
-  const RS=Object.values(REND).filter(r=>r.periodo===periodo&&!r.anulada&&(!soloId||r.id===soloId));const wb=XLSX.utils.book_new();
-  const h=["Período","Persona","RUT","Estado rendición","Tipo documento","Emisor","RUT emisor","Folio","Fecha","Neto","IVA","Total","Centro de costo","Código centro","Tipo de gasto","Detalle","Cuenta","Producto","Partida","Bien de uso","Tercero","Lectura","Datos en blanco","Revisión","Observación","Jefatura","Aprobación jefatura","Contabilidad","Aprobación contable","Documento"];
+function rdXlsxBuild(periodo,soloId){return rdXlsxLibro(Object.values(REND).filter(r=>r.periodo===periodo&&!r.anulada&&(!soloId||r.id===soloId)))}
+/* v166: cómo se contabilizó (para el Excel) */
+const rdFormaContab=r=>!r||r.estado!=="contabilizada"?"":r.contab&&r.contab.finnegans?"Directo a FinnegansGO":r.exportada?"Excel para FinnegansGO":"Marcar contabilizada";
+const rdContabCols=r=>{const c=r.estado==="contabilizada"&&r.contab||null;return c?[c.asiento||"",c.fecha?fmtD(String(c.fecha).slice(0,10)):"",c.por?quien(c.por):"",rdFormaContab(r)]:["","","",""]};
+/* v166: un libro con las rendiciones que se le pasen (un mes, una rendición o un rango de meses) */
+function rdXlsxLibro(RS){
+  RS=RS.slice().sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));const wb=XLSX.utils.book_new();
+  const h=["Período","Persona","RUT","Estado rendición","Tipo documento","Emisor","RUT emisor","Folio","Fecha","Neto","IVA","Total","Centro de costo","Código centro","Tipo de gasto","Detalle","Cuenta","Producto","Partida","Bien de uso","Tercero","Lectura","Datos en blanco","Revisión","Observación","Jefatura","Aprobación jefatura","Contabilidad","Aprobación contable","N° asiento","Contabilizada el","Contabilizada por","Forma de contabilizar","Documento"]; /* v166: contabilización */
   const rows=[h];const links=[];
-  RS.forEach(r=>docsDe(r).forEach(d=>{const le=d.lectura||{},cat=gastoDe(d),ce=centroDoc(r,d),im=imputar(r,d);rows.push([r.periodo,r.persona?r.persona.nombre:"",r.persona&&r.persona.rut||"",RD_ESTADO[r.estado]||r.estado,TIPO_DOC[d.tipo]||d.tipo||"",d.emisor||"",d.rut||"",d.folio||"",d.fecha?fmtD(d.fecha):"",num(d.neto)||"",num(d.iva)||"",num(d.total)||0,centroNombre(ce),ce,cat?cat.n:(d.gasto||""),d.glosa||"",im.cuenta,im.prod,im.part,im.bu,im.ter,le.estado==="ok"?(d.revisadoManual?"IA + corrección manual":"IA"):"Manual",docAdvertencias(r,d).join(" · "),d.estadoRev==="ok"?"Revisada":d.estadoRev==="obs"?"Observada":"",d.obsRev||"",r.aprobJef?quien(r.aprobJef.por):(r.jefatura&&r.jefatura.nombre)||"",r.aprobJef?fmtD(r.aprobJef.fecha):"",r.aprobCont?quien(r.aprobCont.por):(r.aprobadaPor?quien(r.aprobadaPor):""),r.aprobCont?fmtD(r.aprobCont.fecha):(r.aprobadaFecha?fmtD(r.aprobadaFecha):""),rdLinkDoc(r,d).t]);{const L=rdLinkDoc(r,d);if(L.u)links.push([rows.length-1,L.u])}}));
-  const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[9,24,12,18,16,30,14,10,11,10,10,12,22,16,30,36,9,9,9,11,12,10,30,10,30,20,12,20,12,10].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:h.length-1}})};
+  RS.forEach(r=>docsDe(r).forEach(d=>{const le=d.lectura||{},cat=gastoDe(d),ce=centroDoc(r,d),im=imputar(r,d);rows.push([r.periodo,r.persona?r.persona.nombre:"",r.persona&&r.persona.rut||"",RD_ESTADO[r.estado]||r.estado,TIPO_DOC[d.tipo]||d.tipo||"",d.emisor||"",d.rut||"",d.folio||"",d.fecha?fmtD(d.fecha):"",num(d.neto)||"",num(d.iva)||"",num(d.total)||0,centroNombre(ce),ce,cat?cat.n:(d.gasto||""),d.glosa||"",im.cuenta,im.prod,im.part,im.bu,im.ter,le.estado==="ok"?(d.revisadoManual?"IA + corrección manual":"IA"):"Manual",docAdvertencias(r,d).join(" · "),d.estadoRev==="ok"?"Revisada":d.estadoRev==="obs"?"Observada":"",d.obsRev||"",r.aprobJef?quien(r.aprobJef.por):(r.jefatura&&r.jefatura.nombre)||"",r.aprobJef?fmtD(r.aprobJef.fecha):"",r.aprobCont?quien(r.aprobCont.por):(r.aprobadaPor?quien(r.aprobadaPor):""),r.aprobCont?fmtD(r.aprobCont.fecha):(r.aprobadaFecha?fmtD(r.aprobadaFecha):""),...rdContabCols(r),rdLinkDoc(r,d).t]);{const L=rdLinkDoc(r,d);if(L.u)links.push([rows.length-1,L.u])}}));
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[9,24,12,18,16,30,14,10,11,10,10,12,22,16,30,36,9,9,9,11,12,10,30,10,30,20,12,20,12,12,12,20,22,10].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:h.length-1}})};
   links.forEach(([rw,u])=>{const c=ws[XLSX.utils.encode_cell({r:rw,c:h.length-1})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});XLSX.utils.book_append_sheet(wb,ws,"Documentos");
-  const res=[["Persona","Estado","Documentos","Total","Jefatura","Contabilidad"]];RS.sort((a,b)=>String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre))).forEach(r=>res.push([r.persona?r.persona.nombre:"",RD_ESTADO[r.estado]||r.estado,docsDe(r).length,totalRend(r),r.aprobJef?`${quien(r.aprobJef.por)} ${fmtD(r.aprobJef.fecha)}`:"",r.aprobCont?`${quien(r.aprobCont.por)} ${fmtD(r.aprobCont.fecha)}`:""]));
+  const res=[["Período","Persona","Estado","Documentos","Total","Jefatura","Contabilidad","N° asiento","Contabilizada por","Forma de contabilizar"]]; /* v166 */
+  RS.forEach(r=>{const k=rdContabCols(r);res.push([r.periodo,r.persona?r.persona.nombre:"",RD_ESTADO[r.estado]||r.estado,docsDe(r).length,totalRend(r),r.aprobJef?`${quien(r.aprobJef.por)} ${fmtD(r.aprobJef.fecha)}`:"",r.aprobCont?`${quien(r.aprobCont.por)} ${fmtD(r.aprobCont.fecha)}`:"",k[0],k[2],k[3]])});
+  const sumar=(L,clave)=>{const o={};L.forEach(r=>{const c=clave(r)||"Sin dato";(o[c]=o[c]||{n:0,t:0}).n++;o[c].t+=totalRend(r)});return o};
+  const apr=RS.filter(r=>r.estado==="aprobada"||r.estado==="contabilizada");
+  res.push([]);res.push(["Aprobado por mes","","Rendiciones","","Total"]);Object.entries(sumar(apr,r=>r.periodo)).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([k,v])=>res.push([k,"",v.n,"",v.t]));
+  res.push([]);res.push(["Aprobado en Contabilidad por","","Rendiciones","","Total"]);Object.entries(sumar(apr,r=>r.aprobCont?quien(r.aprobCont.por):"")).sort((a,b)=>b[1].t-a[1].t).forEach(([k,v])=>res.push([k,"",v.n,"",v.t]));
+  res.push([]);res.push(["Contabilizado por","","Rendiciones","","Total"]);Object.entries(sumar(RS.filter(r=>r.estado==="contabilizada"),r=>r.contab&&r.contab.por?quien(r.contab.por):"")).sort((a,b)=>b[1].t-a[1].t).forEach(([k,v])=>res.push([k,"",v.n,"",v.t]));
   const porC={},porG={};RS.filter(r=>r.estado==="aprobada"||r.estado==="contabilizada").forEach(r=>docsDe(r).forEach(d=>{const ce=centroNombre(centroDoc(r,d))||"Sin centro",g=(gastoDe(d)||{}).n||"Sin tipo";porC[ce]=(porC[ce]||0)+num(d.total);porG[g]=(porG[g]||0)+num(d.total)}));
-  res.push([]);res.push(["Aprobado por centro de costo"]);Object.entries(porC).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","",v]));res.push([]);res.push(["Aprobado por tipo de gasto"]);Object.entries(porG).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","",v]));
-  const w2=XLSX.utils.aoa_to_sheet(res);w2["!cols"]=[{wch:32},{wch:24},{wch:12},{wch:14},{wch:26},{wch:26}];XLSX.utils.book_append_sheet(wb,w2,"Resumen");
+  res.push([]);res.push(["Aprobado por centro de costo","","","","Total"]);Object.entries(porC).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","","",v]));res.push([]);res.push(["Aprobado por tipo de gasto","","","","Total"]);Object.entries(porG).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","","",v]));
+  const w2=XLSX.utils.aoa_to_sheet(res);w2["!cols"]=[{wch:30},{wch:24},{wch:24},{wch:12},{wch:14},{wch:26},{wch:26},{wch:12},{wch:22},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Resumen");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
 async function rdXlsxUpload(periodo){await rdSubir([periodo],`Rendiciones_${periodo}.xlsx`,new Blob([rdXlsxBuild(periodo)]),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
@@ -2250,4 +2276,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="165"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="166"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
