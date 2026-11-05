@@ -106,7 +106,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v163.1";
+const VERSION_SERVIDOR = "v163.2";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -212,7 +212,7 @@ export default {
       // /fondo → saldo del fondo por rendir (110106) desde el Libro Mayor de Finnegans (v94)
       const rf = await rutasFondo(req, env, ctx, url, correo, json, permitidos.includes(correo), env.AVISOS ? objetoAvisos(env) : null, reporte); if (rf) return rf;
       // /finnegans/asiento → contabilizar una rendición aprobada en FinnegansGO (v163; solo Contabilidad y el administrador)
-      if (url.pathname === "/finnegans/asiento") return await contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN });
+      if (url.pathname === "/finnegans/asiento") return await contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN, reporte });
       // /boleta → lectura de un documento con IA (cualquier cuenta de Puduhue)
       if (url.pathname === "/boleta" && req.method === "POST") {
         let body; try { body = await req.json() } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }
