@@ -943,6 +943,29 @@ async function clAddFotos(v,k,files){
   }
   schedSync(800);
 }
+/* v161: la foto marcada (marcarFoto, en index.html) reemplaza a la original en el mismo lugar y se sube como foto nueva. Con
+   «Deshacer» vuelve la original; al terminar el plazo, la original se borra (del teléfono y, si ya estaba subida, de OneDrive).
+   Mientras tanto la original no se sube (se saca de la cola y vuelve a ella con «Deshacer»). */
+async function clMarcarFoto(v,k,ref){
+  if(!v||v.estado==="cerrada"||clRO())return;
+  const src=fotoSrc(ref);if(!src){toast("La foto todavía se está descargando.");return}
+  const img=await marcarFoto(src);if(!img)return;
+  ref=refAhora(ref); /* pudo subirse mientras se marcaba */
+  const r=v.items&&v.items[k];if(!r||!(r.fotos||[]).includes(ref)||v.estado==="cerrada"){toast("La foto ya no está en el ítem.");return}
+  let nref=null;
+  if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:v.id,k,col:"visitas"});QF[t]={actaId:v.id,k,col:"visitas"};nref=t}catch(e){}}
+  if(!nref){nref=refSinEspacio();if(!nref)return}
+  FOTO[nref]=img.dataURL;
+  const i=r.fotos.indexOf(ref),qOrig=QF[ref];if(qOrig)delete QF[ref];
+  r.fotos[i]=nref;clTouch();clRefreshItem(v,k);schedSync(800);
+  deshacer("Foto marcada.",()=>{
+    /* la marcada pudo subirse ya (su ref pasó de q: a a:) */
+    const nueva=refAhora(nref),pos=r.fotos.indexOf(nueva);
+    if(pos>=0)r.fotos[pos]=ref;else if(!r.fotos.includes(ref))r.fotos.splice(Math.min(i,r.fotos.length),0,ref);
+    borrarFotoRef(nueva);if(nueva!==nref)borrarFotoRef(nref);if(qOrig)QF[ref]=qOrig;
+    if(clv===v){clTouch();clRefreshItem(v,k)}else{v.actualizado=new Date().toISOString();saveVis(v)}schedSync(800)},
+    ()=>borrarFotoRef(ref));
+}
 async function clTrasCierre(p,v){try{await new Promise(r=>setTimeout(r,2500));await clXlsx(p,false,tipoDe(v));if(v)await clPdf(v,true)}catch(e){console.warn(e)}}
 
 /* ---------- OneDrive: carpetas y Excel ---------- */
@@ -1142,4 +1165,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="160"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="161"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
