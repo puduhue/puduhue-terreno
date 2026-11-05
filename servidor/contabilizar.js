@@ -73,31 +73,28 @@ export function cotizacionDe(filas, fecha) {
   M.sort((a, b) => a.f.localeCompare(b.f));
   return M.length ? { cotizacion: M[M.length - 1].c, fecha: M[M.length - 1].f } : null;
 }
-/* v163.3: el reporte pide la moneda («Falta especificar la moneda», prueba del 05-11-2026). Se prueban los nombres de parámetro más
-   probables (y con rango de fechas si hace falta) y se recuerda el que sirvió. FINN_PARAMS_COTIZACION (Cloudflare, opcional) fija los
-   parámetros, por ejemplo «PARAMWEBREPORT_Moneda=DOL». */
+/* v163.3-v163.4: el reporte pide Moneda (el nombre, «DOLARES») y Fecha Desde / Fecha Hasta (captura de Benja del 05-11-2026: hay una
+   sola cotización del dólar, 700, del 21-12-2021, y es la que usa FinnegansGO). Se pide desde el 2000 hasta la fecha del asiento y se
+   toma la última; se recuerda la combinación que sirvió. FINN_PARAMS_COTIZACION (Cloudflare, opcional) fija los parámetros. */
 let COT_OK = null;
-const COT_CLAVES = ["Moneda", "moneda", "MonedaID", "CodigoMoneda", "IdMoneda"];
 export async function cotizacionDolar(env, fecha, reporte) {
   const c = COT.get(fecha); if (c && Date.now() - c.t < 600e3) return c.v;
-  const desde = new Date(new Date(fecha + "T12:00:00Z").getTime() - 45 * 864e5).toISOString().slice(0, 10);
-  const conFechas = o => Object.assign({}, o, { PARAMWEBREPORT_FechaDesde: desde, PARAMWEBREPORT_FechaHasta: fecha });
+  const rango = o => Object.assign({}, o, { PARAMWEBREPORT_FechaDesde: "2000-01-01", PARAMWEBREPORT_FechaHasta: fecha });
   const fijos = env.FINN_PARAMS_COTIZACION ? Object.fromEntries(new URLSearchParams(env.FINN_PARAMS_COTIZACION)) : null;
-  const cola = fijos ? [fijos, conFechas(fijos)] : (COT_OK ? [COT_OK] : []).concat(COT_CLAVES.map(k => ({ ["PARAMWEBREPORT_" + k]: "DOL" })));
+  const base = [rango({ PARAMWEBREPORT_Moneda: "DOLARES" }), rango({ PARAMWEBREPORT_Moneda: "DOL" }), { PARAMWEBREPORT_Moneda: "DOLARES" }, { PARAMWEBREPORT_Moneda: "DOL" }];
+  const cola = fijos ? (fijos.PARAMWEBREPORT_FechaDesde ? [fijos] : [rango(fijos), fijos]) : (COT_OK ? [rango(COT_OK)] : []).concat(base);
   const intentos = []; let v = null, n = 0;
-  while (cola.length && n < 9 && !v) {
+  while (cola.length && n < 6 && !v) {
     const o = cola.shift(); n++;
     const txt = Object.entries(o).map(([k, x]) => `${k.replace("PARAMWEBREPORT_", "")}=${x}`).join("&") || "(sin parámetros)";
     try {
       const d = await reporte(env, "MONEDACOTIZACION", new URLSearchParams(o));
       v = cotizacionDe(d, fecha);
-      if (v) { COT_OK = o; break; }
+      if (v) { COT_OK = Object.fromEntries(Object.entries(o).filter(([k]) => !/Fecha(Desde|Hasta)$/.test(k))); break; }
       intentos.push(`${txt}: ${Array.isArray(d) ? d.length : 0} filas, sin el dólar al ${fecha}`);
-      if (!o.PARAMWEBREPORT_FechaDesde) cola.unshift(conFechas(o)); // la clave sirvió pero sin datos: probar con fechas
     } catch (e) {
       const m = `${e.error || ""} ${e.detalle || ""}`.replace(/\s+/g, " ");
       intentos.push(`${txt}: ${(m.match(/Se ha producido un error: ([^"\\]+)/) || [null, m.slice(0, 120)])[1].trim()}`);
-      if (!/moneda/i.test(m) && !o.PARAMWEBREPORT_FechaDesde) cola.unshift(conFechas(o)); // reconoce la moneda: puede faltar la fecha
     }
   }
   if (v) { COT.set(fecha, { t: Date.now(), v }); return v; }
