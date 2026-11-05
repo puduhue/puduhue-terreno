@@ -41,7 +41,7 @@
   solo el administrador. Temporales.
   Contabilizar en FinnegansGO (v163): POST /finnegans/asiento, solo Contabilidad y el administrador; ver contabilizar.js.
     FINN_EMPRESA      (texto)   opcional. Empresa de Finnegans de los asientos; por defecto 2 (CAPAC SPA, como el Excel)
-    FINN_PARAMS_COTIZACION (texto) opcional (v163.3). Parámetros del reporte MONEDACOTIZACION (ej.: PARAMWEBREPORT_Moneda=DOL)
+    FINN_PARAMS_COTIZACION (texto) opcional (v163.3). Parámetros del reporte MONEDACOTIZACION (ej.: PARAMWEBREPORT_Moneda=DOLARES)
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
   Recordatorios (v84): una tarea programada cada hora (wrangler.toml, [triggers]); a las 9:00 de Santiago en
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
@@ -107,7 +107,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v163.3";
+const VERSION_SERVIDOR = "v163.4";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
