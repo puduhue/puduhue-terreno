@@ -13,7 +13,7 @@
   Probado en la v162.1-v162.2: el GET va por IdentificacionExterna; con las credenciales del servidor se puede crear; el formato de
   abajo (sin talonario ni cotización en dólares) pasa todas las validaciones salvo la del cuadre.
   Variables opcionales en Cloudflare: FINN_EMPRESA (por defecto "2", la de CAPAC SPA, como el Excel).
-  v163.2: FinnegansGO exige también la cotización del dólar («Debe indicar la cotización para la moneda DOLARES», prueba del
+  v163.2-v163.3: FinnegansGO exige también la cotización del dólar («Debe indicar la cotización para la moneda DOLARES», prueba del
   05-11-2026); el Excel no la lleva porque el importador la pone solo. Se lee del reporte MONEDACOTIZACION («Cotizaciones de
   Monedas»: PAIS, MONEDA, COTIZACION, FECHA, CODIGO) la última del dólar con fecha hasta la del asiento. Sin ella no se envía nada.
 */
@@ -73,17 +73,35 @@ export function cotizacionDe(filas, fecha) {
   M.sort((a, b) => a.f.localeCompare(b.f));
   return M.length ? { cotizacion: M[M.length - 1].c, fecha: M[M.length - 1].f } : null;
 }
+/* v163.3: el reporte pide la moneda («Falta especificar la moneda», prueba del 05-11-2026). Se prueban los nombres de parámetro más
+   probables (y con rango de fechas si hace falta) y se recuerda el que sirvió. FINN_PARAMS_COTIZACION (Cloudflare, opcional) fija los
+   parámetros, por ejemplo «PARAMWEBREPORT_Moneda=DOL». */
+let COT_OK = null;
+const COT_CLAVES = ["Moneda", "moneda", "MonedaID", "CodigoMoneda", "IdMoneda"];
 export async function cotizacionDolar(env, fecha, reporte) {
   const c = COT.get(fecha); if (c && Date.now() - c.t < 600e3) return c.v;
   const desde = new Date(new Date(fecha + "T12:00:00Z").getTime() - 45 * 864e5).toISOString().slice(0, 10);
-  const intentos = [new URLSearchParams(), new URLSearchParams({ PARAMWEBREPORT_FechaDesde: desde, PARAMWEBREPORT_FechaHasta: fecha })];
-  let v = null, err = "";
-  for (const p of intentos) {
-    try { v = cotizacionDe(await reporte(env, "MONEDACOTIZACION", p), fecha); if (v) break; }
-    catch (e) { err = `${e.error || ""} ${e.detalle || ""}`.trim(); }
+  const conFechas = o => Object.assign({}, o, { PARAMWEBREPORT_FechaDesde: desde, PARAMWEBREPORT_FechaHasta: fecha });
+  const fijos = env.FINN_PARAMS_COTIZACION ? Object.fromEntries(new URLSearchParams(env.FINN_PARAMS_COTIZACION)) : null;
+  const cola = fijos ? [fijos, conFechas(fijos)] : (COT_OK ? [COT_OK] : []).concat(COT_CLAVES.map(k => ({ ["PARAMWEBREPORT_" + k]: "DOL" })));
+  const intentos = []; let v = null, n = 0;
+  while (cola.length && n < 9 && !v) {
+    const o = cola.shift(); n++;
+    const txt = Object.entries(o).map(([k, x]) => `${k.replace("PARAMWEBREPORT_", "")}=${x}`).join("&") || "(sin parámetros)";
+    try {
+      const d = await reporte(env, "MONEDACOTIZACION", new URLSearchParams(o));
+      v = cotizacionDe(d, fecha);
+      if (v) { COT_OK = o; break; }
+      intentos.push(`${txt}: ${Array.isArray(d) ? d.length : 0} filas, sin el dólar al ${fecha}`);
+      if (!o.PARAMWEBREPORT_FechaDesde) cola.unshift(conFechas(o)); // la clave sirvió pero sin datos: probar con fechas
+    } catch (e) {
+      const m = `${e.error || ""} ${e.detalle || ""}`.replace(/\s+/g, " ");
+      intentos.push(`${txt}: ${(m.match(/Se ha producido un error: ([^"\\]+)/) || [null, m.slice(0, 120)])[1].trim()}`);
+      if (!/moneda/i.test(m) && !o.PARAMWEBREPORT_FechaDesde) cola.unshift(conFechas(o)); // reconoce la moneda: puede faltar la fecha
+    }
   }
-  if (v) COT.set(fecha, { t: Date.now(), v });
-  return v || (err ? { error: err } : null);
+  if (v) { COT.set(fecha, { t: Date.now(), v }); return v; }
+  return { error: intentos.join(" | ").slice(0, 900) };
 }
 
 async function finn(FINN, ruta, tok, cuerpo) {
@@ -116,7 +134,7 @@ export async function enviarAsiento(env, a, { tokenFinnegans, FINN, reporte }) {
   if (g.estado !== 404) return [{ error: "No se pudo revisar en FinnegansGO si la rendición ya estaba cargada. No se envió nada; intenta de nuevo.", detalle: motivoFinn(g, tok) }, 502];
   // v163.2: cotización del dólar (FinnegansGO la exige)
   const cot = await cotizacionDolar(env, a.cuerpo.Fecha, reporte);
-  if (!cot || cot.error) return [{ error: `No se encontró en FinnegansGO la cotización del dólar al ${a.cuerpo.Fecha}. No se envió nada.`, detalle: cot && cot.error ? cot.error.slice(0, 300) : "El reporte de cotizaciones no trae el dólar para esa fecha." }, 502];
+  if (!cot || cot.error) return [{ error: `No se encontró en FinnegansGO la cotización del dólar al ${a.cuerpo.Fecha}. No se envió nada.`, detalle: cot && cot.error ? cot.error.slice(0, 900) : "El reporte de cotizaciones no trae el dólar para esa fecha." }, 502];
   a.cuerpo.AsientoGenericoCotizaciones = [{ MonedaID: "PES", Cotizacion: 1 }, { MonedaID: "DOL", Cotizacion: cot.cotizacion }];
   // 2. Enviar
   const p = await finn(FINN, ENTIDAD, tok, a.cuerpo);
