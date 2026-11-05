@@ -38,6 +38,8 @@
   Pruebas con la API asientoGenerico (v162.1 consulta de solo lectura; v162.2 envío de un asiento descuadrado a propósito, solo con
   prueba=descuadrado): ver asientoprueba.js. Se usan desde la pantalla de prueba de Finnegans de la app (reporte «asientoGenerico»),
   solo el administrador. Temporales.
+  Contabilizar en FinnegansGO (v163): POST /finnegans/asiento, solo Contabilidad y el administrador; ver contabilizar.js.
+    FINN_EMPRESA      (texto)   opcional. Empresa de Finnegans de los asientos; por defecto 2 (CAPAC SPA, como el Excel)
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
   Recordatorios (v84): una tarea programada cada hora (wrangler.toml, [triggers]); a las 9:00 de Santiago en
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
@@ -48,6 +50,7 @@ import { rutasFondo, esContabSrv, contabDef } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
+import { contabilizarAsiento } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
 import { pruebaAsiento } from "./asientoprueba.js"; /* v162.1: consulta temporal de solo lectura de un asiento genérico */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
@@ -102,7 +105,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v162.2";
+const VERSION_SERVIDOR = "v163";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -207,6 +210,8 @@ export default {
       const rfl = await rutasFirma(req, env, url, correo, json, env.AVISOS ? objetoAvisos(env) : null, env.AVISOS ? c => objetoAvisos(env).usar("firma", c, +env.LIMITE_FIRMAS || FL_LIMITE, santiago().fecha) : null); if (rfl) return rfl;
       // /fondo → saldo del fondo por rendir (110106) desde el Libro Mayor de Finnegans (v94)
       const rf = await rutasFondo(req, env, ctx, url, correo, json, permitidos.includes(correo), env.AVISOS ? objetoAvisos(env) : null, reporte); if (rf) return rf;
+      // /finnegans/asiento → contabilizar una rendición aprobada en FinnegansGO (v163; solo Contabilidad y el administrador)
+      if (url.pathname === "/finnegans/asiento") return await contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN });
       // /boleta → lectura de un documento con IA (cualquier cuenta de Puduhue)
       if (url.pathname === "/boleta" && req.method === "POST") {
         let body; try { body = await req.json() } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }
