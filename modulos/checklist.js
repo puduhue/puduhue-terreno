@@ -309,15 +309,15 @@ async function guardarCatalogo(manual){
 let CAT_PEND=false;
 function itemConHistorial(key){return Object.values(VIS).some(v=>v.items&&v.items[key]&&v.items[key].e)}
 const CL_LABEL={C:"Cumple",P:"Parcial",N:"No cumple",NA:"N/A"};
-/* v151: en casas de huéspedes las respuestas son Sí / No / N/A (se guardan como C / N / NA) */
-const CH_LABEL={C:"Sí",P:"Parcial",N:"No",NA:"N/A"};
-const lblE=(e,it)=>((it&&it.sheet==="ch")?CH_LABEL:CL_LABEL)[e];
-const lblT=(e,t)=>(t==="huespedes"?CH_LABEL:CL_LABEL)[e];
+/* v151: en casas de huéspedes las respuestas eran Sí / No / N/A (se guardan como C / N / NA).
+   v164: Cumple / Parcial / No cumple / N/A, como el resto (lo guardado no cambia: «Sí» se ve como Cumple y «No» como No cumple) */
+const lblE=(e,it)=>CL_LABEL[e];
+const lblT=(e,t)=>CL_LABEL[e];
 /* resultado de la inspección: lo propone la app y quien revisa lo puede cambiar */
 const CH_RES={conf:"Conforme",obs:"Conforme con observaciones",no:"No conforme / requiere medidas inmediatas"};
 const chItems=v=>itemsDe(v).filter(i=>i.sheet==="ch"); /* v152: en visitas, solo la sección Casa de huéspedes */
 const chEval=v=>chItems(v).some(i=>{const e=((v.items||{})[i.key]||{}).e;return e&&e!=="NA"}); /* se revisó la casa */
-const chResProp=v=>chItems(v).some(i=>((v.items||{})[i.key]||{}).e==="N")?"obs":"conf";
+const chResProp=v=>chItems(v).some(i=>esHallazgo(((v.items||{})[i.key]||{}).e))?"obs":"conf"; /* v164: Parcial o No cumple */
 const chRes=v=>CH_RES[v.resultado]?v.resultado:chResProp(v);
 const SCORE={C:1,P:.5,N:0};
 
@@ -543,7 +543,7 @@ function renderCL(){
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${K.titulo}</h1>
     ${semListaHTML()}
-    <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:clTipo==="huespedes"?`Inspección de la casa de huéspedes de cada predio: ${nAct} puntos con Sí, No o N/A.`:`Control y Gestión: ${nAct} ítems por predio.`} Cada visita compara con la anterior y los hallazgos quedan en seguimiento hasta que se corrigen.</p>
+    <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:clTipo==="huespedes"?`Inspección de la casa de huéspedes de cada predio: ${nAct} puntos con Cumple, Parcial, No cumple o N/A.`:`Control y Gestión: ${nAct} ítems por predio.`} Cada visita compara con la anterior y los hallazgos quedan en seguimiento hasta que se corrigen.</p>
     ${clTipo==="camionetas"?`<div class="btns"><button class="btn" data-a="clcOtra">+ Camioneta sin acta en la app</button></div>`:""}
     ${esAdmin()?`<p class="note">Catálogo: ${nAct} ítems activos${nTot-nAct?` y ${nTot-nAct} retirados`:""} · <button class="lnk" data-a="clCat">Editar catálogo</button></p>`:""}
     <p class="note">Versión ${APP_VER}</p>
@@ -623,7 +623,7 @@ function renderCLPredio(){
   const nVis=hzVis.filter(h=>hzCoincide(clHzQ,hzNorm([codigo(h.it),etqIt(h.it),h.it.txt,h.plan&&h.plan.resp,h.plan&&h.plan.acc,h.ultima&&h.ultima.obs,lblE(h.ultima.e,h.it)].join(" ")))).length;
   const panelHz=ha.length?`${ha.length>8?`<div class="hzbus"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="hzbus" type="search" value="${esc(clHzQ)}" placeholder="Buscar: texto, código o responsable" aria-label="Buscar hallazgo" autocomplete="off" enterkeyhint="search"></div>`:""}${ha.length>3?`<div class="hzfs" role="group" aria-label="Filtrar hallazgos">${HZ_FILTROS.filter(x=>x[0]==="todos"||cuenta(x)||x[0]===f[0]).map(x=>`<button class="hzf${x[0]==="venc"?" rr":x[0]==="sem"?" aa":""}" data-a="clHzF" data-f="${x[0]}" aria-pressed="${x[0]===f[0]}">${x[1]} <b>${cuenta(x)}</b></button>`).join("")}</div>`:""}
       ${hzVis.map(hzFilaHTML).join("")}${hzVis.length?`<div class="empty" id="hznada"${nVis?" hidden":""}>Ningún hallazgo coincide con la búsqueda.</div>`:`<div class="empty">No hay hallazgos en este filtro.</div>`}
-      <p class="note">${clTipo==="huespedes"?"Puntos en «No» en la última visita cerrada. Se cierran solos cuando en una visita posterior quedan en «Sí».":"Ítems en Parcial o No cumple en la última visita cerrada. Se cierran solos cuando en una visita posterior quedan en Cumple."}${cerr?` Ya se han corregido ${cerr}.`:""}</p>`
+      <p class="note">Ítems en Parcial o No cumple en la última visita cerrada. Se cierran solos cuando en una visita posterior quedan en Cumple.${cerr?` Ya se han corregido ${cerr}.`:""}</p>`
     :`<div class="empty">${vv.filter(v=>v.estado==="cerrada").length?`No hay hallazgos abiertos.${cerr?` Se han corregido ${cerr}.`:""}`:"Aún no hay visitas cerradas."}</div>`;
   const panelVis=`${evolHTML(vv)}${visitasListaHTML(p,vs)}
     <h2>Archivos en OneDrive</h2>
@@ -661,7 +661,7 @@ function clItemHTML(it){
     ${prevHTML}
     ${CL_PAT.includes(it.key)?clPatHTML(v,it,r,ro):""}
     ${(()=>{const en=tipoDe(v)==="camionetas"?cmEntrega(v,it.key):null;if(en===null)return"";return `<div class="cment"><span class="chip ${en==="si"?"B":en==="no"?"M":"none"}">Acta de entrega: ${en==="si"?"Sí":en==="no"?"No":"sin dato"}</span>${en==="no"?`<span class="note" style="margin:0">No se entregó: si sigue sin estar, marca N/A.</span>`:""}</div>`})()}
-    <div class="seg seg4${it.sheet==="ch"?" s3":""}" role="group">${(it.sheet==="ch"?["C","N","NA"]:["C","P","N","NA"]).map(e=>`<button data-a="clRate" data-k="${esc(it.key)}" data-e="${esc(e)}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${lblE(e,it)}</span></button>`).join("")}</div>
+    <div class="seg seg4" role="group">${["C","P","N","NA"].map(e=>`<button data-a="clRate" data-k="${esc(it.key)}" data-e="${esc(e)}" aria-pressed="${r.e===e}" ${ro?"disabled":""}><span class="sgi" aria-hidden="true">${CL_ICO[e]}</span><span class="sgt">${lblE(e,it)}</span></button>`).join("")}</div>
     ${fotos.length?`<div class="fotos"><div class="strip">${fotos.map(f=>ro?thumb(f,it.key,true,false):`<span class="thw">${thumb(f,it.key,true,false)}<button class="thx" data-a="clDelFoto" data-ref="${esc(f)}" data-k="${esc(it.key)}" aria-label="Eliminar foto">✕</button></span>`).join("")}</div></div>`:""}
     ${r.e||r.obs||ro?`<input class="obs" data-clf="obs" data-k="${esc(it.key)}" value="${esc(r.obs)}" placeholder="Observación" ${ro?"disabled":""}>`:""}
     ${plan}
@@ -698,7 +698,7 @@ function renderCLV(){
     ${prev?`<p class="note" style="margin-top:0">Comparando con la visita ${esc(prev.n)} (${fmtD(prev.fecha)}).</p>`:`<p class="note" style="margin-top:0">Primera visita a ${tipoDe(v)==="camionetas"?"esta camioneta":"este predio"}: no hay comparación anterior.</p>`}
     ${clProgHTML()}
     ${ro?"":disUnoSwitchHTML()}
-    <div class="filt"${DIS.uno&&!ro?" hidden":""}>${[["all","Todos"],["pend",`Sin revisar${(()=>{const n=areaItems.filter(i=>!(v.items[i.key]||{}).e).length;return n?` (${n})`:""})()}`],["hall",`Hallazgos anteriores${nHall?` (${nHall})`:""}`],["mal",tipoDe(v)==="huespedes"?"En «No»":"Parcial / No cumple"]].map(([k,t])=>`<button class="fb" data-a="clFiltro" data-f="${esc(k)}" aria-pressed="${clFiltro===k}">${t}</button>`).join("")}</div>
+    <div class="filt"${DIS.uno&&!ro?" hidden":""}>${[["all","Todos"],["pend",`Sin revisar${(()=>{const n=areaItems.filter(i=>!(v.items[i.key]||{}).e).length;return n?` (${n})`:""})()}`],["hall",`Hallazgos anteriores${nHall?` (${nHall})`:""}`],["mal","Parcial / No cumple"]].map(([k,t])=>`<button class="fb" data-a="clFiltro" data-f="${esc(k)}" aria-pressed="${clFiltro===k}">${t}</button>`).join("")}</div>
     <h1 style="font-size:22px">${esc(AREA_NAME[clArea])}</h1>
     ${clArea==="casa"&&tipoDe(v)==="visitas"?chCasaHTML(v,ro):""}
     ${DIS.uno&&!ro?disUnoHTML(v):body}
@@ -712,10 +712,10 @@ function clRefreshItem(v,k){if(clv!==v||view!=="clv")return;const el=$("#cli-"+k
 /* v151: nota normativa (área de baños) y resultado de la inspección de una casa de huéspedes */
 function chNotaHTML(){return `<details class="info chnota"><summary><b>Nota normativa: baños separados para hombres y mujeres</b></summary><p>${esc(CH_NOTA)}</p></details>`}
 function chResHTML(v,ro){const ev=tipoDe(v)==="huespedes"||chEval(v),pr=chResProp(v),r=CH_RES[v.resultado]?v.resultado:ev?pr:"",elegido=CH_RES[v.resultado]&&v.resultado!==pr; /* v152: sin puntos respondidos, todavía no propone */
-  const nN=chItems(v).filter(i=>((v.items||{})[i.key]||{}).e==="N").length;
+  const nN=chItems(v).filter(i=>esHallazgo(((v.items||{})[i.key]||{}).e)).length; /* v164 */
   return `<section class="sec chres" id="chres"><h3>Resultado de inspección</h3>
     <div class="reps chreps" role="group" aria-label="Resultado de inspección">${Object.entries(CH_RES).map(([k,t])=>`<button data-a="clRes" data-r="${k}" aria-pressed="${r===k}" class="chr-${k}" ${ro?"disabled":""}>${esc(t)}</button>`).join("")}</div>
-    <p class="note" style="margin:6px 0 0">${elegido?`Elegido por quien revisa. La app propone «${esc(CH_RES[pr])}». ${ro?"":`<button class="lnk" data-a="clRes" data-r="">Usar lo que propone la app</button>`}`:(ev?`Propuesto por la app: ${nN?`hay ${nN} ${nN===1?"punto":"puntos"} en «No»`:"ningún punto en «No»"}. Si hay riesgos que requieren medidas inmediatas, elige «No conforme».`:"La app lo propone cuando respondas los puntos de la casa.")}</p></section>`}
+    <p class="note" style="margin:6px 0 0">${elegido?`Elegido por quien revisa. La app propone «${esc(CH_RES[pr])}». ${ro?"":`<button class="lnk" data-a="clRes" data-r="">Usar lo que propone la app</button>`}`:(ev?`Propuesto por la app: ${nN?`hay ${nN} ${nN===1?"punto":"puntos"} en Parcial o No cumple`:"ningún punto en Parcial o No cumple"}. Si hay riesgos que requieren medidas inmediatas, elige «No conforme».`:"La app lo propone cuando respondas los puntos de la casa.")}</p></section>`}
 /* v152: arriba de la sección Casa de huéspedes de una visita: datos de la casa y «no tiene casa» */
 function chCasaHTML(v,ro){const L=chItems(v),sin=L.filter(i=>!((v.items||{})[i.key]||{}).e).length,opc=(k,O)=>`<option value="">Elige</option>${O.map(x=>`<option ${v[k]===x?"selected":""}>${esc(x)}</option>`).join("")}`;
   if(v.sinCasa){const nA=v.estado==="cerrada"?0:chOcupActas(v.predio).length;return `<div class="info chsin" id="chcasa-box"><b>Este predio no tiene casa de huéspedes</b><br>Los ${L.length} puntos quedaron en N/A${v.sinCasaDe?` porque en la visita ${esc(v.sinCasaDe)} tampoco tenía`:""}. ${ro?"":`<button class="lnk" data-a="clConCasa">Sí tiene casa: revisarla</button>`}${nA?`<br><b class="chop-mas">Ojo: hay ${nA} ${nA===1?"acta":"actas"} de entrega de casa de huéspedes de este predio sin devolución.</b>`:""}</div>`}
@@ -901,7 +901,7 @@ async function clClick(A,b){
     if(!String(clv.revisor||"").trim()){toast("No se puede cerrar: falta quién hizo la revisión (revisor).");return true}
     const falt=itemsDe(clv).filter(it=>{const r=clv.items[it.key];return r&&esHallazgo(r.e)&&(!r.acc||!r.resp||!r.plazo)}).length;
     const CHX=tipoDe(clv)==="huespedes"||chEval(clv);
-    const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${CHX?` ${tipoDe(clv)==="huespedes"?"Resultado":"Casa de huéspedes"}: «${CH_RES[chRes(clv)]}».`:""}${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, ${tipoDe(clv)==="huespedes"?"los puntos en «No»":"los ítems en Parcial, No cumple o No"} quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
+    const msg=`${sc.rev} de ${itemsDe(clv).length} ítems revisados${sc.pct!==null?`, ${sc.pct} % de cumplimiento`:""}.${CHX?` ${tipoDe(clv)==="huespedes"?"Resultado":"Casa de huéspedes"}: «${CH_RES[chRes(clv)]}».`:""}${falt?` ${falt} ${falt===1?"hallazgo no tiene":"hallazgos no tienen"} acción, responsable o plazo completos.`:""} Al cerrar, los ítems en Parcial o No cumple quedan como hallazgos abiertos y la visita ya no se puede modificar.`;
     if(!(await ask("¿Cerrar la visita?",msg,"Cerrar visita")))return true;
     if(tipoDe(clv)==="visitas"&&!clv.sinCasa&&chItems(clv).length)clv.huespFoto=chOcupantes(clv).map(x=>({nombre:x.nombre,rut:x.rut,vivienda:x.vivienda,desde:x.desde,actaId:x.actaId||"",esta:x.esta,sinActa:x.sinActa})); /* v160 */
     if(clv.reabierta&&VIS["bod-"+clv.id])clv.bodPend=true; /* v162: la copia en el check list de bodega se actualiza (traspasarBodega) */
@@ -1089,15 +1089,14 @@ async function clPdf(v,subir){
   }
   /* 1. resumen por área */
   titulo("Resumen");d.setFontSize(8.5);
-  const CH3=TV==="huespedes"; /* v151: Sí / No, sin Parcial */
-  const colsR=CH3?(prev?[60,18,18,22,26,18,18]:[76,26,26,26,26]):prev?[42,17,17,21,20,26,18,19]:[60,24,24,24,24,24];const SECV=seccionesDe(TV,ITV);const headR=[SECV.col].concat(CH3?["Sí","No"]:["Cumple","Parcial","No cumple"]).concat(["Evaluados","Cumplimiento"]).concat(prev?[`Visita ${esc(prev.n)}`,"Cambio"]:[]);
+  const colsR=prev?[42,17,17,21,20,26,18,19]:[60,24,24,24,24,24]; /* v164: también en casas de huéspedes (antes, Sí / No) */const SECV=seccionesDe(TV,ITV);const headR=[SECV.col].concat(["Cumple","Parcial","No cumple"]).concat(["Evaluados","Cumplimiento"]).concat(prev?[`Visita ${esc(prev.n)}`,"Cambio"]:[]);
   const dl=(a,b)=>a===null||b===null?"-":{t:b===a?"igual":(b-a>0?"+":"")+(b-a)+" pts",c:b-a>0?COL.C:b-a<0?COL.N:[90,90,90]};
   const sinAplicar=SECV.filter(a=>ITV.some(a.f)&&!ITA.some(a.f)).map(a=>a.name);
   const fila=(cells,bold,fill)=>{chk(7);let x=L;if(fill){d.setFillColor(...fill);d.rect(L,y-4.2,W,6.5,"F")}d.setFont("helvetica",bold?"bold":"normal");cells.forEach((c,i)=>{if(c&&typeof c==="object"){d.setTextColor(...c.c);d.text(String(c.t),x+1.5,y);d.setTextColor(0)}else d.text(String(c),x+1.5,y);x+=colsR[i]});y+=6.5};
   fila(headR,true,[228,234,248]);
   const cnt=(f,e)=>ITV.filter(i=>f(i)&&v.items&&v.items[i.key]&&v.items[i.key].e===e).length;
-  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);const s0=prev?puntaje(prev,f).pct:null;fila([a.name].concat(CH3?[cnt(f,"C"),cnt(f,"N")]:[cnt(f,"C"),cnt(f,"P"),cnt(f,"N")]).concat([s.n,s.pct===null?"-":s.pct+" %"]).concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
-  const T=puntaje(v);fila(["Total"].concat(CH3?[cnt(()=>true,"C"),cnt(()=>true,"N")]:[cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N")]).concat([T.n,T.pct===null?"-":T.pct+" %"]).concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
+  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);const s0=prev?puntaje(prev,f).pct:null;fila([a.name].concat([cnt(f,"C"),cnt(f,"P"),cnt(f,"N")]).concat([s.n,s.pct===null?"-":s.pct+" %"]).concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
+  const T=puntaje(v);fila(["Total"].concat([cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N")]).concat([T.n,T.pct===null?"-":T.pct+" %"]).concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
   y+=5;
   /* 2. check list completo: cada punto con su resultado */
   titulo(`Check list (${ITA.length} ${ITA.length===1?"punto que aplica":"puntos que aplican"})`);
@@ -1134,7 +1133,7 @@ async function clPdf(v,subir){
   const hall=ITA.filter(it=>{const r=v.items&&v.items[it.key];return r&&esHallazgo(r.e)});
   const corr=prev?ITA.filter(it=>{const r=v.items&&v.items[it.key],pr=prev.items&&prev.items[it.key];return r&&r.e==="C"&&pr&&esHallazgo(pr.e)}):[];
   titulo(`Hallazgos y plan de acción (${hall.length})`);
-  if(!hall.length){d.setFont("helvetica","normal");d.setFontSize(9.5);d.text(TV==="huespedes"?"Sin puntos en «No».":"Sin puntos en Parcial o No cumple.",L,y);y+=7}
+  if(!hall.length){d.setFont("helvetica","normal");d.setFontSize(9.5);d.text("Sin puntos en Parcial o No cumple.",L,y);y+=7}
   hall.forEach(it=>{const r=v.items[it.key];const pr=prev&&prev.items&&prev.items[it.key];const hh=H[it.key];
     d.setFontSize(8.8);const lines=d.splitTextToSize(it.txt,W-34);
     const meta=[];if(pr&&pr.e)meta.push(`Visita ${esc(prev.n)}: ${lblE(pr.e,it)}${{emp:" (empeoró)",mej:" (mejoró, sigue abierto)",sig:" (sigue abierto)"}[CK[it.key]]||" (nuevo)"}`);else if(prev)meta.push("Nuevo");if(hh&&hh.estado==="abierto"&&v.estado==="cerrada"&&hh.desde.v<v.n)meta.push(`Abierto desde la visita ${hh.desde.v} (${fmtD(hh.desde.fecha)})`);
@@ -1185,4 +1184,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="163"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="164"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
