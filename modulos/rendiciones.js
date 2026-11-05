@@ -1426,7 +1426,7 @@ function rdAlertasHTML(al,r){
   if(!al.length)return `<div class="info" style="border-left:5px solid var(--b-ink)">Sin alertas: el asiento cumple las reglas contables${MAE?" y los códigos existen en los maestros":""}.</div>`;
   const li=a=>`<li>${a.k&&r.docs&&r.docs[a.k]?`<button class="lnk" data-a="rdDoc" data-k="${esc(a.k)}">${esc(r.docs[a.k].emisor||"Documento")}${num(r.docs[a.k].total)?" "+fmtP(num(r.docs[a.k].total)):""}</button>: `:""}${esc(a.m)}</li>`;
   const b=al.filter(a=>a.n==="b"),p=al.filter(a=>a.n==="p"),v=al.filter(a=>a.n!=="b"&&a.n!=="p");
-  return (b.length?`<div class="info netbox"><b>Por corregir antes de aprobar (${b.length})</b><ul>${b.map(li).join("")}</ul></div>`:"")+(p.length?`<div class="info" style="border-left:5px solid var(--act)"><b>Por crear en Finnegans (${p.length})</b> · no impide aprobar; el Excel de esta rendición sale cuando exista en Finnegans<ul>${p.map(li).join("")}</ul></div>`:"")+(v.length?`<div class="info" style="border-left:5px solid var(--r-ink)"><b>Por revisar (${v.length})</b><ul>${v.map(li).join("")}</ul></div>`:"");
+  return (b.length?`<div class="info netbox"><b>Por corregir antes de aprobar (${b.length})</b><ul>${b.map(li).join("")}</ul></div>`:"")+(p.length?`<div class="info" style="border-left:5px solid var(--act)"><b>Por crear en Finnegans (${p.length})</b> · no impide aprobar; se podrá contabilizar cuando exista en Finnegans<ul>${p.map(li).join("")}</ul></div>`:"")+(v.length?`<div class="info" style="border-left:5px solid var(--r-ink)"><b>Por revisar (${v.length})</b><ul>${v.map(li).join("")}</ul></div>`:"");
 }
 /* v75: buscador por nombre para cuenta, producto, partida, tercero y centro: Contabilidad elige por nombre y la app guarda el código */
 const AJ_TIT={cuenta:"Cuenta contable",producto:"Producto",partida:"Partida financiera",tercero:"Tercero (proveedor o persona)",centro:"Centro de costo"};
@@ -2007,7 +2007,7 @@ async function rdClick(A,b){
   if(A==="rdAprobarCont"){if(!puedeContab(rdv))return true;const D=docsDe(rdv);if(D.some(d=>d.estadoRev==="obs")){toast("Hay documentos observados: devuélvela o quita la observación.");return true}
     const As=rdAsiento(rdv);if(As.bloq){toast("Hay cosas por corregir en el asiento.");render();return true}
     const nr=As.al.filter(a=>a.n==="r").length;
-    if(!(await ask("¿Aprobar la imputación?",`Asiento de ${fmtP(As.debe)} con ${As.lineas.length} líneas${nr?` y ${nr} ${nr===1?"alerta revisada":"alertas revisadas"}`:""}. ${As.pend?`Falta crear en Finnegans: ${As.al.filter(a=>a.n==="p").map(a=>`${a.nombre} (${a.rut})`).join(", ")}; el Excel de esta rendición sale cuando exista.`:"Queda lista para el Excel de FinnegansGO."} ${rdv.persona&&rdv.persona.nombre?primerNombre(rdv.persona.nombre)+" recibirá un aviso por correo.":""}`,"Aprobar")))return true;
+    if(!(await ask("¿Aprobar la imputación?",`Asiento de ${fmtP(As.debe)} con ${As.lineas.length} líneas${nr?` y ${nr} ${nr===1?"alerta revisada":"alertas revisadas"}`:""}. ${As.pend?`Falta crear en Finnegans: ${As.al.filter(a=>a.n==="p").map(a=>`${a.nombre} (${a.rut})`).join(", ")}; se podrá contabilizar cuando exista.`:"Queda lista para contabilizar en FinnegansGO."} ${rdv.persona&&rdv.persona.nombre?primerNombre(rdv.persona.nombre)+" recibirá un aviso por correo.":""}`,"Aprobar")))return true;
     D.forEach(d=>{d.estadoRev="ok"});rdv.aprobCont={por:yo(),fecha:today()};rdv.asiento={lineas:As.lineas.map(l=>({lado:l.lado,cuenta:l.cuenta,prod:l.prod,part:l.part,centro:l.centro,ter:l.ter,bu:l.bu,monto:l.monto,glosa:l.glosa})),fecha:As.fecha,desc:As.desc,debe:As.debe};rdv.estado="aprobada";rdHist(rdv,"aprobada por Contabilidad");rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"aprobada","Imputación aprobada.").catch(e=>console.warn("correo",e));if(DB&&navigator.onLine!==false)setTimeout(()=>rdArchivos(rr),2500);return true}
   if(A==="rdReabrir"){if(!puedeContabilizar(rdv))return true;const ex=rdv.exportada;
     if(!(await ask("¿Volver a revisión contable?",`Podrás corregir la imputación y aprobarla de nuevo.${ex?` Ya se exportó a Excel el ${fmtD(ex.fecha)}: si ya está cargada en FinnegansGO, corrígela también allá, porque al aprobarla de nuevo vuelve a salir en el Excel.`:""}`,"Volver a revisión")))return true;
@@ -2250,4 +2250,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="164"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="165"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
