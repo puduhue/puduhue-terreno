@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 166 | 2026-11-05 | [82421c4](https://github.com/puduhue/puduhue-terreno/tree/82421c4) | «Excel de rendiciones» en Rendiciones › Contabilidad: todas las rendiciones de un rango de meses, de todas las personas, con N° de asiento, fecha, quién contabilizó y la forma (directo a FinnegansGO, Excel o a mano); el resumen suma por mes y por quién aprobó y contabilizó. El Excel del mes y el de cada rendición traen las mismas columnas nuevas. |
 | 165 | 2026-11-05 | [bde2305](https://github.com/puduhue/puduhue-terreno/tree/bde2305) | Textos de Rendiciones al día con «Contabilizar en FinnegansGO»: al aprobar la imputación dice «Queda lista para contabilizar en FinnegansGO» (antes «para el Excel»); con una persona o proveedor por crear en Finnegans, «se podrá contabilizar cuando exista». |
 | 163.5 (solo servidor) | 2026-11-05 | [17097e3](https://github.com/puduhue/puduhue-terreno/tree/17097e3) | Servidor v163.5: se quita la consulta temporal de asientos de Finnegans (asientoprueba.js), usada para probar «Contabilizar en FinnegansGO» (prueba real hecha con el AG - 3866, ya eliminado). No cambia la app. |
 | 163.4 (solo servidor) | 2026-11-05 | [06d4cd6](https://github.com/puduhue/puduhue-terreno/tree/06d4cd6) | Servidor v163.4: la cotización del dólar se pide al reporte de FinnegansGO con Moneda=DOLARES y Fecha Desde (2000) / Fecha Hasta (fecha del asiento), como lo pide el informe; hoy da 700. No cambia la app. |
