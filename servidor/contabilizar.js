@@ -120,7 +120,8 @@ export function motivoFinn(r, tok) {
   return m.slice(0, 600) || (r.estado ? `Estado ${r.estado}.` : "Sin conexión con Finnegans.");
 }
 
-/* revisar si ya está, enviar y confirmar; devuelve [cuerpo de la respuesta, estado]. Lo usa también la prueba de asientoprueba.js (v163.1) */
+/* revisar si ya está, enviar y confirmar; devuelve [cuerpo de la respuesta, estado]. (v163.1-v163.4 lo usó también la prueba real de
+   asientoprueba.js, que se quitó en la v163.5 después de probar con el AG - 3866) */
 export async function enviarAsiento(env, a, { tokenFinnegans, FINN, reporte }) {
   const tok = await tokenFinnegans(env);
   const ruta = `${ENTIDAD}/${encodeURIComponent(a.idExt)}`;

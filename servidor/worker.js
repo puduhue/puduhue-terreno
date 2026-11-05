@@ -35,10 +35,6 @@
   Notificaciones (v83): no requieren variables. Los equipos registrados y las claves de envío se guardan en el
   Durable Object AVISOS (ver push.js y wrangler.toml); se crea solo al publicar.
   Firma por link (v154): ver firma.js. Usa el mismo Durable Object AVISOS; no requiere variables.
-  Pruebas con la API asientoGenerico (v162.1 consulta de solo lectura; v162.2 envío de un asiento descuadrado a propósito; v163.1
-  copia real del último asiento con prueba=duplicar; las dos, solo con
-  prueba=descuadrado): ver asientoprueba.js. Se usan desde la pantalla de prueba de Finnegans de la app (reporte «asientoGenerico»),
-  solo el administrador. Temporales.
   Contabilizar en FinnegansGO (v163): POST /finnegans/asiento, solo Contabilidad y el administrador; ver contabilizar.js.
     FINN_EMPRESA      (texto)   opcional. Empresa de Finnegans de los asientos; por defecto 2 (CAPAC SPA, como el Excel)
     FINN_PARAMS_COTIZACION (texto) opcional (v163.3). Parámetros del reporte MONEDACOTIZACION (ej.: PARAMWEBREPORT_Moneda=DOLARES)
@@ -53,7 +49,6 @@ import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 import { contabilizarAsiento } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
-import { pruebaAsiento } from "./asientoprueba.js"; /* v162.1: consulta temporal de solo lectura de un asiento genérico */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -107,7 +102,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v163.4";
+const VERSION_SERVIDOR = "v163.5";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -246,8 +241,6 @@ export default {
       // /reporte?nombre=X&PARAMWEBREPORT_...=... → solo reportes autorizados en FINN_REPORTES
       if (url.pathname === "/reporte") {
         const pedido = (url.searchParams.get("nombre") || "").trim();
-        /* v162.1-v162.2: «asientoGenerico» → último asiento de rendición (GET) y, con prueba=descuadrado, un POST que Finnegans debería rechazar (solo el administrador; ver asientoprueba.js) */
-        if (pedido.toLowerCase() === "asientogenerico") return json({ ...(await pruebaAsiento(env, url.searchParams, { reporte, tokenFinnegans, FINN })), consultadoPor: correo });
         const lista = (env.FINN_REPORTES || "").split(",").map(s => s.trim()).filter(Boolean).concat(env.FINN_REPORTE_STOCK ? [env.FINN_REPORTE_STOCK.trim()] : []);
         const nombre = lista.find(n => n.toLowerCase() === pedido.toLowerCase());
         if (!nombre) return json({ error: `El reporte ${pedido || "(sin nombre)"} no está autorizado en el servidor. Agrégalo en la variable FINN_REPORTES de Cloudflare.` }, 403);
