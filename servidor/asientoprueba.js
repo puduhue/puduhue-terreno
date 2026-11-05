@@ -9,13 +9,18 @@
                                  los códigos del último asiento de rendición. Finnegans debería rechazarlo por no cuadrar: así se
                                  sabe si las credenciales pueden crear asientos sin crear ninguno. Si Finnegans lo aceptara, la
                                  respuesta lo dice y Contabilidad lo anula (descripción «PRUEBA API - ANULAR»).
-  Sin «prueba=descuadrado» todo es solo lectura (GET). Lo que se sabe desde la v162.1: el GET de un asiento va por su
+    prueba=duplicar              (v163.1) PRUEBA REAL: vuelve a enviar el último asiento de rendición con el mismo código que el botón
+                                 «Contabilizar en FinnegansGO» (armarAsiento y enviarAsiento de contabilizar.js), con la descripción
+                                 «PRUEBA API - ELIMINAR - …» e IdentificacionExterna «RD-PRUEBA<N° del asiento original>» (si ya
+                                 existe, no lo crea otra vez). Crea un asiento real que Benja elimina después en FinnegansGO.
+  Sin «prueba» todo es solo lectura (GET). Lo que se sabe desde la v162.1: el GET de un asiento va por su
   IdentificacionExterna («AG - 3865») y no existe el listado (405 «No se puede hacer list sobre una transaccion»).
   La respuesta usa el formato de /reporte (filas «paso · resultado · detalle») para que la pantalla de prueba de la app la muestre
   sin cambios; en el computador se copia con Ctrl+A y Ctrl+C. La clave de Finnegans nunca va en la respuesta.
   Quitar este archivo cuando la versión con el botón esté publicada.
 */
 import { columnas, numero, fechaISO } from "./fondo.js";
+import { armarAsiento, enviarAsiento } from "./contabilizar.js"; /* v163.1 */
 
 const ENTIDAD = "asientoGenerico";
 const MAX_FILAS = 15; // la pantalla de prueba muestra hasta 15 filas
@@ -99,7 +104,7 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const dias = Math.min(366, Math.max(1, parseInt(q.get("dias"), 10) || 60));
   const desde = isoHace(dias, hoy);
-  const prueba = String(q.get("prueba") || "").trim().toLowerCase() === "descuadrado";
+  const modo = String(q.get("prueba") || "").trim().toLowerCase(), prueba = modo === "descuadrado" || modo === "duplicar";
   let ids = [];
   const idPedido = String(q.get("id") || "").trim();
 
@@ -110,9 +115,9 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
     p.set("PARAMWEBREPORT_FechaDesde", desde); p.set("PARAMWEBREPORT_FechaHasta", hoy); p.set("PARAMWEBREPORT_cuenta", (env.FONDO_CUENTA || "110106").trim());
     let mayor;
     try { mayor = await reporte(env, "libroMayor", p); }
-    catch (e) { fila("1. Libro Mayor 110106", "error", sinClave(`${e.error || ""} ${e.detalle || ""}`, tok)); return salida(filas, prueba); }
+    catch (e) { fila("1. Libro Mayor 110106", "error", sinClave(`${e.error || ""} ${e.detalle || ""}`, tok)); return salida(filas, modo); }
     const u = ultimoAsientoRendicion(mayor);
-    if (!u.fila) { fila("1. Libro Mayor 110106", `sin asientos de rendición desde el ${desde}`, `Filas: ${filasDe(mayor).length}. Prueba con dias=180.`); return salida(filas, prueba); }
+    if (!u.fila) { fila("1. Libro Mayor 110106", `sin asientos de rendición desde el ${desde}`, `Filas: ${filasDe(mayor).length}. Prueba con dias=180.`); return salida(filas, modo); }
     ids = candidatosId(u.fila);
     fila("1. Libro Mayor 110106", `último asiento de rendición: ${fechaISO(u.fila[u.C.fecha])} · ${String(u.fila[u.C.desc] || "")}`.slice(0, 160), prueba ? "" : sinClave(js(u.fila), tok));
   }
@@ -128,13 +133,25 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
     if (asiento) break;
   }
   fila(`2. GET ${ENTIDAD}/<id>`, asiento ? `asiento encontrado: ${asiento.Nombre || asiento.IdentificacionExterna || ""}` : ids.length ? "ningún identificador sirvió" : "no hay identificadores para probar", sinClave(intentos.join(" · "), tok));
-  if (!asiento) { if (prueba) fila("3. POST descuadrado", "no se envió", "Sin un asiento de rendición del que copiar los códigos."); return salida(filas, prueba); }
+  if (!asiento) { if (prueba) fila("3. POST descuadrado", "no se envió", "Sin un asiento de rendición del que copiar los códigos."); return salida(filas, modo); }
+
+  if (modo === "duplicar") {
+    // 3. (v163.1) el asiento de base, en el formato que manda la app, con el mismo armado y envío que el botón
+    const lineas = (Array.isArray(asiento.AsientoItems) ? asiento.AsientoItems : []).map(lineaApp);
+    const n = String(asiento.NumeroInterno ?? String(asiento.Nombre || "")).replace(/\D/g, "");
+    const a = armarAsiento({ idExt: "RD-PRUEBA" + (n || "0000000"), asiento: { fecha: asiento.Fecha, desc: `PRUEBA API - ELIMINAR - ${asiento.Descripcion || ""}`, lineas } }, env);
+    if (a.error) { fila("3. Asiento para la prueba", "no se envió", a.error); return salida(filas, modo); }
+    fila("3. Asiento enviado (POST)", `copia de ${asiento.Nombre || "el asiento"}: ${lineas.length} líneas, debe $${a.debe}`, sinClave(JSON.stringify(a.cuerpo), tok));
+    const [r] = await enviarAsiento(env, a, { tokenFinnegans, FINN });
+    fila("4. Resultado", r.ok ? (r.ya ? `ya existía: ${r.numero} (no se creó otro)` : `CREADO: ${r.numero}${r.sinConfirmar ? " (sin confirmar con GET)" : ""} · eliminarlo en FinnegansGO`) : `no se creó: ${r.error || ""}`, sinClave(JSON.stringify(r), tok));
+    return salida(filas, modo);
+  }
 
   if (prueba) {
     // 3. POST de un asiento descuadrado a propósito: Finnegans debería rechazarlo
     const marca = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
     const cuerpo = asientoDescuadrado(asiento, hoy, marca);
-    if (!cuerpo) { fila("3. POST descuadrado", "no se envió", "El asiento de base no tiene una línea al debe y una al haber."); return salida(filas, prueba); }
+    if (!cuerpo) { fila("3. POST descuadrado", "no se envió", "El asiento de base no tiene una línea al debe y una al haber."); return salida(filas, modo); }
     fila("3. Asiento enviado (POST)", "debe $1 · haber $2 (descuadrado a propósito)", sinClave(JSON.stringify(cuerpo), tok));
     const r = await pedirFinn(FINN, ENTIDAD, tok, { cuerpo });
     const sinPermiso = r.estado === 401 || r.estado === 403;
@@ -143,7 +160,7 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
     const v = await pedirFinn(FINN, `${ENTIDAD}/${encodeURIComponent(cuerpo.IdentificacionExterna)}`, tok);
     const creado = v.ok && unAsiento(v.datos);
     fila("5. ¿Quedó creado?", creado ? `SÍ: ${creado.Nombre || cuerpo.IdentificacionExterna} · avisar a Contabilidad para anularlo` : `no (GET ${cuerpo.IdentificacionExterna}: ${v.estado})`, creado ? sinClave(js({ Nombre: creado.Nombre, NumeroInterno: creado.NumeroInterno, IdentificacionExterna: creado.IdentificacionExterna, EstadoID: creado.EstadoID }), tok) : sinClave(String(v.texto || "").slice(0, 300), tok));
-    return salida(filas, prueba);
+    return salida(filas, modo);
   }
 
   // 3. El asiento: cabecera y cada línea (sin campos vacíos)
@@ -155,6 +172,11 @@ export async function pruebaAsiento(env, q, { reporte, tokenFinnegans, FINN }) {
     if (i < libres - 1 || items.length <= libres) fila(`4. Línea ${i + 1} de ${items.length}`, `${it.DebeHaber === -1 ? "haber" : "debe"} ${it.CuentaID || ""} ${it.ImporteMonPrincipal ?? ""}`.trim(), sinClave(js(it), tok));
   });
   if (items.length > libres) fila(`4. Líneas ${libres} a ${items.length}`, "resto de las líneas", sinClave(js(items.slice(libres - 1)), tok));
-  return salida(filas, prueba);
+  return salida(filas, modo);
 }
-const salida = (filas, prueba) => ({ ok: true, reporte: `${ENTIDAD} (${prueba ? "prueba de envío descuadrado" : "solo lectura"})`, hora: new Date().toISOString(), datos: filas });
+const salida = (filas, modo) => ({ ok: true, reporte: `${ENTIDAD} (${modo === "duplicar" ? "prueba real: copia del último asiento" : modo === "descuadrado" ? "prueba de envío descuadrado" : "solo lectura"})`, hora: new Date().toISOString(), datos: filas });
+/* v163.1: una línea de la API (AsientoItems) al formato de línea de la app (rdAsiento) */
+export function lineaApp(it) {
+  const dim = c => { const d = (it.DimensionDistribucion || []).find(x => x && x.dimensionCodigo === c); return d && d.distribucionItems && d.distribucionItems[0] ? String(d.distribucionItems[0].codigo || "") : ""; };
+  return { lado: it.DebeHaber === -1 ? "H" : "D", cuenta: String(it.CuentaID || ""), prod: it.ProductoID || "", part: dim("DIMPARFIN"), centro: dim("DIMCTC"), ter: it.OrganizacionID || "", bu: dim("DIMBU"), monto: Math.round(Number(it.ImporteMonPrincipal) || 0), glosa: it.Descripcion || "" };
+}

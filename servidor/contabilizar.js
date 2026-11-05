@@ -77,27 +77,33 @@ export function motivoFinn(r, tok) {
   return m.slice(0, 600) || (r.estado ? `Estado ${r.estado}.` : "Sin conexión con Finnegans.");
 }
 
+/* revisar si ya está, enviar y confirmar; devuelve [cuerpo de la respuesta, estado]. Lo usa también la prueba de asientoprueba.js (v163.1) */
+export async function enviarAsiento(env, a, { tokenFinnegans, FINN }) {
+  const tok = await tokenFinnegans(env);
+  const ruta = `${ENTIDAD}/${encodeURIComponent(a.idExt)}`;
+  // 1. ¿Ya está cargada?
+  let g = await finn(FINN, ruta, tok);
+  let x = g.ok ? asientoDe(g.datos) : null;
+  if (x) return [{ ok: true, ya: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt }, 200];
+  if (g.estado !== 404) return [{ error: "No se pudo revisar en FinnegansGO si la rendición ya estaba cargada. No se envió nada; intenta de nuevo.", detalle: motivoFinn(g, tok) }, 502];
+  // 2. Enviar
+  const p = await finn(FINN, ENTIDAD, tok, a.cuerpo);
+  // 3. Confirmar (también si el POST falló: puede haber quedado creado)
+  g = await finn(FINN, ruta, tok);
+  x = g.ok ? asientoDe(g.datos) : null;
+  if (x) return [{ ok: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt, debe: a.debe }, 200];
+  if (!p.ok) return [{ error: "FinnegansGO no aceptó el asiento.", detalle: motivoFinn(p, tok), estado: p.estado }, p.estado === 401 || p.estado === 403 ? 403 : 422];
+  // el POST dijo que sí pero el GET aún no lo encuentra: se toma lo que devolvió el POST
+  const y = asientoDe(p.datos);
+  return [{ ok: true, numero: y ? numeroDe(y) : "", interno: y ? y.NumeroInterno ?? null : null, idExt: a.idExt, debe: a.debe, sinConfirmar: true }, 200];
+}
+
 export async function contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN }) {
   if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
   if (!(await esContab())) return json({ error: "Solo Contabilidad o el administrador contabilizan en FinnegansGO." }, 403);
   let body; try { body = await req.json(); } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }
   const a = armarAsiento(body, env);
   if (a.error) return json({ error: a.error }, 400);
-  const tok = await tokenFinnegans(env);
-  const ruta = `${ENTIDAD}/${encodeURIComponent(a.idExt)}`;
-  // 1. ¿Ya está cargada?
-  let g = await finn(FINN, ruta, tok);
-  let x = g.ok ? asientoDe(g.datos) : null;
-  if (x) return json({ ok: true, ya: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt, por: correo });
-  if (g.estado !== 404) return json({ error: "No se pudo revisar en FinnegansGO si la rendición ya estaba cargada. No se envió nada; intenta de nuevo.", detalle: motivoFinn(g, tok) }, 502);
-  // 2. Enviar
-  const p = await finn(FINN, ENTIDAD, tok, a.cuerpo);
-  // 3. Confirmar (también si el POST falló: puede haber quedado creado)
-  g = await finn(FINN, ruta, tok);
-  x = g.ok ? asientoDe(g.datos) : null;
-  if (x) return json({ ok: true, numero: numeroDe(x), interno: x.NumeroInterno ?? null, idExt: a.idExt, por: correo, debe: a.debe });
-  if (!p.ok) return json({ error: "FinnegansGO no aceptó el asiento.", detalle: motivoFinn(p, tok), estado: p.estado }, p.estado === 401 || p.estado === 403 ? 403 : 422);
-  // el POST dijo que sí pero el GET aún no lo encuentra: se toma lo que devolvió el POST
-  const y = asientoDe(p.datos);
-  return json({ ok: true, numero: y ? numeroDe(y) : "", interno: y ? y.NumeroInterno ?? null : null, idExt: a.idExt, por: correo, debe: a.debe, sinConfirmar: true });
+  const [r, st] = await enviarAsiento(env, a, { tokenFinnegans, FINN });
+  return json(r.ok ? { ...r, por: correo } : r, st);
 }

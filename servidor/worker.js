@@ -35,7 +35,8 @@
   Notificaciones (v83): no requieren variables. Los equipos registrados y las claves de envío se guardan en el
   Durable Object AVISOS (ver push.js y wrangler.toml); se crea solo al publicar.
   Firma por link (v154): ver firma.js. Usa el mismo Durable Object AVISOS; no requiere variables.
-  Pruebas con la API asientoGenerico (v162.1 consulta de solo lectura; v162.2 envío de un asiento descuadrado a propósito, solo con
+  Pruebas con la API asientoGenerico (v162.1 consulta de solo lectura; v162.2 envío de un asiento descuadrado a propósito; v163.1
+  copia real del último asiento con prueba=duplicar; las dos, solo con
   prueba=descuadrado): ver asientoprueba.js. Se usan desde la pantalla de prueba de Finnegans de la app (reporte «asientoGenerico»),
   solo el administrador. Temporales.
   Contabilizar en FinnegansGO (v163): POST /finnegans/asiento, solo Contabilidad y el administrador; ver contabilizar.js.
@@ -105,7 +106,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v163";
+const VERSION_SERVIDOR = "v163.1";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
