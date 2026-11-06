@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-k0jUYZMA5N5kpWhMTunRCz0E/rDbx3kvd1PtYQzbg1o=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-D+uPGaKaOMQI7OJBba2CbiOzcAQFbF9mSkHUsdR66Cs=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=167">
+<link rel="stylesheet" href="estilos.css?v=168">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="167";
+const APP_VER="168";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -894,7 +894,8 @@ async function eliminarActa(a){
   go("home");toast("Borrador eliminado.");if(DB&&navigator.onLine!==false)setTimeout(()=>actasXlsx(false),1500);/* v130: sin su fila */return true;
 }
 
-/* ---------- v93: barra de navegación abajo ----------
+/* ---------- v93: barra de navegación abajo (desde la v168: Inicio · ＋ Nuevo · Cuenta; los módulos están solo en el Inicio,
+   así que ya no se elige qué módulos mostrar; lo de abajo describe la barra hasta la v167) ----------
    - En las pantallas principales (Inicio y la lista de cada módulo) queda una barra fija abajo: Inicio, los módulos que
      usa la persona (hasta 3) y «Más» (el resto de los módulos y su cuenta). Cuenta como usado lo que abre en este equipo
      y donde tiene registros propios; si todavía no usa nada, aparece Rendiciones. Quien solo rinde ve
@@ -902,17 +903,8 @@ async function eliminarActa(a){
    - Dentro de una rendición, documento, visita o acta no aparece: ahí manda la barra de acción de esa pantalla.
    - En Rendiciones, un número rojo con lo pendiente (por aprobar + devueltas).
    - En el teléfono se esconde mientras se escribe, para no quedar encima del teclado. */
-const TB_USO_K="actas-uso-mod";
 const TB_ICO_ACTA=`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15.5" r="4"/><path d="M10.9 12.6L19 4.5"/><path d="M15.5 8l2.5 2.5"/><path d="M13.5 10l1.8 1.8"/></svg>`;
-const TB_MODS=[
-  {k:"rd",a:"rd",t:"Rendiciones",tl:"Rendiciones",s:"Facturas y boletas",i:()=>ICO.receipt,ok:()=>true},
-  {k:"cl",a:"clHub",t:"Check list",tl:"Check list de cumplimiento",s:"Visitas a predios, bodegas y camionetas",i:()=>ICO.check,ok:()=>permVe("cl")},
-  {k:"ax",a:"axHub",t:"Actas",tl:"Actas",s:"Viviendas, vehículos, activos y capacitaciones",i:()=>TB_ICO_ACTA,ok:()=>permVe("ax")},
-  {k:"cb",a:"cb",t:"Bodega",tl:"Control de bodega",s:"Conteo contra el stock del sistema",i:()=>ICO.clip,ok:()=>puedeContar()},
-  {k:"stock",a:"stock",t:"Stock",tl:"Stock",s:"Existencias desde Finnegans",i:()=>ICO.box,ok:()=>puedeVerStock()},
-  /* v113: los check list de bodega y de camionetas están dentro de «Check list de cumplimiento» */];
 const TB_RAIZ={launch:1,rd:1,clhub:1,cl:1,axhub:1,cb:1,stock:1};
-let TB_ULT=null;
 function tbModDe(v){
   if(v==="launch")return"inicio";
   if(["rd","rdv","rdd","rdm","rdcol","fdl"].includes(v))return"rd";
@@ -922,42 +914,19 @@ function tbModDe(v){
   if(v==="stock")return"stock";
   return null;
 }
-function tbUso(){try{return JSON.parse(localStorage.getItem(TB_USO_K)||"{}")||{}}catch(e){return{}}}
-function tbContar(k){try{const u=tbUso();u[k]=(u[k]||0)+1;localStorage.setItem(TB_USO_K,JSON.stringify(u))}catch(e){}}
-/* qué módulos usa la persona: los que abre en este equipo y aquellos donde tiene registros propios */
 const tbMio=x=>!!(x&&ME&&x.creadoPor&&x.creadoPor.id&&x.creadoPor.id===ME.id);
-const TB_DATOS={
-  rd:()=>misRend().length>0||rdParaMi().length>0,
-  cl:()=>Object.values(VIS).some(v=>!v.anulada&&tbMio(v)),
-  ax:()=>Object.values(ACTAS).some(tbMio),
-  cb:()=>Object.values(CONT).some(tbMio)};
-function tbElegidos(){
-  const u=tbUso(),disp=TB_MODS.filter(m=>{try{return m.ok()}catch(e){return false}});
-  const tiene=m=>{try{return TB_DATOS[m.k]?!!TB_DATOS[m.k]():false}catch(e){return false}};
-  const sc=m=>(u[m.k]||0)*2+(tiene(m)?1:0)+(m.k==="rd"?0.5:0);
-  /* Rendiciones entra siempre que haya espacio: casi todos rinden */
-  let el=disp.filter(m=>sc(m)>=1||m.k==="rd").sort((a,b)=>(sc(b)-sc(a))||(TB_MODS.indexOf(a)-TB_MODS.indexOf(b))).slice(0,3);
-  if(!el.length)el=disp.filter(m=>m.k==="rd");
-  return el.sort((a,b)=>TB_MODS.indexOf(a)-TB_MODS.indexOf(b));
-}
 function tbPendRd(){try{return rdParaMi().length+misRend().filter(r=>!r.anulada&&r.estado==="observada").length}catch(e){return 0}}
-const TB_MAS_ICO=`<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>`;
 function tbSync(){
   let n=document.getElementById("tabbar");
-  const mod=tbModDe(view);
-  if(mod&&mod!=="inicio"&&mod!==TB_ULT)tbContar(mod);
-  TB_ULT=mod;
   const ver=!!(loaded&&CUENTA&&ME&&TB_RAIZ[view]);
   document.body.classList.toggle("contab",ver);
   if(!ver){if(n)n.hidden=true;return}
-  if(!n){n=document.createElement("nav");n.id="tabbar";n.className="tabbar";n.setAttribute("aria-label","Módulos");document.body.appendChild(n)}
-  n.hidden=false;
-  const els=tbElegidos();n.style.gridTemplateColumns=`repeat(${els.length+2},minmax(0,1fr))`;n.style.setProperty("--tbn",els.length+2);
-  const pend=tbPendRd(),act=els.some(m=>m.k===mod)||mod==="inicio"?mod:"mas";
-  const b=(a,t,ico,on,extra)=>`<button data-a="${esc(a)}" class="${on?"on":""}"${on?' aria-current="page"':""}><span class="tbi">${ico}</span><span class="tbt">${t}</span>${extra||""}</button>`;
-  n.innerHTML=b("launch","Inicio",ICO.home,act==="inicio")
-    +els.map(m=>b(m.a,m.t,m.i(),act===m.k,m.k==="rd"&&pend?`<span class="tbb" aria-label="${pend} pendientes">${pend>99?"99+":pend}</span>`:"")).join("")
-    +b("tbMas","Más",TB_MAS_ICO,act==="mas");
+  if(!n){n=document.createElement("nav");n.id="tabbar";n.className="tabbar";document.body.appendChild(n)}
+  n.setAttribute("aria-label","Navegación");n.hidden=false;
+  /* v168: Inicio · ＋ Nuevo · Cuenta (los módulos están en el Inicio; el número de Rendiciones va en su ícono del Inicio) */
+  n.style.gridTemplateColumns="repeat(3,minmax(0,1fr))";n.style.setProperty("--tbn",3);n.classList.add("tb3");
+  const b=(a,t,ico,on,cls)=>`<button data-a="${esc(a)}" class="${on?"on":""}${cls?" "+cls:""}"${on?' aria-current="page"':""}><span class="tbi">${ico}</span><span class="tbt">${t}</span></button>`;
+  n.innerHTML=b("launch","Inicio",ICO.home,view==="launch")+b("iniNuevo","Nuevo",`<span class="tbmas">${INI_ICO_MAS}</span>`,false,"tbnuevo")+b("tbMas","Cuenta",iniAvatar(),false,"tbcta");
   tbIndicador(n);
 }
 /* v149: indicador que se desliza hasta la pestaña elegida y el ícono que «palpita» al tocarla o al llegar a ella; TB_DIR guarda hacia
@@ -999,12 +968,10 @@ document.addEventListener("pointercancel",e=>tbSoltar(e,true),true);
 document.addEventListener("click",e=>{if(e.isTrusted&&Date.now()-TBD.suelto<450&&e.target&&e.target.closest&&e.target.closest("#tabbar")){e.stopPropagation();e.preventDefault()}},true);
 function tbMas(){
   document.querySelectorAll(".tbsheet").forEach(x=>x.remove());
-  const els=tbElegidos().map(m=>m.k),resto=TB_MODS.filter(m=>{try{return m.ok()}catch(e){return false}}).filter(m=>!els.includes(m.k));
-  const op=(a,ico,t,s)=>`<button class="tbop" data-a="${esc(a)}"><span class="tboi">${ico}</span><span><b>${esc(t)}</b>${s?`<small>${esc(s)}</small>`:""}</span></button>`;
+    const op=(a,ico,t,s)=>`<button class="tbop" data-a="${esc(a)}"><span class="tboi">${ico}</span><span><b>${esc(t)}</b>${s?`<small>${esc(s)}</small>`:""}</span></button>`;
   const m=document.createElement("div");m.className="modal tbsheet";
-  m.innerHTML=`<div class="sheet tbhoja" role="dialog" aria-modal="true" aria-label="Más"><div class="tbtir" aria-hidden="true"></div>
+  m.innerHTML=`<div class="sheet tbhoja" role="dialog" aria-modal="true" aria-label="Cuenta"><div class="tbtir" aria-hidden="true"></div>
     ${disSyncMasHTML()}
-    ${resto.length?`<h3>Otros módulos</h3>${resto.map(x=>op(x.a,x.i(),x.tl,x.s)).join("")}`:""}
     ${esAdmin()?`<h3>Administración</h3>${op("adm",ADM_ICO,"Herramientas de administración","Servidor, Finnegans, recordatorios y catálogo")}`:""}
     <h3>Tu cuenta</h3>
     ${disLetraHTML()}
@@ -1334,13 +1301,14 @@ function disSyncMasHTML(){
   const st=SYNC_INFO.estado==="bajando"||syncing||pulling?["chk","Sincronizando…"]:SYNC_INFO.error?["no",SYNC_INFO.error]:sinAccesoTxt()?["no",sinAccesoTxt()]:np?["camb",`${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir`]:["ok","Todo sincronizado"];
   return `<div class="lx-sync tbsync ${st[0]}"><div class="lx-syncl"><span class="lx-synct">${esc(st[1])}</span><span class="lx-syncs">Última sincronización: ${esc(disUlt())}</span></div><button class="btn" data-a="pull" ${on?"":"disabled"}>${on?"Sincronizar":"Sin señal"}</button></div>`;
 }
-function disBuscadorHTML(){return `<button type="button" class="lx-bus" data-a="disBuscar">${ICO_BUS}<span>Buscar actas, visitas o rendiciones</span></button>`}
+function disBuscadorHTML(){const q=[permVe("ax")?"actas":"",permVe("cl")?"visitas":""].filter(Boolean);const t=q.length?`Buscar ${q.join(", ")} o rendiciones`:"Buscar rendiciones y boletas"; /* v168: solo lo que la persona tiene */
+  return `<button type="button" class="lx-bus" data-a="disBuscar">${ICO_BUS}<span>${t}</span></button>`}
 let DIS_PHT=false;
 function disPh(L){
   /* primero lo urgente, después lo que está en curso y al final los recordatorios */
   const rk=h=>/\bph-urg\b/.test(h)?0:/class="lx-cont ph/.test(h)?2:1;
   L=L.map((h,i)=>({h,i,k:rk(h)})).sort((a,b)=>a.k-b.k||a.i-b.i).map(x=>x.h);
-  const max=DIS_ANCHO()?6:4;if(L.length<=max+1)return L.join("");
+  const max=DIS_ANCHO()?6:3; /* v168: 3 en el teléfono */if(L.length<=max+1)return L.join("");
   if(DIS_PHT)return L.join("")+`<button type="button" class="ph-todo" data-a="disPhTodo" aria-expanded="true">Ver menos</button>`;
   return L.slice(0,max).join("")+`<button type="button" class="ph-todo" data-a="disPhTodo" aria-expanded="false">Ver ${L.length-max} más</button>`;
 }
@@ -1596,7 +1564,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}"${back?"":` aria-label="Volver al inicio" title="Volver al inicio"`}>${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${esc(MARCA)}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
-function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue();flDecorar()}}
+function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue();flDecorar();try{iniModColor()}catch(e){}}}
 /* v150: esqueleto de carga (la forma del Inicio en gris, con un brillo) */
 function esqueletoHTML(){
   const fila=`<div class="esqf"><span class="esq esq-ic"></span><span class="esqx"><span class="esq" style="width:78%"></span><span class="esq" style="width:52%"></span></span></div>`;
@@ -1851,7 +1819,7 @@ function animarPantalla(v){try{if(matchMedia("(prefers-reduced-motion: reduce)")
   requestAnimationFrame(()=>requestAnimationFrame(arranca));setTimeout(arranca,400)}catch(e){}}
 /* v149: deslizar entre secciones (las pantallas de la barra de abajo), como en Instagram: equivale a tocar la pestaña vecina */
 const SWT={x0:null};
-function swtVecino(dir){const tb=document.getElementById("tabbar");if(!tb||tb.hidden)return null;const bs=[...tb.querySelectorAll("button[data-a]")].filter(b=>b.dataset.a!=="tbMas");
+function swtVecino(dir){const tb=document.getElementById("tabbar");if(!tb||tb.hidden)return null;const bs=[...tb.querySelectorAll("button[data-a]")].filter(b=>b.dataset.a!=="tbMas"&&b.dataset.a!=="iniNuevo");
   const i=bs.findIndex(b=>b.classList.contains("on"));return i<0?null:(bs[i+dir]||null)}
 function swtPuede(e){try{if(ESCRITORIO()||!loaded||!TB_RAIZ[view]||!e.touches||e.touches.length!==1||document.querySelector(".modal")||(typeof FAB_AB!=="undefined"&&FAB_AB))return false;
   const tb=document.getElementById("tabbar");if(!tb||tb.hidden)return false;const t=e.target;
@@ -1932,6 +1900,9 @@ async function onClickAccion(ev,b,A){
   if(A==="launch"){await flush();cur=null;go("launch");checkRed();return}
   if(A==="tbMas"){tbMas();return}
   if(A==="iniBod"){iniBodHoja();return}
+  if(A==="iniNuevo"){iniNuevo();return}
+  if(A==="iniHojaCL"){iniHojaCL();return}
+  if(A==="iniHojaAx"){iniHojaAx();return}
   if(A==="tema"){cambiarTema();return}
   if(A==="login"){iniciarSesion();return}
   if(A==="logout"){await cerrarSesion();return}
@@ -2727,7 +2698,7 @@ function renderLaunch(){
            :on?`<span class="lx-sig ok">${ICO.wifi}<span>Con señal</span></span>`
               :`<button class="lx-sig no" data-a="checkRed" title="Volver a revisar">${ICO.nowifi}<span>Sin señal · revisar</span></button>`;
   const tema=`<button class="lx-tema" data-a="tema" aria-label="${temaActual()==="dark"?"Cambiar a modo día":"Cambiar a modo noche"}">${temaActual()==="dark"?ICO.sun:ICO.moon}</button>`;
-  const hero=(h1,sub)=>`<header class="lx-hero"><div class="lx-top"><span class="lx-logo"><img src="${esc(MARCA_HZ)}" alt="Puduhue"></span><div class="lx-tools">${CUENTA&&ME?disChip():sig}${tema}</div></div><p class="lx-date">${fechaLarga()}</p><h1 class="lx-h1">${h1}</h1>${sub?`<p class="lx-sub">${sub}</p>`:""}${CUENTA&&ME?disBuscadorHTML():""}<svg class="lx-hills" viewBox="0 0 390 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 44 C70 20 120 18 180 34 C240 50 300 10 390 30 L390 60 L0 60Z" fill="rgba(255,255,255,.08)"/><path d="M0 52 C90 36 160 44 230 40 C300 36 340 30 390 44 L390 60 L0 60Z" fill="var(--bg)"/></svg></header>`;
+  const hero=(h1,sub)=>`<header class="lx-hero"><div class="lx-top"><span class="lx-logo"><img src="${esc(MARCA_HZ)}" alt="Puduhue"></span><div class="lx-tools">${CUENTA&&ME?disChip():sig}${tema}</div></div><p class="lx-date">${fechaLarga()}</p><h1 class="lx-h1">${h1}</h1>${sub?`<p class="lx-sub">${sub}</p>`:""}${CUENTA&&ME?disBuscadorHTML():""}${CUENTA&&ME?iniAccesosHTML():""}<svg class="lx-hills" viewBox="0 0 390 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 44 C70 20 120 18 180 34 C240 50 300 10 390 30 L390 60 L0 60Z" fill="rgba(255,255,255,.08)"/><path d="M0 52 C90 36 160 44 230 40 C300 36 340 30 390 44 L390 60 L0 60Z" fill="var(--bg)"/></svg></header>`;
   if(!CUENTA){
     return hero("Puduhue Terreno","Las apps de terreno de Puduhue: actas de vivienda, check list de visitas y más")+`<main class="wrap lx-main">${instCardHTML(true)}
     <div class="lx-login">
@@ -2762,51 +2733,92 @@ function renderLaunch(){
     <div><b>${nv}</b><span>${nv===1?"visita":"visitas"} de check list</span></div>
     <div class="${nh?"warn":""}"><b>${nh}</b><span>${nh===1?"hallazgo abierto":"hallazgos abiertos"}</span></div></div>${np?`<p class="lx-foot">${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir.</p>`:""}</section>`;
   const nb=todas.filter(a=>a.estado!=="cerrada").length,nbAx=todasAx.filter(a=>a.estado!=="cerrada").length;
-  return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${(()=>{try{return typeof rdInicioFondo==="function"?rdInicioFondo():""}catch(e){console.warn("inicio fondo",e);return""}})()}${cont}
-    ${iniModsHTML()}
+  return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${iniTipNav()}${(()=>{try{return typeof rdInicioFondo==="function"?rdInicioFondo():""}catch(e){console.warn("inicio fondo",e);return""}})()}${cont}
   </main>`;
 }
 
-/* ---------- v167: módulos del Inicio como tarjetas (aprobado por Benja tras la «Vista previa Terreno: módulos del Inicio», propuesta B) ----------
-   Cada tarjeta: ícono con el color del módulo, nombre, una línea de resumen y una etiqueta solo cuando hay algo de la persona
-   (lo suyo en curso, lo que espera su revisión). Lo abierto por otras personas ya no se cuenta aquí («Para hoy» y las tarjetas
-   dicen lo mismo). Stock y Control de bodega van juntos en «Bodega» (abre una hoja) cuando la persona ve los dos. */
-function iniTarjeta(a,c,ico,nom,res,et,desc){
-  return `<button class="ini-t ini-${c}" data-a="${esc(a)}"><span class="ini-i">${ico}</span><span class="ini-n">${nom}</span><span class="ini-s">${res}</span>${desc?`<span class="ini-d">${desc}</span>`:""}${et?`<span class="ini-p${et[1]?" "+et[1]:""}">${et[0]}</span>`:""}</button>`;
-}
+/* ---------- v167-v168: módulos del Inicio y barra de abajo ----------
+   v167: cada módulo con su color. v168 (Modelo 2.2 con ajustes): los módulos están solo en el Inicio, en una fila de íconos del
+   encabezado; la barra de abajo es Inicio · ＋ Nuevo · Cuenta. Lo abierto por otras personas no se cuenta («Para hoy» dice lo
+   mismo). Stock y Control de bodega van juntos en «Bodega» (abre una hoja) cuando la persona ve los dos. */
 const iniN=(n,uno,varios)=>`${n} ${n===1?uno:varios}`;
 /* «de hoy», «de ayer» o «al 1 de noviembre» */
 function iniFecha(h){try{const d=isoLocal(h);if(d===today())return "de hoy";if(d===sumarDias(today(),-1))return "de ayer";const t=new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long"});return "al "+t}catch(e){return "al "+fmtD(h)}}
-function iniModsHTML(){
+/* v168: módulos en una fila de íconos del encabezado; el número es solo lo propio (rojo: espera la revisión de la persona).
+   Con un solo módulo (casi siempre Rendiciones), un botón ancho con lo pendiente o en qué va la última rendición. */
+const INI_RDC={borrador:"sin enviar",enviada:"en revisión de jefatura",revcont:"en revisión contable",aprobada:"aprobada",contabilizada:"contabilizada",observada:"devuelta"};
+function iniAccesosHTML(){
   const T=[];
-  const RDC={borrador:"sin enviar",enviada:"en jefatura",revcont:"en Contabilidad",aprobada:"aprobada",contabilizada:"contabilizada",observada:"devuelta"};
-  if(permVe("ax")){
-    const ax=Object.values(ACTAS).filter(a=>!a.anulada),mias=ax.filter(a=>a.estado!=="cerrada"&&tbMio(a)).length;
-    T.push(iniTarjeta("axHub","ax",ICO.home,"Actas",ax.length?iniN(ax.length,"acta","actas"):"Sin actas todavía",mias?[iniN(mias,"borrador","borradores"),""]:null,"Viviendas, vehículos, activos fijos y capacitaciones."));
-  }
-  { const per=periodoActual(),r=rendPeriodo(per),pr=rdParaMi().length,mes=periodoTxt(per).split(" ")[0];
-    const n=r?docsDe(r).length:0;
-    const res=r&&n?`${mes}: ${iniN(n,"documento","documentos")}, ${RDC[r.estado]||String(RD_ESTADO[r.estado]||"").toLowerCase()}`:`${mes}: nada rendido todavía`;
-    T.push(iniTarjeta("rd","rd",ICO.receipt,"Rendiciones",res,pr?[`${pr} por revisar`,"urg"]:null,"Facturas y boletas: aprobación y contabilidad.")); }
-  if(permVe("cl")){
-    const tipos=clHubVer().map(x=>x[0]),vs=Object.values(VIS).filter(v=>!v.anulada&&tipos.includes(tipoDe(v)));
-    const mias=vs.filter(v=>v.estado!=="cerrada"&&tbMio(v)).length;
-    const ha=tipos.reduce((n,x)=>n+unidadesCL(x).reduce((m,p)=>m+abiertos(p,x).length,0),0);
-    const res=vs.length?[iniN(vs.length,"visita","visitas"),ha?iniN(ha,"hallazgo abierto","hallazgos abiertos"):""].filter(Boolean).join(" · "):"Sin visitas todavía";
-    T.push(iniTarjeta("clHub","cl",ICO.check,"Check list",res,mias?[`${mias} en curso`,""]:null,"Visitas a predios (con la casa de huéspedes), bodegas y camionetas."));
-  }
-  const vC=puedeContar(),vS=puedeVerStock();
-  const cs=Object.values(CONT).filter(c=>!c.anulado),cMias=cs.filter(c=>c.estado!=="cerrado"&&tbMio(c)).length;
-  const stTxt=STOCK?`Stock ${iniFecha(STOCK.hora)}`:"Stock sin datos todavía";
-  const cbTxt=cs.length?iniN(cs.length,"conteo","conteos"):"Sin conteos todavía";
-  const cbEt=cMias?[`${cMias} en curso`,""]:null;
-  if(vC&&vS){
-    T.push(iniTarjeta("iniBod","cb",ICO.box,"Bodega",`${cbTxt} · ${stTxt.charAt(0).toLowerCase()+stTxt.slice(1)}`,cbEt,"Conteos físicos y existencias desde Finnegans."));
-  }else{
-    if(vC)T.push(iniTarjeta("cb","cb",ICO.clip,"Control de bodega",cbTxt,cbEt,"Conteo físico contra el stock del sistema."));
-    if(vS)T.push(iniTarjeta("stock","st",ICO.box,"Stock",STOCK?`Existencias ${iniFecha(STOCK.hora)}`:"Sin datos todavía",null,"Existencias por depósito desde Finnegans."));
-  }
-  return `<h2 class="lx-h2 lx-modh">Módulos</h2><div class="ini-ts">${T.join("")}</div>`;
+  const ic=(a,c,ico,t,n,urg)=>`<button class="ihacc ini-${c}" data-a="${esc(a)}" aria-label="${esc(t)}${n?` (${n} pendiente${n===1?"":"s"})`:""}"><span class="ini-i">${ico}${n?`<span class="iacn${urg?" urg":""}">${n>99?"99+":n}</span>`:""}</span><span class="iacl">${t}</span></button>`;
+  if(permVe("ax")){const n=Object.values(ACTAS).filter(a=>!a.anulada&&a.estado!=="cerrada"&&tbMio(a)).length;T.push(ic("axHub","ax",ICO.home,"Actas",n))}
+  {const n=tbPendRd();T.push(ic("rd","rd",ICO.receipt,"Rendiciones",n,true))}
+  if(permVe("cl")){const n=Object.values(VIS).filter(v=>!v.anulada&&v.estado!=="cerrada"&&tbMio(v)).length;T.push(ic("clHub","cl",ICO.check,"Check list",n))}
+  const vC=puedeContar(),vS=puedeVerStock(),nc=Object.values(CONT).filter(c=>!c.anulado&&c.estado!=="cerrado"&&tbMio(c)).length;
+  if(vC&&vS)T.push(ic("iniBod","cb",ICO.box,"Bodega",nc));
+  else{if(vC)T.push(ic("cb","cb",ICO.clip,"Bodega",nc));if(vS)T.push(ic("stock","cb",ICO.box,"Stock",0))}
+  if(T.length>1)return `<nav class="ihacc-f" aria-label="Módulos">${T.join("")}</nav>`;
+  const n=tbPendRd();let sub="Facturas y boletas";
+  if(n)sub=`${n} ${n===1?"pendiente":"pendientes"}`;
+  else{try{const r=misRend().filter(x=>!x.anulada).sort((a,b)=>String(b.periodo).localeCompare(String(a.periodo))||(b.n||1)-(a.n||1))[0];
+    if(r&&docsDe(r).length)sub=`${periodoTxt(r.periodo).split(" ")[0]}: ${INI_RDC[r.estado]||String(RD_ESTADO[r.estado]||"").toLowerCase()}`}catch(e){}}
+  return `<button class="ihbtn ini-rd" data-a="rd"><span class="ini-i">${ICO.receipt}</span><span class="ihbt"><b>Mis rendiciones</b><small>${esc(sub)}</small></span><span class="ihbf" aria-hidden="true">›</span></button>`;
+}
+/* aviso de una vez sobre el cambio de orden (se cierra con «Entendido»), según lo que la persona tiene */
+function iniTipNav(){
+  const emp=[permAgrega("cl")?"una visita":"",permAgrega("ax")?"un acta":"",puedeContar()&&permAgrega("cb")?"un conteo":""].filter(Boolean);
+  const varios=permVe("ax")||permVe("cl")||puedeContar()||puedeVerStock();
+  const e=emp.length?`, o empiezas ${emp.length>1?emp.slice(0,-1).join(", ")+" o "+emp[emp.length-1]:emp[0]}`:"";
+  return disTip("nav168",`<b>La app cambió de orden.</b> ${varios?"Tus módulos están arriba.":"Tus rendiciones están arriba."} Con <b>＋</b> rindes una factura o boleta${e}. Tus ajustes están en <b>Cuenta</b>.`);
+}
+/* la tarjeta del fondo (más baja desde la v168) abre «Mis rendiciones» */
+document.addEventListener("click",e=>{try{if(view!=="launch")return;const f=e.target.closest&&e.target.closest(".lx-main .ifd");if(!f||e.target.closest("button,a"))return;rdTab="mias";go("rd")}catch(er){}});
+/* hojas de la barra (＋, Check list, Acta) */
+function iniHoja(tit,ops,extra){
+  document.querySelectorAll(".tbsheet").forEach(x=>x.remove());
+  const op=o=>`<button class="tbop" data-a="${esc(o[0])}"${o[4]?` data-t="${esc(o[4])}"`:""}><span class="tboi">${o[1]}</span><span><b>${esc(o[2])}</b>${o[3]?`<small>${esc(o[3])}</small>`:""}</span></button>`;
+  const m=document.createElement("div");m.className="modal tbsheet";
+  m.innerHTML=`<div class="sheet tbhoja" role="dialog" aria-modal="true" aria-label="${esc(tit||"Nuevo")}"><div class="tbtir" aria-hidden="true"></div>${extra||""}${ops.length?`<h3>${esc(tit)}</h3>${ops.map(op).join("")}`:""}</div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click",e=>{if(e.target===m){m.remove();return}
+    /* elegir una foto: la hoja se esconde y el campo sigue en la página hasta que llega la foto */
+    if(e.target.closest&&e.target.closest("label.tbop")){m.hidden=true;setTimeout(()=>m.remove(),60000);return}
+    const t=e.target.closest&&e.target.closest("[data-a]");if(t)setTimeout(()=>m.remove(),0)});
+  return m;
+}
+function iniHojaCL(){iniHoja("¿Qué vas a revisar?",clHubVer().map(([t,a,nom,desc])=>[a,t==="camionetas"?ICO.camioneta:t==="bodega"?ICO.bodega:ICO.check,nom,String(desc||"").replace(/<[^>]*>/g,"")]))}
+function iniHojaAx(){iniHoja("¿Qué vas a registrar?",[["home",ICO.home,"Vivienda","Entrega o devolución de una casa"],["axList",ICO.camioneta,"Vehículo","Entrega o devolución de una camioneta de la flota","vehiculo"],["axList",ICO.box,"Activo fijo","Computadores, celulares, herramientas o equipos","activo"],["axList",ICO.check,"Capacitación","Tema, relator y la firma de cada participante","capacitacion"]])}
+/* ＋ Nuevo: rendir y empezar algo; lo que más usa la persona en este teléfono va primero */
+const INI_USO_K="actas-nuevo-uso";
+function iniUso(){try{return JSON.parse(localStorage.getItem(INI_USO_K)||"{}")||{}}catch(e){return{}}}
+function iniUsar(k){try{const u=iniUso();u[k]=(u[k]||0)+1;localStorage.setItem(INI_USO_K,JSON.stringify(u))}catch(e){}}
+function iniNuevo(){
+  const lab=(ico,t,s,inp)=>`<label class="tbop"><span class="tboi">${ico}</span><span><b>${t}</b>${s?`<small>${s}</small>`:""}</span>${inp}</label>`;
+  const rendir=`<h3>Rendir una factura o boleta</h3>`+(ESCRITORIO()
+    ?lab(ICO_SUBIR,"Subir fotos o PDF","Se leen solas y van a tu rendición del mes",`<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1">`)
+    :lecFabAyudaHTML()+lab(ICO_CAM,"Cámara","Foto de la boleta o factura",`<input class="vh" type="file" accept="image/*" capture="environment" data-fabrd="1">`)
+      +(lecPuedeEscanear()?`<button class="tbop" data-a="lecEscanear"><span class="tboi">${ICO_TIMBRE}</span><span><b>Escanear código del SII</b><small>Para boletas basta con el código</small></span></button>`:"")
+      +lab(ICO_GAL,"Galería o PDF","Una o varias a la vez",`<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1">`));
+  const E=[],ku={iniHojaCL:"cl",iniHojaAx:"ax",cb:"cb"},u=iniUso();
+  if(permAgrega("cl"))E.push(["iniHojaCL",ICO.check,"Nueva visita","Predio, bodega o camioneta"]);
+  if(permAgrega("ax"))E.push(["iniHojaAx",ICO.home,"Nueva acta","Vivienda, vehículo, activo o capacitación"]);
+  if(puedeContar()&&permAgrega("cb"))E.push(["cb",ICO.clip,"Nuevo conteo","Bodega contra el stock"]);
+  E.sort((a,b)=>(u[ku[b[0]]]||0)-(u[ku[a[0]]]||0));
+  const rendirPrimero=!E.length||(u.rendir||0)>=Math.max(0,...E.map(e=>u[ku[e[0]]]||0));
+  const emp=E.length?`<h3>Empezar</h3>`+E.map(o=>`<button class="tbop" data-a="${esc(o[0])}"><span class="tboi">${o[1]}</span><span><b>${esc(o[2])}</b><small>${esc(o[3])}</small></span></button>`).join(""):"";
+  const m=iniHoja("Nuevo",[],rendirPrimero?rendir+emp:emp+rendir);
+  m.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest(".tbop");if(t)iniUsar(t.dataset.a?(ku[t.dataset.a]||t.dataset.a):"rendir")},true);
+}
+const INI_ICO_MAS=`<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+function iniAvatar(){const t=String((ME&&(ME.nombre||ME.correo))||"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();return `<span class="tbav">${esc(t||"·")}</span>`}
+/* cada módulo con su color también por dentro: línea bajo la barra de arriba y su ícono junto al título de la pantalla principal */
+const INI_MODC={rd:["rd","receipt"],cl:["cl","check"],ax:["ax","home"],cb:["cb","box"],stock:["cb","box"]};
+function iniModColor(){
+  const m=INI_MODC[tbModDe(view)];
+  if(!m){delete document.body.dataset.mod;return}
+  document.body.dataset.mod=m[0];
+  if(!TB_RAIZ[view])return;
+  const h=document.querySelector("#app main h1");
+  if(h&&!h.querySelector(".ini-h1i"))h.insertAdjacentHTML("afterbegin",`<span class="ini-i ini-${m[0]} ini-h1i" aria-hidden="true">${ICO[m[1]]}</span>`);
 }
 /* «Bodega»: hoja con Control de bodega y Stock */
 function iniBodHoja(){
@@ -3724,10 +3736,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=167"></script>
-<script src="modulos/bodega.js?v=167"></script>
-<script src="modulos/rendiciones.js?v=167"></script>
-<script src="modulos/actas-entrega.js?v=167"></script>
+<script src="modulos/checklist.js?v=168"></script>
+<script src="modulos/bodega.js?v=168"></script>
+<script src="modulos/rendiciones.js?v=168"></script>
+<script src="modulos/actas-entrega.js?v=168"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
