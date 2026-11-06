@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-MryEP/iXjdU7kphEzZUWrGP23h1/BpsvGVBcR3tq/n4=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-k0jUYZMA5N5kpWhMTunRCz0E/rDbx3kvd1PtYQzbg1o=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -2793,7 +2793,7 @@ function iniModsHTML(){
     const mias=vs.filter(v=>v.estado!=="cerrada"&&tbMio(v)).length;
     const ha=tipos.reduce((n,x)=>n+unidadesCL(x).reduce((m,p)=>m+abiertos(p,x).length,0),0);
     const res=vs.length?[iniN(vs.length,"visita","visitas"),ha?iniN(ha,"hallazgo abierto","hallazgos abiertos"):""].filter(Boolean).join(" · "):"Sin visitas todavía";
-    T.push(iniTarjeta("clHub","cl",ICO.check,"Check list",res,mias?[`${mias} en curso`,""]:null,"Predios, bodegas y camionetas."));
+    T.push(iniTarjeta("clHub","cl",ICO.check,"Check list",res,mias?[`${mias} en curso`,""]:null,"Visitas a predios (con la casa de huéspedes), bodegas y camionetas."));
   }
   const vC=puedeContar(),vS=puedeVerStock();
   const cs=Object.values(CONT).filter(c=>!c.anulado),cMias=cs.filter(c=>c.estado!=="cerrado"&&tbMio(c)).length;
