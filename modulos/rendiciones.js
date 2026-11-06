@@ -22,7 +22,7 @@ const fdHora=h=>{if(!h)return"";const d=new Date(h);if(isNaN(d))return"";const f
   return (f===today()?"hoy":f===sumarDias(today(),-1)?"ayer":fdF(f))+" "+hh};
 function fdCacheMio(){try{const x=JSON.parse(localStorage.getItem(FD_K)||"null");return x&&x.correo===meCorreo()?x:null}catch(e){return null}}
 /* fuente de datos: el servidor de Puduhue consulta el Libro Mayor de la 110106 en Finnegans (solo lo de quien pide; todo, para Contabilidad) */
-async function fdFuente(todos){if(todos)await fdPadron(false);return await workerFetch("/fondo"+(todos?"?todos=1":""))}
+async function fdFuente(todos,forzar){if(todos)await fdPadron(false);return await workerFetch("/fondo"+(todos?"?todos=1"+(forzar?"&forzar=1":""):""))} /* v171: forzar = sin la copia de 5 minutos del servidor (solo Contabilidad) */
 /* lista de colaboradores para el servidor (correo → RUT → organización en Finnegans): así cada persona recibe solo lo suyo.
    La publica Contabilidad (o el administrador) al abrir «Fondos por rendir» o al activar el saldo para todos. */
 let FD_PADRON_OK=0;
@@ -35,11 +35,11 @@ async function fdPadron(forzar){
 }
 /* clave de cada ficha: el RUT, o la organización cuando en Finnegans no es una persona de la lista */
 const fdKey=p=>normRut(p&&p.rut)||("o:"+normTxt(p&&(p.org||p.nombre)||""));
-async function fdTraer(todos,silencioso){
+async function fdTraer(todos,silencioso,forzar){
   if(FD.cargando)return;
   if(navigator.onLine===false){if(!silencioso)toast("Se necesita señal para consultar Finnegans.");return}
   FD.cargando=todos?2:1;if(todos)FD.errT=null;else FD.err=null;if(!silencioso)render();
-  try{const j=await fdFuente(todos);
+  try{const j=await fdFuente(todos,forzar);
     const x={hora:j.hora||new Date().toISOString(),desde:j.desde||"",personas:Array.isArray(j.personas)?j.personas:[],sinPersona:num(j.sinPersona)||0,aviso:j.aviso||"",correo:meCorreo(),cuentas:Array.isArray(j.cuentas)?j.cuentas:[],sinPersonaPor:j.sinPersonaPor&&typeof j.sinPersonaPor==="object"?j.sinPersonaPor:null}; /* v171: también cuentas y sinPersonaPor */
     if(todos)FD.t=x;else{FD.p=x;try{localStorage.setItem(FD_K,JSON.stringify(x))}catch(e){}}}
   catch(e){const m=(e&&e.error)||"No se pudo consultar Finnegans.";if(todos)FD.errT=m;else FD.err=m}
@@ -288,7 +288,7 @@ async function fdClick(A,b){
   if(A==="fdOrd"){fdOrd=b.dataset.o||"saldo";render();return true}
   if(A==="fdAlDia"){fdAlDia=!fdAlDia;render();return true}
   if(A==="fdXls"){await fdXls(b.dataset.k,b.dataset.t==="1");return true} /* v170 */
-  if(A==="fdActualizar"){await fdTraer(true);return true}
+  if(A==="fdActualizar"){await fdTraer(true,false,true);return true} /* v171: directo de Finnegans */
   if(A==="fdActMio"){FD.intento=1;await fdTraer(false);return true}
   if(A==="fdMostrar"){if(!esContab())return true;const on=!fdVisible();
     if(on&&FD.t&&Math.abs(FD.t.sinPersona)>0.5&&!await ask("¿Mostrar los saldos?",`Finnegans todavía tiene ${fmtP(Math.abs(FD.t.sinPersona))} de las cuentas de fondos sin persona (saldo inicial o apertura), así que algunos saldos pueden no estar completos.`,"Mostrar igual"))return true;
