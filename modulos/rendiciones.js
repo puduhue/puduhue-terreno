@@ -107,9 +107,9 @@ function fdMov(key,deTodos){
   if(!p){toast("No hay movimientos de esa persona.");return}
   const c=colabPorRut(p.rut),k=fdCalc(p),nom=(c&&c.nombre)||p.nombre||p.rut;
   document.querySelectorAll(".fdsheet").forEach(x=>x.remove());
-  let run=0;const conSaldo=k.movs.map(x=>{run+=num(x.m)||0;return Object.assign({},x,{run})}).reverse();
+  let run=0;const conSaldo=k.movs.map((x,i)=>{run+=num(x.m)||0;return Object.assign({},x,{run,i})}).reverse(); /* v169: i = posición, para abrir el detalle */
   const porMes={};conSaldo.forEach(x=>{const m=String(x.f).slice(0,7);(porMes[m]=porMes[m]||[]).push(x)});
-  const fila=x=>{const m=num(x.m)||0;return `<div class="fdmv"><span class="fdmf">${fdF(x.f)}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fmtP(x.run)}</small></span></div>`};
+  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fmtP(x.run)}</small></span>${FD_CHEV}</button>`};
   const tram=k.tram.map(r=>`<button class="fdmv fdtr" data-a="fdIrRend" data-id="${esc(r.id)}"><span class="fdmf">${fdF(r.enviada)}</span><span class="fdmt"><b>${esc(rdTitulo(r))}</b><small>${esc(rdEstadoFrase(r).t)}</small></span><span class="fdmm neg">−${fmtP(totalRend(r))}<small>en revisión</small></span></button>`).join("");
   const m=document.createElement("div");m.className="modal fdsheet";
   m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}"><div class="tbtir" aria-hidden="true"></div>
@@ -120,7 +120,43 @@ function fdMov(key,deTodos){
     ${conSaldo.length?Object.keys(porMes).map(mm=>`<div class="fdmes">${esc(periodoTxt(mm))}</div><div class="fdmvs">${porMes[mm].map(fila).join("")}</div>`).join(""):`<p class="fdn">Sin movimientos ${D.desde?`desde el ${fdF(D.desde,1)}`:"en el período"}.</p>`}
     <p class="note">${D.desde?`Desde el ${fdF(D.desde,1)}. `:""}Datos de Finnegans de ${esc(fdHora(D.hora))}. Si algo no calza, avísale a Contabilidad.</p></div>`;
   document.body.appendChild(m);
-  m.addEventListener("click",e=>{if(e.target===m){m.remove();return}const t=e.target.closest&&e.target.closest("[data-a]");if(t)setTimeout(()=>m.remove(),0)});
+  m.addEventListener("click",e=>{if(e.target===m){m.remove();return}
+    const v=e.target.closest&&e.target.closest(".fdmvb");if(v){fdMvAbrir(v,conSaldo,p);return} /* v169 */
+    const t=e.target.closest&&e.target.closest("[data-a]");if(t)setTimeout(()=>m.remove(),0)});
+}
+/* ---- v169: detalle de un movimiento de Finnegans (se abre debajo de la fila; se cierra al volver a tocarla) ---- */
+const FD_CHEV=`<svg class="fdchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+const FD_QUE={rendicion:"Gastos rendidos y contabilizados",devolucion:"Dinero devuelto",inicial:"Saldo con que empieza el período",ajuste:"Corrección o reverso contable"};
+function fdMvAbrir(b,lista,p){
+  const sig=b.nextElementSibling;
+  if(sig&&sig.classList.contains("fdmvd")){sig.remove();b.setAttribute("aria-expanded","false");return}
+  const x=lista.find(y=>String(y.i)===b.dataset.i);if(!x)return;
+  const d=document.createElement("div");d.className="fdmvd";d.id="fdmvd"+x.i;d.innerHTML=fdMvDet(x,lista,p);
+  b.after(d);b.setAttribute("aria-expanded","true");b.setAttribute("aria-controls",d.id);
+  try{if(d.getBoundingClientRect().bottom>innerHeight-8)d.scrollIntoView({block:"nearest",behavior:"smooth"})}catch(e){}
+}
+function fdMvDet(x,lista,p){
+  const m=num(x.m)||0,X=x.x||{},nt=s=>normTxt(s||""),ref=x.ref||X.doc||"",desc=X.ds||x.d||"";
+  const fila=(k,v)=>v?`<div><dt>${k}</dt><dd>${v}</dd></div>`:"";
+  const ef=x.t==="inicial"?"":m>0?"suma a lo que hay por rendir":"descuenta de lo que hay por rendir";
+  const que=FD_QUE[x.t]?FD_QUE[x.t]+(ef?": "+ef:"")+".":ef.charAt(0).toUpperCase()+ef.slice(1)+".";
+  const td=X.td&&!nt(ref).includes(nt(X.td))?X.td:"",co=X.co&&!nt(ref).includes(nt(X.co))?X.co:"";
+  /* el mismo documento con varias líneas (por ejemplo, una orden de pago que paga varias cosas) */
+  const mismos=ref?lista.filter(y=>(y.ref||(y.x&&y.x.doc)||"")===ref):[],tot=mismos.reduce((s,y)=>s+(num(y.m)||0),0);
+  /* rendición de la app que calza con el asiento (misma descripción) */
+  const r=m<0&&desc?fdRendDe(p.rut).find(r=>nt((r.asiento&&r.asiento.desc)||rdDescAsiento(r))===nt(desc)):null;
+  return `<dl>
+    ${fila("Fecha",esc(fdF(x.f,1)))}
+    ${fila("Qué es",esc(que))}
+    ${fila("Monto",`<b class="${m>0?"pos":"neg"}">${m>0?"+":"−"}${esc(fmtP(Math.abs(m)))}</b>`)}
+    ${fila("Saldo después",esc(fmtP(x.run)))}
+    ${fila("Documento",esc(ref))}
+    ${fila("Tipo de documento",esc(td))}
+    ${fila("Comprobante",esc(co))}
+    ${fila("Descripción",esc(desc))}
+    ${fila("Detalle",esc(X.dt||""))}
+    ${mismos.length>1?fila("Mismo documento",`${mismos.length} movimientos, ${tot<0?"−":"+"}${esc(fmtP(Math.abs(tot)))} en total`):""}
+  </dl>${r?`<button type="button" class="btn fdmvir" data-a="fdIrRend" data-id="${esc(r.id)}">Ver la rendición · ${esc(rdTitulo(r))}</button>`:""}`;
 }
 /* ---- Contabilidad: todas las personas ---- */
 function fdLista(){
@@ -2275,4 +2311,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="168"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="169"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

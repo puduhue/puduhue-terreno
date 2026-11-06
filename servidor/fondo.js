@@ -84,7 +84,10 @@ export function movimientos(datos, cuenta) {
     else t = "otro";
     const ref = [doc || tipo, comp].filter(Boolean).join(" ").replace(/\s+/g, " ").slice(0, 60);
     const onT = txt(f, C.orgNom), onD = txt(f, C.orgDoc);
-    out.push({ f: fe, t, m, ref, d: (desc || det).slice(0, 80), oc: txt(f, C.orgCod), on: onT || onD, de: onT ? "linea" : onD ? "documento" : "" });
+    /* v169: detalle para la app (se ve al tocar el movimiento): documento, tipo, comprobante, descripción y detalle completos */
+    const x = {}, pon = (k, v) => { v = String(v || "").replace(/\s+/g, " ").trim().slice(0, 300); if (v) x[k] = v; };
+    pon("doc", doc); pon("td", tipo); pon("co", comp); pon("ds", desc); if (normTxt(det) !== normTxt(desc)) pon("dt", det);
+    out.push({ f: fe, t, m, ref, d: (desc || det).slice(0, 80), x, oc: txt(f, C.orgCod), on: onT || onD, de: onT ? "linea" : onD ? "documento" : "" });
   }
   const f0 = filas.find(f => f && typeof f === "object");
   return { movs: out, columnas: C, filas: filas.length, claves: f0 ? Object.keys(f0) : [], crudo: filas.slice(0, 3) };
@@ -113,6 +116,7 @@ export function agrupar(movs, padron, soloRuts) {
   for (const p of P) per.set(normRut(p.rut), { rut: p.rut, nombre: p.nombre, org: p.org ? p.org.codigo : "", movs: [] });
   for (const mv of movs) {
     const limpio = { f: mv.f, t: mv.t, m: mv.m, ref: mv.ref, d: mv.d };
+    if (mv.x && Object.keys(mv.x).length) limpio.x = mv.x; /* v169 */
     if (!normTxt(mv.oc) && !normTxt(mv.on)) { sin.total += mv.m; sin.n++; continue; }
     const p = P.find(x => esDe(x, mv));
     if (p) { per.get(normRut(p.rut)).movs.push(limpio); continue; }

@@ -1869,3 +1869,18 @@ body[data-mod] .top{border-bottom:3px solid var(--mod-c)}
 #app main h1:has(>.ini-h1i){display:flex;align-items:center;gap:12px}
 .ini-h1i{flex:none;width:44px;height:44px;margin:0!important;border-radius:13px}
 .ini-h1i svg{width:24px;height:24px}
+/* v169: detalle de un movimiento del fondo (se abre al tocarlo) */
+.fdmvb .fdchev{width:16px;height:16px;flex:none;margin-right:-4px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;color:var(--muted);transition:transform .18s ease}
+.fdmvb[aria-expanded="true"]{background:var(--soft)}
+.fdmvb[aria-expanded="true"] .fdchev{transform:rotate(90deg)}
+.fdmvb:focus-visible{outline:2px solid var(--act);outline-offset:-2px}
+.fdmvd{background:var(--soft);padding:2px 14px 12px;animation:fdmvdIn .16s ease}
+@keyframes fdmvdIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.fdmvd dl{margin:0;display:grid;grid-template-columns:minmax(92px,auto) 1fr;gap:7px 12px;font-size:13.5px;line-height:1.35}
+.fdmvd dl>div{display:contents}
+.fdmvd dt{color:var(--muted)}
+.fdmvd dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.fdmvd dd b{font-variant-numeric:tabular-nums}
+.fdmvd dd b.neg{color:var(--sm-v)}
+.fdmvir{margin-top:10px;width:100%}
+@media (prefers-reduced-motion:reduce){.fdmvd{animation:none}.fdmvb .fdchev{transition:none}}
