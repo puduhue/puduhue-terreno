@@ -92,7 +92,7 @@ function fdTarjeta(){
   const big=k.porRendir>0.5?`<div class="fdm"><b>${fmtP(k.porRendir)}</b><span>por rendir</span></div>`
     :k.porRendir<-0.5?`<div class="fdm fav"><b>${fmtP(-k.porRendir)}</b><span>a tu favor: rendiste más de lo que recibiste</span></div>`
     :`<div class="fdm ok"><b>Estás al día</b><span>no tienes fondos por rendir</span></div>`;
-  const tit=(c=>c.length>1?"Tus fondos":c[0]==="110105"?"Tu fondo fijo":"Tu fondo por rendir")(fdCtas(k)); /* v170 */
+  const tit=fdTituloFondo(k); /* v170; v172: misma regla en el Inicio */
   return `<section class="fdc" aria-label="${tit}"><div class="fdh"><b>${tit}</b></div>
     ${big}
     ${k.enTram>0.5?`<dl class="fdl"><div><dt>Saldo en Contabilidad</dt><dd>${fmtP(k.saldo)}</dd></div><div><dt>Enviado, en revisión</dt><dd>−${fmtP(k.enTram)}</dd></div></dl>`:""}
@@ -172,6 +172,8 @@ const fdCtas=k=>[...new Set(((k&&k.movs)||[]).map(m=>m.c).filter(Boolean))].sort
 const fdPorCta=movs=>{const o={};(movs||[]).forEach(m=>{if(m.c)o[m.c]=(o[m.c]||0)+(num(m.m)||0)});return o};
 function fdSubt(k){const c=fdCtas(k);if(!c.length)return "Fondo por rendir · cuenta 110106";
   return c.map((x,i)=>i?fdCtaN(x).toLowerCase():fdCtaN(x)).join(" y ")+` · cuenta${c.length>1?"s":""} ${c.join(" y ")}`}
+/* v172: título de la tarjeta según las cuentas de la persona (Inicio y «Mis rendiciones») */
+const fdTituloFondo=k=>(c=>c.length>1?"Tus fondos":c[0]==="110105"?"Tu fondo fijo":"Tu fondo por rendir")(fdCtas(k));
 const FD_XLS_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const fdFechaX=f=>{const s=String(f||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return "";const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 /* formato de números y fechas, ancho de columnas, filtro y fila de títulos fija */
@@ -309,7 +311,8 @@ function rdInicioFondo(){
     :k.porRendir<-0.5?`<b class="ifdm">${fmtP(-k.porRendir)}</b><span class="ifds">a tu favor: rendiste más de lo que recibiste</span>`
     :`<b class="ifdm ok">Estás al día</b><span class="ifds">no tienes fondos por rendir</span>`;
   const st=[k.enTram>0.5?`<span><i class="t"></i>En revisión<b>${fmtP(k.enTram)}</b></span>`:"",k.enBorr>0.5?`<span><i class="b"></i>Sin enviar<b>${fmtP(k.enBorr)}</b></span>`:""].filter(Boolean);
-  return `<section class="ifd" aria-label="Tu fondo por rendir"><div class="ifdh"><b>Tu fondo por rendir</b>${k.porRendir>0.5&&n?`<span class="ifdc ${esc(n)}">${k.dias} días sin rendir</span>`:""}</div>
+  const tit=fdTituloFondo(k); /* v172 */
+  return `<section class="ifd" aria-label="${tit}"><div class="ifdh"><b>${tit}</b>${k.porRendir>0.5&&n?`<span class="ifdc ${esc(n)}">${k.dias} días sin rendir</span>`:""}</div>
     <div>${monto}</div>
     ${st.length&&tot>0.5?`<div class="ifdb" aria-hidden="true">${k.enTram>0.5?`<i class="t" style="width:${pc(k.enTram)}%"></i>`:""}${k.enBorr>0.5?`<i class="b" style="width:${pc(k.enBorr)}%"></i>`:""}</div><div class="ifdst">${st.join("")}</div>`
       :k.ent?`<p class="ifdn">Último fondo: <b>${fmtP(num(k.ent.m))}</b> el ${fdF(k.ent.f)}</p>`:""}
@@ -2390,4 +2393,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="171"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="172"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
