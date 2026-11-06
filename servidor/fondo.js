@@ -8,7 +8,8 @@
   - Contabilidad (y el administrador) puede pedir todas las personas (?todos=1) y ve además lo que está sin persona.
   - El Libro Mayor se guarda 5 minutos en la caché del servidor para no consultar Finnegans en cada pedido.
   Variables opcionales en Cloudflare:
-    FONDO_DESDE         fecha desde la que se leen los movimientos (AAAA-MM-DD). Por defecto 2024-01-01 (desde la v170; antes 2026-01-01).
+    FONDO_DESDE         fecha desde la que se leen los movimientos (AAAA-MM-DD). Por defecto 2023-01-01 (desde la v170; antes 2026-01-01).
+    FONDO_CUENTAS       cuentas que se leen, separadas por coma (desde la v170). Por defecto 110106,110105 (fondo por rendir y fondo fijo).
     FONDO_CUENTA        cuenta del fondo. Por defecto 110106.
     FINN_PARAMS_FONDO   parámetros extra del Libro Mayor (ej.: PARAMWEBREPORT_Empresa=2).
 */
@@ -111,13 +112,14 @@ const esDe = (p, mv) => {
 };
 /* agrupa los movimientos por persona; lo que no tiene organización va a «sin persona» */
 export function agrupar(movs, padron, soloRuts) {
-  const per = new Map(), sin = { total: 0, n: 0 }, otras = new Map();
+  const per = new Map(), sin = { total: 0, n: 0, por: {} }, otras = new Map();
   const P = padron.personas.filter(p => !soloRuts || soloRuts.has(normRut(p.rut)));
   for (const p of P) per.set(normRut(p.rut), { rut: p.rut, nombre: p.nombre, org: p.org ? p.org.codigo : "", movs: [] });
   for (const mv of movs) {
     const limpio = { f: mv.f, t: mv.t, m: mv.m, ref: mv.ref, d: mv.d };
     if (mv.x && Object.keys(mv.x).length) limpio.x = mv.x; /* v169 */
-    if (!normTxt(mv.oc) && !normTxt(mv.on)) { sin.total += mv.m; sin.n++; continue; }
+    if (mv.c) limpio.c = mv.c; /* v170: cuenta */
+    if (!normTxt(mv.oc) && !normTxt(mv.on)) { sin.total += mv.m; sin.n++; if (mv.c) sin.por[mv.c] = (sin.por[mv.c] || 0) + mv.m; continue; }
     const p = P.find(x => esDe(x, mv));
     if (p) { per.get(normRut(p.rut)).movs.push(limpio); continue; }
     if (soloRuts) continue;
@@ -125,21 +127,27 @@ export function agrupar(movs, padron, soloRuts) {
     if (!otras.has(k)) otras.set(k, { rut: normRut(mv.oc).length >= 7 ? mv.oc : "", org: mv.oc || mv.on, nombre: mv.on || mv.oc, movs: [] });
     otras.get(k).movs.push(limpio);
   }
-  return { personas: [...per.values(), ...otras.values()], sinPersona: Math.round(sin.total), sinPersonaN: sin.n };
+  for (const c in sin.por) sin.por[c] = Math.round(sin.por[c]);
+  return { personas: [...per.values(), ...otras.values()], sinPersona: Math.round(sin.total), sinPersonaN: sin.n, sinPersonaPor: sin.por };
 }
+/* v170: varias cuentas (110106 fondo por rendir y 110105 fondo fijo), un libro mayor por cuenta; cada movimiento lleva c = cuenta */
+export const cuentasFondo = env => [...new Set(String(env.FONDO_CUENTAS || "110106,110105").split(/[\s,;]+/).map(x => x.trim()).filter(x => /^\d{3,12}$/.test(x)))].slice(0, 4);
 async function mayorFondo(env, ctx, reporte, forzar) {
-  const cuenta = (env.FONDO_CUENTA || "110106").trim(), desde = (env.FONDO_DESDE || "2024-01-01").trim(); /* v170 */
+  const cuentas = cuentasFondo(env).length ? cuentasFondo(env) : ["110106"], cuenta = cuentas[0], desde = (env.FONDO_DESDE || "2023-01-01").trim();
   const hoy = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-  const clave = new Request(`https://cache.puduhue-terreno/fondo-mayor?c=${encodeURIComponent(cuenta)}&d=${desde}&h=${hoy}`);
+  const clave = new Request(`https://cache.puduhue-terreno/fondo-mayor?c=${encodeURIComponent(cuentas.join(","))}&d=${desde}&h=${hoy}`);
   const cache = typeof caches !== "undefined" ? caches.default : null;
   if (cache && !forzar) { const r = await cache.match(clave); if (r) return await r.json(); }
-  const p = new URLSearchParams(env.FINN_PARAMS_FONDO || "");
-  p.set("PARAMWEBREPORT_FechaDesde", desde); p.set("PARAMWEBREPORT_FechaHasta", hoy); p.set("PARAMWEBREPORT_cuenta", cuenta);
-  const datos = await reporte(env, "libroMayor", p);
-  const r = movimientos(datos, cuenta);
-  const x = { hora: new Date().toISOString(), desde, cuenta, movs: r.movs, columnas: r.columnas, filas: r.filas, claves: r.claves };
+  const rs = [];
+  for (const c of cuentas) {
+    const p = new URLSearchParams(env.FINN_PARAMS_FONDO || "");
+    p.set("PARAMWEBREPORT_FechaDesde", desde); p.set("PARAMWEBREPORT_FechaHasta", hoy); p.set("PARAMWEBREPORT_cuenta", c);
+    const r = movimientos(await reporte(env, "libroMayor", p), c);
+    r.movs.forEach(m => { m.c = c; }); rs.push(r);
+  }
+  const x = { hora: new Date().toISOString(), desde, cuenta, cuentas, movs: rs.flatMap(r => r.movs), columnas: rs[0].columnas, filas: rs.reduce((s, r) => s + r.filas, 0), claves: rs[0].claves };
   if (cache) ctx.waitUntil(cache.put(clave, new Response(JSON.stringify(x), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" } })));
-  return forzar ? { ...x, crudo: r.crudo } : x;
+  return forzar ? { ...x, crudo: rs.flatMap(r => r.crudo.slice(0, 3)) } : x;
 }
 /* rutas /fondo… */
 /* v134: ¿es de Contabilidad (o el administrador)? Lista fija o la que publica Contabilidad junto con el padrón del fondo */
@@ -171,11 +179,12 @@ export async function rutasFondo(req, env, ctx, url, correo, json, admin, obj, r
   if (diag) {
     const est = {}; for (const mv of M.movs) { const k = (mv.de || "sin") + "|" + mv.t; const e = est[k] = est[k] || { n: 0, debe: 0, haber: 0 }; e.n++; if (mv.m > 0) e.debe += mv.m; else e.haber -= mv.m; }
     const g = agrupar(M.movs, padron, null);
-    return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, filas: M.filas, claves: M.claves, columnas: M.columnas, crudo: M.crudo || [], movimientos: M.movs.length, muestra: M.movs.slice(0, 8), estadistica: est,
+    const porCuenta = {}; for (const mv of M.movs) porCuenta[mv.c || M.cuenta] = (porCuenta[mv.c || M.cuenta] || 0) + mv.m;
+    return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, cuentas: M.cuentas, saldoPorCuenta: porCuenta, filas: M.filas, claves: M.claves, columnas: M.columnas, crudo: M.crudo || [], movimientos: M.movs.length, muestra: M.movs.slice(0, 8), estadistica: est,
       saldoTotal: M.movs.reduce((s, x) => s + x.m, 0), sinPersona: g.sinPersona, sinPersonaN: g.sinPersonaN,
       porOrganizacion: g.personas.map(p => ({ n: p.nombre, s: p.movs.reduce((s, x) => s + x.m, 0), k: p.movs.length })).sort((a, b) => b.s - a.s),
       padron: { personas: padron.personas.length, hora: padron.hora || null } });
   }
   const g = agrupar(M.movs, padron, todos ? null : mios);
-  return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, personas: g.personas, ...(todos ? { sinPersona: g.sinPersona, sinPersonaN: g.sinPersonaN } : {}) });
+  return json({ ok: true, hora: M.hora, desde: M.desde, cuenta: M.cuenta, cuentas: M.cuentas, personas: g.personas, ...(todos ? { sinPersona: g.sinPersona, sinPersonaN: g.sinPersonaN, sinPersonaPor: g.sinPersonaPor } : {}) });
 }

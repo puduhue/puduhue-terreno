@@ -92,7 +92,8 @@ function fdTarjeta(){
   const big=k.porRendir>0.5?`<div class="fdm"><b>${fmtP(k.porRendir)}</b><span>por rendir</span></div>`
     :k.porRendir<-0.5?`<div class="fdm fav"><b>${fmtP(-k.porRendir)}</b><span>a tu favor: rendiste más de lo que recibiste</span></div>`
     :`<div class="fdm ok"><b>Estás al día</b><span>no tienes fondos por rendir</span></div>`;
-  return `<section class="fdc" aria-label="Tu fondo por rendir"><div class="fdh"><b>Tu fondo por rendir</b></div>
+  const tit=(c=>c.length>1?"Tus fondos":c[0]==="110105"?"Tu fondo fijo":"Tu fondo por rendir")(fdCtas(k)); /* v170 */
+  return `<section class="fdc" aria-label="${tit}"><div class="fdh"><b>${tit}</b></div>
     ${big}
     ${k.enTram>0.5?`<dl class="fdl"><div><dt>Saldo en Contabilidad</dt><dd>${fmtP(k.saldo)}</dd></div><div><dt>Enviado, en revisión</dt><dd>−${fmtP(k.enTram)}</dd></div></dl>`:""}
     ${k.porRendir>0.5&&(k.ultRend||k.viejo)?`<p class="fdal ${n}">${n?`<b>${k.dias} días sin rendir:</b> `:""}${k.ultRend?`${n?"tu":"Tu"} última rendición fue el ${fdF(k.ultRend,1)}${n?".":` (${haceDias(k.ultRend)}).`}`:`${n?"recibiste":"Recibiste"} el fondo el ${fdF(k.viejo,1)} y todavía no hay rendiciones.`}</p>`:""}
@@ -108,13 +109,15 @@ function fdMov(key,deTodos){
   const c=colabPorRut(p.rut),k=fdCalc(p),nom=(c&&c.nombre)||p.nombre||p.rut;
   document.querySelectorAll(".fdsheet").forEach(x=>x.remove());
   let run=0;const conSaldo=k.movs.map((x,i)=>{run+=num(x.m)||0;return Object.assign({},x,{run,i})}).reverse(); /* v169: i = posición, para abrir el detalle */
+  const ctas=fdCtas(k),pc=fdPorCta(k.movs),dos=ctas.length>1; /* v170: con dos cuentas, cada fila dice la suya */
   const porMes={};conSaldo.forEach(x=>{const m=String(x.f).slice(0,7);(porMes[m]=porMes[m]||[]).push(x)});
-  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fmtP(x.run)}</small></span>${FD_CHEV}</button>`};
+  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}${dos&&x.c?`<small class="fdmc" title="${esc(fdCtaN(x.c))}">${esc(x.c)}</small>`:""}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fmtP(x.run)}</small></span>${FD_CHEV}</button>`};
   const tram=k.tram.map(r=>`<button class="fdmv fdtr" data-a="fdIrRend" data-id="${esc(r.id)}"><span class="fdmf">${fdF(r.enviada)}</span><span class="fdmt"><b>${esc(rdTitulo(r))}</b><small>${esc(rdEstadoFrase(r).t)}</small></span><span class="fdmm neg">−${fmtP(totalRend(r))}<small>en revisión</small></span></button>`).join("");
   const m=document.createElement("div");m.className="modal fdsheet";
   m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}"><div class="tbtir" aria-hidden="true"></div>
-    <div class="fdsh"><div><h3>${esc(nom)}</h3><p>Fondo por rendir · cuenta 110106</p></div><button class="fdx" data-a="fdCerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="fdsh"><div><h3>${esc(nom)}</h3><p>${esc(fdSubt(k))}</p></div><button class="fdx" data-a="fdCerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="smres fdsum"><div class="${k.porRendir<-0.5?"fav":fdNivel(k)}"><b>${fmtP(Math.abs(k.porRendir))}</b><span>${k.porRendir<-0.5?"a favor":"por rendir"}</span></div><div><b>${fmtP(k.saldo)}</b><span>saldo en Contabilidad</span></div><div><b>${fmtP(k.enTram)}</b><span>en revisión</span></div></div>
+    ${dos?`<div class="fdctas">${ctas.map(c=>`<div><span>${esc(fdCtaN(c))} · ${esc(c)}</span><b>${fmtP(pc[c]||0)}</b></div>`).join("")}</div>`:""}
     <div class="fdxls"><button type="button" class="btn" data-a="fdXls" data-k="${esc(key)}" data-t="${deTodos?1:""}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Descargar Excel</button></div>
     ${tram?`<h4>Enviado, todavía no en Finnegans</h4><div class="fdmvs">${tram}</div>`:""}
     <h4>Movimientos en Finnegans</h4>
@@ -149,6 +152,7 @@ function fdMvDet(x,lista,p){
   return `<dl>
     ${fila("Fecha",esc(fdF(x.f,1)))}
     ${fila("Qué es",esc(que))}
+    ${fila("Cuenta",x.c?esc(x.c+" "+fdCtaN(x.c)):"")}
     ${fila("Monto",`<b class="${m>0?"pos":"neg"}">${m>0?"+":"−"}${esc(fmtP(Math.abs(m)))}</b>`)}
     ${fila("Saldo después",esc(fmtP(x.run)))}
     ${fila("Documento",esc(ref))}
@@ -161,6 +165,13 @@ function fdMvDet(x,lista,p){
 }
 /* ---- v170: Excel del fondo por rendir con el detalle de cada movimiento, por rango de fechas (una persona desde «Movimientos»;
    todas desde «Fondos por rendir»). El saldo de cada fila es el real a esa fecha (se acumula desde el inicio de los datos). ---- */
+/* cuentas de fondos que lee el servidor (desde la v170): 110106 fondo por rendir y 110105 fondo fijo; cada movimiento trae c = cuenta */
+const FD_CTA={"110106":"Fondo por rendir","110105":"Fondo fijo"};
+const fdCtaN=c=>FD_CTA[c]||("Cuenta "+c);
+const fdCtas=k=>[...new Set(((k&&k.movs)||[]).map(m=>m.c).filter(Boolean))].sort().reverse();
+const fdPorCta=movs=>{const o={};(movs||[]).forEach(m=>{if(m.c)o[m.c]=(o[m.c]||0)+(num(m.m)||0)});return o};
+function fdSubt(k){const c=fdCtas(k);if(!c.length)return "Fondo por rendir · cuenta 110106";
+  return c.map((x,i)=>i?fdCtaN(x).toLowerCase():fdCtaN(x)).join(" y ")+` · cuenta${c.length>1?"s":""} ${c.join(" y ")}`}
 const FD_XLS_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const fdFechaX=f=>{const s=String(f||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return "";const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 /* formato de números y fechas, ancho de columnas, filtro y fila de títulos fija */
@@ -176,24 +187,27 @@ function fdXlsxLibro(L,D,d,h){
   d=d||"0000-00-00";h=h||"9999-99-99";
   const $n="#,##0",$f="dd-mm-yyyy",nt=s=>normTxt(s||""),en=f=>f>=d&&f<=h;
   const wb=XLSX.utils.book_new();
-  const res=[["Persona","RUT","Saldo al inicio","Entregado en el período","Rendido o devuelto en el período","Saldo al final","Saldo en Contabilidad hoy","En revisión en la app","Por rendir hoy","A favor hoy","Días sin rendir","Última rendición","Último fondo","Fecha último fondo","Movimientos en el período"]];
-  const mov=[["Persona","RUT","Fecha","Movimiento","Documento","Tipo de documento","Comprobante","Descripción","Detalle","Entregado (+)","Rendido o devuelto (−)","Saldo","Rendición en la app"]];
+  const CT=["110106","110105"].concat([...new Set(L.flatMap(x=>((x.p&&x.p.movs)||[]).map(m=>m.c)).filter(c=>c&&!FD_CTA[c]))]);
+  const res=[["Persona","RUT","Saldo al inicio","Entregado en el período","Rendido o devuelto en el período","Saldo al final","Saldo en Contabilidad hoy",...CT.map(c=>`${fdCtaN(c)} ${c} hoy`),"En revisión en la app","Por rendir hoy","A favor hoy","Días sin rendir","Última rendición","Último fondo","Fecha último fondo","Movimientos en el período"]];
+  const mov=[["Persona","RUT","Fecha","Cuenta","Movimiento","Documento","Tipo de documento","Comprobante","Descripción","Detalle","Entregado (+)","Rendido o devuelto (−)","Saldo de la cuenta","Saldo total","Rendición en la app"]];
   const rev=[["Persona","RUT","Rendición","Estado","Enviada","Monto"]];
   L.slice().sort((a,b)=>cmpEs(a.nom,b.nom)).forEach(x=>{
-    const p=x.p,k=fdCalc(p),rut=p.rut||"",R=fdRendDe(p.rut);let run=0,ini=0,ent=0,ren=0,fin=0,n=0;
-    k.movs.forEach(m=>{const v=num(m.m)||0,f=String(m.f).slice(0,10),X=m.x||{},desc=X.ds||m.d||"";
-      if(f<d)ini+=v;run+=v;if(f<=h)fin=run;if(!en(f))return;n++;if(v>0)ent+=v;else ren-=v;
+    const p=x.p,k=fdCalc(p),rut=p.rut||"",R=fdRendDe(p.rut),pc=fdPorCta(k.movs),rc={};let run=0,ini=0,ent=0,ren=0,fin=0,n=0;
+    k.movs.forEach(m=>{const v=num(m.m)||0,f=String(m.f).slice(0,10),X=m.x||{},desc=X.ds||m.d||"",c=m.c||"";
+      if(f<d)ini+=v;run+=v;rc[c]=(rc[c]||0)+v;if(f<=h)fin=run;if(!en(f))return;n++;if(v>0)ent+=v;else ren-=v;
       const r=v<0&&desc?R.find(r=>nt((r.asiento&&r.asiento.desc)||rdDescAsiento(r))===nt(desc)):null;
-      mov.push([x.nom,rut,fdFechaX(f),FD_TIPO[m.t]||FD_TIPO.otro,m.ref||X.doc||"",X.td||"",X.co||"",desc,X.dt||"",v>0?v:"",v<0?-v:"",Math.round(run),r?rdTitulo(r):""])});
-    res.push([x.nom,rut,Math.round(ini),Math.round(ent),Math.round(ren),Math.round(fin),k.saldo,k.enTram,Math.max(0,k.porRendir),k.porRendir<-0.5?-k.porRendir:0,k.porRendir>0.5&&(k.ultRend||k.viejo)?k.dias:"",fdFechaX(k.ultRend),k.ent?num(k.ent.m):"",k.ent?fdFechaX(k.ent.f):"",n]);
+      mov.push([x.nom,rut,fdFechaX(f),c?`${c} ${fdCtaN(c)}`:"",FD_TIPO[m.t]||FD_TIPO.otro,m.ref||X.doc||"",X.td||"",X.co||"",desc,X.dt||"",v>0?v:"",v<0?-v:"",Math.round(rc[c]),Math.round(run),r?rdTitulo(r):""])});
+    res.push([x.nom,rut,Math.round(ini),Math.round(ent),Math.round(ren),Math.round(fin),k.saldo,...CT.map(c=>Math.round(pc[c]||0)),k.enTram,Math.max(0,k.porRendir),k.porRendir<-0.5?-k.porRendir:0,k.porRendir>0.5&&(k.ultRend||k.viejo)?k.dias:"",fdFechaX(k.ultRend),k.ent?num(k.ent.m):"",k.ent?fdFechaX(k.ent.f):"",n]);
     k.tram.forEach(r=>rev.push([x.nom,rut,rdTitulo(r),rdEstadoFrase(r).t,fdFechaX(r.enviada),totalRend(r)]));
   });
   const nRes=res.length;
-  if(D&&Math.abs(num(D.sinPersona)||0)>0.5)res.push(["Sin persona en Finnegans (hoy)","","","","","",num(D.sinPersona)]);
-  res.push([]);res.push([`Movimientos del ${fmtD(d)} al ${fmtD(h)}. «Saldo al inicio» y «Saldo al final» son los de la cuenta 110106 de cada persona en esas fechas; las columnas «hoy» son el saldo actual.`]);
+  if(D&&Math.abs(num(D.sinPersona)||0)>0.5){const sp=D.sinPersonaPor||{};res.push(["Sin persona en Finnegans (hoy)","","","","","",num(D.sinPersona),...CT.map(c=>sp[c]==null?"":Math.round(num(sp[c])||0))])}
+  res.push([]);res.push([`Movimientos del ${fmtD(d)} al ${fmtD(h)}. «Saldo al inicio» y «Saldo al final» son los de cada persona en esas fechas, sumando sus cuentas de fondos (${CT.map(c=>c+" "+fdCtaN(c).toLowerCase()).join(" y ")}); las columnas «hoy» son el saldo actual.`]);
   res.push([`Datos de Finnegans de ${fdHora(D&&D.hora)}${D&&D.desde?`; Finnegans se lee desde el ${fmtD(String(D.desde).slice(0,10))}`:""}.`]);
-  XLSX.utils.book_append_sheet(wb,fdHojaX(res,[30,13,13,14,16,13,14,13,13,12,10,14,13,14,12],{2:$n,3:$n,4:$n,5:$n,6:$n,7:$n,8:$n,9:$n,11:$f,12:$n,13:$f},nRes),"Resumen");
-  XLSX.utils.book_append_sheet(wb,fdHojaX(mov,[26,13,11,22,18,18,13,46,30,13,13,13,24],{2:$f,9:$n,10:$n,11:$n}),"Movimientos");
+  /* columnas del resumen: 2-6 saldos, 7.. una por cuenta, después en revisión, por rendir, a favor, días, última rendición (fecha), último fondo, su fecha y n° */
+  const nc=CT.length,fr={};[2,3,4,5,6,7+nc,8+nc,9+nc,12+nc].forEach(i=>fr[i]=$n);CT.forEach((c,i)=>fr[7+i]=$n);fr[11+nc]=$f;fr[13+nc]=$f;
+  XLSX.utils.book_append_sheet(wb,fdHojaX(res,[30,13,13,14,16,13,14,...CT.map(()=>16),13,13,12,10,14,13,14,12],fr,nRes),"Resumen");
+  XLSX.utils.book_append_sheet(wb,fdHojaX(mov,[26,13,11,22,22,18,18,13,46,30,13,13,13,13,24],{2:$f,10:$n,11:$n,12:$n,13:$n}),"Movimientos");
   XLSX.utils.book_append_sheet(wb,fdHojaX(rev,[26,13,22,30,11,13],{4:$f,5:$n}),"En revisión");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
@@ -208,7 +222,7 @@ async function fdXls(key,deTodos){
   /* rango de fechas: por defecto, todo lo que hay (desde el inicio de los datos de Finnegans hasta hoy) */
   const fs=L.flatMap(x=>((x.p&&x.p.movs)||[]).map(m=>String(m.f||"").slice(0,10))).filter(f=>/^\d{4}-\d{2}-\d{2}$/.test(f)).sort();
   const hoy=today(),d0=/^\d{4}-\d{2}-\d{2}/.test(String(D&&D.desde||""))?String(D.desde).slice(0,10):(fs[0]||hoy);
-  const pr=askVal("Excel del fondo por rendir",`Movimientos de la cuenta 110106${L.length>1?` de ${L.length} personas`:""} con todo su detalle. Elige las fechas:`,"Armar Excel",
+  const pr=askVal("Excel del fondo por rendir",`Movimientos de los fondos (110106 fondo por rendir y 110105 fondo fijo)${L.length>1?` de ${L.length} personas`:""} con todo su detalle. Elige las fechas:`,"Armar Excel",
     `<div class="btns" style="gap:10px"><div class="f" style="flex:1"><label for="fxDesde">Desde</label><input id="fxDesde" type="date" data-v="desde" value="${d0}" min="${d0}" max="${hoy}"></div><div class="f" style="flex:1"><label for="fxHasta">Hasta</label><input id="fxHasta" type="date" data-v="hasta" value="${hoy}" min="${d0}" max="${hoy}"></div></div>
     <div class="fxrap" role="group" aria-label="Fechas rápidas">${[["Este mes",hoy.slice(0,8)+"01"],["Este año",hoy.slice(0,5)+"01-01"],["Todo",d0]].map(([t,v])=>`<button type="button" class="fxr" data-fx="${v<d0?d0:v}" aria-pressed="${t==="Todo"}">${t}</button>`).join("")}</div>
     <p class="note">Por defecto, todo lo que hay en Finnegans (desde el ${fmtD(d0)}). El saldo de cada fila es el real a esa fecha.</p>`);
@@ -235,9 +249,9 @@ function renderFDL(){
   if(!esContab())return head+`<main class="wrap"><h1>Fondos por rendir</h1><div class="empty">Solo Contabilidad ve esta pantalla.</div></main>`;
   if(!FD.t&&!FD.cargando&&!FD.errT&&DB&&navigator.onLine!==false)setTimeout(()=>fdTraer(true,true),0);
   const L=fdLista(),D=FD.t;
-  const cfg=`<div class="fdcfg"><span><b>Mostrar a cada persona su saldo</b><small>Aparece en «Mis rendiciones». Actívalo cuando en Finnegans la 110106 tenga a la persona en todas sus líneas.</small></span><button class="fdsw" role="switch" aria-checked="${fdVisible()}" data-a="fdMostrar" aria-label="Mostrar a cada persona su saldo"><i></i></button></div>
+  const cfg=`<div class="fdcfg"><span><b>Mostrar a cada persona su saldo</b><small>Aparece en «Mis rendiciones». Actívalo cuando en Finnegans la 110106 y la 110105 tengan a la persona en todas sus líneas.</small></span><button class="fdsw" role="switch" aria-checked="${fdVisible()}" data-a="fdMostrar" aria-label="Mostrar a cada persona su saldo"><i></i></button></div>
     ${fdConf().por?`<p class="note">${fdVisible()?"Activado":"Desactivado"} por ${esc(quien(fdConf().por))} el ${fmtD(String(fdConf().hora||"").slice(0,10))}.</p>`:""}`;
-  if(!L)return head+`<main class="wrap"><h1>Fondos por rendir</h1><p class="lead">Saldo de la cuenta 110106 por persona.</p>
+  if(!L)return head+`<main class="wrap"><h1>Fondos por rendir</h1><p class="lead">Saldo de las cuentas 110106 (fondo por rendir) y 110105 (fondo fijo) por persona.</p>
     <div class="empty">${FD.cargando?`<span class="esqc" role="status" aria-label="Consultando Finnegans">${'<span class="esqf"><span class="esqx"><span class="esq" style="width:70%"></span><span class="esq" style="width:45%"></span></span></span>'.repeat(3)}</span>`:FD.errT?`${esc(FD.errT)}<div class="btns" style="justify-content:center"><button class="btn" data-a="fdActualizar">Reintentar</button></div>`:navigator.onLine===false?"Se necesita señal para consultar Finnegans.":`<button class="btn" data-a="fdActualizar">Consultar Finnegans</button>`}</div>${cfg}</main>`;
   const con=L.filter(x=>x.porRendir>0.5),alDia=L.filter(x=>Math.abs(x.porRendir)<=0.5),favor=L.filter(x=>x.porRendir<-0.5);
   const tot=con.reduce((s,x)=>s+x.porRendir,0),nA=con.filter(x=>x.dias>=FD_DIAS_A).length,tram=L.reduce((s,x)=>s+x.enTram,0);
@@ -245,13 +259,13 @@ function renderFDL(){
   const ini=t=>String(t||"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
   const fila=x=>{const n=fdNivel(x),q=hzNorm(x.nom+" "+(x.p.rut||""));
     return `<button class="smrow fdrow" data-a="fdMovT" data-k="${esc(fdKey(x.p))}" data-q="${esc(q)}"${hzCoincide(fdQ,q)?"":" hidden"}><span class="fdav ${n}" aria-hidden="true">${esc(ini(x.nom))}</span>
-      <span class="smt"><b>${esc(x.nom)}</b><span class="sms">${x.ent?`Último fondo ${fmtP(num(x.ent.m))} el ${fdF(x.ent.f)}`:"Sin fondos en el período"}${x.ultRend&&!n?` · rindió ${haceDias(x.ultRend)}`:!x.ultRend&&x.porRendir>0.5?" · sin rendiciones":""}</span>
+      <span class="smt"><b>${esc(x.nom)}</b><span class="sms">${x.ent?`Último fondo ${fmtP(num(x.ent.m))} el ${fdF(x.ent.f)}`:"Sin fondos en el período"}${x.ultRend&&!n?` · rindió ${haceDias(x.ultRend)}`:!x.ultRend&&x.porRendir>0.5?" · sin rendiciones":""}${fdCtas(x).includes("110105")?" · fondo fijo":""}</span>
       ${n||x.enTram>0.5?`<span class="smch">${n?`<span class="smc ${n}">${x.dias} días sin rendir</span>`:""}${x.enTram>0.5?`<span class="smc cur">En revisión ${fmtP(x.enTram)}</span>`:""}</span>`:""}</span>
       <span class="fdrm${x.porRendir<-0.5?" fav":""}"><b>${fmtP(Math.abs(x.porRendir))}</b><small>${x.porRendir<-0.5?"a favor":x.porRendir>0.5?"por rendir":"al día"}</small></span></button>`};
   const sp=Math.abs(D.sinPersona)>0.5;
   return head+`<main class="wrap"><h1>Fondos por rendir</h1>
-    <p class="lead">Cuenta 110106 por persona: el saldo en Finnegans menos lo enviado que todavía no se contabiliza.</p>
-    ${sp?`<div class="info fdwarn"><b>${fmtP(Math.abs(D.sinPersona))} en Finnegans sin persona.</b> Son movimientos de la 110106 que no tienen persona ni en la línea ni en el documento (por ejemplo, el saldo inicial o el asiento de apertura del año). Mientras no se asignen a cada persona, la suma de los saldos de abajo no cuadra con la cuenta.</div>`:""}
+    <p class="lead">Cuentas 110106 (fondo por rendir) y 110105 (fondo fijo) por persona: el saldo en Finnegans menos lo enviado que todavía no se contabiliza.</p>
+    ${sp?`<div class="info fdwarn"><b>${fmtP(Math.abs(D.sinPersona))} en Finnegans sin persona${D.sinPersonaPor&&Object.keys(D.sinPersonaPor).length>1?` (${Object.keys(D.sinPersonaPor).sort().reverse().map(c=>`${c}: ${fmtP(D.sinPersonaPor[c])}`).join(", ")})`:""}.</b> Son movimientos de las cuentas de fondos que no tienen persona ni en la línea ni en el documento (por ejemplo, el saldo inicial o el asiento de apertura del año). Mientras no se asignen a cada persona, la suma de los saldos de abajo no cuadra con la cuenta.</div>`:""}
     <div class="smres fdres"><div><b>${fmtP(tot)}</b><span>por rendir</span></div><div><b>${con.length}</b><span>${con.length===1?"persona":"personas"} con saldo</span></div><div class="${nA?"rr":""}"><b>${nA}</b><span>sin rendir hace ${FD_DIAS_A}+ días</span></div></div>
     ${tram>0.5?`<p class="note" style="margin-top:6px">Ya descontado: ${fmtP(tram)} enviado y en revisión en la app.</p>`:""}
     <div class="smol">Ordenar por</div><div class="smord" role="group" aria-label="Ordenar">${[["saldo","Saldo"],["dias","Antigüedad"],["nom","Nombre"]].map(o=>`<button data-a="fdOrd" data-o="${o[0]}" aria-pressed="${fdOrd===o[0]}">${o[1]}</button>`).join("")}</div>
@@ -277,7 +291,7 @@ async function fdClick(A,b){
   if(A==="fdActualizar"){await fdTraer(true);return true}
   if(A==="fdActMio"){FD.intento=1;await fdTraer(false);return true}
   if(A==="fdMostrar"){if(!esContab())return true;const on=!fdVisible();
-    if(on&&FD.t&&Math.abs(FD.t.sinPersona)>0.5&&!await ask("¿Mostrar los saldos?",`Finnegans todavía tiene ${fmtP(Math.abs(FD.t.sinPersona))} de la 110106 sin persona (saldo inicial o apertura), así que algunos saldos pueden no estar completos.`,"Mostrar igual"))return true;
+    if(on&&FD.t&&Math.abs(FD.t.sinPersona)>0.5&&!await ask("¿Mostrar los saldos?",`Finnegans todavía tiene ${fmtP(Math.abs(FD.t.sinPersona))} de las cuentas de fondos sin persona (saldo inicial o apertura), así que algunos saldos pueden no estar completos.`,"Mostrar igual"))return true;
     try{if(on)await fdPadron(true);await rdMaeGuardar(n=>{n.fondo={mostrar:on,por:yo(),hora:new Date().toISOString()}});toast(on?"Cada persona ya ve su saldo en «Mis rendiciones».":"El saldo ya no se muestra a las personas.")}
     catch(e){toast("No se pudo guardar: "+errMsg(e))}render();return true}
   return false;
