@@ -8,7 +8,7 @@
   - Contabilidad (y el administrador) puede pedir todas las personas (?todos=1) y ve además lo que está sin persona.
   - El Libro Mayor se guarda 5 minutos en la caché del servidor para no consultar Finnegans en cada pedido.
   Variables opcionales en Cloudflare:
-    FONDO_DESDE         fecha desde la que se leen los movimientos (AAAA-MM-DD). Por defecto 2026-01-01.
+    FONDO_DESDE         fecha desde la que se leen los movimientos (AAAA-MM-DD). Por defecto 2024-01-01 (desde la v170; antes 2026-01-01).
     FONDO_CUENTA        cuenta del fondo. Por defecto 110106.
     FINN_PARAMS_FONDO   parámetros extra del Libro Mayor (ej.: PARAMWEBREPORT_Empresa=2).
 */
@@ -128,7 +128,7 @@ export function agrupar(movs, padron, soloRuts) {
   return { personas: [...per.values(), ...otras.values()], sinPersona: Math.round(sin.total), sinPersonaN: sin.n };
 }
 async function mayorFondo(env, ctx, reporte, forzar) {
-  const cuenta = (env.FONDO_CUENTA || "110106").trim(), desde = (env.FONDO_DESDE || "2026-01-01").trim();
+  const cuenta = (env.FONDO_CUENTA || "110106").trim(), desde = (env.FONDO_DESDE || "2024-01-01").trim(); /* v170 */
   const hoy = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
   const clave = new Request(`https://cache.puduhue-terreno/fondo-mayor?c=${encodeURIComponent(cuenta)}&d=${desde}&h=${hoy}`);
   const cache = typeof caches !== "undefined" ? caches.default : null;

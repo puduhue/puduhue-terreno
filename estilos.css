@@ -1884,3 +1884,11 @@ body[data-mod] .top{border-bottom:3px solid var(--mod-c)}
 .fdmvd dd b.neg{color:var(--sm-v)}
 .fdmvir{margin-top:10px;width:100%}
 @media (prefers-reduced-motion:reduce){.fdmvd{animation:none}.fdmvb .fdchev{transition:none}}
+/* v170: Excel del fondo por rendir */
+.fdxls{display:flex;justify-content:flex-end;margin:10px 0 0}
+.fdxls .btn,.fdxt{display:inline-flex;align-items:center;gap:7px}
+.fdxls svg,.fdxt svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.fxrap{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}
+.fxr{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer;min-height:36px}
+.fxr[aria-pressed="true"]{background:var(--act);border-color:var(--act);color:var(--act-ink)}
+.fxr:focus-visible{outline:2px solid var(--act);outline-offset:2px}

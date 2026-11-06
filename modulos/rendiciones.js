@@ -115,6 +115,7 @@ function fdMov(key,deTodos){
   m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}"><div class="tbtir" aria-hidden="true"></div>
     <div class="fdsh"><div><h3>${esc(nom)}</h3><p>Fondo por rendir · cuenta 110106</p></div><button class="fdx" data-a="fdCerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="smres fdsum"><div class="${k.porRendir<-0.5?"fav":fdNivel(k)}"><b>${fmtP(Math.abs(k.porRendir))}</b><span>${k.porRendir<-0.5?"a favor":"por rendir"}</span></div><div><b>${fmtP(k.saldo)}</b><span>saldo en Contabilidad</span></div><div><b>${fmtP(k.enTram)}</b><span>en revisión</span></div></div>
+    <div class="fdxls"><button type="button" class="btn" data-a="fdXls" data-k="${esc(key)}" data-t="${deTodos?1:""}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Descargar Excel</button></div>
     ${tram?`<h4>Enviado, todavía no en Finnegans</h4><div class="fdmvs">${tram}</div>`:""}
     <h4>Movimientos en Finnegans</h4>
     ${conSaldo.length?Object.keys(porMes).map(mm=>`<div class="fdmes">${esc(periodoTxt(mm))}</div><div class="fdmvs">${porMes[mm].map(fila).join("")}</div>`).join(""):`<p class="fdn">Sin movimientos ${D.desde?`desde el ${fdF(D.desde,1)}`:"en el período"}.</p>`}
@@ -122,7 +123,7 @@ function fdMov(key,deTodos){
   document.body.appendChild(m);
   m.addEventListener("click",e=>{if(e.target===m){m.remove();return}
     const v=e.target.closest&&e.target.closest(".fdmvb");if(v){fdMvAbrir(v,conSaldo,p);return} /* v169 */
-    const t=e.target.closest&&e.target.closest("[data-a]");if(t)setTimeout(()=>m.remove(),0)});
+    const t=e.target.closest&&e.target.closest("[data-a]");if(t&&t.dataset.a!=="fdXls")setTimeout(()=>m.remove(),0)}); /* v170: el Excel no cierra la hoja */
 }
 /* ---- v169: detalle de un movimiento de Finnegans (se abre debajo de la fila; se cierra al volver a tocarla) ---- */
 const FD_CHEV=`<svg class="fdchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
@@ -157,6 +158,69 @@ function fdMvDet(x,lista,p){
     ${fila("Detalle",esc(X.dt||""))}
     ${mismos.length>1?fila("Mismo documento",`${mismos.length} movimientos, ${tot<0?"−":"+"}${esc(fmtP(Math.abs(tot)))} en total`):""}
   </dl>${r?`<button type="button" class="btn fdmvir" data-a="fdIrRend" data-id="${esc(r.id)}">Ver la rendición · ${esc(rdTitulo(r))}</button>`:""}`;
+}
+/* ---- v170: Excel del fondo por rendir con el detalle de cada movimiento, por rango de fechas (una persona desde «Movimientos»;
+   todas desde «Fondos por rendir»). El saldo de cada fila es el real a esa fecha (se acumula desde el inicio de los datos). ---- */
+const FD_XLS_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const fdFechaX=f=>{const s=String(f||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return "";const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+/* formato de números y fechas, ancho de columnas, filtro y fila de títulos fija */
+function fdHojaX(rows,anchos,fmt,nDatos){
+  const ws=XLSX.utils.aoa_to_sheet(rows,{dateNF:"dd-mm-yyyy"});const n=nDatos==null?rows.length:nDatos;
+  ws["!cols"]=anchos.map(w=>({wch:w}));
+  if(n>1){ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:n-1,c:rows[0].length-1}})};ws["!freeze"]={xSplit:0,ySplit:1}}
+  for(let r=1;r<rows.length;r++)Object.keys(fmt).forEach(c=>{const x=ws[XLSX.utils.encode_cell({r,c:+c})];if(x&&x.t==="n")x.z=fmt[c]});
+  return ws;
+}
+/* L: lista de {p,nom}; D: datos de Finnegans (desde, hora, sinPersona); d y h: rango AAAA-MM-DD (incluidos) */
+function fdXlsxLibro(L,D,d,h){
+  d=d||"0000-00-00";h=h||"9999-99-99";
+  const $n="#,##0",$f="dd-mm-yyyy",nt=s=>normTxt(s||""),en=f=>f>=d&&f<=h;
+  const wb=XLSX.utils.book_new();
+  const res=[["Persona","RUT","Saldo al inicio","Entregado en el período","Rendido o devuelto en el período","Saldo al final","Saldo en Contabilidad hoy","En revisión en la app","Por rendir hoy","A favor hoy","Días sin rendir","Última rendición","Último fondo","Fecha último fondo","Movimientos en el período"]];
+  const mov=[["Persona","RUT","Fecha","Movimiento","Documento","Tipo de documento","Comprobante","Descripción","Detalle","Entregado (+)","Rendido o devuelto (−)","Saldo","Rendición en la app"]];
+  const rev=[["Persona","RUT","Rendición","Estado","Enviada","Monto"]];
+  L.slice().sort((a,b)=>cmpEs(a.nom,b.nom)).forEach(x=>{
+    const p=x.p,k=fdCalc(p),rut=p.rut||"",R=fdRendDe(p.rut);let run=0,ini=0,ent=0,ren=0,fin=0,n=0;
+    k.movs.forEach(m=>{const v=num(m.m)||0,f=String(m.f).slice(0,10),X=m.x||{},desc=X.ds||m.d||"";
+      if(f<d)ini+=v;run+=v;if(f<=h)fin=run;if(!en(f))return;n++;if(v>0)ent+=v;else ren-=v;
+      const r=v<0&&desc?R.find(r=>nt((r.asiento&&r.asiento.desc)||rdDescAsiento(r))===nt(desc)):null;
+      mov.push([x.nom,rut,fdFechaX(f),FD_TIPO[m.t]||FD_TIPO.otro,m.ref||X.doc||"",X.td||"",X.co||"",desc,X.dt||"",v>0?v:"",v<0?-v:"",Math.round(run),r?rdTitulo(r):""])});
+    res.push([x.nom,rut,Math.round(ini),Math.round(ent),Math.round(ren),Math.round(fin),k.saldo,k.enTram,Math.max(0,k.porRendir),k.porRendir<-0.5?-k.porRendir:0,k.porRendir>0.5&&(k.ultRend||k.viejo)?k.dias:"",fdFechaX(k.ultRend),k.ent?num(k.ent.m):"",k.ent?fdFechaX(k.ent.f):"",n]);
+    k.tram.forEach(r=>rev.push([x.nom,rut,rdTitulo(r),rdEstadoFrase(r).t,fdFechaX(r.enviada),totalRend(r)]));
+  });
+  const nRes=res.length;
+  if(D&&Math.abs(num(D.sinPersona)||0)>0.5)res.push(["Sin persona en Finnegans (hoy)","","","","","",num(D.sinPersona)]);
+  res.push([]);res.push([`Movimientos del ${fmtD(d)} al ${fmtD(h)}. «Saldo al inicio» y «Saldo al final» son los de la cuenta 110106 de cada persona en esas fechas; las columnas «hoy» son el saldo actual.`]);
+  res.push([`Datos de Finnegans de ${fdHora(D&&D.hora)}${D&&D.desde?`; Finnegans se lee desde el ${fmtD(String(D.desde).slice(0,10))}`:""}.`]);
+  XLSX.utils.book_append_sheet(wb,fdHojaX(res,[30,13,13,14,16,13,14,13,13,12,10,14,13,14,12],{2:$n,3:$n,4:$n,5:$n,6:$n,7:$n,8:$n,9:$n,11:$f,12:$n,13:$f},nRes),"Resumen");
+  XLSX.utils.book_append_sheet(wb,fdHojaX(mov,[26,13,11,22,18,18,13,46,30,13,13,13,24],{2:$f,9:$n,10:$n,11:$n}),"Movimientos");
+  XLSX.utils.book_append_sheet(wb,fdHojaX(rev,[26,13,22,30,11,13],{4:$f,5:$n}),"En revisión");
+  return XLSX.write(wb,{bookType:"xlsx",type:"array"});
+}
+async function fdXls(key,deTodos){
+  if(typeof XLSX==="undefined"){toast("No se pudo preparar el Excel. Vuelve a abrir la app.");return}
+  let L,D,base;
+  if(key==="*"){if(!esContab())return;D=FD.t;L=D&&fdLista();if(!L||!L.length){toast("Todavía no hay datos de Finnegans.");return}base="Fondos_por_rendir"}
+  else{D=(deTodos&&FD.t)||FD.p||FD.t;let p=D&&D.personas.find(x=>fdKey(x)===key)||null;
+    if(!p&&deTodos){const LL=fdLista(),x=LL&&LL.find(y=>fdKey(y.p)===key);p=x?x.p:null}
+    if(!p){toast("No hay movimientos de esa persona.");return}
+    const c=colabPorRut(p.rut),n=(c&&c.nombre)||p.nombre||p.rut||"Persona";L=[{p,nom:n}];base=`Fondo_por_rendir_${limpiaNombre(n).replace(/\s+/g,"_")}`}
+  /* rango de fechas: por defecto, todo lo que hay (desde el inicio de los datos de Finnegans hasta hoy) */
+  const fs=L.flatMap(x=>((x.p&&x.p.movs)||[]).map(m=>String(m.f||"").slice(0,10))).filter(f=>/^\d{4}-\d{2}-\d{2}$/.test(f)).sort();
+  const hoy=today(),d0=/^\d{4}-\d{2}-\d{2}/.test(String(D&&D.desde||""))?String(D.desde).slice(0,10):(fs[0]||hoy);
+  const pr=askVal("Excel del fondo por rendir",`Movimientos de la cuenta 110106${L.length>1?` de ${L.length} personas`:""} con todo su detalle. Elige las fechas:`,"Armar Excel",
+    `<div class="btns" style="gap:10px"><div class="f" style="flex:1"><label for="fxDesde">Desde</label><input id="fxDesde" type="date" data-v="desde" value="${d0}" min="${d0}" max="${hoy}"></div><div class="f" style="flex:1"><label for="fxHasta">Hasta</label><input id="fxHasta" type="date" data-v="hasta" value="${hoy}" min="${d0}" max="${hoy}"></div></div>
+    <div class="fxrap" role="group" aria-label="Fechas rápidas">${[["Este mes",hoy.slice(0,8)+"01"],["Este año",hoy.slice(0,5)+"01-01"],["Todo",d0]].map(([t,v])=>`<button type="button" class="fxr" data-fx="${v<d0?d0:v}" aria-pressed="${t==="Todo"}">${t}</button>`).join("")}</div>
+    <p class="note">Por defecto, todo lo que hay en Finnegans (desde el ${fmtD(d0)}). El saldo de cada fila es el real a esa fecha.</p>`);
+  /* fechas rápidas: escuchador de esta hoja (askVal solo atiende data-m) */
+  const hj=[...document.querySelectorAll(".modal")].pop();
+  if(hj)hj.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".fxr[data-fx]");if(!b)return;
+    hj.querySelector("#fxDesde").value=b.dataset.fx;hj.querySelector("#fxHasta").value=hoy;hj.querySelectorAll(".fxr").forEach(x=>x.setAttribute("aria-pressed",String(x===b)))});
+  const o=await pr;if(!o)return;
+  let d=/^\d{4}-\d{2}-\d{2}$/.test(o.desde||"")?o.desde:d0,h=/^\d{4}-\d{2}-\d{2}$/.test(o.hasta||"")?o.hasta:hoy;if(d>h)[d,h]=[h,d];
+  let buf;try{buf=fdXlsxLibro(L,D,d,h)}catch(e){console.warn(e);toast("No se pudo armar el Excel.");return}
+  const n=fs.filter(f=>f>=d&&f<=h).length,todo=d===d0&&h===hoy;
+  await compartirBlob(new Blob([buf],{type:FD_XLS_MIME}),`${base}_${todo?hoy:d+"_a_"+h}.xlsx`,`Excel listo: ${n} ${n===1?"movimiento":"movimientos"}${L.length>1?` de ${L.length} personas`:""}, del ${fmtD(d)} al ${fmtD(h)}.`,esContab()?["Informes"]:null);
 }
 /* ---- Contabilidad: todas las personas ---- */
 function fdLista(){
@@ -195,7 +259,7 @@ function renderFDL(){
     <div class="list fdlist" style="margin-top:10px">${con.sort(ord).map(fila).join("")||`<div class="empty">Nadie tiene fondos por rendir.</div>`}</div>
     ${favor.length?`<div class="smsep">Con saldo a favor <b>${favor.length}</b></div><div class="list fdlist">${favor.sort((a,b)=>a.porRendir-b.porRendir).map(fila).join("")}</div>`:""}
     ${alDia.length?`<button class="fdmas" data-a="fdAlDia" aria-expanded="${esc(fdAlDia)}">${fdAlDia?"Ocultar":"Ver"} ${alDia.length===1?"la persona al día":`las ${alDia.length} personas al día`}</button>${fdAlDia?`<div class="list fdlist">${alDia.sort((a,b)=>cmpEs(a.nom,b.nom)).map(fila).join("")}</div>`:""}`:""}
-    <div class="btns" style="margin-top:16px"><button class="btn" data-a="fdActualizar" ${FD.cargando?"disabled":""}>${FD.cargando===2?"Consultando Finnegans…":"Actualizar desde Finnegans"}</button></div>
+    <div class="btns" style="margin-top:16px"><button class="btn" data-a="fdActualizar" ${FD.cargando?"disabled":""}>${FD.cargando===2?"Consultando Finnegans…":"Actualizar desde Finnegans"}</button><button class="btn fdxt" data-a="fdXls" data-k="*"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Excel de todos</button></div>
     <p class="note">Datos de Finnegans de ${esc(fdHora(D.hora))}${D.desde?`, movimientos desde el ${fdF(D.desde,1)}`:""}. Con saldo y más de ${FD_DIAS_A} días sin rendir en ámbar, más de ${FD_DIAS_R} en rojo, contando desde la última rendición (enviada en la app o contabilizada).</p>
     ${cfg}</main>`;
 }
@@ -209,6 +273,7 @@ async function fdClick(A,b){
   if(A==="fdIrRend"){const r=REND[b.dataset.id];if(r){rdv=r;rdd=null;go("rdv");window.scrollTo(0,0)}return true}
   if(A==="fdOrd"){fdOrd=b.dataset.o||"saldo";render();return true}
   if(A==="fdAlDia"){fdAlDia=!fdAlDia;render();return true}
+  if(A==="fdXls"){await fdXls(b.dataset.k,b.dataset.t==="1");return true} /* v170 */
   if(A==="fdActualizar"){await fdTraer(true);return true}
   if(A==="fdActMio"){FD.intento=1;await fdTraer(false);return true}
   if(A==="fdMostrar"){if(!esContab())return true;const on=!fdVisible();
@@ -2311,4 +2376,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="169"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="170"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
