@@ -212,7 +212,7 @@ function fdParaHoy(){
 
 /* ---- 1) botón flotante «Rendir» ---- */
 let FAB_AB=false;
-function disFabVer(){if(!(loaded&&CUENTA&&ME))return false;return view==="launch"||(view==="rd"&&rdTab==="mias")}
+function disFabVer(){return false} /* v168: «Rendir» está en ＋ de la barra de abajo (antes: Inicio y «Mis rendiciones») */
 function disFab(){
   let f=document.getElementById("fab");const ver=disFabVer();
   document.body.classList.toggle("confab",ver);
@@ -701,7 +701,6 @@ const rdEditable=r=>r&&(r.estado==="borrador"||r.estado==="observada");
 const rdTituloCorto=r=>{const [y,m]=String(r.periodo||"").split("-");const mes=FD_MESL[(+m||1)-1]||"";const t=mes.charAt(0).toUpperCase()+mes.slice(1)+(y&&y!==today().slice(0,4)?" "+y:"");return t+((r.n||1)>1?` · N°${r.n}`:"")};
 const rdTitulo=r=>periodoTxt(r.periodo)+((r.n||1)>1?` · N°${r.n}`:"");
 const rdMismaPersona=(r,c)=>c?normRut(r.persona&&r.persona.rut)===normRut(c.rut):!(r.persona&&r.persona.rut);
-const rendPeriodo=p=>{const L=misRend().filter(r=>r.periodo===p);return L.find(rdEditable)||L.sort((a,b)=>(b.n||1)-(a.n||1))[0]||null};
 const rdAbiertaDe=(p,c)=>misRend().find(r=>r.periodo===p&&rdMismaPersona(r,c)&&rdEditable(r))||null;
 const rdSiguienteN=(p,c)=>1+Math.max(0,...Object.values(REND).filter(r=>!r.anulada&&r.periodo===p&&(c?normRut(r.persona&&r.persona.rut)===normRut(c.rut):(r.persona&&ME&&r.persona.id===ME.id))).map(r=>r.n||1));
 function nuevaRend(p,c){const per=c?{id:"rut:"+normRut(c.rut),nombre:c.nombre,correo:meCorreo(),rut:c.rut}:{id:ME.id,nombre:ME.nombre,correo:ME.correo,rut:""};
@@ -2276,4 +2275,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="167"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="168"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
