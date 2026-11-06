@@ -48,7 +48,7 @@ export function columnas(filas) {
     debe: uno("debe", "debemonedappal", v => /^debe/.test(v) && v.includes("ppal"), v => /^debe/.test(v) && !/secund|transac|ext/.test(v)),
     haber: uno("haber", "habermonedappal", v => /^haber/.test(v) && v.includes("ppal"), v => /^haber/.test(v) && !/secund|transac|ext/.test(v)),
     imp: uno("importeoperacionppal", v => v.includes("importeoperacion") || v.includes("impoperacion"), "importe"),
-    saldo: uno("saldomonedappal", "saldo", v => /^saldo/.test(v) && v.includes("ppal")),
+    saldo: uno("saldomonedappal", "saldo", v => /^saldo/.test(v) && v.includes("ppal"), v => /^saldomon/.test(v)), /* v170: «Saldo mon. principal» */
     orgCod: uno(v => v.includes("organizacion") && v.includes("codigo"), v => v.includes("organizacion") && v.includes("rut")),
     /* el Libro Mayor trae dos organizaciones: la de la línea (transacción) y la del documento (cabecera) */
     orgNom: uno("organizaciontransaccion", v => v.includes("organizacion") && v.includes("transac") && !v.includes("id") && !v.includes("codigo")),
@@ -68,7 +68,7 @@ export function movimientos(datos, cuenta) {
   const filas = filasDe(datos), C = columnas(filas), out = [];
   for (const f of filas) {
     if (!f || typeof f !== "object") continue;
-    if (C.cta && txt(f, C.cta) && normTxt(txt(f, C.cta)) !== normTxt(cuenta)) continue;
+    if (C.cta && txt(f, C.cta) && normTxt(txt(f, C.cta)) !== normTxt(cuenta) && !(txt(f, C.cta).match(/\d{3,}/g) || []).includes(String(cuenta).trim())) continue; /* v170 */
     let m = Math.round(C.debe || C.haber ? numero(f[C.debe]) - numero(f[C.haber]) : numero(f[C.imp]));
     const fe = fechaISO(f[C.fecha]);
     const desc = txt(f, C.desc), det = txt(f, C.det), tipo = txt(f, C.tipo), doc = txt(f, C.doc), comp = txt(f, C.comp);
