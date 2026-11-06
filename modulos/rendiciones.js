@@ -238,6 +238,30 @@ async function fdXls(key,deTodos){
   const n=fs.filter(f=>f>=d&&f<=h).length,todo=d===d0&&h===hoy;
   await compartirBlob(new Blob([buf],{type:FD_XLS_MIME}),`${base}_${todo?hoy:d+"_a_"+h}.xlsx`,`Excel listo: ${n} ${n===1?"movimiento":"movimientos"}${L.length>1?` de ${L.length} personas`:""}, del ${fmtD(d)} al ${fmtD(h)}.`,esContab()?["Informes"]:null);
 }
+/* ---- v173: tarjeta del fondo en el Inicio con lo que le sirve a la persona: el saldo de cada fondo (si tiene los dos) y su próximo
+   paso (rendición devuelta, sin enviar o en revisión; si no, cuándo rindió por última vez). Pedido de Benja: «lo que se necesita que
+   se muestre es información valiosa para el usuario». Cada próximo paso abre la rendición; sin rendición, «Mis rendiciones». ---- */
+const FD_SIG_ICO=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+const fdMin=t=>{t=String(t||"");return t.charAt(0).toLowerCase()+t.slice(1)};
+function fdSiguiente(k){
+  const b=(cls,txt,id)=>`<button type="button" class="ifdx ${cls}" ${id?`data-a="fdIrRend" data-id="${esc(id)}"`:`data-a="rdTabIr" data-t="mias"`}><i aria-hidden="true"></i><span>${txt}</span>${FD_SIG_ICO}</button>`;
+  const porPer=(a,b2)=>String(b2.periodo||"").localeCompare(String(a.periodo||""));
+  const dev=k.borr.filter(r=>r.estado==="observada").sort(porPer)[0];
+  if(dev)return b("rr",`Tu rendición de ${esc(fdMin(rdTitulo(dev)))} fue devuelta: corrígela y reenvíala.`,dev.id);
+  const bo=k.borr.filter(r=>r.estado==="borrador").sort(porPer)[0];
+  if(bo)return b("aa",`Tienes <b>${fmtP(totalRend(bo))}</b> sin enviar en ${esc(fdMin(rdTitulo(bo)))}. Envíala a aprobación.`,bo.id);
+  const tr=k.tram.slice().sort((a,b2)=>String(b2.enviada||"").localeCompare(String(a.enviada||"")))[0];
+  if(tr)return b("act",`${esc(rdTitulo(tr))}: ${esc(fdMin(rdEstadoFrase(tr).t))}`,tr.id);
+  if(k.porRendir<=0.5)return"";
+  const n=fdNivel(k);
+  if(k.ultRend)return b(n,`Tu última rendición fue el ${fdF(k.ultRend,1)} (${haceDias(k.ultRend)}).${n?" Rinde lo que tengas pendiente.":""}`);
+  if(k.viejo)return b(n,`Recibiste el fondo el ${fdF(k.viejo,1)} y todavía no hay rendiciones.`);
+  return"";
+}
+function fdCuentasIni(k){
+  const c=fdCtas(k);if(c.length<2)return"";const pc=fdPorCta(k.movs);
+  return `<div class="ifdcu">${c.map(x=>`<span>${esc(fdCtaN(x))}<b>${fmtP(pc[x]||0)}</b></span>`).join("")}</div>`;
+}
 /* ---- Contabilidad: todas las personas ---- */
 function fdLista(){
   const D=FD.t;if(!D)return null;
@@ -314,8 +338,10 @@ function rdInicioFondo(){
   const tit=fdTituloFondo(k); /* v172 */
   return `<section class="ifd" aria-label="${tit}"><div class="ifdh"><b>${tit}</b>${k.porRendir>0.5&&n?`<span class="ifdc ${esc(n)}">${k.dias} días sin rendir</span>`:""}</div>
     <div>${monto}</div>
+    ${fdCuentasIni(k)}
     ${st.length&&tot>0.5?`<div class="ifdb" aria-hidden="true">${k.enTram>0.5?`<i class="t" style="width:${pc(k.enTram)}%"></i>`:""}${k.enBorr>0.5?`<i class="b" style="width:${pc(k.enBorr)}%"></i>`:""}</div><div class="ifdst">${st.join("")}</div>`
       :k.ent?`<p class="ifdn">Último fondo: <b>${fmtP(num(k.ent.m))}</b> el ${fdF(k.ent.f)}</p>`:""}
+    ${fdSiguiente(k)}
     <div class="ifdbt"><button class="btn pri" data-a="rdTabIr" data-t="mias">Ver mis rendiciones</button><button class="btn" data-a="fdMov" data-k="${esc(normRut(cs[0].rut))}">Movimientos</button></div></section>`;
 }
 function fdParaHoy(){
@@ -2393,4 +2419,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="172"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="173"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
