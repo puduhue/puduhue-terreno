@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-+GfS6Efnk+LFGqAS+TYoQ48ZO08DxYJTQJnMb3fapT4=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-k0jUYZMA5N5kpWhMTunRCz0E/rDbx3kvd1PtYQzbg1o=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=166">
+<link rel="stylesheet" href="estilos.css?v=167">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="166";
+const APP_VER="167";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1931,6 +1931,7 @@ async function onClickAccion(ev,b,A){
   if(A==="home"){await flush();cur=null;go("home");return}
   if(A==="launch"){await flush();cur=null;go("launch");checkRed();return}
   if(A==="tbMas"){tbMas();return}
+  if(A==="iniBod"){iniBodHoja();return}
   if(A==="tema"){cambiarTema();return}
   if(A==="login"){iniciarSesion();return}
   if(A==="logout"){await cerrarSesion();return}
@@ -2754,7 +2755,7 @@ function renderLaunch(){
   (permAgrega("ax")?Object.values(ACTAS):[]).filter(a=>esAx(a)&&!a.anulada&&a.estado!=="cerrada"&&tbMio(a)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||""))).slice(0,1).forEach(a=>{const T=AX[a.tipo],m=axFaltantes(a).length;
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${esc(a.id)}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
-  cont=`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy${ph.length?`<span class="cnt">${ph.length}</span>`:""}</h2>${ph.length?`<div class="lx-conts">${disPh(ph)}</div>`:`<div class="ph-aldia">${EST_ICO.ok}<span>No tienes nada pendiente.</span></div>`}</section>`;
+  cont=ph.length?`<section class="lx-sec lx-hoy"><h2 class="lx-h2">Para hoy<span class="cnt">${ph.length}</span></h2><div class="lx-conts">${disPh(ph)}</div></section>`:`<section class="lx-sec ini-aldia">${EST_ICO.ok}<span>No tienes nada pendiente para hoy.</span></section>`;
   const nv=Object.values(VIS).filter(v=>!v.anulada).length,nh=prediosCL().reduce((n,p)=>n+abiertos(p,"visitas").length+abiertos(p,"bodega").length+abiertos(p,"huespedes").length,0)+unidadesCL("camionetas").reduce((n,p)=>n+abiertos(p,"camionetas").length,0);
   const resumen=`<section class="lx-sec"><h2 class="lx-h2">Resumen</h2><div class="lx-stats">
     <div><b>${todasAx.length}</b><span>${todasAx.length===1?"acta de entrega":"actas de entrega"}</span></div>
@@ -2762,15 +2763,62 @@ function renderLaunch(){
     <div class="${nh?"warn":""}"><b>${nh}</b><span>${nh===1?"hallazgo abierto":"hallazgos abiertos"}</span></div></div>${np?`<p class="lx-foot">${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir.</p>`:""}</section>`;
   const nb=todas.filter(a=>a.estado!=="cerrada").length,nbAx=todasAx.filter(a=>a.estado!=="cerrada").length;
   return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${(()=>{try{return typeof rdInicioFondo==="function"?rdInicioFondo():""}catch(e){console.warn("inicio fondo",e);return""}})()}${cont}
-    <h2 class="lx-h2 lx-modh">Módulos</h2>
-    <div class="lx-modes lx-mods lx-lista">
-      ${permVe("ax")?`<button class="lx-mode off" data-a="axHub"><span class="lx-mi">${ICO.home}</span><span class="lx-mt">Actas</span><span class="lx-md">Viviendas, vehículos, activos fijos y capacitaciones: fotos, firmas y PDF.</span><span class="lx-ma">${todasAx.length?`${todasAx.length} ${todasAx.length===1?"acta":"actas"}${nbAx?` · ${nbAx} en borrador`:""}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      <button class="lx-mode on" data-a="rd"><span class="lx-mi">${ICO.receipt}</span><span class="lx-mt">Rendiciones</span><span class="lx-md">Fotografía tus facturas y boletas; las aprueba tu jefatura y Contabilidad las deja listas para FinnegansGO.</span><span class="lx-ma">${(()=>{const r=rendPeriodo(periodoActual());const pr=rdParaMi().length;return [r?`${docsDe(r).length} ${docsDe(r).length===1?"documento":"documentos"} · ${RD_ESTADO[r.estado]}`:"",pr?`${pr} por revisar`:""].filter(Boolean).join(" · ")||"Abrir"})()} ${ICO.arrow}</span></button>
-      ${puedeContar()?`<button class="lx-mode on" data-a="cb"><span class="lx-mi">${ICO.clip}</span><span class="lx-mt">Control de bodega</span><span class="lx-md">Conteo físico de cada bodega contra el stock del sistema, con informe.</span><span class="lx-ma">${(()=>{const cs=Object.values(CONT).filter(c=>!c.anulado);const ab=cs.filter(c=>c.estado!=="cerrado").length;return cs.length?`${cs.length} ${cs.length===1?"conteo":"conteos"}${ab?` · ${ab} en curso`:""}`:"Abrir"})()} ${ICO.arrow}</span></button>`:""}
-      ${puedeVerStock()?`<button class="lx-mode on" data-a="stock"><span class="lx-mi">${ICO.box}</span><span class="lx-mt">Stock</span><span class="lx-md">Existencias por depósito desde Finnegans, con valor y alertas de reposición.</span><span class="lx-ma">${STOCK?`Al ${fmtD(STOCK.hora)}`:"Abrir"} ${ICO.arrow}</span></button>`:""}
-      ${permVe("cl")?`<button class="lx-mode on" data-a="clHub"><span class="lx-mi">${ICO.check}</span><span class="lx-mt">Check list de cumplimiento</span><span class="lx-md">Visitas a predios (con la casa de huéspedes), bodegas y camionetas, con seguimiento de hallazgos.</span><span class="lx-ma">${clHubCnt(null)} ${ICO.arrow}</span></button>`:""}
-    </div>
+    ${iniModsHTML()}
   </main>`;
+}
+
+/* ---------- v167: módulos del Inicio como tarjetas (aprobado por Benja tras la «Vista previa Terreno: módulos del Inicio», propuesta B) ----------
+   Cada tarjeta: ícono con el color del módulo, nombre, una línea de resumen y una etiqueta solo cuando hay algo de la persona
+   (lo suyo en curso, lo que espera su revisión). Lo abierto por otras personas ya no se cuenta aquí («Para hoy» y las tarjetas
+   dicen lo mismo). Stock y Control de bodega van juntos en «Bodega» (abre una hoja) cuando la persona ve los dos. */
+function iniTarjeta(a,c,ico,nom,res,et,desc){
+  return `<button class="ini-t ini-${c}" data-a="${esc(a)}"><span class="ini-i">${ico}</span><span class="ini-n">${nom}</span><span class="ini-s">${res}</span>${desc?`<span class="ini-d">${desc}</span>`:""}${et?`<span class="ini-p${et[1]?" "+et[1]:""}">${et[0]}</span>`:""}</button>`;
+}
+const iniN=(n,uno,varios)=>`${n} ${n===1?uno:varios}`;
+/* «de hoy», «de ayer» o «al 1 de noviembre» */
+function iniFecha(h){try{const d=isoLocal(h);if(d===today())return "de hoy";if(d===sumarDias(today(),-1))return "de ayer";const t=new Date(d+"T12:00:00").toLocaleDateString("es-CL",{day:"numeric",month:"long"});return "al "+t}catch(e){return "al "+fmtD(h)}}
+function iniModsHTML(){
+  const T=[];
+  const RDC={borrador:"sin enviar",enviada:"en jefatura",revcont:"en Contabilidad",aprobada:"aprobada",contabilizada:"contabilizada",observada:"devuelta"};
+  if(permVe("ax")){
+    const ax=Object.values(ACTAS).filter(a=>!a.anulada),mias=ax.filter(a=>a.estado!=="cerrada"&&tbMio(a)).length;
+    T.push(iniTarjeta("axHub","ax",ICO.home,"Actas",ax.length?iniN(ax.length,"acta","actas"):"Sin actas todavía",mias?[iniN(mias,"borrador","borradores"),""]:null,"Viviendas, vehículos, activos fijos y capacitaciones."));
+  }
+  { const per=periodoActual(),r=rendPeriodo(per),pr=rdParaMi().length,mes=periodoTxt(per).split(" ")[0];
+    const n=r?docsDe(r).length:0;
+    const res=r&&n?`${mes}: ${iniN(n,"documento","documentos")}, ${RDC[r.estado]||String(RD_ESTADO[r.estado]||"").toLowerCase()}`:`${mes}: nada rendido todavía`;
+    T.push(iniTarjeta("rd","rd",ICO.receipt,"Rendiciones",res,pr?[`${pr} por revisar`,"urg"]:null,"Facturas y boletas: aprobación y contabilidad.")); }
+  if(permVe("cl")){
+    const tipos=clHubVer().map(x=>x[0]),vs=Object.values(VIS).filter(v=>!v.anulada&&tipos.includes(tipoDe(v)));
+    const mias=vs.filter(v=>v.estado!=="cerrada"&&tbMio(v)).length;
+    const ha=tipos.reduce((n,x)=>n+unidadesCL(x).reduce((m,p)=>m+abiertos(p,x).length,0),0);
+    const res=vs.length?[iniN(vs.length,"visita","visitas"),ha?iniN(ha,"hallazgo abierto","hallazgos abiertos"):""].filter(Boolean).join(" · "):"Sin visitas todavía";
+    T.push(iniTarjeta("clHub","cl",ICO.check,"Check list",res,mias?[`${mias} en curso`,""]:null,"Visitas a predios (con la casa de huéspedes), bodegas y camionetas."));
+  }
+  const vC=puedeContar(),vS=puedeVerStock();
+  const cs=Object.values(CONT).filter(c=>!c.anulado),cMias=cs.filter(c=>c.estado!=="cerrado"&&tbMio(c)).length;
+  const stTxt=STOCK?`Stock ${iniFecha(STOCK.hora)}`:"Stock sin datos todavía";
+  const cbTxt=cs.length?iniN(cs.length,"conteo","conteos"):"Sin conteos todavía";
+  const cbEt=cMias?[`${cMias} en curso`,""]:null;
+  if(vC&&vS){
+    T.push(iniTarjeta("iniBod","cb",ICO.box,"Bodega",`${cbTxt} · ${stTxt.charAt(0).toLowerCase()+stTxt.slice(1)}`,cbEt,"Conteos físicos y existencias desde Finnegans."));
+  }else{
+    if(vC)T.push(iniTarjeta("cb","cb",ICO.clip,"Control de bodega",cbTxt,cbEt,"Conteo físico contra el stock del sistema."));
+    if(vS)T.push(iniTarjeta("stock","st",ICO.box,"Stock",STOCK?`Existencias ${iniFecha(STOCK.hora)}`:"Sin datos todavía",null,"Existencias por depósito desde Finnegans."));
+  }
+  return `<h2 class="lx-h2 lx-modh">Módulos</h2><div class="ini-ts">${T.join("")}</div>`;
+}
+/* «Bodega»: hoja con Control de bodega y Stock */
+function iniBodHoja(){
+  document.querySelectorAll(".tbsheet").forEach(x=>x.remove());
+  const op=(a,ico,t,s)=>`<button class="tbop" data-a="${esc(a)}"><span class="tboi">${ico}</span><span><b>${esc(t)}</b>${s?`<small>${esc(s)}</small>`:""}</span></button>`;
+  const cs=Object.values(CONT).filter(c=>!c.anulado),ab=cs.filter(c=>c.estado!=="cerrado").length;
+  const m=document.createElement("div");m.className="modal tbsheet";
+  m.innerHTML=`<div class="sheet tbhoja" role="dialog" aria-modal="true" aria-label="Bodega"><div class="tbtir" aria-hidden="true"></div><h3>Bodega</h3>
+    ${op("cb",ICO.clip,"Control de bodega",cs.length?`${iniN(cs.length,"conteo","conteos")}${ab?` · ${ab} en curso`:""}`:"Conteo físico contra el stock del sistema")}
+    ${op("stock",ICO.box,"Stock",STOCK?`Existencias ${iniFecha(STOCK.hora)}`:"Existencias por depósito desde Finnegans")}</div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click",e=>{if(e.target===m){m.remove();return}const t=e.target.closest&&e.target.closest("[data-a]");if(t)setTimeout(()=>m.remove(),0)});
 }
 
 /* ---------- Traspaso por archivo (versión sin conexión → app en línea) ---------- */
@@ -3676,10 +3724,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=166"></script>
-<script src="modulos/bodega.js?v=166"></script>
-<script src="modulos/rendiciones.js?v=166"></script>
-<script src="modulos/actas-entrega.js?v=166"></script>
+<script src="modulos/checklist.js?v=167"></script>
+<script src="modulos/bodega.js?v=167"></script>
+<script src="modulos/rendiciones.js?v=167"></script>
+<script src="modulos/actas-entrega.js?v=167"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
