@@ -1847,7 +1847,10 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 @media (max-width:759px){.lx-hero .lx-date{margin-top:14px;margin-bottom:2px;font-size:14px}.lx-hero .lx-h1{font-size:25px;line-height:1.15}.lx-hero .lx-bus{margin-top:12px;min-height:44px}.ihacc-f{margin-top:14px}}
 /* fondo por rendir más bajo; toda la tarjeta abre «Mis rendiciones» */
 .lx-main .ifd{gap:8px;padding:14px 16px;cursor:pointer}
-.lx-main .ifd .ifdst,.lx-main .ifd .ifdbt,.lx-main .ifd .ifdn{display:none}
+.lx-main .ifd .ifdbt,.lx-main .ifd .ifdn{display:none}
+/* qué es cada color de la barra, en una línea */
+.lx-main .ifd .ifdst{display:flex;flex-wrap:wrap;gap:2px 16px;font-size:12.5px}
+.lx-main .ifd .ifdst b{display:inline;margin:0 0 0 5px;font-size:12.5px}
 .lx-main .ifd .ifdm{display:inline;font-size:28px}
 .lx-main .ifd .ifds{display:inline;margin-left:6px}
 .lx-main .ifd .ifdh b::after{content:" ›";color:var(--muted)}
@@ -1858,6 +1861,7 @@ p.fdn .esqc{gap:9px;padding:4px 0}
 #tabbar.tb3 .tbnuevo .tbt{margin-top:-2px}
 .tbav{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--act);color:var(--act-ink);font-size:11.5px;font-weight:800;letter-spacing:.02em}
 label.tbop{cursor:pointer}
+.sheet.tbhoja p.fabh{max-width:none;margin:0 2px 8px;padding:0;background:none;border:0;box-shadow:none;animation:none;color:var(--muted);font-size:13px;line-height:1.4} /* ayuda del código del SII (v98) */
 label.tbop .tboi svg{stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* color de cada módulo por dentro */
 body[data-mod="rd"]{--mod-c:var(--ini-rd)}body[data-mod="cl"]{--mod-c:var(--ini-cl)}body[data-mod="ax"]{--mod-c:var(--ini-ax)}body[data-mod="cb"]{--mod-c:var(--ini-cb)}

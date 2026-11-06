@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-IkUiOQkyeuRN2LCF6uzCNx3267YMzN2zYNTChJk/Ans=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-D+uPGaKaOMQI7OJBba2CbiOzcAQFbF9mSkHUsdR66Cs=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -2795,7 +2795,7 @@ function iniNuevo(){
   const lab=(ico,t,s,inp)=>`<label class="tbop"><span class="tboi">${ico}</span><span><b>${t}</b>${s?`<small>${s}</small>`:""}</span>${inp}</label>`;
   const rendir=`<h3>Rendir una factura o boleta</h3>`+(ESCRITORIO()
     ?lab(ICO_SUBIR,"Subir fotos o PDF","Se leen solas y van a tu rendición del mes",`<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1">`)
-    :lab(ICO_CAM,"Cámara","Foto de la boleta o factura",`<input class="vh" type="file" accept="image/*" capture="environment" data-fabrd="1">`)
+    :lecFabAyudaHTML()+lab(ICO_CAM,"Cámara","Foto de la boleta o factura",`<input class="vh" type="file" accept="image/*" capture="environment" data-fabrd="1">`)
       +(lecPuedeEscanear()?`<button class="tbop" data-a="lecEscanear"><span class="tboi">${ICO_TIMBRE}</span><span><b>Escanear código del SII</b><small>Para boletas basta con el código</small></span></button>`:"")
       +lab(ICO_GAL,"Galería o PDF","Una o varias a la vez",`<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-fabrd="1">`));
   const E=[],ku={iniHojaCL:"cl",iniHojaAx:"ax",cb:"cb"},u=iniUso();
