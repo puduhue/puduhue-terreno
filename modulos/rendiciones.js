@@ -40,7 +40,7 @@ async function fdTraer(todos,silencioso){
   if(navigator.onLine===false){if(!silencioso)toast("Se necesita señal para consultar Finnegans.");return}
   FD.cargando=todos?2:1;if(todos)FD.errT=null;else FD.err=null;if(!silencioso)render();
   try{const j=await fdFuente(todos);
-    const x={hora:j.hora||new Date().toISOString(),desde:j.desde||"",personas:Array.isArray(j.personas)?j.personas:[],sinPersona:num(j.sinPersona)||0,aviso:j.aviso||"",correo:meCorreo()};
+    const x={hora:j.hora||new Date().toISOString(),desde:j.desde||"",personas:Array.isArray(j.personas)?j.personas:[],sinPersona:num(j.sinPersona)||0,aviso:j.aviso||"",correo:meCorreo(),cuentas:Array.isArray(j.cuentas)?j.cuentas:[],sinPersonaPor:j.sinPersonaPor&&typeof j.sinPersonaPor==="object"?j.sinPersonaPor:null}; /* v171: también cuentas y sinPersonaPor */
     if(todos)FD.t=x;else{FD.p=x;try{localStorage.setItem(FD_K,JSON.stringify(x))}catch(e){}}}
   catch(e){const m=(e&&e.error)||"No se pudo consultar Finnegans.";if(todos)FD.errT=m;else FD.err=m}
   FD.cargando=0;render();
@@ -48,7 +48,7 @@ async function fdTraer(todos,silencioso){
 /* se trae sola al abrir «Mis rendiciones» (una vez por sesión, o si el dato tiene más de 15 minutos) */
 function fdAuto(){
   if(!FD.p){const c=fdCacheMio();if(c)FD.p=c}
-  const viejo=!FD.p||Date.now()-new Date(FD.p.hora).getTime()>15*60e3;
+  const viejo=!FD.p||!Array.isArray(FD.p.cuentas)||Date.now()-new Date(FD.p.hora).getTime()>15*60e3; /* v171: la copia de antes de la v170 (sin cuentas) se vuelve a consultar */
   if(viejo&&!FD.cargando&&!FD.intento&&DB&&navigator.onLine!==false){FD.intento=1;setTimeout(()=>fdTraer(false,true),0)}
 }
 /* v133 (B-09): una rendición aprobada que ya se exportó a Excel, o cuyo asiento ya aparece en Finnegans (misma descripción),
@@ -122,7 +122,7 @@ function fdMov(key,deTodos){
     ${tram?`<h4>Enviado, todavía no en Finnegans</h4><div class="fdmvs">${tram}</div>`:""}
     <h4>Movimientos en Finnegans</h4>
     ${conSaldo.length?Object.keys(porMes).map(mm=>`<div class="fdmes">${esc(periodoTxt(mm))}</div><div class="fdmvs">${porMes[mm].map(fila).join("")}</div>`).join(""):`<p class="fdn">Sin movimientos ${D.desde?`desde el ${fdF(D.desde,1)}`:"en el período"}.</p>`}
-    <p class="note">${D.desde?`Desde el ${fdF(D.desde,1)}. `:""}Datos de Finnegans de ${esc(fdHora(D.hora))}. Si algo no calza, avísale a Contabilidad.</p></div>`;
+    <p class="note">${D.desde?`Desde el ${fdF(D.desde,1)}. `:""}Datos de Finnegans de ${esc(fdHora(D.hora))} <button type="button" class="lnk" data-a="${deTodos?"fdActualizar":"fdActMio"}">Actualizar</button>. Si algo no calza, avísale a Contabilidad.</p></div>`;
   document.body.appendChild(m);
   m.addEventListener("click",e=>{if(e.target===m){m.remove();return}
     const v=e.target.closest&&e.target.closest(".fdmvb");if(v){fdMvAbrir(v,conSaldo,p);return} /* v169 */
@@ -2390,4 +2390,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="170"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="171"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
