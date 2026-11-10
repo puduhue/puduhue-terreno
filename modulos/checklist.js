@@ -1184,4 +1184,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="178"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="179"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
