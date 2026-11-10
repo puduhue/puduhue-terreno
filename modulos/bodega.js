@@ -117,6 +117,7 @@ function frescoTxt(iso){if(!iso)return"";const d=new Date(iso),h=String(d.getHou
 function frescoChip(d){const h=horaDep(d);return h?`<span class="xp ${esHoy(h)?"ok":"nueva"}">Actualizada ${frescoTxt(h)}</span>`:""}
 /* v174: recuadro con la fecha y el botón: en la pantalla general actualiza todas las bodegas; dentro de una bodega, solo esa */
 function stkSyncHTML(dep){
+  if(!STOCK)return""; /* sin stock guardado (un conteo en curso se puede abrir igual) */
   const h=dep?horaDep(dep):horaTodo(),car=!!skCargando&&skCargando===(dep||"*");
   const pd=dep?((STOCK.porDep&&STOCK.porDep[dep])||STOCK.por):(STOCK.horaTodo?STOCK.porTodo:STOCK.por);
   const btn=puedeActStock()?`<button class="btn pri" data-a="${dep?"stkActDep":"stkAct"}"${dep?` data-d="${esc(dep)}"`:""} ${skCargando||navigator.onLine===false?"disabled":""}>${car?"Consultando Finnegans…":navigator.onLine===false?"Sin señal":dep?"Actualizar esta bodega":"Actualizar todas las bodegas"}</button>`:"";
