@@ -394,9 +394,24 @@ let DIS_EDK=null;
 function disModoConf(r,d,editP,P){
   if(!editP||!d||DIS_EDK===d.k)return null;const le=d.lectura||{};
   if(le.estado==="leyendo"&&!(d.timbre&&lecSoloElegir(P)))return"leyendo";
-  if(d.foto&&(!P.b.length||(d.timbre&&lecSoloElegir(P)))&&(le.estado!=="pendiente"||d.timbre))return"ok";
+  if(d.foto)return"ok"; /* v179 (quien rinde): la tarjeta siempre; lo que falta se completa desde ella */
   return null;
 }
+/* v179 (quien rinde): datos del documento en una línea (para el visor de la foto) */
+const rdDatosLinea=d=>[num(d.total)?fmtP(num(d.total)):"",d.fecha?fmtD(d.fecha):"",`${TIPO_DOC[d.tipo]||"Documento"}${d.folio?` N° ${d.folio}`:""}`,d.rut?`RUT ${d.rut}`:""].filter(Boolean).join(" · ");
+/* lo que impide enviar y no es una fila de la tarjeta: cada aviso abre «Corregir datos» en su campo */
+const RD_CAMPO_HOJA={rdTd:"cTd",rdEm:"cEm",rdRut:"cRut",rdFol:"cFol",rdFe:"cFe",rdTot:"cTot",rdNe:"cNe"};
+function rdFaltaHTML(P){const B=P.b.filter(m=>!/^rd(Ce|Ga)$/.test(campoDeMsg(m)||""));if(!B.length)return"";
+  return `<div class="rdok-falta"><b>Para enviar falta</b>${B.map(m=>{const c=RD_CAMPO_HOJA[campoDeMsg(m)];return c?`<button type="button" class="lnk" data-a="rdCorregir" data-c="${c}">${esc(m)}</button>`:`<button type="button" class="lnk" data-a="disEditar" data-c="${esc(campoDeMsg(m)||"")}">${esc(m)}</button>`}).join("")}</div>`}
+/* pone un dato igual que el formulario (rdInput): montos como número, marca de corregido a mano y registro del cambio de Contabilidad */
+function rdPoner(d,f,v){const antes=d[f];let nv;
+  if(["total","neto","iva"].includes(f)){const s=String(v==null?"":v).replace(/[^\d]/g,"");nv=s?+s:0}else nv=String(v==null?"":v).trim();
+  const vac=x=>x==null||x===""||x===0;
+  if(String(antes==null?"":antes)===String(nv)||(vac(antes)&&vac(nv)))return false;
+  d[f]=nv;if(f==="glosa")delete d.glosaTimbre;
+  if(puedeContab(rdv)){d.orig=d.orig||{};if(!(f in d.orig))d.orig[f]=antes==null?"":antes}
+  if(f==="tipo"&&d.tipo==="peaje"&&!d.gasto&&catalogo().some(c=>c.id===GASTO_PEAJE))d.gasto=GASTO_PEAJE;
+  d.revisadoManual=true;return true}
 function disConfHTML(r,d,P,modo){
   if(modo==="leyendo")return `<section class="rdok leyendo" aria-busy="true" aria-label="Leyendo el documento"><div class="rdok-sk" aria-hidden="true"><i></i><i></i><i class="g"></i></div><p class="rdok-lee"><span class="spin" aria-hidden="true"></span>Leyendo el documento…</p><button type="button" class="lnk" data-a="disEditar">Escribir los datos a mano</button></section>`;
   const le=d.lectura||{},cat=gastoDe(d),centro=centroDoc(r,d),sugC=d.centroSug&&centro,sugG=(d.gastoIA||d.gastoHist)&&cat,tot=num(d.total);
@@ -405,19 +420,45 @@ function disConfHTML(r,d,P,modo){
   /* v135: dudas solo si la confianza es baja, o hay problemas y la confianza no es alta; el detalle va en «Ver detalle» */
   const dudas=le.estado==="ok"&&(le.confianza!=null&&le.confianza<0.6||(le.problemas&&le.problemas.length&&!(le.confianza>=0.8)));
   return `<section class="rdok" aria-label="Datos del documento">
-    <div class="rdok-em">${esc(d.emisor||"Sin emisor")}</div>
-    <div class="rdok-meta">${meta}${d.rut?` <span class="rdok-rut">· RUT ${esc(d.rut)}</span>`:""}</div>
-    <div class="rdok-tot">${tot?fmtP(tot):"Sin total"}</div>
-    ${d.tipo==="factura"&&(num(d.neto)||num(d.iva))?`<div class="rdok-iva">Neto ${fmtP(num(d.neto))} · IVA ${fmtP(num(d.iva))}</div>`:""}${(m=>m?`<div class="rdok-iva">Incluye propina de ${esc((m.match(/[$][0-9.]+/)||[""])[0])} (no es parte de la boleta o factura)</div>`:"")(P.a.find(m=>/propina/.test(m)))}
-    <div class="rdok-l">
-      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,sugC?` <i class="xp sug">Sugerido</i>`:"")}
-      ${fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Elegir",!cat,sugG?` <i class="xp sug">Sugerido</i>`:"")}
-      ${fila(`data-a="disEditar" data-c="rdGl"`,"Detalle",d.glosa?esc(d.glosa):"Agregar qué se compró",!d.glosa,d.glosaTimbre&&d.glosa?` <i class="xp sug">Sugerido</i>`:"")}
+    <button type="button" class="rdok-cab" data-a="rdCorregir" aria-label="Corregir los datos del documento"><span class="rdok-lap" aria-hidden="true">Corregir</span><span class="rdok-em">${esc(d.emisor||"Sin emisor")}</span>
+    <span class="rdok-meta">${meta}${d.rut?` <span class="rdok-rut">· RUT ${esc(d.rut)}</span>`:""}</span>
+    <span class="rdok-tot${tot?"":" falta"}">${tot?fmtP(tot):"Falta el total"}</span>
+    ${d.tipo==="factura"&&(num(d.neto)||num(d.iva))?`<span class="rdok-iva">Neto ${fmtP(num(d.neto))} · IVA ${fmtP(num(d.iva))}</span>`:""}${(m=>m?`<span class="rdok-iva">Incluye propina de ${esc((m.match(/[$][0-9.]+/)||[""])[0])} (no es parte de la boleta o factura)</span>`:"")(P.a.find(m=>/propina/.test(m)))}
+    </button><div class="rdok-l">
+      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,!centro?` <i class="xp nueva">Falta</i>`:sugC?` <i class="xp sug">Sugerido</i>`:"")}
+      ${fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Elegir",!cat,!cat?` <i class="xp nueva">Falta</i>`:sugG?` <i class="xp sug">Sugerido</i>`:"")}
+      ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):"Agregar qué se compró",!d.glosa,d.glosaTimbre&&d.glosa?` <i class="xp sug">Sugerido</i>`:"")}
     </div>
+    ${rdFaltaHTML(P)}${le.estado==="pendiente"?`<p class="rdok-av">${ICO_ALERTA}<span>Sin señal: la app leerá el documento cuando vuelva la conexión. Si quieres, escribe los datos con «Corregir datos».</span></p>`:le.estado==="error"?`<p class="rdok-av">${ICO_ALERTA}<span>La lectura automática no funcionó. Escribe los datos con «Corregir datos».</span></p>`:""}
     ${lecTarjetaHTML(d,P)}
     ${dudas?`<div class="rdok-av">${ICO_ALERTA}<span>La lectura tiene dudas: compara con la foto.${le.problemas&&le.problemas.length?`<details class="rdok-det"><summary>Ver detalle</summary>${esc(le.problemas.join("; "))}</details>`:""}</span></div>`:le.estado==="ok"&&!d.revisadoManual?`<p class="rdok-ia">Leída automáticamente. Compara con la foto.</p>`:""}
-    ${(PA=>PA.length?`<p class="rdok-av">${ICO_ALERTA}<span>Por revisar: ${esc(PA.slice(0,2).join(" "))}${PA.length>2?` Y ${PA.length-2} más.`:""} Puedes enviar igual. <button type="button" class="lnk" data-a="disEditar">Completar</button></span></p>`:"")(P.a.filter(m=>!/propina/.test(m)))}
-    <button type="button" class="btn rdok-ed" data-a="disEditar">Editar datos</button>
+    ${(PA=>PA.length?`<p class="rdok-av">${ICO_ALERTA}<span>Por revisar: ${esc(PA.slice(0,2).join(" "))}${PA.length>2?` Y ${PA.length-2} más.`:""} Puedes enviar igual. <button type="button" class="lnk" data-a="rdCorregir">Completar</button></span></p>`:"")(P.a.filter(m=>!/propina/.test(m)))}
+    <button type="button" class="btn rdok-ed" data-a="rdCorregir">Corregir datos</button><p class="rdok-mas"><button type="button" class="lnk rdok-todo" data-a="disEditar">Ver todos los campos</button><span aria-hidden="true"> · </span><button type="button" class="lnk rdok-foto" data-a="disEditar" data-c="rdFotoBox">Cambiar la foto</button></p>
+  </section>`;
+}
+/* v179 (quien revisa): quien revisa (jefatura o Contabilidad) y quien solo mira ven la ficha del documento, no el formulario */
+const rdRevisa=r=>!!r&&!editaPersona(r)&&(puedeJefatura(r)||puedeContab(r));
+const RDFIC_OK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+function disFichaHTML(r,d,P,edita){
+  const cat=gastoDe(d),centro=centroDoc(r,d),tot=num(d.total),rev=rdRevisa(r);
+  const meta=[TIPO_DOC[d.tipo]||"Sin tipo",d.fecha?fmtD(d.fecha):"sin fecha",d.folio?`N° ${d.folio}`:"sin número"].map(esc).join(" · ");
+  const fila=(attrs,et,val,vacio)=>edita?`<button type="button" class="rdok-r" ${attrs}><span class="rdok-et">${et}</span><span class="rdok-v${vacio?" vacio":""}">${val}</span>${ICO_CHEV}</button>`
+    :`<div class="rdok-r fija"><span class="rdok-et">${et}</span><span class="rdok-v${vacio?" vacio":""}">${val}</span></div>`;
+  const av=P.b.concat(P.a).filter(m=>!/propina/.test(m));
+  const est=!rev?"":d.estadoRev==="ok"?`<p class="rdfic-e ok">${RDFIC_OK}Revisado</p>`
+    :d.estadoRev==="obs"?`<div class="rdfic-e obs"><span>${ICO_ALERTA}<span><b>Observado</b>${d.obsRev?`: ${esc(d.obsRev)}`:""}</span></span><button type="button" class="lnk" data-a="rdRevQuitar">Quitar</button></div>`:"";
+  /* Contabilidad corrige con las mismas hojas cortas de quien rinde (el encabezado se toca) */
+  const cab=`<span class="rdok-em">${esc(d.emisor||"Sin emisor")}</span><span class="rdok-meta">${meta}</span><span class="rdok-meta">${d.rut?`RUT ${esc(d.rut)}`:"Sin RUT del emisor"}</span><span class="rdok-tot">${tot?fmtP(tot):"Sin total"}</span>${d.tipo==="factura"&&(num(d.neto)||num(d.iva))?`<span class="rdok-iva">Neto ${fmtP(num(d.neto))} · IVA ${fmtP(num(d.iva))}</span>`:""}${(m=>m?`<span class="rdok-iva">Incluye propina de ${esc((m.match(/[$][0-9.]+/)||[""])[0])} (no es parte de la boleta o factura)</span>`:"")(P.a.find(m=>/propina/.test(m)))}`;
+  return `<section class="rdok rdfic" aria-label="Datos del documento">${est}
+    ${edita?`<button type="button" class="rdok-cab" data-a="rdCorregir" aria-label="Corregir los datos del documento"><span class="rdok-lap" aria-hidden="true">Corregir</span>${cab}</button>`:`<div class="rdok-cab fija">${cab}</div>`}
+    <div class="rdok-l">
+      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Sin centro",!centro)}
+      ${fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Sin tipo de gasto",!cat)}
+      ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):"Sin detalle",!d.glosa)}
+      ${d.bu?`<div class="rdok-r fija"><span class="rdok-et">Bien de uso</span><span class="rdok-v">${esc((maeTiene("bienes")&&MAE.bienes[d.bu])||d.bu)}</span></div>`:""}${d.dist?`<div class="rdok-r fija"><span class="rdok-et">Reparto</span><span class="rdok-v">Según la tabla de ${esc(d.dist)}</span></div>`:""}
+    </div>
+    ${av.length?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(av.slice(0,3).join(" "))}${av.length>3?` Y ${av.length-3} más.`:""}</span></p>`:""}
+    ${edita?`<button type="button" class="btn rdok-ed" data-a="rdCorregir">Corregir datos</button><p class="rdok-mas"><button type="button" class="lnk rdok-todo" data-a="disEditar">Ver todos los campos</button></p>`:""}
   </section>`;
 }
 function disTipoHTML(d,dis){
@@ -535,7 +576,8 @@ const rdRefotoHTML=t=>`${t}: `+(ESCRITORIO()?`<label class="lnk">Subir foto<inpu
   :`<label class="lnk">Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label> · <label class="lnk">Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label>`);
 function lecTarjetaHTML(d,P){
   const le=d.lectura||{};let h="";
-  if(P&&P.b.length)h+=`<p class="rdok-av">${ICO_ALERTA}<span>Para enviar falta elegir ${P.b.map(m=>campoDeMsg(m)==="rdCe"?"el centro de costo":"el tipo de gasto").filter((x,i,a)=>a.indexOf(x)===i).join(" y ")}.</span></p>`;
+  const PB=P?P.b.filter(m=>/^rd(Ce|Ga)$/.test(campoDeMsg(m)||"")):[];
+  if(PB.length)h+=`<p class="rdok-av">${ICO_ALERTA}<span>Para enviar falta elegir ${PB.map(m=>campoDeMsg(m)==="rdCe"?"el centro de costo":"el tipo de gasto").filter((x,i,a)=>a.indexOf(x)===i).join(" y ")}.</span></p>`;
   if(d.timbre){const df=timbreDiferencias(d);
     h+=df.length?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(df.join(" "))}</span></p>`:`<p class="rdok-tim">${ICO_OK96}<span>RUT, N°, fecha y total del timbre del SII</span></p>`}
   if(le.estado==="leyendo")h+=`<p class="rdok-ia"><span class="spin" aria-hidden="true"></span><span>Completando el comercio y el detalle…</span></p>`;
@@ -1457,7 +1499,9 @@ function rdNavHTML(r,d){const N=rdNavLista(r,d);if(N.keys.length<2||N.i<0)return
 }
 async function rdIrDoc(k){if(!rdv||!k||!rdv.docs[k])return;await flush();rdd=rdv.docs[k];go("rdd");window.scrollTo(0,0)}
 function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtP(num(d.total)):"Sin total";
-  const res=accRes(N.keys.length>1&&N.i>=0?`${N.cola?"Nuevo":"Documento"} ${N.i+1} de ${N.keys.length}`:"Documento",`${esc(d.emisor||"Sin emisor")} · ${tot}`);
+  const nf=editaPersona(r)?problemasDoc2(r,d).b.length:0; /* v179 (quien rinde): cuántos datos faltan para enviar */
+  const res=accRes(N.keys.length>1&&N.i>=0?`${N.cola?"Nuevo":"Documento"} ${N.i+1} de ${N.keys.length}`:"Documento",nf?`<em>${nf===1?"Falta 1 dato":`Faltan ${nf} datos`} para enviar</em>`:`${esc(d.emisor||"Sin emisor")} · ${tot}`);
+  if(rdRevisa(r))return accBar("rddbar",res,`<button class="btn" data-a="rdRevObs">Observar</button>`+(d.estadoRev==="ok"?(N.sig?`<button class="btn pri" data-a="rdIrDoc" data-k="${esc(N.sig)}">Siguiente</button>`:`<button class="btn pri" data-a="rdVolver">Listo</button>`):`<button class="btn pri" data-a="rdRevOk">Está bien</button>`));
   return accBar("rddbar",res,N.sig?`<button class="btn pri" data-a="rdIrDoc" data-k="${esc(N.sig)}">Siguiente</button>`:`<button class="btn pri" data-a="rdVolver">Listo</button>`)}
 /* tras subir varios juntos: abrir el primero en modo revisión */
 function rdTrasSubir(r,keys){keys=keys.filter(Boolean);if(keys.length<2||!rdv||rdv.id!==r.id||view!=="rdv")return;
@@ -1564,7 +1608,7 @@ function rdDocCard(r,d){
   if(probs.length&&editable)ch.push(`<span class="xp nueva">${probs.length===1?"1 dato obligatorio":probs.length+" datos obligatorios"}</span>`);
   if(P.a.length&&editable)ch.push(`<span class="xp camb">${P.a.length} ${P.a.length===1?"dato en blanco":"datos en blanco"}</span>`);
   if(d.aj&&Object.keys(d.aj).length)ch.push(`<span class="xp camb">Ajuste contable</span>`);
-  {const gs=d.gastoIA||d.gastoHist;if(editable&&(d.centroSug||gs))ch.push(`<span class="xp camb">${d.centroSug&&gs?"Centro y tipo sugeridos":gs?"Tipo sugerido":"Centro sugerido"}</span>`)}
+  {const gs=d.gastoIA||d.gastoHist;if(editable&&(d.centroSug||gs))ch.push(`<span class="xp sug">${d.centroSug&&gs?"Centro y tipo sugeridos":gs?"Tipo sugerido":"Centro sugerido"}</span>`)}
   if(!ch.length&&editable)ch.push(`<span class="xp ok">Completa</span>`);
   const pdfCh=d.pdf||d.pdfPags?`<span class="xp" style="background:var(--soft);color:var(--muted)">PDF</span>`:"";
   return `<div class="rdd" role="button" tabindex="0" data-a="rdDoc" data-k="${esc(d.k)}">
@@ -1660,12 +1704,12 @@ function renderRDV(){
   if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>
       ${disTip("rdsolo",`Solo sirven <b>facturas y boletas</b>, en foto o en PDF.${ESCRITORIO()?" También puedes arrastrar las fotos o los PDF a esta página.":""}`,"rdsolo")}
       ${D.length?`${inc?`<p class="note">Faltan datos obligatorios en ${inc} ${inc===1?"documento":"documentos"} (foto, total, tipo de documento, centro de costo, tipo de gasto o RUT de la factura). <button class="lnk" data-a="rdDoc" data-k="${esc(D.find(d=>!docCompleto(r,d)).k)}">Ir ${inc===1?"al documento":"al primero"}</button></p>`:adv?`<p class="note">${adv} ${adv===1?"dato queda en blanco":"datos quedan en blanco"}; se puede enviar igual y quien revisa los completa.</p>`:""}`:""}`;
-  else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Toca cada documento para marcarlo revisado u observarlo. Para devolver, al menos uno debe tener observación.</p>`;
+  else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Revisa cada documento: «Está bien» u «Observar».</p>`;
   else if(esContab()&&r.estado==="revcont"&&aprobeJef(r)&&!esPropia(r))acciones=`<p class="note">La aprobaste como jefatura: la revisión contable la hace otra persona de Contabilidad.</p>`;
   else if(con)acciones=`${A&&A.bloq?`<p class="note">Corrige lo que está en «Por corregir» (toca el documento) para poder aprobar.</p>`:""}`;
   else if(ctz)acciones=`<div class="btns"><button class="btn pri" data-a="rdFinnEnviar" style="flex:1" ${RD_FINN?"disabled":""}>${RD_FINN?"Enviando a FinnegansGO…":"Contabilizar en FinnegansGO"}</button></div><div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button><button class="btn" data-a="rdContabilizar" style="flex:1">Marcar contabilizada</button></div><div class="btns"><button class="btn" data-a="rdReabrir">Volver a revisión contable</button></div><p class="note">«Contabilizar en FinnegansGO» envía el asiento directo y la deja contabilizada con el número de asiento. El Excel y «Marcar contabilizada» son para cargarla a mano.</p>`; /* v163 */
   else if(esContab()&&r.estado==="contabilizada")acciones=`<div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button></div>`;
-  const resR=accRes(fmtP(totalRend(r)),`${D.length} ${D.length===1?"documento":"documentos"}${inc&&edit?` · <em>faltan datos en ${inc}</em>`:obs&&(jef||con)?` · ${obs} con observación`:""}`);
+  const resR=accRes(fmtP(totalRend(r)),`${D.length} ${D.length===1?"documento":"documentos"}${inc&&edit?` · <em>faltan datos en ${inc}</em>`:(jef||con)?`${(n=>n?` · ${n} ${n===1?"revisado":"revisados"}`:"")(D.filter(d=>d.estadoRev==="ok").length)}${obs?` · ${obs} ${obs===1?"observado":"observados"}`:""}`:""}`);
   const barra=edit&&D.length?accBar("rdbar",resR,`<button class="btn pri" data-a="rdEnviar" ${inc?"disabled":""}>${r.estado==="observada"?"Reenviar":"Enviar a aprobación"}</button>`)
     :jef?accBar("rdbar",resR,`<button class="btn" data-a="rdDevolver">Devolver${obs?` (${obs})`:""}</button><button class="btn pri" data-a="rdAprobarJef">Aprobar</button>`)
     :con?accBar("rdbar",resR,`<button class="btn" data-a="rdDevolver">Devolver${obs?` (${obs})`:""}</button><button class="btn pri" data-a="rdAprobarCont" ${A&&A.bloq?"disabled":""}>Aprobar imputación</button>`):"";
@@ -1682,6 +1726,7 @@ function renderRDV(){
     ${rdPasosHTML(r)}
     ${r.comentario?`<div class="info netbox"><b>Comentario de ${r.devueltaEn==="revcont"?"Contabilidad":"revisión"}:</b> ${esc(r.comentario)}</div>`:""}
     ${acciones}
+    ${rdRevisa(r)&&D.length?(n=>`<div class="start rdrevini" style="grid-template-columns:1fr"><button class="big dev acc" data-a="rdRevIni"><strong>${n===D.length?"Ver los documentos":n?"Seguir revisando":D.length===1?"Revisar el documento":`Revisar los ${D.length} documentos`}</strong><span>${n?`${n} de ${D.length} revisados`:"Foto y datos de cada uno, uno tras otro"}</span></button></div>`)(D.filter(d=>d.estadoRev).length):""}
     <h2>Documentos<span class="cnt">${D.length}</span></h2>
     <div class="list">${D.map(d=>rdDocCard(r,d)).join("")||`<div class="empty">Todavía no hay documentos. Toca <b>Agregar documento</b> y saca la foto de la factura o boleta.</div>`}</div>
     ${asi}
@@ -1703,6 +1748,7 @@ function renderRDD(){
   const cat=gastoDe(d),centro=centroDoc(r,d),im=imputar(r,d),base=imputar(r,d,true);
   const dis=ro?"disabled":"";
   const conf=disModoConf(r,d,editP,P);
+  const fic=!editP&&DIS_EDK!==d.k; /* v179 (quien revisa): ficha en vez del formulario */
   const sugC=editP&&d.centroSug&&centro,sugG=editP&&(d.gastoIA||d.gastoHist)&&cat;
   const pideBU=(cat&&cat.bu)||/^4106/.test(im.cuenta),servs=distServicios(),pideDist=cat&&cat.dist&&(servs.length||d.dist);
   const verC=esContab()&&(r.estado==="revcont"||r.estado==="aprobada"||r.estado==="contabilizada"||(r.estado==="enviada"&&sinJefatura(r)))&&!esPropia(r);
@@ -1714,11 +1760,11 @@ function renderRDD(){
       <div class="skf dupla">${[["cuenta",base.cuenta],["producto",base.prod],["partida",base.part],["tercero",base.ter]].map(([f,b])=>`<div class="f"><label>${esc(AJ_TIT[f])}</label>${ajBtn(f,aj[f]||"",`data-a="rdPickAj" data-f="${esc(f)}"`,b?`Según el tipo de gasto: ${nomAj(f,b)||b}`:"Según el tipo de gasto")}</div>`).join("")}</div>`:""}
       ${d.orig&&Object.keys(d.orig).length?`<p class="note">Cambiado por Contabilidad: ${Object.entries(d.orig).map(([k,v])=>`${esc(k)} (antes: ${esc(String(v||"vacío"))})`).join(" · ")}</p>`:""}`}
   return `<div class="top rddtop"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rdVolver">${esc(rdTituloCorto(r))}</button><div class="ttl">Documento</div>${estadoChip()}</div></div></div>
-  <main class="wrap rddw${conf?" conf":""}">
+  <main class="wrap rddw${conf||fic?" conf":""}${fic?" fic":""}">
     ${rdNavHTML(r,d)}
     <div class="rdfoto" id="rdFotoBox">${d.foto?(fotoSrc(d.foto)?`<img src="${esc(fotoSrc(d.foto))}" alt="Documento" data-a="foto" data-ref="${esc(d.foto)}" data-k="${esc(d.k)}">`:`<div class="empty">La foto se está cargando…</div>`):`<div class="empty">Sin foto</div>`}
       ${rdPdfInfo(d)}${editP?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}</div>
-    ${conf?disConfHTML(r,d,P,conf):""}<div class="rdform"${conf?" hidden":""}>
+    ${conf?disConfHTML(r,d,P,conf):fic?disFichaHTML(r,d,P,editC):""}<div class="rdform"${conf||fic?" hidden":""}>
     ${le.estado==="leyendo"?`<div class="info">Leyendo el documento…</div>`:le.estado==="pendiente"?`<div class="info netbox">Sin señal: el documento se leerá automáticamente cuando vuelva la conexión. Mientras tanto puedes escribir los datos a mano.</div>`:le.estado==="error"?`<div class="info netbox"><b>La lectura automática no funcionó.</b> ${esc(le.msg||"")} Completa los datos a mano.</div>`:le.estado==="ok"&&editP?`<div class="info" style="border-left:5px solid ${le.confianza>=0.6?"var(--b-ink)":"var(--r-ink)"}"><b>Leída automáticamente</b>${le.confianza!=null?` · confianza ${Math.round(le.confianza*100)}%`:""}. ${le.problemas&&le.problemas.length?`La IA advierte: ${esc(le.problemas.join("; "))}. `:""}Revisa que los datos coincidan con el documento.</div>`:""}
     ${probs.length&&!ro?`<div class="info netbox"><b>Para enviar falta:</b> <span class="hint">(toca cada aviso para ir al dato)</span><ul>${probs.map(liCampo).join("")}</ul></div>`:""}
     ${P.a.length&&!ro?`<div class="info" style="border-left:5px solid var(--r-ink)"><b>Datos en blanco o por revisar</b> (no impiden enviar; quien revisa puede completarlos):<ul>${P.a.map(liCampo).join("")}</ul></div>`:!probs.length&&editP?`<div class="info" style="border-left:5px solid var(--b-ink)">Documento completo.${(d.centroSug||d.gastoIA)?" El centro de costo y el tipo de gasto marcados como «Sugerido» los propuso la app: revisa que correspondan.":""}</div>`:""}
@@ -1743,7 +1789,7 @@ function renderRDD(){
       ${pideDist?`<div class="f"><label for="rdDi">Gasto compartido entre predios</label><select id="rdDi" data-rdf="dist" ${dis}><option value="">No: va al centro elegido</option>${servs.concat(d.dist&&!servs.includes(d.dist)?[d.dist]:[]).map(s=>`<option value="${esc(s)}" ${d.dist===s?"selected":""}>Repartir según la tabla de ${esc(s)}</option>`).join("")}</select></div>`:""}
       <div class="f"><label for="rdGl">Detalle del gasto${editP&&d.glosaTimbre&&d.glosa?` <span class="xp sug">Sugerido</span>`:""}</label><input id="rdGl" data-rdf="glosa" value="${esc(d.glosa||"")}" placeholder="${esc((cat&&cat.ph)||"Qué se compró y para qué")}" maxlength="120" ${dis}></div>
     </div></div>
-    ${(jef||editC)?`<h2>Revisión</h2><div class="seg" style="grid-template-columns:1fr 1fr"><button data-a="rdRev" data-v="ok" aria-pressed="${d.estadoRev==="ok"}">Revisado</button><button data-a="rdRev" data-v="obs" aria-pressed="${d.estadoRev==="obs"}">Observar</button></div>${d.estadoRev==="obs"?`<input class="obs" data-rdf="obsRev" value="${esc(d.obsRev||"")}" placeholder="Qué debe corregir la persona">`:""}`:d.obsRev?`<div class="info netbox"><b>Observación de revisión:</b> ${esc(d.obsRev)}</div>`:""}
+    ${(jef||editC)&&fic?"":(jef||editC)?`<h2>Revisión</h2><div class="seg" style="grid-template-columns:1fr 1fr"><button data-a="rdRev" data-v="ok" aria-pressed="${d.estadoRev==="ok"}">Revisado</button><button data-a="rdRev" data-v="obs" aria-pressed="${d.estadoRev==="obs"}">Observar</button></div>${d.estadoRev==="obs"?`<input class="obs" data-rdf="obsRev" value="${esc(d.obsRev||"")}" placeholder="Qué debe corregir la persona">`:""}`:d.obsRev?`<div class="info netbox"><b>Observación de revisión:</b> ${esc(d.obsRev)}</div>`:""}
     ${contHTML}
     ${editP?`<div class="btns" style="margin-top:14px"><button class="btn" data-a="rdDelDoc" data-k="${esc(d.k)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar este documento</button></div>`:""}
   </main>${rdPieDoc(r,d)}`;
@@ -2140,6 +2186,39 @@ async function rdClick(A,b){
     r.actualizado=new Date().toISOString();await saveRend(r);go("rd");toast(el?"Rendición eliminada.":"Rendición anulada.");
     if(enExcel&&DB&&navigator.onLine!==false)subirExcel("rend:"+r.periodo,false,()=>rdXlsxUpload(r.periodo)).catch(e=>console.warn("excel rendición",e));
     return true}
+  /* v179 (quien rinde): corregir desde la tarjeta, sin abrir el formulario completo */
+  if(A==="rdCorregir"){if(!rdd||rdRO(rdv))return true;const d=rdd,c=b.dataset.c||"",fac=d.tipo==="factura"||num(d.neto)||num(d.iva);
+    const tipos=TIPOS_RENDIR.includes(d.tipo)?TIPOS_RENDIR:TIPOS_RENDIR.concat(d.tipo?[d.tipo]:[]);
+    const pr=askVal("Corregir datos","Compara con la foto y cambia solo lo que esté distinto.","Guardar",`
+      <div class="f"><label for="cTd">Tipo de documento</label><select id="cTd" data-v="tipo">${d.tipo?"":`<option value="">Elegir</option>`}${tipos.map(k=>`<option value="${esc(k)}" ${d.tipo===k?"selected":""}>${esc(TIPO_DOC[k]||k)}${TIPOS_RENDIR.includes(k)?"":" (no sirve para rendir)"}</option>`).join("")}</select></div>
+      <div class="f"><label for="cEm">Emisor (comercio o proveedor)</label><input id="cEm" data-v="emisor" value="${esc(d.emisor||"")}" autocomplete="off"></div>
+      <div class="grid2 g2m"><div class="f"><label for="cRut">RUT del emisor</label><input id="cRut" data-v="rut" value="${esc(d.rut||"")}" placeholder="76.123.456-7" autocapitalize="characters" autocomplete="off"></div>
+        <div class="f"><label for="cFol">N° de boleta</label><input id="cFol" data-v="folio" value="${esc(d.folio||"")}" inputmode="numeric" autocomplete="off"></div></div>
+      <div class="grid2 g2m"><div class="f"><label for="cFe">Fecha</label><input id="cFe" type="date" data-v="fecha" value="${esc(d.fecha||"")}"></div>
+        <div class="f"><label for="cTot">Total ($)</label><input id="cTot" data-v="total" inputmode="numeric" value="${d.total?esc(fmtN(num(d.total),0)):""}" autocomplete="off"></div></div>
+      ${fac?`<div class="grid2 g2m"><div class="f"><label for="cNe">Neto ($)</label><input id="cNe" data-v="neto" inputmode="numeric" value="${d.neto?esc(fmtN(num(d.neto),0)):""}" autocomplete="off"></div>
+        <div class="f"><label for="cIva">IVA ($)</label><input id="cIva" data-v="iva" inputmode="numeric" value="${d.iva?esc(fmtN(num(d.iva),0)):""}" autocomplete="off"></div></div>`:""}`);
+    const hoja=document.querySelector(".modal:last-of-type .sheet");if(hoja)hoja.classList.add("rdhoja");
+    if(c)setTimeout(()=>{const x=document.querySelector(".modal #"+c);if(x){try{x.focus();if(x.select)x.select()}catch(e){}}},80);
+    const o=await pr;if(!o)return true;let cambio=false;Object.entries(o).forEach(([f,v])=>{if(rdPoner(d,f,v))cambio=true});
+    if(cambio)rdTouch();render();return true}
+  if(A==="rdDetalle"){if(!rdd||rdRO(rdv))return true;const d=rdd,cat=gastoDe(d);
+    const o=await askVal("Detalle del gasto","Qué se compró y para qué.","Guardar",`<div class="f"><label for="cGl">Detalle</label><input id="cGl" data-v="glosa" value="${esc(d.glosa||"")}" maxlength="120" placeholder="${esc((cat&&cat.ph)||"Ej.: repuesto para el tractor")}" autocomplete="off"></div>`);
+    if(o&&rdPoner(d,"glosa",o.glosa))rdTouch();render();return true}
+  /* v179 (quien revisa): revisar desde la barra de abajo */
+  if(A==="rdRevIni"){if(!rdv)return true;const D=docsDe(rdv),d=D.find(x=>!x.estadoRev)||D[0];if(d)await rdIrDoc(d.k);return true}
+  if(A==="rdRevQuitar"){if(!rdd||!rdRevisa(rdv))return true;rdd.estadoRev=undefined;rdd.obsRev="";rdTouch();render();return true}
+  if(A==="rdRevOk"||A==="rdRevObs"){if(!rdd||!rdRevisa(rdv))return true;const r=rdv,d=rdd;
+    if(A==="rdRevObs"){let txt=d.obsRev||"";const leer=()=>{const x=document.querySelector("#obsRevIn");if(x)txt=x.value.trim()};document.addEventListener("input",leer,true);let ok;
+      try{ok=await ask("Observar este documento",`${d.emisor||"Documento"}${num(d.total)?" · "+fmtP(num(d.total)):""}. La persona lo verá cuando le devuelvas la rendición.`,"Observar",false,`<div class="f"><label for="obsRevIn">Qué debe corregir</label><input id="obsRevIn" value="${esc(d.obsRev||"")}" placeholder="Ej.: la foto está cortada" maxlength="160" autocomplete="off"></div>`)}
+      finally{leer();document.removeEventListener("input",leer,true)}
+      if(!ok)return true;d.estadoRev="obs";d.obsRev=txt}
+    else{d.estadoRev="ok";d.obsRev=""}
+    rdTouch();const K=docsDe(r).map(x=>x.k),i=K.indexOf(d.k),sig=K.slice(i+1).concat(K.slice(0,i)).find(k=>!r.docs[k].estadoRev);
+    if(sig)await rdIrDoc(sig);
+    else{await flush();rdd=null;RD_COLA=null;go("rdv");const nO=docsDe(r).filter(x=>x.estadoRev==="obs").length;
+      toast(nO?`Revisaste todos: ${nO} con observación. Toca «Devolver» para que ${nO===1?"lo":"los"} corrijan.`:"Revisaste todos los documentos. Ya puedes aprobar.",6000)}
+    return true}
   if(A==="rdRev"){if(!rdd||!(puedeJefatura(rdv)||puedeContab(rdv)))return true;rdd.estadoRev=b.dataset.v;if(rdd.estadoRev==="ok")rdd.obsRev="";rdTouch();render();return true}
   /* v115: siempre activo y siempre con comentario para la persona (lo ve en su rendición, en «Para hoy» y en el correo) */
   if(A==="rdDevolver"){if(!(puedeJefatura(rdv)||puedeContab(rdv)))return true;const D=docsDe(rdv);const obs=D.filter(d=>d.estadoRev==="obs");
@@ -2426,4 +2505,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="178"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="179"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

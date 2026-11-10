@@ -2077,3 +2077,40 @@ details>*{box-sizing:border-box}
 .rdc-i.anu{background:var(--soft);color:var(--muted)}
 .xp.rdanux{background:var(--soft);color:var(--muted)}
 .bod.rdc.anu .rdc-v{color:var(--muted);font-weight:500}
+
+/* ---------- v179 (quien rinde): la tarjeta siempre, corregir en una hoja corta y comparar con la foto ---------- */
+.rdok-cab{position:relative;display:block;width:100%;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rdok-cab>span{display:block}
+.rdok-cab .rdok-em{padding-right:78px}
+.rdok-lap{position:absolute;top:1px;right:0;padding:4px 10px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--act);background:var(--card)}
+.rdok-cab:active .rdok-lap{background:var(--soft)}
+.rdok-tot.falta{font-size:22px;color:var(--m-ink)}
+.rdok-falta{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:12px 0 0;padding:10px 12px;border-radius:12px;background:var(--m-bg);color:var(--m-ink);font-size:14px}
+.rdok-falta .lnk{color:var(--m-ink);text-align:left;font-weight:600}
+.rdok-mas{margin:10px 0 0;text-align:center;font-size:13.5px;color:var(--muted)}
+.rdok-mas .lnk{font-size:13.5px;color:var(--muted)}
+.rdok-v .xp.nueva{font-style:normal}
+/* la foto en la tarjeta: un poco más grande y con la marca de que se amplía */
+@media (max-width:759px){.rddw.conf .rdfoto img{max-height:38vh;max-height:38dvh}}
+.rddw.conf .rdfoto{position:relative}
+.rddw.conf .rdfoto:has(>img)::after{content:"Toca para ampliar";position:absolute;right:10px;bottom:10px;padding:4px 10px;border-radius:999px;background:rgba(16,24,40,.72);color:#fff;font-size:12px;font-weight:600;pointer-events:none}
+@media (hover:hover) and (pointer:fine){.rddw.conf .rdfoto:has(>img)::after{content:"Clic para ampliar"}}
+/* hoja «Corregir datos» */
+.sheet.rdhoja .f{margin:8px 0}
+.sheet.rdhoja .grid2{gap:0 10px}
+
+/* ---------- v179 (quien revisa): ficha del documento y revisión desde la barra de abajo ---------- */
+.rdok-r.fija{cursor:default;grid-template-columns:minmax(96px,auto) minmax(0,1fr)}
+.rdok-r.fija:active{background:none}
+.rdok-r.fija .rdok-v.vacio{color:var(--muted);font-weight:500}
+.rdfic .rdok-meta+.rdok-meta{margin-top:2px}
+.rdok-cab.fija{cursor:default}
+.rdok-cab.fija .rdok-em{padding-right:0}
+.rdfic-e{display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:14px;font-weight:600}
+.rdfic-e svg{width:18px;height:18px;flex:none}
+.rdfic-e.ok{color:var(--b-ink)}
+.rdfic-e.obs{justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;background:var(--m-bg);color:var(--m-ink);font-weight:400}
+.rdfic-e.obs>span{display:flex;gap:8px;align-items:flex-start}
+.rdfic-e.obs .lnk{color:var(--m-ink);flex:none}
+@media (max-width:759px){.rddw.fic .rdfoto img{max-height:44vh;max-height:44dvh}}
+.rdrevini{margin-top:12px}
