@@ -290,8 +290,8 @@ function renderFDL(){
       <span class="fdrm${x.porRendir<-0.5?" fav":""}"><b>${fmtP(Math.abs(x.porRendir))}</b><small>${x.porRendir<-0.5?"a favor":x.porRendir>0.5?"por rendir":"al día"}</small></span></button>`};
   const sp=Math.abs(D.sinPersona)>0.5;
   return head+`<main class="wrap"><h1>Fondos por rendir</h1>
-    <p class="lead">Cuentas 110106 (fondo por rendir) y 110105 (fondo fijo) por persona: el saldo en Finnegans menos lo enviado que todavía no se contabiliza.</p>
-    ${sp?`<div class="info fdwarn"><b>${fmtP(Math.abs(D.sinPersona))} en Finnegans sin persona${D.sinPersonaPor&&Object.keys(D.sinPersonaPor).length>1?` (${Object.keys(D.sinPersonaPor).sort().reverse().map(c=>`${c}: ${fmtP(D.sinPersonaPor[c])}`).join(", ")})`:""}.</b> Son movimientos de las cuentas de fondos que no tienen persona ni en la línea ni en el documento (por ejemplo, el saldo inicial o el asiento de apertura del año). Mientras no se asignen a cada persona, la suma de los saldos de abajo no cuadra con la cuenta.</div>`:""}
+    <p class="lead">Saldo por persona de las cuentas 110106 y 110105: Finnegans menos lo enviado sin contabilizar.</p>
+    ${sp?`<details class="info fdwarn"><summary><b>${fmtP(Math.abs(D.sinPersona))} en Finnegans sin persona${D.sinPersonaPor&&Object.keys(D.sinPersonaPor).length>1?` (${Object.keys(D.sinPersonaPor).sort().reverse().map(c=>`${c}: ${fmtP(D.sinPersonaPor[c])}`).join(", ")})`:""}.</b> La suma de abajo no cuadra con la cuenta.</summary><p>Son movimientos de las cuentas de fondos que no tienen persona ni en la línea ni en el documento (por ejemplo, el saldo inicial o el asiento de apertura del año). Mientras no se asignen a cada persona, la suma de los saldos de abajo no cuadra con la cuenta.</p></details>`:""}
     <div class="smres fdres"><div><b>${fmtP(tot)}</b><span>por rendir</span></div><div><b>${con.length}</b><span>${con.length===1?"persona":"personas"} con saldo</span></div><div class="${nA?"rr":""}"><b>${nA}</b><span>sin rendir hace ${FD_DIAS_A}+ días</span></div></div>
     ${tram>0.5?`<p class="note" style="margin-top:6px">Ya descontado: ${fmtP(tram)} enviado y en revisión en la app.</p>`:""}
     <div class="smol">Ordenar por</div><div class="smord" role="group" aria-label="Ordenar">${[["saldo","Saldo"],["dias","Antigüedad"],["nom","Nombre"]].map(o=>`<button data-a="fdOrd" data-o="${o[0]}" aria-pressed="${fdOrd===o[0]}">${o[1]}</button>`).join("")}</div>
@@ -1501,7 +1501,7 @@ function renderRD(){
     const p=periodoActual(),cs=colabsDeCuenta(),act=misRend().filter(r=>r.periodo===p),ant=misRend().filter(r=>r.periodo!==p);
     const falta=cs.length>1?cs.some(c=>!act.some(r=>normRut(r.persona&&r.persona.rut)===normRut(c.rut)&&rdEditable(r))):!act.some(rdEditable);
     body=`${rdRecordatoriosHTML()}${fdTarjeta()}<h2>${esc(periodoTxt(p))}</h2>${act.length?`<div class="list">${act.map(r=>rdCard(r)).join("")}</div>`:""}
-    ${falta?`<div class="start" style="grid-template-columns:1fr${act.length?";margin-top:10px":""}"><button class="big ent" data-a="rdNueva" data-p="${esc(p)}"><strong>${act.length?`Empezar otra rendición de ${esc(periodoTxt(p).toLowerCase())}`:`Empezar la rendición de ${esc(periodoTxt(p).toLowerCase())}`}</strong><span>${act.length&&cs.length<=1?"La que ya enviaste sigue su revisión; los documentos nuevos van en una rendición aparte (N°"+rdSiguienteN(p,cs[0]||null)+").":cs.length>1?"Esta cuenta la usan varias personas: la app te preguntará quién rinde.":"Saca una foto de cada factura o boleta; la app lee los datos y te pide lo que falte."}</span></button></div>`:""}
+    ${falta?`<div class="start" style="grid-template-columns:1fr${act.length?";margin-top:10px":""}"><button class="big ent acc" data-a="rdNueva" data-p="${esc(p)}"><strong>${act.length?`Empezar otra rendición de ${esc(periodoTxt(p).toLowerCase())}`:`Empezar la rendición de ${esc(periodoTxt(p).toLowerCase())}`}</strong><span>${act.length&&cs.length<=1?"La que ya enviaste sigue su revisión; los documentos nuevos van en una rendición aparte (N°"+rdSiguienteN(p,cs[0]||null)+").":cs.length>1?"Esta cuenta la usan varias personas: la app te preguntará quién rinde.":"Foto de cada boleta o factura; la app lee los datos"}</span></button></div>`:""}
     ${ant.length?`<h2>Anteriores</h2><div class="list">${ant.map(r=>rdCard(r)).join("")}</div>`:""}
     ${colabs().length&&!cs.length?`<p class="note">Tu cuenta no está en la lista de colaboradores de Contabilidad. Puedes rendir igual: Contabilidad asignará tu RUT y revisará la rendición.</p>`:""}
     ${disTip("rdlee","Las boletas se leen solas cuando hay señal. Sin señal puedes fotografiarlas igual: se leen después.")}`;
@@ -1513,7 +1513,7 @@ function rdRecordatorios(){
   if(!ME)return[];const p=periodoActual(),[y,m]=p.split("-").map(Number),hoy=new Date(),ult=new Date(y,m,0).getDate(),quedan=ult-hoy.getDate();
   const out=[];misRend().filter(r=>rdEditable(r)&&docsDe(r).length).forEach(r=>{const n=docsDe(r).length,tot=fmtP(totalRend(r)),nom=colabsDeCuenta().length>1&&r.persona?` de ${r.persona.nombre}`:"";
     const nd=`${n} ${n===1?"documento":"documentos"}`; /* v144: t y s, texto corto para «Por resolver» y «Para hoy» */
-    if(r.periodo<p)out.push({n:"b",id:r.id,t:`${rdTitulo(r)}${nom} · sin enviar`,s:`${nd} · ${tot} · envíala para que Contabilidad cierre el mes`,m:`La rendición de ${rdTitulo(r).toLowerCase()}${nom} sigue sin enviar (${n} ${n===1?"documento":"documentos"}, ${tot}). Envíala para que Contabilidad pueda cerrar ese mes.`});
+    if(r.periodo<p)out.push({n:"b",id:r.id,t:`${rdTitulo(r)}${nom} · sin enviar`,s:`${nd} · ${tot}`,m:`La rendición de ${rdTitulo(r).toLowerCase()}${nom} sigue sin enviar (${n} ${n===1?"documento":"documentos"}, ${tot}). Envíala para que Contabilidad pueda cerrar ese mes.`});
     else if(r.periodo===p&&quedan<=4)out.push({n:"r",id:r.id,t:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}`,s:`Envía tu rendición${nom}: ${nd} · ${tot}`,m:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`})});
   return out;
 }
@@ -1815,10 +1815,10 @@ function rdMaeRevision(){
 }
 function renderRDM(){
   const ar=(MAE&&MAE.archivos)||{},rev=rdMaeRevision();
-  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rd">Rendiciones</button><div class="ttl">Maestros contables</div>${estadoChip()}</div></div></div>
+  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rd">Rendiciones</button><div class="ttl">Maestros</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div><h1>Maestros contables</h1>
-    <p class="note" style="margin-top:4px">Con estos archivos la app valida cuentas, productos, partidas, centros, bienes de uso y proveedores, y sabe quién aprueba cada rendición. Se guardan en OneDrive: <b>Rendiciones / _maestros</b>.</p>
-    ${esContab()?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""} style="flex:1">${ORGS_TRAYENDO?"Consultando Finnegans…":"Traer organizaciones desde Finnegans"}</button></div><p class="note">Las organizaciones (proveedores y personas) se traen directo de Finnegans; se actualizan solas cada 12 horas cuando Contabilidad abre Rendiciones.</p>`:""}
+    <p class="note" style="margin-top:4px">Con estos archivos la app valida cuentas, centros y proveedores. Están en OneDrive: <b>Rendiciones / _maestros</b>.</p>
+    ${esContab()?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""} style="flex:1">${ORGS_TRAYENDO?"Consultando Finnegans…":"Traer organizaciones desde Finnegans"}</button></div><p class="note">Proveedores y personas vienen de Finnegans y se actualizan solos cada 12 horas.</p>`:""}
     ${esContab()?`<div class="btns"><label class="btn pri" style="flex:1;text-align:center">Cargar archivos Excel<input class="vh" type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-rdmae="1"></label></div><p class="note">Puedes elegir varios a la vez. Cada archivo reemplaza solo su propio maestro.</p>`:""}
     ${MAE_TIPOS.map(([k,t,h])=>{const a=ar[k];return `<div class="rdmf${a?" ok":""}"><b>${esc(t)}</b><span>${a?`${fmtN(a.filas,0)} registros · ${esc(a.nombre)} · ${fmtD(String(a.hora||"").slice(0,10))}${a.por?` · ${esc(a.por)}`:""}`:k==="tipos"?"Se usa el catálogo de la app ("+CATALOGO_DEF.length+" tipos)":"No cargado"}</span><span class="hint">${esc(h)}</span></div>`}).join("")}
     ${esContab()?`<div class="btns"><button class="btn pri" data-a="rdCol" style="flex:1">Colaboradores y aprobadores: ver y editar</button></div><p class="note">Agrega personas, cambia su jefatura o centro y desactiva a quien ya no rinde. Se guarda también en el Excel.</p>`:""}
@@ -1963,7 +1963,7 @@ function renderRDCol(){
   const F=rdColFuera(),A=aprobadores(),H=((MAE&&MAE.colabHist)||[]).slice(-8).reverse(),pend=rdColPend().length,inc=colabs().filter(c=>c.activo!==false&&rdColFaltan(c).length).length;
   return band("Colaboradores","rdMae","Maestros")+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Colaboradores y aprobadores</h1>
-    <p class="lead">Quién rinde, con qué centro y fondo, y quién le aprueba. Lo que cambies aquí se guarda en la app y en el Excel de <b>Rendiciones / _maestros</b>.</p>
+    <p class="lead">Quién rinde y quién le aprueba. Los cambios se guardan también en el Excel de <b>_maestros</b>.</p>
     ${pend||RDCOL_EXCEL?`<div class="info netbox"><b>El Excel no está al día.</b> ${esc(RDCOL_EXCEL||`Hay ${pend} ${pend===1?"cambio":"cambios"} por pasar al Excel.`)} La app ya usa los cambios. <button class="lnk" data-a="rdColReint">Reintentar</button></div>`:""}
     ${F.length?`<h2>Rinden y no están en la lista<span class="cnt">${F.length}</span></h2><p class="note" style="margin-top:0">Sin estar en la lista, sus rendiciones salen sin RUT y van directo a Contabilidad.</p><div class="list">${F.map(x=>`<div class="rdcc"><span class="rdcc-t"><b>${esc(x.nombre)}</b><span class="tag borrador">Fuera de la lista</span></span><span class="rdcc-l">${esc(x.correo)} · ${x.n} ${x.n===1?"rendición":"rendiciones"}</span><button class="btn pri" data-a="rdColNuevo" data-n="${esc(x.nombre)}" data-c="${esc(x.correo)}" style="margin-top:8px">Agregar a la lista</button></div>`).join("")}</div>`:""}
     <h2>Colaboradores<span class="cnt">${colabs().length}</span></h2>
@@ -2421,4 +2421,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="175"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="176"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

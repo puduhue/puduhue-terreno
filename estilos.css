@@ -2022,3 +2022,51 @@ input[type=checkbox],input[type=radio]{accent-color:var(--act)}
 /* v175: «‹ Todas las bodegas» separado de la barra de arriba; la etiqueta «Bajo punto de reposición» del ancho de su texto */
 .skvolver{margin:12px 0 -8px}
 .skn>.xp{align-self:flex-start}
+/* ---------- v176: cinco cambios de la revisión de diseño ---------- */
+/* 1. textos de ayuda: la introducción de cada pantalla, más chica */
+#app main p.lead{font-size:14.5px;line-height:1.4}
+details.fdwarn>summary{list-style:none;cursor:pointer}
+details.fdwarn>summary::-webkit-details-marker{display:none}
+details.fdwarn>summary::after{content:"Ver detalle";display:block;margin-top:2px;font-size:13px;font-weight:600;color:var(--act)}
+details.fdwarn[open]>summary::after{content:"Ocultar detalle"}
+details.fdwarn>p{margin:8px 0 0}
+/* 2. acción principal destacada: fondo suave, círculo con ＋ o flecha y sin «›» (no es navegación) */
+.start>.big.acc{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;row-gap:1px;align-content:center;min-height:64px;padding:12px 16px 12px 12px;background:var(--soft);border-color:transparent!important}
+.start>.big.acc::before{content:"";grid-row:1/span 2;align-self:center;width:40px;height:40px;border-radius:50%;background:var(--act)}
+.start>.big.acc::after{left:22px;right:auto;width:20px;height:20px;background:var(--act-ink);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E") center/20px no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E") center/20px no-repeat}
+.start>.big.dev.acc::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E")}
+.start>.big.acc[data-a="newDev"]::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14l-4-4 4-4M5 10h9a5 5 0 0 1 0 10h-2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14l-4-4 4-4M5 10h9a5 5 0 0 1 0 10h-2'/%3E%3C/svg%3E")}
+.start>.big.acc strong{grid-column:2;color:var(--act);font-size:16.5px;line-height:1.25}
+.start>.big.acc span{grid-column:2;font-size:13.5px;line-height:1.3}
+.start>.big.acc:active{background:var(--soft);filter:brightness(.96)}
+@media (hover:hover) and (pointer:fine){.start>.big.acc:hover{border-color:var(--act)!important;box-shadow:none}}
+/* Stock y Control de bodega: «Actualizar…» como botón secundario, del ancho de su texto */
+.lx-sync.sks .btn:not(.pri){width:auto;align-self:flex-start}
+/* 3. formularios: datos cortos en dos columnas también en el teléfono; menos aire entre campos */
+@media (max-width:520px){
+  .grid2.g2m{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .grid2.g2m>*{min-width:0}
+}
+@media (max-width:420px){
+  .enc{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .enc>*{grid-column:1/-1}
+  .enc>.f:has(>#rdFe),.enc>.f:has(>#rdTot),.enc>.f:has(>#rdNe),.enc>.f:has(>#rdIva){grid-column:auto}
+}
+.enc>.f{margin:3px 0}
+:is(#app,.modal) .f>label,:is(#app,.modal) .f>.lbl{font-size:14px}
+/* 4. listas agrupadas: una tarjeta con divisores (como «Para hoy» y las rendiciones) */
+.list:has(>.bod:not(.rdc)),.list:has(>.rdcc),.fdlist:not(:has(>.empty)),.smlist{display:flex;flex-direction:column;gap:0;background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.list>.bod:not(.rdc),.list>.rdcc,.fdlist>.smrow,.smlist>.smrow{margin:0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
+.list>.bod:not(.rdc):first-child,.list>.rdcc:first-child,.fdlist>.smrow:first-child,.smlist>.smrow:first-child,.fdlist>.smrow:nth-child(1 of :not([hidden])),.smlist>.smrow:nth-child(1 of :not([hidden])){border-top:0}
+.list>.bod:not(.rdc):active,.list>button.rdcc:active,.fdlist>.smrow:active,.smlist>.smrow:active{background:var(--soft)}
+@media (hover:hover) and (pointer:fine){.list>.bod:not(.rdc):hover,.list>button.rdcc:hover,.fdlist>.smrow:hover,.smlist>.smrow:hover{background:var(--soft);box-shadow:none}}
+.list>.rdcc{padding:12px 16px}
+.fdlist>.smrow,.smlist>.smrow{padding:12px 10px 12px 12px}
+.lx-sync+.list{margin-top:12px} /* el recuadro de la fecha no va pegado a la lista */
+/* productos de Stock: las filas seguidas forman una sola tarjeta */
+.skr+.skr{border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.skr:has(+.skr){margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.skp+.skp>summary{border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.skp:has(+.skp){margin-bottom:0}
+.skp:has(+.skp)>summary{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.skp:has(+.skp)>.skd:last-child{border-radius:0;margin-bottom:0}

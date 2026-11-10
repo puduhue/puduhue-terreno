@@ -517,36 +517,36 @@ function semListaHTML(){
 
 /* ---------- Pantalla: predios ---------- */
 /* v113: «Check list de cumplimiento»: un solo módulo con los tres check list (pedido por Benja el 19-10-2026) */
-const CL_HUB=[["visitas","cl","Visitas a predios","Control y Gestión en cada predio: oficina, sala de ordeña, ternerera, casa de huéspedes y más."],
-  ["bodega","clb","Bodegas","Orden, aseo y seguridad de la bodega de cada predio."],
-  ["camionetas","clc","Camionetas","Revisión de cada camioneta con los puntos del acta de entrega: accesorios, documentos, estado y uso."],
-  ["huespedes","clh","Casas de huéspedes","Dormitorios, baños, cocina, instalaciones y agua de la casa de huéspedes de cada predio."]];
+const CL_HUB=[["visitas","cl","Visitas a predios","Control y Gestión, con la casa de huéspedes"],
+  ["bodega","clb","Bodegas","Orden, aseo y seguridad de cada bodega"],
+  ["camionetas","clc","Camionetas","Revisión con los puntos del acta de entrega"],
+  ["huespedes","clh","Casas de huéspedes","Inspección de la casa de cada predio"]];
 /* resumen de un check list (t) o de todos (null): visitas, en curso y hallazgos abiertos */
 /* v152: casas de huéspedes ahora es una sección de Visitas a predios; la opción aparte solo sigue si ya hay revisiones de ese tipo */
+/* v176: nombre de cada lista, igual al de su acceso («Visitas a predios», «Bodegas», «Camionetas») */
+const clNom=t=>(CL_HUB.find(x=>x[0]===t)||[])[2]||CLK[t].titulo;
 const clHubVer=()=>CL_HUB.filter(x=>x[0]!=="huespedes"||Object.values(VIS).some(v=>v&&tipoDe(v)==="huespedes"));
 function clHubCnt(t){const T=t?[t]:clHubVer().map(x=>x[0]);const vs=Object.values(VIS).filter(v=>!v.anulada&&T.includes(tipoDe(v)));const ab=vs.filter(v=>v.estado!=="cerrada").length;
   const ha=T.reduce((n,x)=>n+unidadesCL(x).reduce((m,p)=>m+abiertos(p,x).length,0),0);
   return vs.length?`${vs.length} ${vs.length===1?"visita":"visitas"}${ab?` · ${ab} en curso`:""}${ha?` · ${ha} ${ha===1?"hallazgo":"hallazgos"}`:""}`:t?"Sin visitas todavía":"Abrir"}
 function renderCLHub(){
-  return band("Check list de cumplimiento")+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
+  return band("Check list")+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Check list de cumplimiento</h1>
-    <p class="lead">Elige qué vas a revisar. Cada visita compara con la anterior, los hallazgos quedan en seguimiento y el informe PDF se guarda en OneDrive.</p>
+    <p class="lead">Elige qué vas a revisar.</p>
     <div class="start" style="grid-template-columns:1fr">
       ${clHubVer().map(([t,a,nom,desc],i)=>`<button class="big ${i===1?"dev":"ent"}" data-a="${esc(a)}"><strong>${nom}</strong><span>${desc}</span><span><b>${clHubCnt(t)}</b></span></button>`).join("")}
     </div>
-    <p class="note">Versión ${APP_VER}</p>
   </main>`;
 }
 function renderCL(){
   const K=KC(),nAct=catalogoActivo().filter(i=>enTipo(clTipo,i.area)).length,nTot=CL_ITEMS.filter(i=>enTipo(clTipo,i.area)).length;
-  return `${band(K.titulo,"clHub","Check list")}
+  return `${band(clNom(K.tipo),"clHub","Check list")}
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
-    <h1>${K.titulo}</h1>
+    <h1>${clNom(K.tipo)}</h1>
     ${semListaHTML()}
-    <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:clTipo==="huespedes"?`Inspección de la casa de huéspedes de cada predio: ${nAct} puntos con Cumple, Parcial, No cumple o N/A.`:`Control y Gestión: ${nAct} ítems por predio.`} Cada visita compara con la anterior y los hallazgos quedan en seguimiento hasta que se corrigen.</p>
+    <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:clTipo==="huespedes"?`Inspección de la casa de huéspedes de cada predio: ${nAct} puntos con Cumple, Parcial, No cumple o N/A.`:`Control y Gestión: ${nAct} ítems por predio.`}</p>
     ${clTipo==="camionetas"?`<div class="btns"><button class="btn" data-a="clcOtra">+ Camioneta sin acta en la app</button></div>`:""}
     ${esAdmin()?`<p class="note">Catálogo: ${nAct} ítems activos${nTot-nAct?` y ${nTot-nAct} retirados`:""} · <button class="lnk" data-a="clCat">Editar catálogo</button></p>`:""}
-    <p class="note">Versión ${APP_VER}</p>
   </main>`;
 }
 
@@ -634,8 +634,8 @@ function renderCLPredio(){
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(p)}</h1>${clTipo==="camionetas"?`<p class="lead" style="margin-top:-6px">${esc(cmDesc(p))}</p>`:""}
     <div class="start" style="grid-template-columns:1fr">
-      ${ab?`<button class="big dev" data-a="clAbrir" data-id="${esc(ab.id)}"><strong>Continuar visita ${esc(ab.n)}</strong><span>Iniciada el ${fmtD(ab.fecha)}${ab.revisor?` por ${esc(ab.revisor)}`:""} · ${puntaje(ab).rev} de ${itemsDe(ab).length} ítems</span></button>`
-          :`<button class="big ent" data-a="clNueva" data-p="${esc(p)}"><strong>Nueva visita</strong><span>${vs.length?`Será la visita ${esc(Math.max(...vs.map(v=>+v.n||0))+1)}${vv.some(v=>v.estado==="cerrada")?"; compara con la anterior ítem por ítem":""}`:`Primera visita a esta ${clTipo==="camionetas"?"camioneta":"unidad"}`.replace("esta unidad","este predio")}</span></button>`}
+      ${ab?`<button class="big dev acc" data-a="clAbrir" data-id="${esc(ab.id)}"><strong>Continuar visita ${esc(ab.n)}</strong><span>Iniciada el ${fmtD(ab.fecha)}${ab.revisor?` por ${esc(ab.revisor)}`:""} · ${puntaje(ab).rev} de ${itemsDe(ab).length} ítems</span></button>`
+          :`<button class="big ent acc" data-a="clNueva" data-p="${esc(p)}"><strong>Nueva visita</strong><span>${vs.length?`Será la visita ${esc(Math.max(...vs.map(v=>+v.n||0))+1)}`:`Primera visita a esta ${clTipo==="camionetas"?"camioneta":"unidad"}`.replace("esta unidad","este predio")}</span></button>`}
     </div>
     <div class="smord dos ptabs" role="tablist"><button role="tab" data-a="clPTab" data-t="hz" aria-pressed="${tab==="hz"}" aria-selected="${tab==="hz"}">Hallazgos <b>${ha.length}</b></button><button role="tab" data-a="clPTab" data-t="vis" aria-pressed="${tab==="vis"}" aria-selected="${tab==="vis"}">Visitas <b>${vs.length}</b></button></div>
     <div class="ppanel">${tab==="hz"?panelHz:panelVis}</div>
@@ -804,7 +804,7 @@ function renderCLCat(){
     <div class="btns"><button class="btn" data-a="clCatCancel">Cancelar</button><button class="btn pri" data-a="clCatAdd" style="flex:1">Agregar ítem</button></div></div>`:`<div class="btns"><button class="btn pri" data-a="clCatNuevo">+ Agregar ítem en ${esc(AREA_NAME[catArea])}</button></div>`;
   return `<div class="top"><div class="in"><div class="bar"><button class="back" data-a="clCatSalir">Check list</button><div class="ttl">Catálogo</div><span class="saved">${CAT_PEND?"Sin guardar":"Guardado"}</span></div>${ARC.length>1?`<nav class="tabs">${tabs}</nav>`:""}</div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
-    <div class="info" style="margin-top:12px">Los cambios se guardan en <b>_config / Catalogo_check_list.xlsx</b> de OneDrive y se aplican a las visitas que se creen desde ahora. Las visitas en curso y las cerradas conservan su propio catálogo. Los demás teléfonos reciben el catálogo nuevo en su siguiente sincronización.</div>
+    <div class="info" style="margin-top:12px">Los cambios se guardan en <b>_config / Catalogo_check_list.xlsx</b> y valen para las visitas nuevas; las que ya existen conservan su catálogo.</div>
     <input class="search" type="search" placeholder="Buscar ítem, grupo o código" value="${esc(catQ)}" data-catq="1">
     <datalist id="dl-grupos">${grupos_dl}</datalist>
     ${nuevo}
@@ -1184,4 +1184,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="175"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="176"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

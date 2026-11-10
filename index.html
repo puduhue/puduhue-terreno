@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Cz5N/RYc7MdgZ8AmYV7fuet/Pb2KuK4va7fhpC9pO4M=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-mX+Jz1hYor/cKUxjke35XCM9AXvmpEm/HsfrsiLssrk=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=175">
+<link rel="stylesheet" href="estilos.css?v=176">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="175";
+const APP_VER="176";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1175,7 +1175,7 @@ function renderPerm(){
   const est=PERM_PEND?`<div class="info">Hay cambios sin guardar en OneDrive${PERM_ERR?`: ${esc(PERM_ERR)}`:navigator.onLine===false?" (sin señal)":""}. Se guardan solos cuando haya conexión.</div>`
     :PERM.actualizado?`<p class="note">Guardado en OneDrive. Último cambio el ${fmtD(isoLocal(PERM.actualizado))}${PERM.por?` por ${esc(PERM.por)}`:""}.</p>`:"";
   return head+`<main class="wrap"><h1>Permisos por persona</h1>
-    <p class="lead">Qué módulos ve cada persona y si puede editarlos (agregar o modificar registros) o solo verlos. Toca a una persona para cambiarlo.</p>
+    <p class="lead">Qué ve y qué edita cada persona. Toca a una para cambiarlo.</p>
     ${est}
     <div class="f permbus"><input id="permbus" type="search" placeholder="Buscar persona o correo" value="${esc(permQ)}" autocomplete="off" aria-label="Buscar persona"></div>
     <div class="filt"><button class="fb" data-a="permFil" data-v="" aria-pressed="${!permSolo}">Todas (${P.length})</button><button class="fb" data-a="permFil" data-v="1" aria-pressed="${esc(permSolo)}">Con restricciones (${nr})</button></div>
@@ -1630,12 +1630,12 @@ function renderHome(){
   const grp=(tipo,titulo,vacio)=>{const g=L.filter(a=>a.tipo===tipo);return `<h2>${titulo}<span class="cnt">${g.length}</span></h2><div class="list">${g.map(card).join("")||`<div class="empty">${vacio}</div>`}</div>`};
   const hay=Object.keys(ACTAS).length,t=q.trim();
   const rows=grp("entrega","Viviendas entregadas",t?"Ninguna entrega coincide con la búsqueda.":"Todavía no hay entregas.")+grp("devolucion","Viviendas recibidas",t?"Ninguna devolución coincide con la búsqueda.":"Todavía no hay devoluciones.");
-  return band("Entrega y devolución de viviendas","axHub","Actas")+`<main class="wrap">
-    <h1>Entrega y devolución de viviendas</h1>
-    <p class="lead">Registra el estado de la vivienda al entregarla y al recibirla de vuelta, firma el acta y descarga el informe general (check list + fotos) y el acta por separado.</p>
+  return band("Viviendas","axHub","Actas")+`<main class="wrap">
+    <h1>Viviendas</h1>
+    <p class="lead">Entrega y devolución de casas, con check list, fotos y firmas.</p>
     <div class="start">
-      <button class="big ent" data-a="newEnt"><strong>Entregar vivienda</strong><span>La empresa entrega la vivienda al trabajador</span></button>
-      <button class="big dev" data-a="newDev"><strong>Recibir vivienda</strong><span>El trabajador devuelve la vivienda a la empresa</span></button>
+      <button class="big ent acc" data-a="newEnt"><strong>Entregar vivienda</strong><span>El trabajador recibe la casa</span></button>
+      <button class="big dev acc" data-a="newDev"><strong>Recibir vivienda</strong><span>El trabajador devuelve la casa</span></button>
     </div>
     <div class="pendslot">${slotHTML()}</div>
     ${hay?`<input class="search" id="q" type="search" placeholder="Buscar trabajador, predio o RUT" value="${esc(q)}" style="margin-top:22px">`:""}
@@ -1644,7 +1644,6 @@ function renderHome(){
     ${traspasoHTML()}
     ${DB?"":`<p class="note">Sin sesión iniciada: las actas se guardan solo en este teléfono y se subirán cuando inicies sesión.</p>`}
     ${PWA&&ME?`<p class="note">Sesión de <b>${esc(ME.nombre||ME.correo)}</b> · <button class="lnk" data-a="logout">Cerrar sesión</button></p>`:""}
-    <p class="note">Versión ${APP_VER}</p>
   </main>`;
 }
 function renderPick(){
@@ -1681,7 +1680,7 @@ function stepDatos(){
   const opts=PREDIOS.map(p=>`<option ${a.predio===p?"selected":""}>${p}</option>`).join("")+optPredioAntiguo(a.predio,PREDIOS);
   const rutMsg=a.rut&&!rutOk(a.rut)?`<span class="err" id="rutErr">El RUT no es válido. Revisa el dígito verificador.</span>`:`<span class="err" id="rutErr"></span>`;
   return `${dev?(a.entregaId?`<div class="info">Vivienda entregada el <b>${fmtD(a.entregaFecha)}</b>. El check list mostrará el estado de la entrega junto a cada ítem.</div>`:`<div class="info">Devolución sin acta de entrega en la app: no habrá comparación con el estado inicial.</div>`):""}
-  <div class="grid2">
+  <div class="grid2 g2m">
     <div class="f"><label for="fecha">${dev?"Fecha de devolución":"Fecha de entrega"}</label><input id="fecha" type="date" data-f="fecha" value="${esc(a.fecha)}" ${dis()}></div>
     <div class="f"><label for="predio">Predio</label><select id="predio" data-f="predio" ${dis()}><option value="">Elige un predio</option>${opts}<option ${a.predio==="Otro"?"selected":""}>Otro</option></select></div>
   </div>
@@ -2838,10 +2837,10 @@ function iniBodHoja(){
 let INI_TIT_OBS=null;
 function iniTitulo(){
   if(INI_TIT_OBS){INI_TIT_OBS.disconnect();INI_TIT_OBS=null}
-  const top=document.querySelector("#app .top"),ttl=top&&top.querySelector(".ttl"),h=document.querySelector("#app main h1");
-  if(!top||!ttl||!h)return;
+  const top=document.querySelector("#app .top"),ttl=top&&top.querySelector(".ttl"),h=document.querySelector("#app main h1:not([style])");
+  if(!top||!ttl||!h||top.querySelector(".steps"))return;
   const n=x=>String(x||"").replace(/\s+/g," ").trim().toLowerCase();
-  if(!n(ttl.textContent)||n(h.textContent)!==n(ttl.textContent))return;
+  if(!n(ttl.textContent)||!n(h.textContent).includes(n(ttl.textContent)))return; /* v176: también la forma corta */
   top.classList.add("tt-rep");
   if("IntersectionObserver" in window){INI_TIT_OBS=new IntersectionObserver(es=>{top.classList.toggle("tt-ver",!es[0].isIntersecting)},{rootMargin:"-60px 0px 0px 0px"});INI_TIT_OBS.observe(h)}
   else top.classList.add("tt-ver");
@@ -3114,9 +3113,9 @@ function renderFinn(){
     ${cols.length?`<h2>Columnas (${cols.length})</h2><p class="note" style="margin-top:0">${cols.map(esc).join(" · ")}</p>
     <h2>Primeras filas</h2><div class="tscroll"><table class="tfinn"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${filas.slice(0,15).map(f=>`<tr>${cols.map(c=>`<td>${esc(f[c]==null?"":String(f[c]))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:`<p class="note">El reporte respondió sin filas para esos parámetros.</p>`}`}
   const err=FT.err?`<div class="info netbox"><b>${esc(FT.err.error||"Error")}</b>${FT.err.estado?` (estado ${esc(String(FT.err.estado))})`:""}${FT.err.detalle?`<br><span style="font-size:13px;word-break:break-word">${esc(FT.err.detalle)}</span>`:""}</div>`:"";
-  return band("Conexión con Finnegans")+`<main class="wrap">
+  return band("Finnegans")+`<main class="wrap">
     <h1>Conexión con Finnegans</h1>
-    <p class="lead">Prueba el camino completo: la app pide el reporte al servidor de Puduhue, el servidor obtiene la clave de Finnegans con las credenciales guardadas en Cloudflare y devuelve los datos. Nada de esto se guarda; es solo para verificar y ver qué columnas trae cada reporte.</p>
+    <p class="lead">Prueba un reporte de punta a punta, del servidor a Finnegans. Nada se guarda.</p>
     <div class="filt" style="margin-top:0"><button class="fb" data-a="finnPreset" data-p="stock">Stock por depósito</button><button class="fb" data-a="finnPreset" data-p="resumen">Resumen de stock</button><button class="fb" data-a="finnPreset" data-p="leche">Leche (prueba)</button></div>
     <div class="f"><label for="ftRep">Reporte</label><input id="ftRep" data-ft="reporte" value="${esc(FT.reporte)}" placeholder="Nombre API del reporte"></div>
     <div class="f" style="margin-top:10px"><label for="ftPar">Parámetros (uno por línea)</label><textarea id="ftPar" data-ft="params" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font:13px/1.4 ui-monospace,Menlo,monospace">${esc(FT.params)}</textarea></div>
@@ -3750,10 +3749,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=175"></script>
-<script src="modulos/bodega.js?v=175"></script>
-<script src="modulos/rendiciones.js?v=175"></script>
-<script src="modulos/actas-entrega.js?v=175"></script>
+<script src="modulos/checklist.js?v=176"></script>
+<script src="modulos/bodega.js?v=176"></script>
+<script src="modulos/rendiciones.js?v=176"></script>
+<script src="modulos/actas-entrega.js?v=176"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
