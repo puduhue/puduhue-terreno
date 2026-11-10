@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-8lOKfwbOKlAxpdIKcHmv0tOOakxnGliDbWBslKTV/VY=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-8suZU7LdOQkqomf6vJ9bPvXr85aZgwCWO4LJWyoAVJA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=179">
+<link rel="stylesheet" href="estilos.css?v=180">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="179";
+const APP_VER="180";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -235,9 +235,9 @@ function ask(title,msg,ok,danger,extraHTML,cancelar){
     m.innerHTML=`<div class="sheet" role="alertdialog" aria-modal="true" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${msg?`<p>${esc(msg)}</p>`:""}${extraHTML||""}<div class="btns"><button class="btn" data-m="no">${esc(cancelar||"Cancelar")}</button>${ok?`<button class="btn pri${danger?" danger":""}" data-m="yes" style="flex:1;${danger?"background:var(--danger-bg);border-color:var(--danger-bg);color:var(--danger-ink)":""}">${esc(ok)}</button>`:""}</div></div>`;
     document.body.appendChild(m);document.body.style.overflow="hidden";
     const done=v=>{m.remove();document.body.style.overflow="";res(v)};
-    m.addEventListener("click",e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(a==="yes"){const inp=m.querySelector("#motAn");
-      /* v136 (B-02): motivo obligatorio (data-obl = mínimo de letras): la hoja no se cierra */
-      if(inp&&inp.dataset.obl&&inp.value.trim().length<+inp.dataset.obl){let er=m.querySelector(".motErr");if(!er){er=document.createElement("p");er.className="note motErr";er.style.color="var(--m-ink)";er.textContent=`Escribe el motivo (al menos ${inp.dataset.obl} letras).`;inp.after(er)}inp.focus();return}
+    m.addEventListener("click",e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(a==="yes"){const inp=m.querySelector("#motAn"),obl=m.querySelector("[data-obl]");
+      /* v136 (B-02): motivo obligatorio (data-obl = mínimo de letras): la hoja no se cierra. v180: vale para cualquier campo de la hoja y data-oblmsg cambia el aviso */
+      if(obl&&obl.value.trim().length<+obl.dataset.obl){let er=m.querySelector(".motErr");if(!er){er=document.createElement("p");er.className="note motErr";er.setAttribute("role","alert");er.style.color="var(--m-ink)";er.textContent=obl.dataset.oblmsg||`Escribe el motivo (al menos ${obl.dataset.obl} letras).`;obl.after(er);obl.addEventListener("input",()=>er.remove(),{once:true})}obl.focus();return}
       if(inp){const g=document.createElement("input");g.type="hidden";g.id="motAn";g.value=inp.value;document.body.appendChild(g);setTimeout(()=>g.remove(),500)}done(true)}else if(a==="no"||e.target===m)done(false)});
     const y=m.querySelector('[data-m="yes"]')||m.querySelector('[data-m="no"]');if(y)y.focus();
   });
@@ -3452,7 +3452,7 @@ function paraHoyItems(){
     if(apJ.length)L.push(phItem(ICO.receipt,`${apJ.length} ${apJ.length===1?"rendición espera":"rendiciones esperan"} tu aprobación`,quienes(apJ),`data-a="rdTabIr" data-t="jef"`,"urg"));
     if(apC.length)L.push(phItem(ICO.receipt,`${apC.length} ${apC.length===1?"rendición":"rendiciones"} para revisión contable`,quienes(apC),`data-a="rdTabIr" data-t="cont"`,"urg"));
     const dev=misRend().filter(r=>r.estado==="observada"),devIds=new Set(dev.map(r=>r.id));
-    dev.forEach(r=>L.push(phItem(ICO.receipt,`${esc(rdTitulo(r))} · devuelta`,esc(r.comentario||"Corrige lo observado y vuelve a enviarla."),`data-a="rdAbrir" data-id="${esc(r.id)}"`,"urg")));
+    dev.forEach(r=>L.push(phItem(ICO.receipt,`${esc(rdTitulo(r))} · devuelta`,esc(r.comentario||"Corrige lo pedido y vuelve a enviarla."),`data-a="rdAbrir" data-id="${esc(r.id)}"`,"urg")));
     rdRecordatorios().filter(x=>!devIds.has(x.id)).forEach(x=>L.push(phItem(ICO.receipt,esc(x.t||x.m),x.t?esc(x.s||""):"",`data-a="rdAbrir" data-id="${esc(x.id)}"`,x.n==="b"?"urg":"av")));
     fdParaHoy().forEach(x=>L.push(x));
   }catch(e){console.warn("paraHoy",e)}
@@ -3749,10 +3749,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=179"></script>
-<script src="modulos/bodega.js?v=179"></script>
-<script src="modulos/rendiciones.js?v=179"></script>
-<script src="modulos/actas-entrega.js?v=179"></script>
+<script src="modulos/checklist.js?v=180"></script>
+<script src="modulos/bodega.js?v=180"></script>
+<script src="modulos/rendiciones.js?v=180"></script>
+<script src="modulos/actas-entrega.js?v=180"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

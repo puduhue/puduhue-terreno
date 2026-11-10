@@ -825,4 +825,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="179"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="180"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
