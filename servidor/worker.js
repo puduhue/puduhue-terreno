@@ -18,6 +18,7 @@
                                   parámetros del stock, separados por coma (el correo del administrador). Si queda vacía, nadie
                                   (desde la app v132; antes, todos).
                                   El stock (/stock) lo puede traer cualquier cuenta de Puduhue (desde la app v61).
+                                  Desde la v174, /stock?ceros=1 trae también los productos en 0 y &deposito=…&nombre=… solo una bodega.
     ANTHROPIC_API_KEY   (Secret)  clave de la API de Claude, para leer boletas (módulo Rendiciones)
     MODELO_LECTURA      (texto)   opcional. Modelo de la primera lectura. Por defecto claude-haiku-5-5 (desde la v98)
     MODELO_REVISION     (texto)   opcional. Modelo que revisa las lecturas dudosas. Por defecto claude-sonnet-5-5; "no" la desactiva
@@ -102,7 +103,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v170";
+const VERSION_SERVIDOR = "v174";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -126,6 +127,34 @@ async function tokenFinnegans(env) {
   tok = String(tok).replace(/"/g, "").trim();
   if (!tok) throw { status: 502, error: "Finnegans no devolvió una clave." };
   return tok;
+}
+
+/* v174: /stock con los productos en 0 (ceros=1), de una sola bodega (deposito=<DEPOSITOID>&nombre=<DEPOSITO>) y compacto (compacto=1,
+   solo las columnas que usa la app). Sin esos parámetros, igual que antes (teléfonos con versiones anteriores). */
+const SK_CAMPOS = ["PRODUCTOID","PRODUCTO","PRODUCTOCODIGO","DEPOSITOID","DEPOSITO","CANTIDAD1","UNIDAD1","CANTIDAD2","UNIDAD2","PRECIOUNIDADSTOCK1","IMPORTE","MONEDA","FAMILIA","SUBFAMILIA","RUBRO","PUNTOREPOSICION","STOCKMINIMO","STOCKDISPONIBLE","STOCKRESERVADO","PARTIDA","PARTIDA_VTO","LUGAR","ORGANIZACION"];
+export async function stockSrv(env, url, autorizado, rep) {
+  const nombre = env.FINN_REPORTE_STOCK, q = url.searchParams, t0 = Date.now();
+  const p = new URLSearchParams(env.FINN_PARAMS_STOCK || PARAMS_STOCK);
+  if (!p.get("PARAMWEBREPORT_fecha")) p.set("PARAMWEBREPORT_fecha", hoyChile());
+  if (autorizado) for (const [k, v] of q) if (k.startsWith("PARAMWEBREPORT_")) p.set(k, v); // los demás usan siempre los parámetros fijos
+  const ceros = q.get("ceros") === "1";
+  if (ceros) p.set("PARAMWEBREPORT_soloStockNoCero", "false");
+  const filasDe = d => Array.isArray(d) ? d : (d && Array.isArray(d.data) ? d.data : []);
+  const depId = String(q.get("deposito") || "").trim().slice(0, 80), depNom = String(q.get("nombre") || "").trim().slice(0, 160);
+  let datos, filtro = null;
+  if (depId || depNom) {
+    const esDe = o => (depId && String(o.DEPOSITOID ?? "").trim() === depId) || (depNom && String(o.DEPOSITO ?? "").trim() === depNom);
+    let L = [];
+    if (depId) { const p1 = new URLSearchParams(p); p1.set("PARAMWEBREPORT_deposito", depId); try { L = filasDe(await rep(env, nombre, p1)); } catch (e) { L = []; } }
+    if (L.length && L.every(esDe)) filtro = "finnegans";               // Finnegans filtró la bodega
+    else if (L.some(esDe)) { L = L.filter(esDe); filtro = "servidor"; } // Finnegans no usó el parámetro: se filtra aquí
+    else { L = filasDe(await rep(env, nombre, p)).filter(esDe); filtro = "completo"; } // el parámetro no sirvió: reporte completo y filtro
+    datos = L;
+  } else datos = await rep(env, nombre, p);
+  const r = { ok: true, reporte: nombre, hora: new Date().toISOString(), ceros, deposito: depNom || depId || null, filtro, ms: Date.now() - t0 };
+  if (q.get("compacto") === "1") { const L = filasDe(datos); r.campos = SK_CAMPOS; r.filas = L.map(o => SK_CAMPOS.map(c => o[c] == null ? "" : o[c])); }
+  else r.datos = datos;
+  return r;
 }
 
 async function reporte(env, nombre, params) {
@@ -224,11 +253,8 @@ export default {
       // /stock → reporte de stock por depósito configurado en el servidor
       if (url.pathname === "/stock") {
         if (!env.FINN_REPORTE_STOCK) return json({ error: "Falta FINN_REPORTE_STOCK en el servidor." }, 500);
-        const p = new URLSearchParams(env.FINN_PARAMS_STOCK || PARAMS_STOCK);
-        if (!p.get("PARAMWEBREPORT_fecha")) p.set("PARAMWEBREPORT_fecha", hoyChile());
-        if (autorizado) for (const [k, v] of url.searchParams) p.set(k, v); // los demás usan siempre los parámetros fijos
-        const datos = await reporte(env, env.FINN_REPORTE_STOCK, p);
-        return json({ ok: true, reporte: env.FINN_REPORTE_STOCK, consultadoPor: correo, hora: new Date().toISOString(), datos });
+        const r = await stockSrv(env, url, autorizado, reporte); /* v174: con los productos en 0 y por bodega */
+        return json(Object.assign(r, { consultadoPor: correo }));
       }
       // /maestro?entidad=organizacion → listado de un maestro de Finnegans (desde la v134, solo Contabilidad y el administrador)
       if (url.pathname === "/maestro") {
