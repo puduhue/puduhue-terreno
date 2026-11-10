@@ -2114,3 +2114,8 @@ details>*{box-sizing:border-box}
 .rdfic-e.obs .lnk{color:var(--m-ink);flex:none}
 @media (max-width:759px){.rddw.fic .rdfoto img{max-height:44vh;max-height:44dvh}}
 .rdrevini{margin-top:12px}
+
+/* v180: la observación de quien revisó, arriba del documento */
+.rdobsarr{margin:0 0 12px}
+/* «Pedir corrección» ocupa lo que mide su texto y «Está bien» (el botón principal) se queda con el resto */
+.accbar.dos .accb .btn[data-a="rdRevObs"]{flex:0 0 auto}
