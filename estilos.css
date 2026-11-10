@@ -1926,3 +1926,99 @@ body[data-mod] .top{border-bottom:3px solid var(--mod-c)}
 .cbzr{box-sizing:border-box;display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
 .cbzr .skn{flex:1}.cbzr .skn b{overflow-wrap:anywhere}
 .cbzr .mini{white-space:nowrap;pointer-events:none}
+
+/* ---------- v175: menos peso en la letra y en los bloques ---------- */
+/* letra en toda la app: negritas a 600 y títulos a 700 (con #app para ganarle a las reglas de cada pantalla) */
+#app :is(b,strong){font-weight:600}
+#app :is(.lx-ct,.bodn,.ini-n,.big strong,.skn b,.rdct,.rdc-t){font-weight:600}
+#app :is(h1,h2){font-weight:700}
+#app main h1{font-size:25px;letter-spacing:-.02em}
+#app :is(.ifdm,.fdm b,.rdok-tot){font-weight:700;letter-spacing:-.02em}
+#app :is(.fdm b,.rdok-tot){font-size:32px}
+#app .lx-stats b{font-weight:650}
+#app :is(.btn,.cli .txt,.tab,.ph-todo,.tipx){font-weight:600}
+/* barra de arriba, estados, etiquetas de formularios, nombres en listas y códigos */
+:is(#app,.modal) :is(.top .ttl,.lx-synct,label,.seg button,.steps button,.rdt,.who,.lbl,.cod,.txt){font-weight:600}
+/* hojas y diálogos que se abren encima (están fuera de #app) */
+.modal :is(b,strong,.btn,.tbop b,.bsqx){font-weight:600}
+.modal :is(h3,h4){font-weight:700}
+.top .ttl{font-weight:600}
+#app .lx-hero .lx-h1{font-weight:700}
+/* títulos y montos: 700 en vez de 800, un poco más chicos */
+h1{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.lx-hero .lx-h1{font-weight:700;letter-spacing:-.02em}
+@media (max-width:759px){.lx-hero .lx-h1{font-size:24px}}
+.lx-hoy>.lx-h2{font-size:19px;font-weight:700}
+.ifdm{font-weight:700;letter-spacing:-.02em}
+.lx-main .ifd .ifdm{font-size:26px}
+.lx-stats b{font-size:23px;font-weight:650}
+/* nombres de filas y tarjetas: 600 en vez de 700 */
+.lx-cont .lx-ct,.bod .bodn,.big strong,.start>.big strong,.skn b,.rdd .rdv b,.rdc .rdv b,.ini-n,.iac-x b,.tbop b,.fdctas b,.ifdcu b{font-weight:600}
+#app main .list b,#app main .bod b{font-weight:600}
+.bod .bodn{font-size:16px}
+/* ícono del módulo junto al título, más chico; línea del módulo más fina */
+.ini-h1i{width:34px;height:34px;border-radius:10px}
+.ini-h1i svg{width:19px;height:19px}
+#app main h1:has(>.ini-h1i){gap:10px}
+body[data-mod] .top{border-bottom-width:2px}
+.skdep{margin:-2px 0 12px;font-size:15px;color:var(--muted)}
+/* tarjeta del fondo: cajas de cada fondo sin relleno gris */
+.ifdcu span{padding:0 0 0 10px;border-radius:0;background:none;border-left:2px solid var(--line)}
+/* al día: una línea */
+.ifd.ifd-ok{flex-direction:row;align-items:center;gap:10px;width:100%;padding:14px 16px;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.ifd-ok>b{flex:1;font-size:15px;font-weight:600;color:var(--muted)}
+.ifdokt{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;color:var(--b-ink)}
+.ifdokt i{width:16px;height:16px;border-radius:50%;background:var(--b-ink);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat}
+.ifdokf{font-size:22px;line-height:1;color:var(--muted)}
+
+/* ---------- v175: hallazgos de la revisión de diseño independiente ---------- */
+/* 1. filas de Actas y de conteos en el teléfono: nombre y fecha / lugar / estado y avance / autoría */
+@media (max-width:759px){
+  .mcard>.row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who when" "where where" "tag st" "by by";gap:3px 10px;align-items:baseline;padding:12px 4px 12px 14px}
+  .mcard>.row .who{grid-area:who;min-width:0}
+  .mcard>.row .when{grid-area:when;white-space:nowrap;font-size:13px}
+  .mcard>.row .where{grid-area:where}
+  .mcard>.row .tag{grid-area:tag;justify-self:start;align-self:center;margin-top:3px}
+  .mcard>.row .st{grid-area:st;justify-self:end;align-self:center;font-size:13px;color:var(--muted);margin-top:3px}
+  .mcard>.row .by{grid-area:by;font-size:12.5px;color:var(--muted)}
+  .mcard>.row .by:empty{display:none}
+}
+.mcard .by .xp.ok{display:none} /* «Sincronizada» solo se avisa cuando falta subir algo (como en Rendiciones) */
+.mcard .vmenu{border-left:0;color:var(--muted)}
+/* 2. botón secundario más liviano; varios juntos llenan la fila */
+#app .btn:not(.pri):not(.danger):not(.lx-big),.modal:not(.escan)>.sheet:not(.viewer):not(.pdfv) .btn:not(.pri):not(.danger){padding:10px 16px;border:1px solid var(--line);background:var(--card);font-size:15px;min-height:44px}
+@media (max-width:759px){#app .btns:has(>.btn:nth-child(2))>.btn:not(.pri){flex:1 1 auto}}
+#app .btns+.list,#app .btn+.list{margin-top:12px} /* el botón no va pegado a la lista */
+/* 3. título una sola vez */
+.top.tt-rep .ttl{opacity:0;transition:opacity .16s ease}
+.top.tt-rep.tt-ver .ttl{opacity:1}
+.top .bar .back{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.top.tt-rep .ttl{transition:none}}
+/* 4. filtros: un solo «seleccionado» y una sola línea */
+.hzf[aria-pressed="true"],.fxr[aria-pressed="true"]{background:var(--soft);border-color:var(--act);color:var(--act)}
+.hzf[aria-pressed="true"] b,.fxr[aria-pressed="true"] b{color:inherit}
+#app :is(.fb,.hzf,.fxr){font-weight:600}
+@media (max-width:759px){.filt{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-right:-16px;padding-right:16px}.filt::-webkit-scrollbar{display:none}.filt>*{flex:none}}
+/* 5. etiquetas de estado: borrador en gris azulado */
+.tag.borrador{background:var(--soft);color:var(--muted)}
+/* 6. fotos: botones compactos también fuera del check list */
+.addf.addm,.addf.addm.gal{width:auto;height:auto;flex-direction:row;gap:5px;padding:8px 11px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;font-weight:600;color:var(--act);background:var(--card)}
+.addf.addm svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* 7. detalles */
+label.tbop{font-weight:400}
+.modal .tbop small{font-weight:400}
+input[type=checkbox],input[type=radio]{accent-color:var(--act)}
+#app main p.lead{font-size:15px;line-height:1.45}
+/* v175: check list y botones chicos */
+.cl-datos{margin-top:10px}
+.obs{background:var(--card)}
+.sec h3{border-bottom-color:var(--line)}
+.mini{border-radius:999px;border:1px solid var(--line)}
+/* v175: donde el botón principal llena la fila (flex:1 en línea: «Cerrar conteo»), el secundario queda de su ancho */
+@media (max-width:759px){#app .btns:has(>.btn.pri[style*="flex:1"])>.btn:not(.pri){flex:0 1 auto}}
+/* v175: el texto de «volver» se corta con «…» (con inline-flex los puntos no aparecían) */
+.top .bar .back:not([data-a="launch"]){display:inline-block}
+.top .bar .back:not([data-a="launch"])::before{display:inline-block;vertical-align:-5px;margin-right:2px}
+/* v175: «‹ Todas las bodegas» separado de la barra de arriba; la etiqueta «Bajo punto de reposición» del ancho de su texto */
+.skvolver{margin:12px 0 -8px}
+.skn>.xp{align-self:flex-start}
