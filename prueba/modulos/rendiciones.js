@@ -1463,7 +1463,7 @@ function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtP(num(d.total
 function rdTrasSubir(r,keys){keys=keys.filter(Boolean);if(keys.length<2||!rdv||rdv.id!==r.id||view!=="rdv")return;
   RD_COLA={rid:r.id,keys};rdd=r.docs[keys[0]];if(rdd)go("rdd");window.scrollTo(0,0)}
 function rdEstadoChip(r){const e=r.estado||"borrador";const cls=e==="aprobada"||e==="contabilizada"?"ok":e==="enviada"||e==="revcont"?"camb":e==="observada"?"nueva":"";return `<span class="xp ${cls}" ${cls?"":'style="background:var(--soft);color:var(--muted)"'}>${RD_ESTADO[e]||e}</span>`}
-/* v177: fila de una rendición anulada o eliminada (lista «Anuladas y eliminadas» de Contabilidad): dice qué pasó, cuándo y quién,
+/* v178: fila de una rendición anulada o eliminada (lista «Anuladas y eliminadas» de Contabilidad): dice qué pasó, cuándo y quién,
    en vez del estado que tenía («Borrador») */
 const RDC_ANU=`<span class="rdc-i anu" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/><path d="M10 11v5.5M14 11v5.5"/></svg></span>`;
 const rdAnuPor=r=>{const x=r.anulada,q=x&&x.por?quien(x.por):"";return q&&normTxt(q)!==normTxt((r.persona&&r.persona.nombre)||"")?` · por ${esc(q)}`:""};
@@ -2426,4 +2426,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="177"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="178"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
