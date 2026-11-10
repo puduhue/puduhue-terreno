@@ -113,16 +113,18 @@ function nuevaAxDev(e){
     antes:{acc:Object.assign({},e.acc),docs:Object.assign({},e.docs),llavesN:e.llavesN||"",estadoDesc:e.estadoDesc||"",km:(e.veh||{}).km||""},firmas:{conductor:{nombre:e.conductor||""}}});
   return Object.assign(base,{recibe:e.recibe||"",rutRecibe:e.rutRecibe||"",cargo:e.cargo||"",activos:(e.activos||[]).filter(x=>x.tipo||x.marca||x.ref).map(x=>Object.assign({},x,{devuelto:"",estadoDev:"",obsDev:""})),obs:"",firmas:{recibe:{nombre:e.recibe||""}}});
 }
+/* v176: nombre corto para la barra de arriba */
+const axBarra=a=>a.tipo==="capacitacion"?"Capacitación":(esDev(a)?"Devolución de ":"Entrega de ")+(a.tipo==="vehiculo"?"vehículo":"activos");
 const axTitulo=a=>a.tipo==="capacitacion"?AX.capacitacion.uno:esDev(a)?(a.tipo==="vehiculo"?"Acta de devolución de vehículo":"Registro de devolución de activos"):AX[a.tipo].uno;
 
 /* ---------- Datos comunes ---------- */
 const AX={
-  vehiculo:{t:"Vehículos",nom:"Entrega y devolución de vehículos",uno:"Acta de entrega de vehículo",corto:"Vehículo",steps:["Datos","Accesorios","Firmas"],excel:"Actas_de_vehiculos.xlsx",pdf:"Acta de entrega de vehículo.pdf",carpeta:"Vehículos",
-    desc:"Acta de entrega y responsabilidad de vehículo de la flota Salfa Rent: identificación, accesorios, documentos, responsabilidades del conductor y firmas."},
-  activo:{t:"Activos fijos",nom:"Entrega y devolución de activos fijos",uno:"Registro de entrega de activos",corto:"Activo fijo",steps:["Datos","Activos","Firmas"],excel:"Entregas_de_activos.xlsx",pdf:"Registro de entrega de activos.pdf",carpeta:"Activos fijos",
-    desc:"Entrega formal de activos fijos (computadores, celulares, herramientas, equipos) a la persona responsable, con firmas de quien entrega y quien recibe."},
-  capacitacion:{t:"Capacitaciones",nom:"Registro de capacitaciones",uno:"Registro de capacitación",corto:"Capacitación",steps:["Datos","Participantes","Firma y cierre"],excel:"Registro_de_capacitaciones.xlsx",pdf:"Registro de capacitación.pdf",carpeta:"Capacitaciones",
-    desc:"Registro de capacitaciones y charlas: tema, relator, predios, horario y la firma de cada participante en el teléfono."}
+  vehiculo:{t:"Vehículos",nom:"Vehículos",uno:"Acta de entrega de vehículo",corto:"Vehículo",steps:["Datos","Accesorios","Firmas"],excel:"Actas_de_vehiculos.xlsx",pdf:"Acta de entrega de vehículo.pdf",carpeta:"Vehículos",
+    desc:"Entrega y devolución de camionetas"},
+  activo:{t:"Activos fijos",nom:"Activos fijos",uno:"Registro de entrega de activos",corto:"Activo fijo",steps:["Datos","Activos","Firmas"],excel:"Entregas_de_activos.xlsx",pdf:"Registro de entrega de activos.pdf",carpeta:"Activos fijos",
+    desc:"Computadores, celulares y equipos"},
+  capacitacion:{t:"Capacitaciones",nom:"Capacitaciones",uno:"Registro de capacitación",corto:"Capacitación",steps:["Datos","Participantes","Firma y cierre"],excel:"Registro_de_capacitaciones.xlsx",pdf:"Registro de capacitación.pdf",carpeta:"Capacitaciones",
+    desc:"Charlas con firma de los participantes"}
 };
 let axTipo="vehiculo";
 function nuevaAx(tipo){
@@ -196,15 +198,14 @@ function renderAxHub(){
   const cnt=(f,uno,varios)=>{const t=n(f),b=nb(f);return t?`${t} ${t===1?uno:varios}${b?` · ${b} en borrador`:""}`:"Sin registros todavía"};
   return band("Actas")+`<main class="wrap">
     <h1>Actas</h1>
-    <p class="lead">Elige qué vas a registrar. Cada acta queda con fotos, firmas en el teléfono y su PDF guardado en OneDrive.</p>
+    <p class="lead">Elige qué vas a registrar.</p>
     <div class="start" style="grid-template-columns:1fr">
-      <button class="big ent" data-a="home"><strong>Entrega y devolución de viviendas</strong><span>Entrega y devolución de casas: check list por ambiente, fotos y firmas.</span><span><b>${cnt(esViv,"acta","actas")}</b></span></button>
+      <button class="big ent" data-a="home"><strong>Viviendas</strong><span>Entrega y devolución de casas</span><span><b>${cnt(esViv,"acta","actas")}</b></span></button>
       <button class="big dev" data-a="axList" data-t="vehiculo"><strong>${AX.vehiculo.nom}</strong><span>${esc(AX.vehiculo.desc)}</span><span><b>${cnt(a=>a.tipo==="vehiculo","acta","actas")}</b></span></button>
       <button class="big dev" data-a="axList" data-t="activo" style="border-left-color:var(--r-ink)"><strong>${AX.activo.nom}</strong><span>${esc(AX.activo.desc)}</span><span><b>${cnt(a=>a.tipo==="activo","entrega","entregas")}</b></span></button>
       <button class="big ent" data-a="axList" data-t="capacitacion"><strong>${AX.capacitacion.nom}</strong><span>${esc(AX.capacitacion.desc)}</span><span><b>${cnt(a=>a.tipo==="capacitacion","registro","registros")}</b></span></button>
     </div>
     <div class="pendslot">${slotHTML()}</div>
-    <p class="note">Versión ${APP_VER}</p>
   </main>`;
 }
 let axQ="";
@@ -224,14 +225,13 @@ function renderAxList(){
     <h1>${esc(T.nom)}</h1>
     <p class="lead">${esc(T.desc)}</p>
     ${CAP?"":`<p class="note" style="margin:0 0 8px">Para registrar una <b>devolución</b>, abre el acta de entrega cerrada y toca «Registrar devolución».</p>`}
-    <div class="start" style="grid-template-columns:1fr"><button class="big ent" data-a="axNew"><strong>${CAP?"Nueva capacitación":axTipo==="vehiculo"?"Entregar vehículo":"Entregar activos"}</strong><span>${CAP?"Registra el tema, el relator y los participantes; cada uno firma en el teléfono.":axTipo==="vehiculo"?"Completa el acta junto al conductor y firmen en el teléfono.":"Registra los activos, quién entrega (Administración) y quién recibe."}</span></button></div>
+    <div class="start" style="grid-template-columns:1fr"><button class="big ent acc" data-a="axNew"><strong>${CAP?"Nueva capacitación":axTipo==="vehiculo"?"Entregar vehículo":"Entregar activos"}</strong><span>${CAP?"Tema, relator y firma de cada participante":axTipo==="vehiculo"?"Con el conductor; firman en el teléfono":"Qué se entrega, quién entrega y quién recibe"}</span></button></div>
     <div class="pendslot">${slotHTML()}</div>
     ${L.length?`<input class="search" id="axq" type="search" placeholder="${CAP?"Buscar tema, relator o predio":axTipo==="vehiculo"?"Buscar conductor, patente o predio":"Buscar persona, activo o predio"}" value="${esc(axQ)}" style="margin-top:22px">`:""}
     <div id="axlists"><h2>En borrador<span class="cnt">${abiertas.length}</span></h2><div class="list">${abiertas.map(card).join("")||`<div class="empty">No hay borradores.</div>`}</div>
     <h2>Cerradas<span class="cnt">${cerradas.length}</span></h2><div class="list">${cerradas.map(card).join("")||`<div class="empty">${t?"Ninguna coincide con la búsqueda.":CAP?"Todavía no hay registros cerrados.":"Todavía no hay actas cerradas."}</div>`}</div></div>
     ${L.length?`<div class="btns"><button class="btn" data-a="axXlsx">Actualizar Excel en OneDrive</button></div>`:""}
     ${disTip("mnax",`En el «⋯» de cada acta están el PDF${CAP?"":", la devolución"}${esAdmin()?", anular y restaurar":" y eliminar los borradores"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}
-    <p class="note">Versión ${APP_VER}</p>
   </main>`;
 }
 const axDis=()=>ro()?"disabled":"";
@@ -268,7 +268,7 @@ function renderAxEdit(){
   const body=a.tipo==="capacitacion"?[capDatos,capParticipantes,capFirmas][axStep]():esDev(a)?(a.tipo==="vehiculo"?[vehDevDatos,vehAcc,vehDevFirmas][axStep]():[actDevDatos,actDevActivos,actDevFirmas][axStep]()):a.tipo==="vehiculo"?[vehDatos,vehAcc,vehFirmas][axStep]():[actDatos,actActivos,actFirmas][axStep]();
   const nav=axStep<2?`<button class="btn" data-a="axStep" data-s="${axStep-1}" ${axStep===0?"disabled":""}>Atrás</button><button class="btn pri" data-a="axStep" data-s="${axStep+1}">Siguiente</button>`
     :`<button class="btn" data-a="axStep" data-s="1">Atrás</button>${ro()?`<button class="btn pri" data-a="axBack">Volver</button>`:`<button class="btn pri" data-a="axClose">Finalizar y cerrar acta</button>`}`;
-  return topBar(axTitulo(a),"axBack",T.t,esDev(a)?["Datos",a.tipo==="vehiculo"?"Accesorios":"Activos","Firmas"]:T.steps,axStep)+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>${autoriaTxt(a)?`<p class="note autoria">${autoriaHTML(a)}</p>`:""}${a.anulada?`<div class="info netbox"><b>Acta anulada</b> el ${fmtD(a.anulada.fecha)} por ${esc(quien(a.anulada.por))}${a.anulada.motivo?`: ${esc(a.anulada.motivo)}`:""}.</div>`:""}${ro()?`<div class="info lock">Acta cerrada el ${fmtD(a.cerrada)}. Ya no se puede modificar.</div>`:""}
+  return topBar(axBarra(a),"axBack",T.t,esDev(a)?["Datos",a.tipo==="vehiculo"?"Accesorios":"Activos","Firmas"]:T.steps,axStep)+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>${autoriaTxt(a)?`<p class="note autoria">${autoriaHTML(a)}</p>`:""}${a.anulada?`<div class="info netbox"><b>Acta anulada</b> el ${fmtD(a.anulada.fecha)} por ${esc(quien(a.anulada.por))}${a.anulada.motivo?`: ${esc(a.anulada.motivo)}`:""}.</div>`:""}${ro()?`<div class="info lock">Acta cerrada el ${fmtD(a.cerrada)}. Ya no se puede modificar.</div>`:""}
   ${body}
   </main><div class="foot"><div class="in">${nav}</div></div><p class="note" style="text-align:center">Versión ${APP_VER}</p>`;
 }
@@ -276,7 +276,7 @@ function renderAxEdit(){
 function capDatos(){
   const a=cur,P=AX_PREDIOS.concat(["Otro"]);
   return `<div class="grid2">${axInp("fecha","Fecha",{type:"date"})}${axInp("realizadaPor","Realizada por (relator)",{ph:"Quien dicta la capacitación"})}</div>
-  <div class="grid2">${axInp("inicio","Inicio",{type:"time"})}${axInp("fin","Fin",{type:"time"})}</div>
+  <div class="grid2 g2m">${axInp("inicio","Inicio",{type:"time"})}${axInp("fin","Fin",{type:"time"})}</div>
   <p class="note" id="capDur" style="margin-top:-4px">${capDur(a)?`Duración: <b>${capDur(a)}</b>`:""}</p>
   <div class="f"><label>Predios</label><div class="filt" style="margin:4px 0 0">${P.map(p=>`<button type="button" class="fb" data-a="axCapPred" data-v="${esc(p)}" aria-pressed="${(a.predios||[]).includes(p)}" ${axDis()}>${esc(p)}</button>`).join("")}</div><span class="hint">Marca todos los predios de los participantes.</span></div>
   ${(a.predios||[]).includes("Otro")?axInp("predioOtro","Otro predio o área"):""}
@@ -325,8 +325,8 @@ function vehDatos(){
   ${axPredio()}
   <div class="grid2">${axInp("conductor","Conductor(a)",{ph:"Nombre completo"})}${axInp("rut","RUT del conductor(a)",{ph:"12.345.678-9",err:rutMsg})}</div>
   <h2>1. Identificación del vehículo</h2>
-  <div class="grid2">${VEH_ID1.map(([k,l])=>axInp("veh."+k,l,{ph:k==="tipoVeh"?"Ej.: Camioneta":k==="marca"?"Ej.: GWM":k==="modelo"?"Ej.: Poer":"Ej.: 2027",mode:k==="anio"?"numeric":""})).join("")}</div>
-  <div class="grid2">${VEH_ID2.map(([k,l])=>axInp("veh."+k,l,{ph:k==="patente"?"Ej.: WBHD30":k==="combustible"?"Ej.: Petróleo":"Ej.: 28",mode:k==="km"?"numeric":""})).join("")}</div>
+  <div class="grid2 g2m">${VEH_ID1.map(([k,l])=>axInp("veh."+k,l,{ph:k==="tipoVeh"?"Ej.: Camioneta":k==="marca"?"Ej.: GWM":k==="modelo"?"Ej.: Poer":"Ej.: 2027",mode:k==="anio"?"numeric":""})).join("")}</div>
+  <div class="grid2 g2m">${VEH_ID2.map(([k,l])=>axInp("veh."+k,l,{ph:k==="patente"?"Ej.: WBHD30":k==="combustible"?"Ej.: Petróleo":"Ej.: 28",mode:k==="km"?"numeric":""})).join("")}</div>
   ${!ro()?`<div class="btns"><button class="btn danger" data-a="axDel">Eliminar borrador</button></div>`:""}`;
 }
 function ynHTML(grp,k,l){
@@ -365,7 +365,7 @@ function vehFirmas(){
 /* Activo · paso 1 */
 function actDatos(){
   const a=cur,rutMsg=`<span class="err" id="axRutErr">${a.rutRecibe&&!rutOk(a.rutRecibe)?"El RUT no es válido. Revisa el dígito verificador.":""}</span>`;
-  return `<div class="grid2">${axInp("fecha","Fecha",{type:"date"})}<div>${axPredio()}</div></div>
+  return `<div class="grid2 g2m">${axInp("fecha","Fecha",{type:"date"})}<div>${axPredio()}</div></div>
   <h2>Recibe</h2>
   <div class="grid2">${axInp("recibe","Nombre de quien recibe",{ph:"Nombre completo"})}${axInp("rutRecibe","RUT (opcional)",{ph:"12.345.678-9",err:rutMsg})}</div>
   ${axInp("cargo","Cargo de quien recibe",{ph:"Ej.: Administrador de campo"})}
@@ -377,7 +377,7 @@ function actDatos(){
 function actActivos(){
   const a=cur;
   const row=(x,i)=>`<div class="it" id="axa-${x.id}"><div class="nm"><span>Activo ${i+1}</span>${!ro()&&a.activos.length>1?`<button class="mini danger" data-a="axDelAct" data-r="${esc(x.id)}">Quitar</button>`:""}</div>
-    <div class="grid2">${[["tipo","Tipo de activo","Ej.: Notebook"],["marca","Marca","Ej.: Lenovo"],["ref","Referencia","Modelo o N° de serie"],["factura","Factura","N° de factura"],["valor","Valor referencial","Ej.: 650.000"]].map(([k,l,ph])=>`<div class="f"><label for="x_${x.id}_${k}">${l}</label><input id="x_${x.id}_${k}" data-xa="${esc(x.id)}" data-k="${esc(k)}" value="${esc(x[k])}" placeholder="${esc(ph)}" ${k==="valor"?'inputmode="numeric"':""} autocomplete="off" ${axDis()}></div>`).join("")}
+    <div class="grid2 g2m">${[["tipo","Tipo de activo","Ej.: Notebook"],["marca","Marca","Ej.: Lenovo"],["ref","Referencia","Modelo o N° de serie"],["factura","Factura","N° de factura"],["valor","Valor referencial","Ej.: 650.000"]].map(([k,l,ph])=>`<div class="f"><label for="x_${x.id}_${k}">${l}</label><input id="x_${x.id}_${k}" data-xa="${esc(x.id)}" data-k="${esc(k)}" value="${esc(x[k])}" placeholder="${esc(ph)}" ${k==="valor"?'inputmode="numeric"':""} autocomplete="off" ${axDis()}></div>`).join("")}
     <div class="f"><label for="x_${x.id}_estado">Estado</label><select id="x_${x.id}_estado" data-xa="${esc(x.id)}" data-k="estado" ${axDis()}><option value="">Elige</option>${ACT_ESTADOS.map(e=>`<option ${x.estado===e?"selected":""}>${e}</option>`).join("")}</select></div></div>
     <div class="f"><label for="x_${x.id}_obs">Observación</label><input id="x_${x.id}_obs" data-xa="${esc(x.id)}" data-k="obs" value="${esc(x.obs)}" placeholder="Accesorios incluidos, detalles" ${axDis()}></div>
     ${axFotos("a_"+x.id,"Fotos del activo (opcional)").replace('class="it"','class="it" style="border:0;padding:0;margin:0"')}</div>`;
@@ -401,7 +401,7 @@ function vehDevDatos(){
   return `<div class="info">Devolución del vehículo <b>${esc((a.veh||{}).patente||"")}</b> ${esc([(a.veh||{}).marca,(a.veh||{}).modelo].filter(Boolean).join(" "))}, entregado a <b>${esc(a.conductor||"")}</b> el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${esc(a.entregaId)}">Ver acta de entrega</button>`:""}</div>
   <div class="grid2">${axInp("ciudad","Lugar de la devolución (ciudad)",{ph:"Ej.: Osorno"})}${axInp("fecha","Fecha de devolución",{type:"date"})}</div>
   ${axPredio()}
-  <div class="grid2"><div class="f"><label>Km de entrega</label><input value="${esc((a.antes||{}).km||"")}" disabled></div>${axInp("kmDev","Km de devolución",{mode:"numeric",ph:"Lo que marca el tablero"})}</div>
+  <div class="grid2 g2m"><div class="f"><label>Km de entrega</label><input value="${esc((a.antes||{}).km||"")}" disabled></div>${axInp("kmDev","Km de devolución",{mode:"numeric",ph:"Lo que marca el tablero"})}</div>
   ${ke&&kd?`<p class="note">${kd>=ke?`Recorrido con el conductor: <b>${(kd-ke).toLocaleString("es-CL")} km</b>.`:`<b style="color:var(--m-ink)">El km de devolución es menor que el de entrega.</b>`}</p>`:""}
   ${!ro()?`<div class="btns"><button class="btn danger" data-a="axDel">Eliminar borrador</button></div>`:""}`;
 }
@@ -417,7 +417,7 @@ function vehDevFirmas(){
 function actDevDatos(){
   const a=cur;
   return `<div class="info">Devolución de activos entregados a <b>${esc(a.recibe||"")}</b>${a.cargo?` (${esc(a.cargo)})`:""} el ${fmtD(a.entregaFecha)}.${ACTAS[a.entregaId]?` <button class="lnk" data-a="axOpen" data-id="${esc(a.entregaId)}">Ver registro de entrega</button>`:""}</div>
-  <div class="grid2">${axInp("fecha","Fecha de devolución",{type:"date"})}<div>${axPredio()}</div></div>
+  <div class="grid2 g2m">${axInp("fecha","Fecha de devolución",{type:"date"})}<div>${axPredio()}</div></div>
   <h2>Recibe</h2><div class="sig" style="padding-bottom:12px">${axAdmPick("entrega")}</div>
   ${!ro()?`<div class="btns"><button class="btn danger" data-a="axDel">Eliminar borrador</button></div>`:""}`;
 }
@@ -825,4 +825,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="175"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="176"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

@@ -120,8 +120,8 @@ function stkSyncHTML(dep){
   if(!STOCK)return""; /* sin stock guardado (un conteo en curso se puede abrir igual) */
   const h=dep?horaDep(dep):horaTodo(),car=!!skCargando&&skCargando===(dep||"*");
   const pd=dep?((STOCK.porDep&&STOCK.porDep[dep])||STOCK.por):(STOCK.horaTodo?STOCK.porTodo:STOCK.por);
-  const btn=puedeActStock()?`<button class="btn pri" data-a="${dep?"stkActDep":"stkAct"}"${dep?` data-d="${esc(dep)}"`:""} ${skCargando||navigator.onLine===false?"disabled":""}>${car?"Consultando Finnegans…":navigator.onLine===false?"Sin señal":dep?"Actualizar esta bodega":"Actualizar todas las bodegas"}</button>`:"";
-  return `<div class="lx-sync sks ${h&&esHoy(h)?"ok":"camb"}"><div class="lx-syncl"><span class="lx-synct">${dep?"Esta bodega":"Todas las bodegas"} al ${fmtFecha(h)}</span><span class="lx-syncs">${hace_(h)}${pd?` · actualizado por ${esc(pd.nombre)}`:""}. ${dep?"Se actualiza solo esta bodega, más rápido.":"Trae todas las bodegas y tarda más; dentro de cada bodega puedes actualizar solo esa."} Se ve sin señal.</span></div>${btn}</div>`;
+  const btn=puedeActStock()?`<button class="btn" data-a="${dep?"stkActDep":"stkAct"}"${dep?` data-d="${esc(dep)}"`:""} ${skCargando||navigator.onLine===false?"disabled":""}>${car?"Consultando Finnegans…":navigator.onLine===false?"Sin señal":dep?"Actualizar esta bodega":"Actualizar todas las bodegas"}</button>`:"";
+  return `<div class="lx-sync sks ${h&&esHoy(h)?"ok":"camb"}"><div class="lx-syncl"><span class="lx-synct">${dep?"Esta bodega":"Todas las bodegas"} al ${fmtFecha(h)}</span><span class="lx-syncs">${hace_(h)}${pd?`, por ${esc(pd.nombre)}`:""}.${dep?"":" Dentro de cada bodega puedes actualizar solo esa."}</span></div>${btn}</div>`;
 }
 
 function renderStock(){
@@ -260,7 +260,7 @@ function renderCB(){
     return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(nomLindo(d))}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${frescoChip(d)}${ab?`<span class="xp sug">Conteo ${esc(ab.n)} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
   return head+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Control de bodega</h1>
-    <p class="lead">Elige la bodega, revisa producto por producto y anota la cantidad que encuentras. Al cerrar, la app compara con el stock del sistema y genera el informe.</p>
+    <p class="lead">Elige la bodega y cuenta producto por producto.</p>
     ${stkSyncHTML("")}
     <div class="list">${cards}</div>
   </main>`;
@@ -276,8 +276,8 @@ function renderCBBod(){
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(nomLindo(d))}</h1>
     ${stkSyncHTML(d)}
-    <div class="start" style="grid-template-columns:1fr;margin-top:12px">${ab?`<button class="big dev" data-a="cbAbrir" data-id="${esc(ab.id)}"><strong>Continuar conteo ${esc(ab.n)}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
-      :`<button class="big ent" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${(n=>`${n} ${n===1?"producto":"productos"}`)(filasSt().filter(o=>o.DEPOSITO===d).length)} según el stock del ${fmtFecha(horaDep(d))}</span></button>`}</div>
+    <div class="start" style="grid-template-columns:1fr;margin-top:12px">${ab?`<button class="big dev acc" data-a="cbAbrir" data-id="${esc(ab.id)}"><strong>Continuar conteo ${esc(ab.n)}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
+      :`<button class="big ent acc" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${(n=>`${n} ${n===1?"producto":"productos"}`)(filasSt().filter(o=>o.DEPOSITO===d).length)} según el stock del ${fmtFecha(horaDep(d))}</span></button>`}</div>
     ${(()=>{const rc=recurrentes(d);if(!rc.length)return"";return`<h2>Diferencias recurrentes<span class="cnt">${rc.length}</span></h2><p class="note" style="margin-top:0">Productos con discrepancia en al menos 2 de los últimos 3 conteos. Suele indicar un problema de registro o de manejo, no un error de conteo.</p>${rc.map(x=>`<div class="skr"><div class="skn"><b>${esc(x.prod)}</b><span>${esc(x.cod||"")} · en ${x.n} conteos</span></div><div class="skv"><b>${x.ult.d<0?"Faltaban":"Sobraban"} ${fmtN(Math.abs(x.ult.d))} ${esc(x.ult.un)}</b><span>conteo ${x.ult.c}</span></div></div>`).join("")}`})()}
     <h2>Conteos<span class="cnt">${cs.length}</span></h2>${cs.length?`${disTip("mncb",`En el «⋯» de cada conteo está el informe PDF${esAdmin()?", anular y restaurar":" y eliminar los que están en curso"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}`:""}
     <div class="list">${filas_||`<div class="empty">Todavía no hay conteos en esta bodega.</div>`}</div>
@@ -515,4 +515,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="175"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="176"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
