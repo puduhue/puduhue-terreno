@@ -2073,3 +2073,7 @@ details.fdwarn>p{margin:8px 0 0}
 /* ---------- v177: dentro de una sección plegable (<details>) las filas ya no se salen de su tarjeta ---------- */
 /* `*{box-sizing:inherit}` hereda del contenedor interno del navegador (content-box); los hijos directos quedan en border-box */
 details>*{box-sizing:border-box}
+/* v177: fila de una rendición anulada o eliminada */
+.rdc-i.anu{background:var(--soft);color:var(--muted)}
+.xp.rdanux{background:var(--soft);color:var(--muted)}
+.bod.rdc.anu .rdc-v{color:var(--muted);font-weight:500}
