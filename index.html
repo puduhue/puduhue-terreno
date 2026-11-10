@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-AN1RZUFt1iY5c0KUO2nRQxLQWP/VxEoAPMOLCCpgkv8=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Cz5N/RYc7MdgZ8AmYV7fuet/Pb2KuK4va7fhpC9pO4M=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=174">
+<link rel="stylesheet" href="estilos.css?v=175">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-1/marcas.js"></script>
 <script>
-const APP_VER="174";
+const APP_VER="175";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-1/marcas.js */
@@ -1564,7 +1564,7 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
 
 /* ---------- Render ---------- */
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}"${back?"":` aria-label="Volver al inicio" title="Volver al inicio"`}>${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${esc(MARCA)}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
-function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue();flDecorar();try{iniModColor()}catch(e){}}}
+function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue();flDecorar();try{iniModColor()}catch(e){}try{iniTitulo()}catch(e){}}}
 /* v150: esqueleto de carga (la forma del Inicio en gris, con un brillo) */
 function esqueletoHTML(){
   const fila=`<div class="esqf"><span class="esq esq-ic"></span><span class="esqx"><span class="esq" style="width:78%"></span><span class="esq" style="width:52%"></span></span></div>`;
@@ -1619,7 +1619,7 @@ function renderHome(){
   const L=lista();
   const card=a=>{
     const c=a.estado==="cerrada",an=!!a.anulada;
-    const st=an?"":c?(a.tipo==="entrega"&&devVig(a)?"Devuelta":`Cerrada ${fmtD(a.cerrada)}`):`${ITEMS.filter(i=>(a.items&&a.items[i.k]||{}).v).length}/${ITEMS.length} ítems`;
+    const st=an?"":c?(a.tipo==="entrega"&&devVig(a)?"Devuelta":(a.cerrada?`el ${fmtD(a.cerrada)}`:"")):`${ITEMS.filter(i=>(a.items&&a.items[i.k]||{}).v).length}/${ITEMS.length} ítems`;
     return `<div class="card mcard${an?" anulada":""}"><button class="row" data-a="open" data-id="${esc(a.id)}">
       <span class="tag ${an?"none":c?"cerrada":"borrador"}">${an?"Anulada":c?"Cerrada":"Borrador"}</span>
       <span class="who">${esc(a.trabajador||"Sin nombre")}</span>
@@ -2722,7 +2722,7 @@ function renderLaunch(){
   (permAgrega("cl")?visAbs:[]).forEach(visAb=>{const sc=puntaje(visAb),TV=itemsDe(visAb).length,pct=TV?Math.round(sc.rev/TV*100):0;
     conts.push(`<button class="lx-cont" data-a="clAbrir" data-id="${esc(visAb.id)}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Visita ${esc(visAb.n)} · ${esc(visAb.predio)}</span><span class="lx-cw">${CLK[tipoDe(visAb)].titulo} · ${fmtD(visAb.fecha)}</span><span class="lx-cn">${sc.rev} de ${TV} ítems revisados</span></span>${ICO.arrow}</button>`)});
   const cbAb=Object.values(CONT).filter(c=>c.estado!=="cerrado"&&!c.anulado&&tbMio(c)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||"")))[0];
-  if(cbAb&&permAgrega("cb")){const R=resumenConteo(cbAb),pct=R.total?Math.round(R.cont/R.total*100):0;conts.push(`<button class="lx-cont" data-a="cbAbrir" data-id="${esc(cbAb.id)}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Conteo ${esc(cbAb.n)} · ${esc(cbAb.bodega)}</span><span class="lx-cw">Control de bodega · ${fmtD(cbAb.fecha)}</span><span class="lx-cn">${R.cont} de ${R.total} productos contados</span></span>${ICO.arrow}</button>`)}
+  if(cbAb&&permAgrega("cb")){const R=resumenConteo(cbAb),pct=R.total?Math.round(R.cont/R.total*100):0;conts.push(`<button class="lx-cont" data-a="cbAbrir" data-id="${esc(cbAb.id)}">${anillo(pct)}<span class="lx-ctx"><span class="lx-ct">Conteo ${esc(cbAb.n)} · ${esc(typeof nomLindo==="function"?nomLindo(cbAb.bodega):cbAb.bodega)}</span><span class="lx-cw">Control de bodega · ${fmtD(cbAb.fecha)}</span><span class="lx-cn">${R.cont} de ${R.total} productos contados</span></span>${ICO.arrow}</button>`)}
   (permAgrega("ax")?Object.values(ACTAS):[]).filter(a=>esAx(a)&&!a.anulada&&a.estado!=="cerrada"&&tbMio(a)).sort((a,b)=>String(b.actualizado||"").localeCompare(String(a.actualizado||""))).slice(0,1).forEach(a=>{const T=AX[a.tipo],m=axFaltantes(a).length;
     conts.push(`<button class="lx-cont" data-a="axOpen" data-id="${esc(a.id)}">${anillo(Math.max(5,100-m*6))}<span class="lx-ctx"><span class="lx-ct">${esc(axTitulo(a))} · ${esc(axQuien(a))}</span><span class="lx-cw">${esc(axDonde(a)||"Sin datos")}</span><span class="lx-cn">${m} ${m===1?"dato pendiente":"datos pendientes"}</span></span>${ICO.arrow}</button>`)});
   const ph=paraHoyItems().concat(conts);
@@ -2831,6 +2831,20 @@ function iniBodHoja(){
     ${op("stock",ICO.box,"Stock",STOCK?`Existencias ${iniFecha(STOCK.hora)}`:"Existencias por depósito desde Finnegans")}</div>`;
   document.body.appendChild(m);
   m.addEventListener("click",e=>{if(e.target===m){m.remove();return}const t=e.target.closest&&e.target.closest("[data-a]");if(t)setTimeout(()=>m.remove(),0)});
+}
+
+/* v175: el título una sola vez. Si el título grande (h1) dice lo mismo que la barra de arriba, la barra lo
+   muestra solo cuando el grande ya no se ve (al desplazarse), como el «título grande» de las apps del iPhone. */
+let INI_TIT_OBS=null;
+function iniTitulo(){
+  if(INI_TIT_OBS){INI_TIT_OBS.disconnect();INI_TIT_OBS=null}
+  const top=document.querySelector("#app .top"),ttl=top&&top.querySelector(".ttl"),h=document.querySelector("#app main h1");
+  if(!top||!ttl||!h)return;
+  const n=x=>String(x||"").replace(/\s+/g," ").trim().toLowerCase();
+  if(!n(ttl.textContent)||n(h.textContent)!==n(ttl.textContent))return;
+  top.classList.add("tt-rep");
+  if("IntersectionObserver" in window){INI_TIT_OBS=new IntersectionObserver(es=>{top.classList.toggle("tt-ver",!es[0].isIntersecting)},{rootMargin:"-60px 0px 0px 0px"});INI_TIT_OBS.observe(h)}
+  else top.classList.add("tt-ver");
 }
 
 /* ---------- Traspaso por archivo (versión sin conexión → app en línea) ---------- */
@@ -3736,10 +3750,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=174"></script>
-<script src="modulos/bodega.js?v=174"></script>
-<script src="modulos/rendiciones.js?v=174"></script>
-<script src="modulos/actas-entrega.js?v=174"></script>
+<script src="modulos/checklist.js?v=175"></script>
+<script src="modulos/bodega.js?v=175"></script>
+<script src="modulos/rendiciones.js?v=175"></script>
+<script src="modulos/actas-entrega.js?v=175"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

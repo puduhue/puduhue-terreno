@@ -114,7 +114,7 @@ function fdMov(key,deTodos){
   const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}${dos&&x.c?`<small class="fdmc" title="${esc(fdCtaN(x.c))}">${esc(x.c)}</small>`:""}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fmtP(x.run)}</small></span>${FD_CHEV}</button>`};
   const tram=k.tram.map(r=>`<button class="fdmv fdtr" data-a="fdIrRend" data-id="${esc(r.id)}"><span class="fdmf">${fdF(r.enviada)}</span><span class="fdmt"><b>${esc(rdTitulo(r))}</b><small>${esc(rdEstadoFrase(r).t)}</small></span><span class="fdmm neg">−${fmtP(totalRend(r))}<small>en revisión</small></span></button>`).join("");
   const m=document.createElement("div");m.className="modal fdsheet";
-  m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}"><div class="tbtir" aria-hidden="true"></div>
+  m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}">
     <div class="fdsh"><div><h3>${esc(nom)}</h3><p>${esc(fdSubt(k))}</p></div><button class="fdx" data-a="fdCerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="smres fdsum"><div class="${k.porRendir<-0.5?"fav":fdNivel(k)}"><b>${fmtP(Math.abs(k.porRendir))}</b><span>${k.porRendir<-0.5?"a favor":"por rendir"}</span></div><div><b>${fmtP(k.saldo)}</b><span>saldo en Contabilidad</span></div><div><b>${fmtP(k.enTram)}</b><span>en revisión</span></div></div>
     ${dos?`<div class="fdctas">${ctas.map(c=>`<div><span>${esc(fdCtaN(c))} · ${esc(c)}</span><b>${fmtP(pc[c]||0)}</b></div>`).join("")}</div>`:""}
@@ -336,6 +336,8 @@ function rdInicioFondo(){
     :`<b class="ifdm ok">Estás al día</b><span class="ifds">no tienes fondos por rendir</span>`;
   const st=[k.enTram>0.5?`<span><i class="t"></i>En revisión<b>${fmtP(k.enTram)}</b></span>`:"",k.enBorr>0.5?`<span><i class="b"></i>Sin enviar<b>${fmtP(k.enBorr)}</b></span>`:""].filter(Boolean);
   const tit=fdTituloFondo(k); /* v172 */
+  /* v175: al día y sin nada en trámite ni próximo paso → una sola línea */
+  if(Math.abs(k.porRendir)<=0.5&&!st.length&&!fdSiguiente(k))return `<button type="button" class="ifd ifd-ok" data-a="rdTabIr" data-t="mias" aria-label="${tit}: al día"><b>${tit}</b><span class="ifdokt"><i aria-hidden="true"></i>Al día</span><span class="ifdokf" aria-hidden="true">›</span></button>`;
   return `<section class="ifd" aria-label="${tit}"><div class="ifdh"><b>${tit}</b>${k.porRendir>0.5&&n?`<span class="ifdc ${esc(n)}">${k.dias} días sin rendir</span>`:""}</div>
     <div>${monto}</div>
     ${fdCuentasIni(k)}
@@ -2419,4 +2421,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="174"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="175"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

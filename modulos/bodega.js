@@ -135,22 +135,22 @@ function renderStock(){
   const Ls=L.filter(o=>!o.cero); /* v174: con stock; los en 0 van aparte */
   const tot=L.reduce((s,o)=>s+o.imp,0),nb=L.filter(o=>o.bajo).length;
   const filtros=`<div class="skf c4">
-    <div class="f"><label for="skDep">Depósito</label><select id="skDep" data-sk="dep"><option value="">Todos (${deps.length})</option>${deps.map(d=>`<option ${d===skDep?"selected":""}>${esc(d)}</option>`).join("")}</select></div>
+    <div class="f"><label for="skDep">Depósito</label><select id="skDep" data-sk="dep"><option value="">Todos (${deps.length})</option>${deps.map(d=>`<option value="${esc(d)}" ${d===skDep?"selected":""}>${esc(nomLindo(d))}</option>`).join("")}</select></div>
     <div class="f"><label for="skFam">Familia</label><select id="skFam" data-sk="fam"><option value="">Todas</option>${fams.map(d=>`<option ${d===skFam?"selected":""}>${esc(d)}</option>`).join("")}</select></div>
     <div class="f"><label for="skSub">Subfamilia</label><select id="skSub" data-sk="sub"><option value="">Todas</option>${subs.map(d=>`<option ${d===skSub?"selected":""}>${esc(d)}</option>`).join("")}</select></div>
     <div class="f"><label for="skQ">Buscar</label><input id="skQ" type="search" data-sk="q" value="${esc(skQ)}" placeholder="Producto o código"></div></div>
     <div class="filt"><button class="fb" data-a="stkModo" data-m="dep" aria-pressed="${skModo==="dep"}">Por depósito</button><button class="fb" data-a="stkModo" data-m="prod" aria-pressed="${skModo==="prod"}">Por producto</button><button class="fb" data-a="stkModo" data-m="bajo" aria-pressed="${skModo==="bajo"}">Bajo reposición${F.some(o=>o.bajo)?` (${F.filter(o=>o.bajo).length})`:""}</button></div>`;
   let cuerpo="";
-  const fila=(o,conDep)=>`<div class="skr${o.bajo?" bajo":""}${o.cero?" cero":""}"><div class="skn"><b>${esc(o.PRODUCTO)}</b><span>${esc(o.PRODUCTOCODIGO)}${conDep?` · ${esc(o.DEPOSITO)}`:""}${o.PARTIDA?` · Partida ${esc(o.PARTIDA)}`:""}${o.PARTIDA_VTO?` · vence ${esc(fmtD(String(o.PARTIDA_VTO).slice(0,10)))}`:""}</span>${o.bajo?`<span class="xp camb">Bajo punto de reposición (${fmtN(o.pr)})</span>`:""}</div><div class="skv"><b>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")}</b><span>${o.cero?"Sin stock":fmtP(o.imp)}</span></div></div>`;
+  const fila=(o,conDep)=>`<div class="skr${o.bajo?" bajo":""}${o.cero?" cero":""}"><div class="skn"><b>${esc(o.PRODUCTO)}</b><span>${esc(o.PRODUCTOCODIGO)}${conDep?` · ${esc(nomLindo(o.DEPOSITO))}`:""}${o.PARTIDA?` · Partida ${esc(o.PARTIDA)}`:""}${o.PARTIDA_VTO&&!/^1900/.test(String(o.PARTIDA_VTO))?` · vence ${esc(fmtD(String(o.PARTIDA_VTO).slice(0,10)))}`:""}</span>${o.bajo?`<span class="xp camb">Bajo punto de reposición (${fmtN(o.pr)})</span>`:""}</div><div class="skv"><b>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")}</b><span>${o.cero?"Sin stock":fmtP(o.imp)}</span></div></div>`;
   const ordP=(a,b)=>String(a.PRODUCTO).localeCompare(String(b.PRODUCTO));
   if(skModo==="dep"&&!skDep&&!q){
     const g={};L.forEach(o=>{const d=g[o.DEPOSITO]||(g[o.DEPOSITO]={n:0,c:0,imp:0,bajo:0});if(o.cero)d.c++;else d.n++;d.imp+=o.imp;if(o.bajo)d.bajo++});
-    cuerpo=`<div class="list">${Object.entries(g).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>`<button class="bod" data-a="stkDep" data-d="${esc(k)}"><span class="bodn">${esc(k)}</span><span class="bodm">${esc(v.n)} ${v.n===1?"producto":"productos"}${v.c?` y ${esc(v.c)} en 0`:""} · <b>${fmtP(v.imp)}</b></span><span class="bodc">${frescoChip(k)}${v.bajo?`<span class="xp camb">${v.bajo} bajo reposición</span>`:""}</span>${ICO.arrow}</button>`).join("")}</div>`;
+    cuerpo=`<div class="list">${Object.entries(g).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>`<button class="bod" data-a="stkDep" data-d="${esc(k)}"><span class="bodn">${esc(nomLindo(k))}</span><span class="bodm">${esc(v.n)} ${v.n===1?"producto":"productos"}${v.c?` y ${esc(v.c)} en 0`:""} · <b>${fmtP(v.imp)}</b></span><span class="bodc">${frescoChip(k)}${v.bajo?`<span class="xp camb">${v.bajo} bajo reposición</span>`:""}</span>${ICO.arrow}</button>`).join("")}</div>`;
   }else if(skModo==="prod"){
     const g={};L.forEach(o=>{const k=o.PRODUCTOCODIGO||o.PRODUCTO;const p=g[k]||(g[k]={o,cant:0,imp:0,deps:[]});p.cant+=o.cant;p.imp+=o.imp;p.deps.push(o)});
     const P=Object.values(g).sort((a,b)=>String(a.o.PRODUCTO).localeCompare(String(b.o.PRODUCTO)));
     const nds=p=>{const n=p.deps.filter(o=>!o.cero).length;return n?`${n} ${n===1?"depósito":"depósitos"}`:"sin stock"};
-    cuerpo=P.slice(0,skLim).map(p=>`<details class="skp"><summary><div class="skn"><b>${esc(p.o.PRODUCTO)}</b><span>${esc(p.o.PRODUCTOCODIGO)} · ${nds(p)}</span></div><div class="skv"><b>${fmtN(p.cant)} ${esc(p.o.UNIDAD1||"")}</b><span>${fmtP(p.imp)}</span></div></summary>${p.deps.sort((a,b)=>b.cant-a.cant).map(o=>`<div class="skd"><span>${esc(o.DEPOSITO)}</span><span>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")} · ${o.cero?"sin stock":fmtP(o.imp)}</span></div>`).join("")}</details>`).join("")+(P.length>skLim?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más (${P.length-skLim})</button></div>`:"");
+    cuerpo=P.slice(0,skLim).map(p=>`<details class="skp"><summary><div class="skn"><b>${esc(p.o.PRODUCTO)}</b><span>${esc(p.o.PRODUCTOCODIGO)} · ${nds(p)}</span></div><div class="skv"><b>${fmtN(p.cant)} ${esc(p.o.UNIDAD1||"")}</b><span>${fmtP(p.imp)}</span></div></summary>${p.deps.sort((a,b)=>b.cant-a.cant).map(o=>`<div class="skd"><span>${esc(nomLindo(o.DEPOSITO))}</span><span>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")} · ${o.cero?"sin stock":fmtP(o.imp)}</span></div>`).join("")}</details>`).join("")+(P.length>skLim?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más (${P.length-skLim})</button></div>`:"");
   }else if(skModo==="bajo"){
     const LL=L.filter(o=>o.bajo).sort(ordP);
     cuerpo=(LL.length?LL.slice(0,skLim).map(o=>fila(o,!skDep)).join(""):`<div class="empty">Nada que mostrar con estos filtros.</div>`)+(LL.length>skLim?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más (${LL.length-skLim})</button></div>`:"");
@@ -163,7 +163,7 @@ function renderStock(){
   }
   return head+`<main class="wrap">
     ${skDep?`<button class="mini skvolver" data-a="stkTodos">‹ Todas las bodegas</button>`:""}
-    <h1>Stock${skDep?` · ${esc(skDep)}`:""}</h1>
+    <h1>Stock</h1>${skDep?`<p class="lead skdep">${esc(nomLindo(skDep))}</p>`:""}
     ${stkSyncHTML(skDep)}
     ${filtros}
     <div class="lx-stats" style="margin-top:12px"><div><b>${fmtP(tot)}</b><span>valor en stock</span></div><div><b>${fmtN(new Set(Ls.map(o=>o.PRODUCTOCODIGO)).size,0)}</b><span>productos con stock</span></div><div class="${nb?"warn":""}"><b>${nb}</b><span>bajo reposición</span></div></div>
@@ -210,6 +210,10 @@ function saveCont(c,deb){
 }
 function cbTouch(){if(!cbv)return;cbv.actualizado=new Date().toISOString();if(ME)cbv.modificadoPor=yo();saveCont(cbv,true)}
 /* Líneas del conteo: copia del stock del sistema al momento de iniciar + productos agregados a mano */
+/* v175: nombres de Finnegans en MAYÚSCULAS a letra normal («BODEGA TRONADOR» → «Bodega Tronador»); siglas cortas y
+   palabras con números quedan igual */
+function nomLindo(s){s=String(s||"");if(s!==s.toUpperCase())return s; /* solo los nombres que vienen enteros en mayúsculas */
+  return s.toLowerCase().replace(/(^|[\s/(-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()).replace(/\b(De|Del|La|Las|Los|Y)\b/g,w=>w.toLowerCase()).replace(/^./,c=>c.toUpperCase())}
 function nuevoConteo(dep,op){
   op=op||{};const fams=op.familias&&op.familias.length?new Set(op.familias):null;
   const base=filasSt().filter(o=>o.DEPOSITO===dep&&(!fams||fams.has(o.FAMILIA||"")));
@@ -253,7 +257,7 @@ function renderCB(){
   const F=filas(),FS=filasSt();const deps=[...new Set(F.map(o=>o.DEPOSITO))].sort((a,b)=>String(a).localeCompare(String(b)));
   const cards=deps.map(d=>{const ab=conteoAbierto(d),cs=conteosDe(d).filter(c=>c.estado==="cerrado"&&!c.anulado),u=cs[0],np=FS.filter(o=>o.DEPOSITO===d).length;
     const r=u?resumenConteo(u):null;
-    return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(d)}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${frescoChip(d)}${ab?`<span class="xp camb">Conteo ${esc(ab.n)} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
+    return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(nomLindo(d))}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${frescoChip(d)}${ab?`<span class="xp sug">Conteo ${esc(ab.n)} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
   return head+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Control de bodega</h1>
     <p class="lead">Elige la bodega, revisa producto por producto y anota la cantidad que encuentras. Al cerrar, la app compara con el stock del sistema y genera el informe.</p>
@@ -268,12 +272,12 @@ function renderCBBod(){
       <span class="where">${esc(c.responsable||"")} · ${r.cont} de ${r.total} contados${r.dif?` · ${r.dif} con diferencia`:""}</span><span class="st">${!an&&r.exact!==null?`<b>${r.exact}%</b>`:""}</span>
       <span class="by">${chipSync(c)}${an?` <span class="aut">Anulado el ${fmtD(c.anulado.fecha)} por ${esc(quien(c.anulado.por))}${c.anulado.motivo?`: ${esc(c.anulado.motivo)}`:""}</span>`:autoriaTxt(c)?` <span class="aut">${autoriaHTML(c)}</span>`:""}</span></button>
       ${mnBtn("mnCb",c.id,"Opciones del conteo "+c.n)}</div>`}).join("");
-  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="cb">Bodegas</button><div class="ttl">${esc(d)}</div>${estadoChip()}</div></div></div>
+  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="cb">Bodegas</button><div class="ttl">${esc(nomLindo(d))}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
-    <h1>${esc(d)}</h1>
+    <h1>${esc(nomLindo(d))}</h1>
     ${stkSyncHTML(d)}
     <div class="start" style="grid-template-columns:1fr;margin-top:12px">${ab?`<button class="big dev" data-a="cbAbrir" data-id="${esc(ab.id)}"><strong>Continuar conteo ${esc(ab.n)}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
-      :`<button class="big ent" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${filasSt().filter(o=>o.DEPOSITO===d).length} productos según el stock del ${fmtFecha(horaDep(d))}</span></button>`}</div>
+      :`<button class="big ent" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${(n=>`${n} ${n===1?"producto":"productos"}`)(filasSt().filter(o=>o.DEPOSITO===d).length)} según el stock del ${fmtFecha(horaDep(d))}</span></button>`}</div>
     ${(()=>{const rc=recurrentes(d);if(!rc.length)return"";return`<h2>Diferencias recurrentes<span class="cnt">${rc.length}</span></h2><p class="note" style="margin-top:0">Productos con discrepancia en al menos 2 de los últimos 3 conteos. Suele indicar un problema de registro o de manejo, no un error de conteo.</p>${rc.map(x=>`<div class="skr"><div class="skn"><b>${esc(x.prod)}</b><span>${esc(x.cod||"")} · en ${x.n} conteos</span></div><div class="skv"><b>${x.ult.d<0?"Faltaban":"Sobraban"} ${fmtN(Math.abs(x.ult.d))} ${esc(x.ult.un)}</b><span>conteo ${x.ult.c}</span></div></div>`).join("")}`})()}
     <h2>Conteos<span class="cnt">${cs.length}</span></h2>${cs.length?`${disTip("mncb",`En el «⋯» de cada conteo está el informe PDF${esAdmin()?", anular y restaurar":" y eliminar los que están en curso"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}`:""}
     <div class="list">${filas_||`<div class="empty">Todavía no hay conteos en esta bodega.</div>`}</div>
@@ -287,7 +291,7 @@ function cbLineaHTML(l){
   const mostrarSis=!c.ciego||ro;
   const vtos=[...new Set((l.partidas||[]).map(p=>p.v).filter(Boolean))].sort();
   const fs=l.manual?"":[!cbFam?famDeLinea(l):"",!cbSub?subDeLinea(l):""].filter(Boolean).join(" · ");
-  const meta=[fs,l.partida?`Partida ${l.partida}${l.vto?` · vence ${fmtD(String(l.vto).slice(0,10))}`:""}`:l.partidas&&l.partidas.length?`${l.partidas.length} partidas${vtos.length?` · vence ${fmtD(String(vtos[0]).slice(0,10))}${vtos.length>1?" y otras":""}`:""}`:"",l.sis2&&l.un2&&l.un2!==l.un&&mostrarSis?`${fmtN(l.sis2)} ${l.un2}`:""].filter(Boolean).join(" · ");
+  const meta=[fs,l.partida?`Partida ${l.partida}${l.vto&&!/^1900/.test(String(l.vto))?` · vence ${fmtD(String(l.vto).slice(0,10))}`:""}`:l.partidas&&l.partidas.length?`${l.partidas.length} ${l.partidas.length===1?"partida":"partidas"}${vtos.length?` · vence ${fmtD(String(vtos[0]).slice(0,10))}${vtos.length>1?" y otras":""}`:""}`:"",l.sis2&&l.un2&&l.un2!==l.un&&mostrarSis?`${fmtN(l.sis2)} ${l.un2}`:""].filter(Boolean).join(" · ");
   return `<div class="it cbl ${est}" id="cbl-${esc(l.k)}">
     <div class="cbh"><span class="cod">${esc(l.cod||"")}</span>${l.manual?'<span class="xp camb">Agregado en terreno</span>':""}${l.cero?`<span class="xp camb">${c.ciego&&!ro?"Agregado al encontrarlo":"En 0 en el sistema"}</span>`:""}${l.cero&&!ro&&o===null&&!(r.fotos||[]).length?`<button class="mini cbquitar" data-a="cbQuitar" data-k="${esc(l.k)}">Quitar</button>`:""}</div>
     <div class="txt">${esc(l.prod)}</div>
@@ -298,7 +302,7 @@ function cbLineaHTML(l){
       ${!ro&&mostrarSis?`<button class="mini cbeq" data-a="cbIgual" data-k="${esc(l.k)}" title="La cantidad coincide con el sistema">= Coincide</button>`:""}
     </div>
     ${d!==null&&mostrarSis?`<div class="cbd ${est}">${est==="ok"?"Coincide con el sistema":est==="tol"?`Diferencia de ${fmtN(Math.abs(d))} ${esc(l.un)}, dentro de la tolerancia`:`${d<0?"Faltan":"Sobran"} ${fmtN(Math.abs(d))} ${esc(l.un)}${l.pu?` · ${fmtP(Math.abs(d*l.pu))}`:""}`}${!ro&&(est==="falta"||est==="sobra")?` <button class="mini" data-a="cbRecontar" data-k="${esc(l.k)}" style="margin-left:8px">Recontar</button>`:""}</div>`:""}
-    <div class="fotos"><div class="strip">${(r.fotos||[]).map(f=>ro?thumb(f,l.k,true,false):`<span class="thw">${thumb(f,l.k,true,false)}<button class="thx" data-a="cbDelFoto" data-ref="${esc(f)}" data-k="${esc(l.k)}" aria-label="Eliminar foto">✕</button></span>`).join("")}${!ro&&(r.fotos||[]).length<3?`${ESCRITORIO()?`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Subir foto<input class="vh" type="file" accept="image/*" multiple data-cbfoto="${esc(l.k)}"></label>`:`<label class="addf"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-cbfoto="${esc(l.k)}"></label><label class="addf gal"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Galería<input class="vh" type="file" accept="image/*" multiple data-cbfoto="${esc(l.k)}"></label>`}`:""}</div></div>
+    <div class="fotos"><div class="strip">${(r.fotos||[]).map(f=>ro?thumb(f,l.k,true,false):`<span class="thw">${thumb(f,l.k,true,false)}<button class="thx" data-a="cbDelFoto" data-ref="${esc(f)}" data-k="${esc(l.k)}" aria-label="Eliminar foto">✕</button></span>`).join("")}${!ro&&(r.fotos||[]).length<3?`${ESCRITORIO()?`<label class="addf addm"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Subir foto<input class="vh" type="file" accept="image/*" multiple data-cbfoto="${esc(l.k)}"></label>`:`<label class="addf addm"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>Cámara<input class="vh" type="file" accept="image/*" capture="environment" data-cbfoto="${esc(l.k)}"></label><label class="addf addm gal"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span>Galería<input class="vh" type="file" accept="image/*" multiple data-cbfoto="${esc(l.k)}"></label>`}`:""}</div></div>
     ${o!==null||r.com||ro?`<input class="obs" data-cbf="com" data-k="${esc(l.k)}" value="${esc(r.com||"")}" placeholder="Comentario (estado, ubicación, vencido, dañado…)" ${ro?"disabled":""}>`:""}
   </div>`;
 }
@@ -318,7 +322,7 @@ function renderCBV(){
     <label class="f"><span>Producto</span><input data-cbn="prod" value="${esc(cbNuevoProd.prod||"")}" placeholder="Nombre del producto"></label>
     <div class="plan2"><label class="f"><span>Código (si lo sabes)</span><input data-cbn="cod" value="${esc(cbNuevoProd.cod||"")}"></label><label class="f"><span>Unidad</span><input data-cbn="un" value="${esc(cbNuevoProd.un||"")}" placeholder="KG, LT, UN…"></label></div>
     <div class="btns"><button class="btn" data-a="cbNuevoCancel">Cancelar</button><button class="btn pri" data-a="cbNuevoAdd" style="flex:1">Agregar al conteo</button></div></div>`:"";
-  return `<div class="top"><div class="in"><div class="bar"><button class="back" data-a="cbBodBack">${esc(c.bodega)}</button><div class="ttl">Conteo ${esc(c.n)}</div>${estadoChip()}</div></div></div>
+  return `<div class="top"><div class="in"><div class="bar"><button class="back" data-a="cbBodBack">${esc(nomLindo(c.bodega))}</button><div class="ttl">Conteo ${esc(c.n)}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     ${c.anulado?`<div class="info netbox"><b>Conteo anulado</b> el ${fmtD(c.anulado.fecha)} por ${esc(quien(c.anulado.por))}${c.anulado.motivo?`: ${esc(c.anulado.motivo)}`:""}.</div>`:ro?`<div class="info lock">Conteo cerrado el ${fmtD(c.cerrado)}. Ya no se puede modificar.</div>`:""}
     <div class="enc"><div class="f"><label for="cbfe">Fecha</label><input id="cbfe" type="date" data-cbenc="fecha" value="${esc(c.fecha)}" ${ro?"disabled":""}></div>
@@ -338,7 +342,7 @@ function renderCBV(){
     ${ro?"":cbCerosHTML(q)}
     ${ro?"":`<div class="btns"><button class="btn" data-a="cbNuevoProd">+ Producto que no está en la lista</button></div>`}
     <div class="btns">${ro?`<button class="btn pri" data-a="cbPdf" data-id="${esc(c.id)}" style="flex:1">Informe PDF</button>`:`<button class="btn" data-a="cbPdf" data-id="${esc(c.id)}">Informe (borrador)</button><button class="btn pri" data-a="cbCerrar" style="flex:1">Cerrar conteo</button>`}</div>
-    ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn" data-a="cbDel" data-id="${esc(c.id)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar este conteo</button></div><p class="note">Para salir sin cerrar usa ‹ ${esc(c.bodega)} arriba; el conteo queda en curso.</p>`}
+    ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn" data-a="cbDel" data-id="${esc(c.id)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar este conteo</button></div><p class="note">Para salir sin cerrar usa ‹ ${esc(nomLindo(c.bodega))} arriba; el conteo queda en curso.</p>`}
   </main>`;
 }
 let cbNuevoProd=null;
@@ -511,4 +515,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="174"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="175"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
