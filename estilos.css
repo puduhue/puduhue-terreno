@@ -1913,3 +1913,16 @@ body[data-mod] .top{border-bottom:3px solid var(--mod-c)}
 .ifdx.rr>svg{color:var(--m-ink)}
 .ifdx:focus-visible{outline:2px solid var(--act);outline-offset:2px}
 @media (hover:hover){.ifdx:hover{filter:brightness(.97)}}
+/* v174: stock por bodega y productos en 0 */
+.skr.cero{background:var(--soft)}.skr.cero .skv b{color:var(--muted);font-weight:600}
+.skzh{margin-top:22px}
+.skvolver{margin:0 0 8px}
+.cbquitar{margin-left:auto;padding:4px 10px;font-size:13px}
+.cbz{margin:16px 0 6px;padding:2px 14px 12px;border:1px solid var(--line);border-radius:var(--rad);background:var(--card)}
+.cbz summary{display:flex;align-items:center;gap:4px;padding:12px 0;cursor:pointer;list-style:none;font-size:15px}
+.cbz summary::-webkit-details-marker{display:none}
+.cbz summary::after{content:"›";margin-left:auto;font-size:20px;line-height:1;color:var(--muted);transition:transform .15s}
+.cbz[open] summary::after{transform:rotate(90deg)}
+.cbzr{box-sizing:border-box;display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
+.cbzr .skn{flex:1}.cbzr .skn b{overflow-wrap:anywhere}
+.cbzr .mini{white-space:nowrap;pointer-events:none}

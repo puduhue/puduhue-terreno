@@ -20,8 +20,11 @@ const num=x=>{if(x==null||x==="")return 0;if(typeof x==="number")return x;const 
 const FMTN_F={};
 const fmtN=(n,d)=>{try{const k=d==null?2:d;const f=FMTN_F[k]||(FMTN_F[k]=new Intl.NumberFormat("es-CL",{maximumFractionDigits:k,minimumFractionDigits:0}));return f.format(Number(n))}catch(e){return String(n)}};
 const fmtP=n=>"$"+fmtN(Math.round(n),0);
-function stockFilas(){if(!STOCK)return[];return STOCK.filas.map(r=>{const o={};SK_CAMPOS.forEach((c,i)=>o[c]=r[i]);o.cant=num(o.CANTIDAD1);o.imp=num(o.IMPORTE);o.pr=num(o.PUNTOREPOSICION);o.bajo=o.pr>0&&o.cant<o.pr;return o})}
-let SKF=null,SKF_T="";function filas(){if(!STOCK)return[];if(SKF_T!==STOCK.hora){SKF=stockFilas();SKF_T=STOCK.hora}return SKF}
+/* v174: STOCK.ceros = productos en 0 de cada bodega, aparte de «filas» para que las versiones anteriores sigan viendo lo mismo (o.cero) */
+function stockFilas(){if(!STOCK)return[];return STOCK.filas.concat(STOCK.ceros||[]).map(r=>{const o={};SK_CAMPOS.forEach((c,i)=>o[c]=r[i]);o.cant=num(o.CANTIDAD1);o.imp=num(o.IMPORTE);o.pr=num(o.PUNTOREPOSICION);o.cero=Math.abs(o.cant)<1e-9;o.bajo=o.pr>0&&o.cant<o.pr;return o})}
+let SKF=null,SKF_T=null,SKS=null;function filas(){if(!STOCK)return[];if(SKF_T!==STOCK){SKF=stockFilas();SKS=SKF.filter(o=>!o.cero);SKF_T=STOCK}return SKF}
+/* v174: solo lo que tiene stock (lo que traía la app hasta la v173) */
+function filasSt(){filas();return STOCK?SKS:[]}
 async function stockCargarLocal(){try{if(IDB.db){const d=await IDB.get("remote","stock/actual");if(d&&d.filas){STOCK=d;STOCK_ETAG=d.etag||""}}}catch(e){}}
 async function stockPull(){
   if(!DB||navigator.onLine===false||!(puedeVerStock()||puedeContar()))return false;
@@ -31,40 +34,95 @@ async function stockPull(){
   try{if(IDB.db)await IDB.put("remote","stock/actual",d)}catch(e){}
   return true;
 }
-async function stockActualizar(silencioso){
+/* v174: filas de la respuesta del servidor en el orden de SK_CAMPOS (compacta desde el servidor v174; si no, la de antes).
+   Con dep, solo las de esa bodega (un servidor anterior a la v174 devuelve todas) */
+function stockFilasDe(j,dep){
+  let R=[];
+  if(j&&Array.isArray(j.filas)&&Array.isArray(j.campos)){const ix=SK_CAMPOS.map(c=>j.campos.indexOf(c));R=j.filas.map(r=>ix.map(i=>i<0||r[i]==null?"":r[i]))}
+  else{const datos=Array.isArray(j&&j.datos)?j.datos:(j&&j.datos&&Array.isArray(j.datos.data)?j.datos.data:[]);R=datos.map(o=>SK_CAMPOS.map(c=>o[c]==null?"":o[c]))}
+  return dep?R.filter(r=>String(r[4]).trim()===String(dep).trim()):R;
+}
+/* v174: arma el stock.json nuevo. Con dep, reemplaza solo esa bodega y conserva las demás (con su fecha) de lo que hay en OneDrive.
+   «filas» = con stock (lo leen igual las versiones anteriores), «ceros» = en 0 */
+function stockMezclar(base,R,dep,hora,por,reporte){
+  const cero=r=>Math.abs(num(r[5]))<1e-9,F=[],C=[],horas={},porDep={};
+  let horaT=hora,porT=por;
+  if(dep&&base&&Array.isArray(base.filas)){
+    const bh=base.hora||hora;
+    base.filas.concat(base.ceros||[]).forEach(r=>{const d=r[4];if(!Object.prototype.hasOwnProperty.call(horas,d)){horas[d]=(base.horas&&base.horas[d])||bh;porDep[d]=(base.porDep&&base.porDep[d])||base.por||null}if(d!==dep)(cero(r)?C:F).push(r)});
+    horaT=base.horaTodo||bh;porT=base.horaTodo?(base.porTodo||null):(base.por||null);
+  }
+  R.forEach(r=>(cero(r)?C:F).push(r));
+  (dep?[dep]:[...new Set(R.map(r=>r[4]))]).forEach(d=>{horas[d]=hora;porDep[d]=por});
+  return{hora,por,reporte,campos:SK_CAMPOS,filas:F,ceros:C,horas,porDep,horaTodo:horaT,porTodo:porT};
+}
+/* v174: guarda en OneDrive. conBase: lee primero lo que hay (otra persona pudo actualizar otra bodega) y sube con If-Match;
+   si OneDrive tiene otra versión (412), vuelve a leer y mezclar */
+async function stockGuardar(mezclar,conBase){
+  for(let i=0;;i++){
+    let meta=null,base=null;
+    if(conBase){try{meta=await gjson(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e}
+      if(meta)base=STOCK&&meta.eTag===STOCK_ETAG?STOCK:await(await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json()}
+    const snap=mezclar(base),h={"Content-Type":"application/json"};if(meta&&!IFM_NO)h["If-Match"]=meta.eTag;
+    try{const up=await gfetch(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}:/content`,{method:"PUT",headers:h,body:JSON.stringify(snap)});const it=await up.json();
+      snap.etag=it.eTag;STOCK=snap;STOCK_ETAG=it.eTag;try{if(IDB.db)await IDB.put("remote","stock/actual",snap)}catch(e){}return snap}
+    catch(e){if(e&&e.status===412&&i<3)continue;throw e}
+  }
+}
+/* v174: dep = solo esa bodega (más rápido); sin dep, todas. Siempre con los productos en 0 */
+async function stockActualizar(silencioso,dep){
   if(!puedeActStock()){toast("Tu cuenta no puede actualizar el stock.");return}
   if(navigator.onLine===false){toast("Necesita señal para consultar Finnegans.");return}
-  /* para no consultar Finnegans muchas veces seguidas: si se actualizó hace menos de 5 minutos, ya está al día */
-  if(!silencioso&&!esAdmin()&&STOCK&&Date.now()-new Date(STOCK.hora)<5*60000){toast(`El stock se actualizó ${hace_(STOCK.hora)}; ya está al día.`);return}
-  skCargando=true;render();if(!silencioso)toast("Consultando Finnegans… puede tardar unos segundos.");
+  if(skCargando){toast("Ya se está consultando Finnegans.");return}
+  /* para no consultar Finnegans muchas veces seguidas: si se actualizó hace menos de 5 minutos, ya está al día (v174: por bodega) */
+  const h0=dep?horaDep(dep):horaTodo();
+  if(!silencioso&&!esAdmin()&&STOCK&&h0&&Date.now()-new Date(h0)<5*60000){toast(`${dep?"Esta bodega":"El stock"} se actualizó ${hace_(h0)}; ya está al día.`);return}
+  skCargando=dep||"*";render();if(!silencioso)toast(dep?"Consultando Finnegans…":"Consultando Finnegans… todas las bodegas tardan más.");
   try{
-    const j=await workerFetch("/stock");
-    const datos=Array.isArray(j.datos)?j.datos:(j.datos&&Array.isArray(j.datos.data)?j.datos.data:[]);
-    if(!datos.length)throw{error:"Finnegans respondió sin filas de stock."};
-    const snap={hora:j.hora||new Date().toISOString(),por:ME?{id:ME.id,nombre:ME.nombre}:null,reporte:j.reporte,campos:SK_CAMPOS,filas:datos.map(o=>SK_CAMPOS.map(c=>o[c]==null?"":o[c]))};
-    const body=JSON.stringify(snap);
-    const up=await gfetch(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body});const it=await up.json();
-    snap.etag=it.eTag;STOCK=snap;STOCK_ETAG=it.eTag;try{if(IDB.db)await IDB.put("remote","stock/actual",snap)}catch(e){}
-    toast(`Stock actualizado: ${datos.length} registros.`);
+    let path="/stock?ceros=1&compacto=1";
+    if(dep){const o=filas().find(x=>x.DEPOSITO===dep);path+="&nombre="+encodeURIComponent(dep)+(o&&String(o.DEPOSITOID)!==""?"&deposito="+encodeURIComponent(o.DEPOSITOID):"")}
+    const j=await workerFetch(path);
+    const R=stockFilasDe(j,dep);
+    if(!R.length)throw{error:dep?"Finnegans no trajo productos de esta bodega. No se cambió nada.":"Finnegans respondió sin filas de stock."};
+    const hora=j.hora||new Date().toISOString(),por=ME?{id:ME.id,nombre:ME.nombre}:null;
+    await stockGuardar(base=>stockMezclar(base,R,dep,hora,por,j.reporte),!!dep);
+    const nc=R.filter(r=>Math.abs(num(r[5]))<1e-9).length;
+    toast(dep?`Bodega actualizada: ${R.length-nc} con stock y ${nc} en 0.`:`Stock actualizado: ${R.length-nc} con stock y ${nc} en 0.`);
     stockExcel().catch(e=>console.warn("excel stock",e));return true;
   }catch(e){toast(e&&e.error?e.error:"No se pudo actualizar el stock.");return false}
   finally{skCargando=false;render()}
 }
 async function stockExcel(){
   if(!window.XLSX||!STOCK)return;const F=filas();const wb=XLSX.utils.book_new();
-  const h=["Depósito","Código","Producto","Familia","Subfamilia","Rubro","Cantidad","Unidad","Cantidad 2","Unidad 2","Precio unitario","Importe","Moneda","Punto reposición","Bajo reposición","Disponible","Reservado","Partida","Vencimiento"];
-  const rows=[h].concat(F.map(o=>[o.DEPOSITO,o.PRODUCTOCODIGO,o.PRODUCTO,o.FAMILIA,o.SUBFAMILIA,o.RUBRO,o.cant,o.UNIDAD1,num(o.CANTIDAD2)||"",o.UNIDAD2,num(o.PRECIOUNIDADSTOCK1)||"",o.imp,o.MONEDA,o.pr||"",o.bajo?"Sí":"",num(o.STOCKDISPONIBLE)||"",num(o.STOCKRESERVADO)||"",o.PARTIDA,o.PARTIDA_VTO]));
-  const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[22,12,34,16,16,14,10,8,10,8,12,14,8,10,8,10,10,12,12].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:h.length-1}})};
+  const h=["Depósito","Código","Producto","Familia","Subfamilia","Rubro","Cantidad","Unidad","Cantidad 2","Unidad 2","Precio unitario","Importe","Moneda","Punto reposición","Bajo reposición","Disponible","Reservado","Partida","Vencimiento","Stock al"];
+  const rows=[h].concat(F.map(o=>[o.DEPOSITO,o.PRODUCTOCODIGO,o.PRODUCTO,o.FAMILIA,o.SUBFAMILIA,o.RUBRO,o.cant,o.UNIDAD1,num(o.CANTIDAD2)||"",o.UNIDAD2,num(o.PRECIOUNIDADSTOCK1)||"",o.imp,o.MONEDA,o.pr||"",o.bajo?"Sí":"",num(o.STOCKDISPONIBLE)||"",num(o.STOCKRESERVADO)||"",o.PARTIDA,o.PARTIDA_VTO,fmtFecha(horaDep(o.DEPOSITO))]));
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[22,12,34,16,16,14,10,8,10,8,12,14,8,10,8,10,10,12,12,16].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:h.length-1}})};
   XLSX.utils.book_append_sheet(wb,ws,"Stock");
-  const dep={};F.forEach(o=>{const d=dep[o.DEPOSITO]||(dep[o.DEPOSITO]={n:0,imp:0,bajo:0});d.n++;d.imp+=o.imp;if(o.bajo)d.bajo++});
-  const r2=[["Depósito","Productos","Importe total","Bajo punto de reposición"]].concat(Object.entries(dep).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>[k,v.n,v.imp,v.bajo]));
-  r2.push([]);r2.push(["Stock al",fmtFecha(STOCK.hora)]);r2.push(["Actualizado por",STOCK.por?STOCK.por.nombre:""]);
-  const w2=XLSX.utils.aoa_to_sheet(r2);w2["!cols"]=[{wch:28},{wch:10},{wch:16},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Por depósito");
+  const dep={};F.forEach(o=>{const d=dep[o.DEPOSITO]||(dep[o.DEPOSITO]={n:0,c:0,imp:0,bajo:0});if(o.cero)d.c++;else d.n++;d.imp+=o.imp;if(o.bajo)d.bajo++});
+  const porD=k=>((STOCK.porDep&&STOCK.porDep[k])||STOCK.por||{}).nombre||"";
+  const r2=[["Depósito","Productos con stock","Productos en 0","Importe total","Bajo punto de reposición","Actualizado","Actualizado por"]].concat(Object.entries(dep).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>[k,v.n,v.c,v.imp,v.bajo,fmtFecha(horaDep(k)),porD(k)]));
+  r2.push([]);r2.push(["Todas las bodegas al",fmtFecha(horaTodo())]);r2.push(["Última actualización",fmtFecha(STOCK.hora)]);r2.push(["Actualizado por",STOCK.por?STOCK.por.nombre:""]);
+  const w2=XLSX.utils.aoa_to_sheet(r2);w2["!cols"]=[{wch:28},{wch:12},{wch:12},{wch:16},{wch:14},{wch:16},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Por depósito");
   const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   await subirExcel("stock",false,async()=>{const r=await gfetch(`/drives/${M365.drive}/items/${STK.root}:/Stock_Finnegans.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()});
 }
 function fmtFecha(iso){try{const d=new Date(iso);return fmtD(iso)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}catch(e){return iso}}
-function hace_(iso){const m=Math.round((Date.now()-new Date(iso))/60000);if(m<60)return`hace ${m} min`;const h=Math.round(m/60);if(h<48)return`hace ${h} h`;return`hace ${Math.round(h/24)} días`}
+function hace_(iso){const m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return"hace un momento";if(m<60)return`hace ${m} min`;const h=Math.round(m/60);if(h<48)return`hace ${h} h`;return`hace ${Math.round(h/24)} días`} /* v174: «hace un momento» */
+/* v174: cada bodega tiene su fecha (STOCK.horas); un stock.json anterior a la v174 usa la general */
+const horaDep=d=>(STOCK&&((STOCK.horas&&STOCK.horas[d])||STOCK.hora))||"";
+const horaTodo=()=>(STOCK&&(STOCK.horaTodo||STOCK.hora))||"";
+const esHoy=iso=>!!iso&&new Date(iso).toDateString()===new Date().toDateString();
+function frescoTxt(iso){if(!iso)return"";const d=new Date(iso),h=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  return esHoy(iso)?`hoy ${h}`:d.toDateString()===new Date(Date.now()-864e5).toDateString()?`ayer ${h}`:hace_(iso)}
+function frescoChip(d){const h=horaDep(d);return h?`<span class="xp ${esHoy(h)?"ok":"nueva"}">Actualizada ${frescoTxt(h)}</span>`:""}
+/* v174: recuadro con la fecha y el botón: en la pantalla general actualiza todas las bodegas; dentro de una bodega, solo esa */
+function stkSyncHTML(dep){
+  if(!STOCK)return""; /* sin stock guardado (un conteo en curso se puede abrir igual) */
+  const h=dep?horaDep(dep):horaTodo(),car=!!skCargando&&skCargando===(dep||"*");
+  const pd=dep?((STOCK.porDep&&STOCK.porDep[dep])||STOCK.por):(STOCK.horaTodo?STOCK.porTodo:STOCK.por);
+  const btn=puedeActStock()?`<button class="btn pri" data-a="${dep?"stkActDep":"stkAct"}"${dep?` data-d="${esc(dep)}"`:""} ${skCargando||navigator.onLine===false?"disabled":""}>${car?"Consultando Finnegans…":navigator.onLine===false?"Sin señal":dep?"Actualizar esta bodega":"Actualizar todas las bodegas"}</button>`:"";
+  return `<div class="lx-sync sks ${h&&esHoy(h)?"ok":"camb"}"><div class="lx-syncl"><span class="lx-synct">${dep?"Esta bodega":"Todas las bodegas"} al ${fmtFecha(h)}</span><span class="lx-syncs">${hace_(h)}${pd?` · actualizado por ${esc(pd.nombre)}`:""}. ${dep?"Se actualiza solo esta bodega, más rápido.":"Trae todas las bodegas y tarda más; dentro de cada bodega puedes actualizar solo esa."} Se ve sin señal.</span></div>${btn}</div>`;
+}
 
 function renderStock(){
   const head=band("Stock");
@@ -74,8 +132,8 @@ function renderStock(){
   const subs=[...new Set(F.filter(o=>!skFam||nfam(o.FAMILIA)===skFam).map(o=>nfam(o.SUBFAMILIA)).filter(Boolean))].sort(cmpEs);if(skSub&&!subs.includes(skSub))skSub="";
   const q=skQ.trim().toLowerCase();
   const L=F.filter(o=>(!skDep||o.DEPOSITO===skDep)&&(!skFam||nfam(o.FAMILIA)===skFam)&&(!skSub||nfam(o.SUBFAMILIA)===skSub)&&(!q||[o.PRODUCTO,o.PRODUCTOCODIGO,o.FAMILIA,o.SUBFAMILIA,o.DEPOSITO].join(" ").toLowerCase().includes(q)));
+  const Ls=L.filter(o=>!o.cero); /* v174: con stock; los en 0 van aparte */
   const tot=L.reduce((s,o)=>s+o.imp,0),nb=L.filter(o=>o.bajo).length;
-  const edad=(Date.now()-new Date(STOCK.hora))/3600000;
   const filtros=`<div class="skf c4">
     <div class="f"><label for="skDep">Depósito</label><select id="skDep" data-sk="dep"><option value="">Todos (${deps.length})</option>${deps.map(d=>`<option ${d===skDep?"selected":""}>${esc(d)}</option>`).join("")}</select></div>
     <div class="f"><label for="skFam">Familia</label><select id="skFam" data-sk="fam"><option value="">Todas</option>${fams.map(d=>`<option ${d===skFam?"selected":""}>${esc(d)}</option>`).join("")}</select></div>
@@ -83,23 +141,32 @@ function renderStock(){
     <div class="f"><label for="skQ">Buscar</label><input id="skQ" type="search" data-sk="q" value="${esc(skQ)}" placeholder="Producto o código"></div></div>
     <div class="filt"><button class="fb" data-a="stkModo" data-m="dep" aria-pressed="${skModo==="dep"}">Por depósito</button><button class="fb" data-a="stkModo" data-m="prod" aria-pressed="${skModo==="prod"}">Por producto</button><button class="fb" data-a="stkModo" data-m="bajo" aria-pressed="${skModo==="bajo"}">Bajo reposición${F.some(o=>o.bajo)?` (${F.filter(o=>o.bajo).length})`:""}</button></div>`;
   let cuerpo="";
-  const fila=(o,conDep)=>`<div class="skr${o.bajo?" bajo":""}"><div class="skn"><b>${esc(o.PRODUCTO)}</b><span>${esc(o.PRODUCTOCODIGO)}${conDep?` · ${esc(o.DEPOSITO)}`:""}${o.PARTIDA?` · Partida ${esc(o.PARTIDA)}`:""}${o.PARTIDA_VTO?` · vence ${esc(fmtD(String(o.PARTIDA_VTO).slice(0,10)))}`:""}</span>${o.bajo?`<span class="xp camb">Bajo punto de reposición (${fmtN(o.pr)})</span>`:""}</div><div class="skv"><b>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")}</b><span>${fmtP(o.imp)}</span></div></div>`;
+  const fila=(o,conDep)=>`<div class="skr${o.bajo?" bajo":""}${o.cero?" cero":""}"><div class="skn"><b>${esc(o.PRODUCTO)}</b><span>${esc(o.PRODUCTOCODIGO)}${conDep?` · ${esc(o.DEPOSITO)}`:""}${o.PARTIDA?` · Partida ${esc(o.PARTIDA)}`:""}${o.PARTIDA_VTO?` · vence ${esc(fmtD(String(o.PARTIDA_VTO).slice(0,10)))}`:""}</span>${o.bajo?`<span class="xp camb">Bajo punto de reposición (${fmtN(o.pr)})</span>`:""}</div><div class="skv"><b>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")}</b><span>${o.cero?"Sin stock":fmtP(o.imp)}</span></div></div>`;
+  const ordP=(a,b)=>String(a.PRODUCTO).localeCompare(String(b.PRODUCTO));
   if(skModo==="dep"&&!skDep&&!q){
-    const g={};L.forEach(o=>{const d=g[o.DEPOSITO]||(g[o.DEPOSITO]={n:0,imp:0,bajo:0});d.n++;d.imp+=o.imp;if(o.bajo)d.bajo++});
-    cuerpo=`<div class="list">${Object.entries(g).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>`<button class="bod" data-a="stkDep" data-d="${esc(k)}"><span class="bodn">${esc(k)}</span><span class="bodm">${esc(v.n)} ${v.n===1?"producto":"productos"} · <b>${fmtP(v.imp)}</b></span>${v.bajo?`<span class="bodc"><span class="xp camb">${v.bajo} bajo reposición</span></span>`:""}${ICO.arrow}</button>`).join("")}</div>`;
+    const g={};L.forEach(o=>{const d=g[o.DEPOSITO]||(g[o.DEPOSITO]={n:0,c:0,imp:0,bajo:0});if(o.cero)d.c++;else d.n++;d.imp+=o.imp;if(o.bajo)d.bajo++});
+    cuerpo=`<div class="list">${Object.entries(g).sort((a,b)=>b[1].imp-a[1].imp).map(([k,v])=>`<button class="bod" data-a="stkDep" data-d="${esc(k)}"><span class="bodn">${esc(k)}</span><span class="bodm">${esc(v.n)} ${v.n===1?"producto":"productos"}${v.c?` y ${esc(v.c)} en 0`:""} · <b>${fmtP(v.imp)}</b></span><span class="bodc">${frescoChip(k)}${v.bajo?`<span class="xp camb">${v.bajo} bajo reposición</span>`:""}</span>${ICO.arrow}</button>`).join("")}</div>`;
   }else if(skModo==="prod"){
     const g={};L.forEach(o=>{const k=o.PRODUCTOCODIGO||o.PRODUCTO;const p=g[k]||(g[k]={o,cant:0,imp:0,deps:[]});p.cant+=o.cant;p.imp+=o.imp;p.deps.push(o)});
     const P=Object.values(g).sort((a,b)=>String(a.o.PRODUCTO).localeCompare(String(b.o.PRODUCTO)));
-    cuerpo=P.slice(0,skLim).map(p=>`<details class="skp"><summary><div class="skn"><b>${esc(p.o.PRODUCTO)}</b><span>${esc(p.o.PRODUCTOCODIGO)} · ${p.deps.length} ${p.deps.length===1?"depósito":"depósitos"}</span></div><div class="skv"><b>${fmtN(p.cant)} ${esc(p.o.UNIDAD1||"")}</b><span>${fmtP(p.imp)}</span></div></summary>${p.deps.sort((a,b)=>b.cant-a.cant).map(o=>`<div class="skd"><span>${esc(o.DEPOSITO)}</span><span>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")} · ${fmtP(o.imp)}</span></div>`).join("")}</details>`).join("")+(P.length>skLim?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más (${P.length-skLim})</button></div>`:"");
-  }else{
-    const LL=(skModo==="bajo"?L.filter(o=>o.bajo):L).slice().sort((a,b)=>String(a.PRODUCTO).localeCompare(String(b.PRODUCTO)));
+    const nds=p=>{const n=p.deps.filter(o=>!o.cero).length;return n?`${n} ${n===1?"depósito":"depósitos"}`:"sin stock"};
+    cuerpo=P.slice(0,skLim).map(p=>`<details class="skp"><summary><div class="skn"><b>${esc(p.o.PRODUCTO)}</b><span>${esc(p.o.PRODUCTOCODIGO)} · ${nds(p)}</span></div><div class="skv"><b>${fmtN(p.cant)} ${esc(p.o.UNIDAD1||"")}</b><span>${fmtP(p.imp)}</span></div></summary>${p.deps.sort((a,b)=>b.cant-a.cant).map(o=>`<div class="skd"><span>${esc(o.DEPOSITO)}</span><span>${fmtN(o.cant)} ${esc(o.UNIDAD1||"")} · ${o.cero?"sin stock":fmtP(o.imp)}</span></div>`).join("")}</details>`).join("")+(P.length>skLim?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más (${P.length-skLim})</button></div>`:"");
+  }else if(skModo==="bajo"){
+    const LL=L.filter(o=>o.bajo).sort(ordP);
     cuerpo=(LL.length?LL.slice(0,skLim).map(o=>fila(o,!skDep)).join(""):`<div class="empty">Nada que mostrar con estos filtros.</div>`)+(LL.length>skLim?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más (${LL.length-skLim})</button></div>`:"");
+  }else{
+    /* v174: primero lo que tiene stock; al final, los productos en 0 */
+    const LL=Ls.slice().sort(ordP),Z=L.filter(o=>o.cero).sort(ordP),mas=Math.max(LL.length,Z.length)>skLim;
+    cuerpo=(LL.length?LL.slice(0,skLim).map(o=>fila(o,!skDep)).join(""):Z.length?"":`<div class="empty">Nada que mostrar con estos filtros.</div>`)
+      +(Z.length?`<h2 class="skzh">En 0 en el sistema<span class="cnt">${Z.length}</span></h2><p class="note" style="margin-top:0">Productos que ${skDep?"esta bodega ha tenido":"han tenido las bodegas"} y que hoy figuran sin stock en Finnegans. Si encuentras alguno, puede faltar registrar una recepción.</p>${Z.slice(0,skLim).map(o=>fila(o,!skDep)).join("")}`:"")
+      +(mas?`<div class="btns"><button class="btn" data-a="stkMas">Mostrar más</button></div>`:"");
   }
   return head+`<main class="wrap">
+    ${skDep?`<button class="mini skvolver" data-a="stkTodos">‹ Todas las bodegas</button>`:""}
     <h1>Stock${skDep?` · ${esc(skDep)}`:""}</h1>
-    <div class="lx-sync sks ${edad>48?"camb":"ok"}"><div class="lx-syncl"><span class="lx-synct">Stock al ${fmtFecha(STOCK.hora)}</span><span class="lx-syncs">${hace_(STOCK.hora)}${STOCK.por?` · actualizado por ${esc(STOCK.por.nombre)}`:""}. Se ve sin señal.</span></div>${act}</div>
+    ${stkSyncHTML(skDep)}
     ${filtros}
-    <div class="lx-stats" style="margin-top:12px"><div><b>${fmtP(tot)}</b><span>valor en stock</span></div><div><b>${fmtN(new Set(L.map(o=>o.PRODUCTOCODIGO)).size,0)}</b><span>productos</span></div><div class="${nb?"warn":""}"><b>${nb}</b><span>bajo reposición</span></div></div>
+    <div class="lx-stats" style="margin-top:12px"><div><b>${fmtP(tot)}</b><span>valor en stock</span></div><div><b>${fmtN(new Set(Ls.map(o=>o.PRODUCTOCODIGO)).size,0)}</b><span>productos con stock</span></div><div class="${nb?"warn":""}"><b>${nb}</b><span>bajo reposición</span></div></div>
     <div style="margin-top:14px">${cuerpo}</div>
     <p class="note">El Excel <b>Stock_Finnegans.xlsx</b> en la carpeta <b>Apps de terreno / Stock</b> de OneDrive se regenera en cada actualización. Valores a precio de costo según Finnegans.</p>
   </main>`;
@@ -107,6 +174,8 @@ function renderStock(){
 async function stkClick(A,b){
   if(A==="stock"){skLim=150;go("stock");return true}
   if(A==="stkAct"){await stockActualizar();return true}
+  if(A==="stkActDep"){await stockActualizar(false,b.dataset.d);return true} /* v174 */
+  if(A==="stkTodos"){skDep="";skModo="dep";skLim=150;render();window.scrollTo(0,0);return true}
   if(A==="stkModo"){skModo=b.dataset.m;skLim=150;render();return true}
   if(A==="stkDep"){skDep=b.dataset.d;skModo="lista";skLim=150;render();window.scrollTo(0,0);return true}
   if(A==="stkMas"){skLim+=300;render();return true}
@@ -143,7 +212,11 @@ function cbTouch(){if(!cbv)return;cbv.actualizado=new Date().toISOString();if(ME
 /* Líneas del conteo: copia del stock del sistema al momento de iniciar + productos agregados a mano */
 function nuevoConteo(dep,op){
   op=op||{};const fams=op.familias&&op.familias.length?new Set(op.familias):null;
-  const base=filas().filter(o=>o.DEPOSITO===dep&&(!fams||fams.has(o.FAMILIA||"")));
+  const base=filasSt().filter(o=>o.DEPOSITO===dep&&(!fams||fams.has(o.FAMILIA||"")));
+  /* v174: productos en 0 de la bodega (se agregan con «Lo encontré» si aparecen); uno por producto, sin los que tienen stock en otra partida */
+  const vistos=new Set(base.map(o=>o.PRODUCTOCODIGO||o.PRODUCTO)),ceros=[];
+  filas().forEach(o=>{if(!o.cero||o.DEPOSITO!==dep||(fams&&!fams.has(o.FAMILIA||"")))return;const k=o.PRODUCTOCODIGO||o.PRODUCTO;if(vistos.has(k))return;vistos.add(k);
+    ceros.push({id:o.PRODUCTOID||"",cod:o.PRODUCTOCODIGO||"",prod:o.PRODUCTO,fam:o.FAMILIA||"",sub:nfam(o.SUBFAMILIA),un:o.UNIDAD1||"",pu:num(o.PRECIOUNIDADSTOCK1)||0})});
   const lineas={};
   if(op.porPartida){base.forEach((o,i)=>{let k="p"+(o.PRODUCTOID||o.PRODUCTOCODIGO||i)+(o.PARTIDA?"-"+o.PARTIDA:"");k=k.replace(/[^\w-]/g,"_");if(lineas[k])k+="_"+i;lineas[k]={k,cod:o.PRODUCTOCODIGO,prod:o.PRODUCTO,fam:o.FAMILIA||"",sub:nfam(o.SUBFAMILIA),un:o.UNIDAD1||"",un2:o.UNIDAD2||"",sis:o.cant,sis2:num(o.CANTIDAD2),pu:num(o.PRECIOUNIDADSTOCK1)||(o.cant?o.imp/o.cant:0),partida:o.PARTIDA||"",vto:o.PARTIDA_VTO||"",orden:i}})}
   else{/* una línea por producto: las partidas se suman y quedan como detalle */
@@ -151,7 +224,7 @@ function nuevoConteo(dep,op){
       l.sis+=o.cant;l.sis2+=num(o.CANTIDAD2);l.imp+=o.imp;if(o.PARTIDA)l.partidas.push({p:o.PARTIDA,c:o.cant,v:o.PARTIDA_VTO||""})});
     Object.values(lineas).forEach(l=>{l.pu=l.sis?l.imp/l.sis:0;delete l.imp;if(l.partidas&&!l.partidas.length)delete l.partidas})}
   const prev=conteosDe(dep).filter(c=>!c.anulado);const n=(prev.length?Math.max(...prev.map(c=>c.n||0)):0)+1;
-  return{id:uid(),_col:"conteos",bodega:dep,n,fecha:today(),responsable:ME?ME.nombre:"",acompanante:"",estado:"abierto",ciego:!!op.ciego,porPartida:!!op.porPartida,tol:op.tol==null?2:+op.tol,familias:fams?[...fams]:null,stockAl:STOCK?STOCK.hora:"",lineas,items:{},creadoPor:yo(),creado:new Date().toISOString(),actualizado:new Date().toISOString()};
+  return{id:uid(),_col:"conteos",bodega:dep,n,fecha:today(),responsable:ME?ME.nombre:"",acompanante:"",estado:"abierto",ciego:!!op.ciego,porPartida:!!op.porPartida,tol:op.tol==null?2:+op.tol,familias:fams?[...fams]:null,stockAl:horaDep(dep),lineas,ceros,items:{},creadoPor:yo(),creado:new Date().toISOString(),actualizado:new Date().toISOString()};
 }
 /* tolerancia: una diferencia menor al % definido se informa pero no cuenta como discrepancia */
 function enTol(c,l,d){if(d===null||Math.abs(d)<1e-9)return true;const t=c.tol==null?2:+c.tol;if(!t)return false;const base=l.sis||0;return base>0&&Math.abs(d)/base*100<=t}
@@ -177,15 +250,14 @@ function recurrentes(dep){
 function renderCB(){
   const head=band("Control de bodega");
   if(!STOCK)return head+`<main class="wrap"><h1>Control de bodega</h1><div class="empty">Para contar una bodega primero hay que traer el stock desde Finnegans (sección Stock).</div><div class="btns"><button class="btn pri" data-a="stock">Ir a Stock</button></div></main>`;
-  const F=filas();const deps=[...new Set(F.map(o=>o.DEPOSITO))].sort((a,b)=>String(a).localeCompare(String(b)));
-  const edad=(Date.now()-new Date(STOCK.hora))/3600000;
-  const cards=deps.map(d=>{const ab=conteoAbierto(d),cs=conteosDe(d).filter(c=>c.estado==="cerrado"&&!c.anulado),u=cs[0],np=F.filter(o=>o.DEPOSITO===d).length;
+  const F=filas(),FS=filasSt();const deps=[...new Set(F.map(o=>o.DEPOSITO))].sort((a,b)=>String(a).localeCompare(String(b)));
+  const cards=deps.map(d=>{const ab=conteoAbierto(d),cs=conteosDe(d).filter(c=>c.estado==="cerrado"&&!c.anulado),u=cs[0],np=FS.filter(o=>o.DEPOSITO===d).length;
     const r=u?resumenConteo(u):null;
-    return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(d)}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${ab?`<span class="xp camb">Conteo ${esc(ab.n)} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
+    return `<button class="bod" data-a="cbBod" data-d="${esc(d)}"><span class="bodn">${esc(d)}</span><span class="bodm">${np} ${np===1?"producto":"productos"} en sistema${u?` · último conteo ${fmtD(u.fecha)}`:""}</span><span class="bodc">${frescoChip(d)}${ab?`<span class="xp camb">Conteo ${esc(ab.n)} en curso</span>`:u?`<span class="xp ok">${cs.length} ${cs.length===1?"conteo":"conteos"}</span>`:`<span class="xp" style="background:var(--soft);color:var(--muted)">Sin conteos</span>`}${r?`<span class="xp ${r.exact>=95?"ok":"nueva"}">${r.exact}% exacto</span>${r.dif?`<span class="xp camb">${r.dif} con diferencia</span>`:""}`:""}</span>${ICO.arrow}</button>`}).join("");
   return head+`<main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Control de bodega</h1>
     <p class="lead">Elige la bodega, revisa producto por producto y anota la cantidad que encuentras. Al cerrar, la app compara con el stock del sistema y genera el informe.</p>
-    ${edad>24?`<div class="info netbox">El stock del sistema es del <b>${fmtFecha(STOCK.hora)}</b> (${hace_(STOCK.hora)}). ${puedeActStock()?"Conviene actualizarlo antes de empezar un conteo.":"Pide que lo actualicen antes de empezar, para comparar con datos recientes."}${puedeActStock()?`<div class="btns" style="margin-top:8px"><button class="btn" data-a="stkAct" ${navigator.onLine===false?"disabled":""}>Actualizar stock ahora</button></div>`:""}</div>`:`<p class="note" style="margin-top:0">Stock del sistema al ${fmtFecha(STOCK.hora)}.</p>`}
+    ${stkSyncHTML("")}
     <div class="list">${cards}</div>
   </main>`;
 }
@@ -199,8 +271,9 @@ function renderCBBod(){
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="cb">Bodegas</button><div class="ttl">${esc(d)}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(d)}</h1>
-    <div class="start" style="grid-template-columns:1fr">${ab?`<button class="big dev" data-a="cbAbrir" data-id="${esc(ab.id)}"><strong>Continuar conteo ${esc(ab.n)}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
-      :`<button class="big ent" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${filas().filter(o=>o.DEPOSITO===d).length} productos según el stock del ${fmtFecha(STOCK.hora)}</span></button>`}</div>
+    ${stkSyncHTML(d)}
+    <div class="start" style="grid-template-columns:1fr;margin-top:12px">${ab?`<button class="big dev" data-a="cbAbrir" data-id="${esc(ab.id)}"><strong>Continuar conteo ${esc(ab.n)}</strong><span>Iniciado el ${fmtD(ab.fecha)} por ${esc(ab.responsable||"")} · ${resumenConteo(ab).cont} de ${resumenConteo(ab).total} contados</span></button>`
+      :`<button class="big ent" data-a="cbNuevo" data-d="${esc(d)}"><strong>Nuevo conteo</strong><span>${filasSt().filter(o=>o.DEPOSITO===d).length} productos según el stock del ${fmtFecha(horaDep(d))}</span></button>`}</div>
     ${(()=>{const rc=recurrentes(d);if(!rc.length)return"";return`<h2>Diferencias recurrentes<span class="cnt">${rc.length}</span></h2><p class="note" style="margin-top:0">Productos con discrepancia en al menos 2 de los últimos 3 conteos. Suele indicar un problema de registro o de manejo, no un error de conteo.</p>${rc.map(x=>`<div class="skr"><div class="skn"><b>${esc(x.prod)}</b><span>${esc(x.cod||"")} · en ${x.n} conteos</span></div><div class="skv"><b>${x.ult.d<0?"Faltaban":"Sobraban"} ${fmtN(Math.abs(x.ult.d))} ${esc(x.ult.un)}</b><span>conteo ${x.ult.c}</span></div></div>`).join("")}`})()}
     <h2>Conteos<span class="cnt">${cs.length}</span></h2>${cs.length?`${disTip("mncb",`En el «⋯» de cada conteo está el informe PDF${esAdmin()?", anular y restaurar":" y eliminar los que están en curso"}. En el teléfono también puedes deslizar la fila hacia la izquierda.`)}`:""}
     <div class="list">${filas_||`<div class="empty">Todavía no hay conteos en esta bodega.</div>`}</div>
@@ -216,7 +289,7 @@ function cbLineaHTML(l){
   const fs=l.manual?"":[!cbFam?famDeLinea(l):"",!cbSub?subDeLinea(l):""].filter(Boolean).join(" · ");
   const meta=[fs,l.partida?`Partida ${l.partida}${l.vto?` · vence ${fmtD(String(l.vto).slice(0,10))}`:""}`:l.partidas&&l.partidas.length?`${l.partidas.length} partidas${vtos.length?` · vence ${fmtD(String(vtos[0]).slice(0,10))}${vtos.length>1?" y otras":""}`:""}`:"",l.sis2&&l.un2&&l.un2!==l.un&&mostrarSis?`${fmtN(l.sis2)} ${l.un2}`:""].filter(Boolean).join(" · ");
   return `<div class="it cbl ${est}" id="cbl-${esc(l.k)}">
-    <div class="cbh"><span class="cod">${esc(l.cod||"")}</span>${l.manual?'<span class="xp camb">Agregado en terreno</span>':""}</div>
+    <div class="cbh"><span class="cod">${esc(l.cod||"")}</span>${l.manual?'<span class="xp camb">Agregado en terreno</span>':""}${l.cero?`<span class="xp camb">${c.ciego&&!ro?"Agregado al encontrarlo":"En 0 en el sistema"}</span>`:""}${l.cero&&!ro&&o===null&&!(r.fotos||[]).length?`<button class="mini cbquitar" data-a="cbQuitar" data-k="${esc(l.k)}">Quitar</button>`:""}</div>
     <div class="txt">${esc(l.prod)}</div>
     ${meta?`<div class="ref">${esc(meta)}</div>`:""}
     <div class="cbsys">${mostrarSis?`Sistema: <b>${fmtN(l.sis||0)} ${esc(l.un)}</b>`:"Cantidad del sistema oculta (conteo ciego)"}</div>
@@ -262,12 +335,23 @@ function renderCBV(){
       const norm=vis.filter(l=>!l.manual),man=vis.filter(l=>l.manual),tit=cbSub?`${cbFam?cbFam+" · ":""}${cbSub}`:cbFam||"Productos de la A a la Z";
       return (norm.length?`<section class="sec"><h3>${esc(tit)}<span class="cnt">${L.filter(l=>!l.manual).length}</span></h3>${norm.map(cbLineaHTML).join("")}</section>`:"")+(man.length?`<section class="sec"><h3>Agregados en terreno<span class="cnt">${man.length}</span></h3>${man.map(cbLineaHTML).join("")}</section>`:"")})()}
     ${L.length>cbLim?`<div class="btns"><button class="btn" data-a="cbMas">Mostrar más (${L.length-cbLim})</button></div>`:""}
+    ${ro?"":cbCerosHTML(q)}
     ${ro?"":`<div class="btns"><button class="btn" data-a="cbNuevoProd">+ Producto que no está en la lista</button></div>`}
     <div class="btns">${ro?`<button class="btn pri" data-a="cbPdf" data-id="${esc(c.id)}" style="flex:1">Informe PDF</button>`:`<button class="btn" data-a="cbPdf" data-id="${esc(c.id)}">Informe (borrador)</button><button class="btn pri" data-a="cbCerrar" style="flex:1">Cerrar conteo</button>`}</div>
     ${ro?"":`<div class="btns" style="margin-top:10px"><button class="btn" data-a="cbDel" data-id="${esc(c.id)}" style="border-color:var(--m-ink);color:var(--m-ink)">Eliminar este conteo</button></div><p class="note">Para salir sin cerrar usa ‹ ${esc(c.bodega)} arriba; el conteo queda en curso.</p>`}
   </main>`;
 }
 let cbNuevoProd=null;
+/* v174: productos que el sistema tiene en 0 en esta bodega (copiados al iniciar el conteo, c.ceros). No van en «Por contar»;
+   con «Lo encontré» pasan al conteo con sistema 0. En un conteo ciego no se dice que están en 0 */
+function cbCerosHTML(q){
+  const c=cbv,ya=new Set(Object.values(c.lineas||{}).map(l=>l.cod||l.prod));
+  const Z=(c.ceros||[]).map((z,i)=>Object.assign({i},z)).filter(z=>!ya.has(z.cod||z.prod)&&(!cbFam||(nfam(z.fam)||"Sin familia")===cbFam)&&(!cbSub||nfam(z.sub)===cbSub)&&(!q||[z.prod,z.cod,z.fam,z.sub].join(" ").toLowerCase().includes(q)));
+  if(!Z.length)return"";
+  return `<details class="cbz"${q?" open":""}><summary><b>${c.ciego?"Otros productos de esta bodega":"En 0 en el sistema"}</b><span class="cnt">${Z.length}</span></summary>
+    <p class="note" style="margin:0 0 8px">${c.ciego?"Productos que esta bodega ha tenido y que no están en la lista.":"Productos que esta bodega ha tenido y que hoy figuran sin stock."} Si encuentras alguno, tócalo para agregarlo al conteo${c.ciego?".":"; la diferencia puede indicar una recepción sin registrar."}</p>
+    ${Z.slice(0,cbLim).map(z=>`<button class="cbzr" data-a="cbCero" data-i="${z.i}"><span class="skn"><b>${esc(z.prod)}</b><span>${esc([z.cod,nfam(z.fam)].filter(Boolean).join(" · "))}</span></span><span class="mini">Lo encontré</span></button>`).join("")}</details>`;
+}
 const CB_OPTS={fams:null,tol:2,part:false,ciego:false};
 function cbRefresh(k){sinPerderFoco(()=>{if(view!=="cbv"||!cbv)return;const l=(cbv.lineas||{})[k];const el=$("#cbl-"+CSS.escape(k));try{if(el&&l&&el.isConnected)el.outerHTML=cbLineaHTML(l)}catch(e){}const p=$("#cbprog");try{if(p&&p.isConnected)p.outerHTML=cbProgHTML()}catch(e){}})}
 
@@ -278,16 +362,16 @@ async function cbClick(A,b){
   if(A==="cbBodBack"){await flush();cbv=null;go("cbb");return true}
   if(A==="cbNuevo"){const d=b.dataset.d;if(conteoAbierto(d)){toast("Ya hay un conteo en curso en esta bodega.");return true}
     /* 1) stock al día: si hay señal y permiso, se actualiza antes de copiar la lista */
-    if(navigator.onLine!==false&&puedeActStock()&&STOCK&&(Date.now()-new Date(STOCK.hora))/3600000>1){toast("Actualizando el stock antes de empezar…");await stockActualizar(true)}
+    if(navigator.onLine!==false&&puedeActStock()&&STOCK&&(Date.now()-new Date(horaDep(d)))/3600000>1){toast("Actualizando el stock de esta bodega antes de empezar…");await stockActualizar(true,d)} /* v174: solo esa bodega */
     /* 2) opciones del conteo */
-    const F=filas().filter(o=>o.DEPOSITO===d);const fams=[...new Set(F.map(o=>o.FAMILIA||"").filter(Boolean))].sort();const nPart=F.filter(o=>o.PARTIDA).length;
+    const F=filasSt().filter(o=>o.DEPOSITO===d);const fams=[...new Set(F.map(o=>o.FAMILIA||"").filter(Boolean))].sort();const nPart=F.filter(o=>o.PARTIDA).length;
     CB_OPTS.fams=null;CB_OPTS.tol=2;CB_OPTS.part=false;CB_OPTS.ciego=false;
     const extra=`<div class="f"><label>Alcance</label><div class="filt" style="margin:4px 0 0" id="cbFams"><button type="button" class="fb" data-fam="" aria-pressed="true">Toda la bodega (${F.length})</button>${fams.map(f=>`<button type="button" class="fb" data-fam="${esc(f)}" aria-pressed="false">${esc(f)} (${F.filter(o=>(o.FAMILIA||"")===f).length})</button>`).join("")}</div><p class="note" style="margin:6px 0 0">Para un conteo cíclico elige una o más familias; el resto no se informa como "sin contar".</p></div>
       <div class="f" style="margin-top:10px"><label for="cbTol">Tolerancia (%)</label><input id="cbTol" type="number" inputmode="decimal" min="0" max="20" step="0.5" value="2" style="max-width:120px"><p class="note" style="margin:6px 0 0">Diferencias menores a este porcentaje se informan pero no cuentan como discrepancia (mermas normales de pesaje).</p></div>
       ${nPart?`<label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:14px"><input type="checkbox" id="cbPart" style="margin-top:3px"> Contar por partida / lote (${nPart} partidas). Si no, se cuenta por producto y las partidas quedan como detalle.</label>`:""}
       <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px"><input type="checkbox" id="cbCiego" style="margin-top:3px"> Conteo ciego: ocultar la cantidad del sistema mientras se cuenta</label>`;
     let sel=new Set();
-    const ok=await ask(`Nuevo conteo · ${d}`,`Stock del sistema al ${fmtFecha(STOCK.hora)}. Conviene que no haya movimientos de bodega mientras se cuenta.`,"Iniciar conteo",false,extra);
+    const ok=await ask(`Nuevo conteo · ${d}`,`Stock del sistema al ${fmtFecha(horaDep(d))}. Conviene que no haya movimientos de bodega mientras se cuenta.`,"Iniciar conteo",false,extra);
     if(!ok)return true;
     const op={familias:CB_OPTS.fams,tol:CB_OPTS.tol,porPartida:CB_OPTS.part,ciego:CB_OPTS.ciego};
     const c=nuevoConteo(d,op);if(!Object.keys(c.lineas).length&&!(await ask("No hay productos en ese alcance","Puedes iniciar el conteo igual y agregar a mano lo que encuentres.","Iniciar")))return true;
@@ -298,6 +382,12 @@ async function cbClick(A,b){
   if(A==="cbMas"){cbLim+=200;render();return true}
   if(A==="cbIgual"){if(cbRO())return true;const k=b.dataset.k,l=cbv.lineas[k];const r=cbv.items[k]||{};r.obs=String(l.sis||0).replace(".",",");cbv.items[k]=r;/* v129: con coma decimal, como se escribe a mano (el punto es de miles) */cbTouch();cbRefresh(k);return true}
   if(A==="cbNuevoProd"){cbNuevoProd={};render();setTimeout(()=>{const e=$("[data-cbn=prod]");if(e){e.focus();e.scrollIntoView({block:"center"})}},50);return true}
+  if(A==="cbCero"){if(cbRO())return true;const z=(cbv.ceros||[])[+b.dataset.i];if(!z)return true; /* v174 */
+    let k=("z"+(z.id||z.cod||uid())).replace(/[^\w-]/g,"_");if(cbv.lineas[k])k+="_"+uid();
+    cbv.lineas[k]={k,cod:z.cod||"",prod:z.prod,fam:z.fam||"",sub:z.sub||"",un:z.un||"",sis:0,pu:z.pu||0,cero:true,orden:9000};
+    if(cbFiltro!=="all")cbFiltro="pend";cbTouch();render();
+    setTimeout(()=>{const e=$("#cbo-"+CSS.escape(k));if(e){e.scrollIntoView({block:"center"});e.focus()}},60);return true}
+  if(A==="cbQuitar"){if(cbRO())return true;const k=b.dataset.k,l=(cbv.lineas||{})[k];if(!l||!l.cero)return true;delete cbv.lineas[k];if(cbv.items)delete cbv.items[k];cbTouch();render();return true}
   if(A==="cbNuevoCancel"){cbNuevoProd=null;render();return true}
   if(A==="cbNuevoAdd"){const n=cbNuevoProd||{};if(!(n.prod||"").trim()){toast("Escribe el nombre del producto.");return true}
     const k="m"+uid();cbv.lineas[k]={k,cod:(n.cod||"").trim(),prod:n.prod.trim(),fam:"",un:(n.un||"").trim(),sis:0,pu:0,manual:true,orden:9999};cbNuevoProd=null;cbFiltro="all";cbQ="";cbTouch();render();
@@ -368,7 +458,7 @@ async function cbSubir(segs,name,blob,type){const f=await cbCarpeta(segs);return
 function cbXlsx(c){
   const wb=XLSX.utils.book_new();const L=lineasDe(c);const R=resumenConteo(c);
   const rows=[["Código","Producto","Familia","Partida","Unidad","Sistema","Observado","Diferencia","Precio unitario","Valor diferencia","Estado","Comentario","Fotos"]];
-  L.forEach(l=>{const r=(c.items||{})[l.k]||{},o=obsDe(c,l.k),d=difDe(c,l);rows.push([l.cod,l.prod,l.fam,l.partida,l.un,l.sis||0,o===null?"":o,d===null?"":d,l.pu||"",d===null?"":Math.round(d*(l.pu||0)),o===null?"Sin contar":Math.abs(d)<1e-9?"Coincide":enTol(c,l,d)?"Dentro de tolerancia":d<0?"Faltante":"Sobrante",(l.manual?"[Agregado en terreno] ":"")+(r.com||""),(r.fotos||[]).map(f=>c.fotoUrl&&c.fotoUrl[f]||"").filter(Boolean).join(" ")])});
+  L.forEach(l=>{const r=(c.items||{})[l.k]||{},o=obsDe(c,l.k),d=difDe(c,l);rows.push([l.cod,l.prod,l.fam,l.partida,l.un,l.sis||0,o===null?"":o,d===null?"":d,l.pu||"",d===null?"":Math.round(d*(l.pu||0)),o===null?"Sin contar":Math.abs(d)<1e-9?"Coincide":enTol(c,l,d)?"Dentro de tolerancia":d<0?"Faltante":"Sobrante",(l.manual?"[Agregado en terreno] ":l.cero?"[En 0 en el sistema] ":"")+(r.com||""),(r.fotos||[]).map(f=>c.fotoUrl&&c.fotoUrl[f]||"").filter(Boolean).join(" ")])});
   const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[12,34,16,12,8,10,10,10,12,14,12,40,30].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:12}})};XLSX.utils.book_append_sheet(wb,ws,"Conteo");
   const res=[["Bodega",c.bodega],["Conteo",c.n],["Fecha",fmtD(c.fecha)],["Responsable",c.responsable||""],["Acompañante",c.acompanante||""],["Stock del sistema al",fmtFecha(c.stockAl)],["Conteo ciego",c.ciego?"Sí":"No"],["Por partida",c.porPartida?"Sí":"No"],["Tolerancia",(c.tol==null?2:c.tol)+" %"],["Alcance",c.familias?c.familias.join(", "):"Toda la bodega"],["Inicio",fmtFecha(c.creado)],["Término",c.cerrado?fmtFecha(c.actualizado):""],[],["Productos en lista",R.total],["Contados",R.cont],["Sin contar",R.total-R.cont],["Coinciden",R.ok],["Dentro de tolerancia",R.tol],["Con faltante",R.falt],["Con sobrante",R.sobr],["Exactitud",R.exact===null?"":R.exact/100],["Valor faltante",Math.round(R.vf)],["Valor sobrante",Math.round(R.vs)],["Diferencia neta",Math.round(R.neto)]];
   const w2=XLSX.utils.aoa_to_sheet(res);w2["!cols"]=[{wch:22},{wch:30}];res.forEach((r,i)=>{if(r[0]==="Exactitud"){const ex=w2["B"+(i+1)];if(ex&&typeof ex.v==="number")ex.z="0%"}});XLSX.utils.book_append_sheet(wb,w2,"Resumen");
@@ -399,7 +489,7 @@ async function cbPdf(c,subir){
   const cols=[{t:"Código",w:20},{t:"Producto",w:58},{t:"Un.",w:12},{t:"Sistema",w:20,r:1},{t:"Observado",w:20,r:1},{t:"Dif.",w:18,r:1},{t:"Valor dif.",w:32,r:1}];
   const headT=()=>{chk(8);d.setFillColor(221,235,247);d.rect(X,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);let x=X;cols.forEach(cc=>{d.text(cc.t,cc.r?x+cc.w-1.5:x+1.5,y,cc.r?{align:"right"}:undefined);x+=cc.w});d.setFont("helvetica","normal");y+=6};
   const filaT=(l,soloDif)=>{const r=(c.items||{})[l.k]||{},o=obsDe(c,l.k),df=difDe(c,l);
-    const prodL=d.splitTextToSize(l.prod+(l.manual?" (agregado)":""),cols[1].w-3);const h=Math.max(5.2,prodL.length*4)+(r.com?4.5:0);chk(h+1);if(y+h>282){nueva();headT()}
+    const prodL=d.splitTextToSize(l.prod+(l.manual?" (agregado)":l.cero?" (en 0 en el sistema)":""),cols[1].w-3);const h=Math.max(5.2,prodL.length*4)+(r.com?4.5:0);chk(h+1);if(y+h>282){nueva();headT()}
     if(df!==null&&Math.abs(df)>=1e-9){d.setFillColor(...(df<0?[250,228,228]:[236,230,206]));d.rect(X,y-3.8,W,h,"F")}
     let x=X;d.setFontSize(8.5);const v=[l.cod||"",null,l.un||"",fmtN(l.sis||0),o===null?"—":fmtN(o),df===null?"":(df>0?"+":"")+fmtN(df),df===null||!l.pu?"":fmtP(df*l.pu)];
     cols.forEach((cc,i)=>{if(i===1)d.text(prodL,x+1.5,y);else d.text(String(v[i]),cc.r?x+cc.w-1.5:x+1.5,y,cc.r?{align:"right"}:undefined);x+=cc.w});
@@ -421,4 +511,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="173"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="174"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
