@@ -1346,7 +1346,7 @@ async function rdFinnEnviar(){
   if(rdIdExt(r).length<9){toast("La rendición no tiene un identificador válido: usa el Excel.");return}
   if(r.exportada&&!(await ask("¿Ya la cargaron con el Excel?",`Esta rendición se exportó a Excel el ${fmtD(r.exportada.fecha)}. Si ya se cargó en FinnegansGO con ese Excel, no la envíes: quedaría dos veces. En ese caso usa «Marcar contabilizada».`,"Enviar igual",true,"","Cancelar")))return;
   if(AX.distinto&&!(await ask("El asiento cambió desde que se aprobó","Con los maestros de hoy saldría distinto. Se envía el asiento que aprobó Contabilidad. Si corresponde el nuevo, cancela y usa «Volver a revisión contable».","Enviar el aprobado",false,"","Cancelar")))return;
-  if(!(await ask("¿Contabilizar en FinnegansGO?",`Se envía el asiento «${A.desc}» del ${A.fecha}: ${nl} ${nl===1?"línea":"líneas"} y ${fmtP(A.debe)} al debe y al haber. Queda contabilizada con el número que dé FinnegansGO.${alDia?"":" No se pudieron traer los últimos cambios de OneDrive; si otra persona ya la envió, FinnegansGO no la carga dos veces."}`,"Contabilizar")))return;
+  if(!(await ask("¿Contabilizar en FinnegansGO?",`Se envía el asiento «${A.desc}» del ${A.fecha}: ${nl} ${nl===1?"línea":"líneas"} y ${fmtP(A.debe)} al debe y al haber. Queda contabilizada con el número que dé FinnegansGO, con el resumen y ${(n=>n===1?"el documento":`los ${n} documentos`)(rdAdjLista(r).length-1)} adjuntos.${alDia?"":" No se pudieron traer los últimos cambios de OneDrive; si otra persona ya la envió, FinnegansGO no la carga dos veces."}`,"Contabilizar")))return;
   RD_FINN=true;render();
   let j=null,err=null;
   try{const resp=await srvFetch("/finnegans/asiento",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idExt:rdIdExt(r),asiento:{fecha:A.fecha,desc:A.desc,lineas:A.lineas.map(l=>({lado:l.lado,cuenta:String(l.cuenta||""),prod:l.prod||"",part:l.part||"",centro:l.centro||"",ter:l.ter||"",bu:l.bu||"",monto:Math.round(num(l.monto)),glosa:l.glosa||""}))}})});
@@ -1359,7 +1359,43 @@ async function rdFinnEnviar(){
   r.estado="contabilizada";r.contab={asiento:String(j.numero||"").trim(),fecha:today(),por:yo(),finnegans:{idExt:j.idExt||rdIdExt(r),interno:j.interno==null?null:j.interno,ya:!!j.ya}};
   rdHist(r,"contabilizada",`${j.ya?"ya estaba en FinnegansGO":"enviada a FinnegansGO"}${j.numero?": "+j.numero:""}`);
   r.actualizado=new Date().toISOString();await saveRend(r);if(rdv&&rdv.id===id)rdv=r;render();
-  exito("Rendición contabilizada",j.numero?`Asiento ${j.numero} en FinnegansGO.`:"Quedó cargada en FinnegansGO.");
+  await rdFinnAdjuntar(r,true); /* v182: el Resumen PDF y cada documento, adjuntos al asiento */
+}
+/* v182: adjuntar en FinnegansGO el Resumen PDF y cada documento (el PDF original si lo tiene; si no, la foto), por el servidor
+   (POST /finnegans/adjunto, API uploadFileCustom). r.contab.adj guarda lo ya adjuntado ({clave: fecha}) para no repetirlo; si
+   algo falla, la rendición contabilizada muestra «Adjuntar documentos en FinnegansGO (N)». */
+const rdAdjIdExt=r=>(r&&r.contab&&r.contab.finnegans&&r.contab.finnegans.idExt)||"";
+function rdAdjLista(r){
+  const L=[{k:"resumen",nombre:"Resumen PDF",t:"Resumen de la rendición"}],usados={};
+  docsDe(r).forEach(d=>{if(!d.pdf&&!d.foto)return;let b=rdPdfNombre(r,d).replace(/\.pdf$/,"")||"documento";
+    usados[b]=(usados[b]||0)+1;if(usados[b]>1)b+="_"+usados[b];
+    L.push({k:d.k,d,nombre:b+(d.pdf?".pdf":".jpg"),t:[`${TIPO_DOC[d.tipo]||"Documento"}${d.folio?` N° ${d.folio}`:""}`,d.emisor||"",num(d.total)?fmtP(num(d.total)):""].filter(Boolean).join(" · ")})});
+  return L}
+const rdAdjFaltan=r=>{const a=(r&&r.contab&&r.contab.adj)||{};return rdAdjLista(r).filter(x=>!a[x.k])};
+const rdPuedeAdjuntar=r=>!!(r&&r.estado==="contabilizada"&&!r.anulada&&esContab()&&rdAdjIdExt(r));
+async function rdAdjDatos(r,x){
+  if(x.k==="resumen"){const o=await rdPdf(r,"blob");return o&&o.blob?{nombre:o.nombre,b64:String(await blobToDataURL(o.blob)).split(",")[1]||""}:null}
+  if(x.d.pdf){const b=await rdPdfBlob(x.d);return b?{nombre:x.nombre,b64:String(await blobToDataURL(b)).split(",")[1]||""}:null}
+  await esperarFoto(x.d.foto,20000);const u=await fotoDataURL(x.d.foto);return u?{nombre:x.nombre,b64:String(u).split(",")[1]||""}:null}
+async function rdFinnAdjuntar(r,recien){
+  const id=r.id,falt=rdAdjFaltan(r),mal=[];let ok=0;
+  const as=r.contab&&r.contab.asiento?` ${r.contab.asiento}`:"";
+  if(!falt.length){if(recien)exito("Rendición contabilizada",`Asiento${as} en FinnegansGO.`);render();return}
+  RD_FINN="adj";render();
+  for(let i=0;i<falt.length;i++){const x=falt[i];toast(`Adjuntando en FinnegansGO: ${i+1} de ${falt.length}…`,120000);let e="";
+    try{const dat=await rdAdjDatos(REND[id]||r,x);
+      if(!dat||!dat.b64)e="no se encontró el archivo en este equipo ni en OneDrive";
+      else{const resp=await srvFetch("/finnegans/adjunto",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idExt:rdAdjIdExt(r),nombre:dat.nombre,descripcion:x.t,base64:dat.b64})});
+        let j=null;try{j=await resp.json()}catch(er){}
+        if(!resp.ok||!j||!j.ok)e=(j&&j.error?j.error+(j.detalle?" "+j.detalle:""):`estado ${resp.status}`)}}
+    catch(er){e="no se pudo conectar con el servidor de Puduhue"}
+    if(e)mal.push({x,e});else{const q=REND[id]||r;q.contab=Object.assign({},q.contab,{adj:Object.assign({},q.contab&&q.contab.adj,{[x.k]:new Date().toISOString()})});ok++}}
+  RD_FINN=false;r=REND[id]||r;
+  if(ok){rdHist(r,"adjuntos",`${ok} ${ok===1?"archivo adjuntado":"archivos adjuntados"} en FinnegansGO`);r.actualizado=new Date().toISOString();await saveRend(r)}
+  if(rdv&&rdv.id===id)rdv=r;{const t=$(".toast");if(t)t.remove()}render();
+  const nA=n=>`${n} ${n===1?"archivo adjunto":"archivos adjuntos"}`;
+  if(!mal.length){exito(recien?"Rendición contabilizada":"Documentos adjuntados",recien?`Asiento${as} en FinnegansGO, con ${nA(ok)}.`:`${nA(ok)} en el asiento${as}.`);return}
+  await ask(recien?"Contabilizada, pero faltan adjuntos":"Faltan adjuntos",`${recien?`La rendición quedó contabilizada (asiento${as}). `:""}${ok?`Se adjuntaron ${ok}. `:""}No se ${mal.length===1?"pudo adjuntar 1 archivo":`pudieron adjuntar ${mal.length} archivos`}: ${mal.slice(0,3).map(m=>`«${m.x.nombre}» (${m.e})`).join("; ")}${mal.length>3?"…":""}. Vuelve a intentarlo con «Adjuntar documentos en FinnegansGO».`,"Entendido");
 }
 async function rdExportarListas(RS,marcar,todas){
   toast("Revisando los últimos cambios en OneDrive…");
@@ -1707,8 +1743,8 @@ function renderRDV(){
   else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Revisa cada documento: «Está bien» o «Pedir corrección».</p>`;
   else if(esContab()&&r.estado==="revcont"&&aprobeJef(r)&&!esPropia(r))acciones=`<p class="note">La aprobaste como jefatura: la revisión contable la hace otra persona de Contabilidad.</p>`;
   else if(con)acciones=`${A&&A.bloq?`<p class="note">Corrige lo que está en «Por corregir» (toca el documento) para poder aprobar.</p>`:""}`;
-  else if(ctz)acciones=`<div class="btns"><button class="btn pri" data-a="rdFinnEnviar" style="flex:1" ${RD_FINN?"disabled":""}>${RD_FINN?"Enviando a FinnegansGO…":"Contabilizar en FinnegansGO"}</button></div><div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button><button class="btn" data-a="rdContabilizar" style="flex:1">Marcar contabilizada</button></div><div class="btns"><button class="btn" data-a="rdReabrir">Volver a revisión contable</button></div><p class="note">«Contabilizar en FinnegansGO» envía el asiento directo y la deja contabilizada con el número de asiento. El Excel y «Marcar contabilizada» son para cargarla a mano.</p>`; /* v163 */
-  else if(esContab()&&r.estado==="contabilizada")acciones=`<div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button></div>`;
+  else if(ctz)acciones=`<div class="btns"><button class="btn pri" data-a="rdFinnEnviar" style="flex:1" ${RD_FINN?"disabled":""}>${RD_FINN?"Enviando a FinnegansGO…":"Contabilizar en FinnegansGO"}</button></div><div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button><button class="btn" data-a="rdContabilizar" style="flex:1">Marcar contabilizada</button></div><div class="btns"><button class="btn" data-a="rdReabrir">Volver a revisión contable</button></div><p class="note">«Contabilizar en FinnegansGO» envía el asiento directo, le adjunta el resumen y cada documento, y la deja contabilizada con el número de asiento. El Excel y «Marcar contabilizada» son para cargarla a mano.</p>`; /* v163 */
+  else if(esContab()&&r.estado==="contabilizada")acciones=`${(n=>rdPuedeAdjuntar(r)?n?`<div class="btns"><button class="btn pri" data-a="rdFinnAdj" style="flex:1" ${RD_FINN?"disabled":""}>${RD_FINN==="adj"?"Adjuntando en FinnegansGO…":`Adjuntar documentos en FinnegansGO (${n})`}</button></div><p class="note">Sube al asiento el resumen y cada documento que todavía no está adjunto.</p>`:`<p class="note">El resumen y ${(m=>m===1?"el documento":`los ${m} documentos`)(rdAdjLista(r).length-1)} están adjuntos al asiento en FinnegansGO.</p>`:"")(rdPuedeAdjuntar(r)?rdAdjFaltan(r).length:0)}<div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button></div>`; /* v182 */
   const resR=accRes(fmtP(totalRend(r)),`${D.length} ${D.length===1?"documento":"documentos"}${inc&&edit?` · <em>faltan datos en ${inc}</em>`:(jef||con)?`${(n=>n?` · ${n} ${n===1?"revisado":"revisados"}`:"")(D.filter(d=>d.estadoRev==="ok").length)}${obs?` · ${obs} por corregir`:""}`:""}`);
   const barra=edit&&D.length?accBar("rdbar",resR,`<button class="btn pri" data-a="rdEnviar" ${inc?"disabled":""}>${r.estado==="observada"?"Reenviar":"Enviar a aprobación"}</button>`)
     :jef?accBar("rdbar",resR,`<button class="btn" data-a="rdDevolver">Devolver${obs?` (${obs})`:""}</button><button class="btn pri" data-a="rdAprobarJef">Aprobar</button>`)
@@ -2245,6 +2281,13 @@ async function rdClick(A,b){
     if(!(await ask("¿Volver a revisión contable?",`Podrás corregir la imputación y aprobarla de nuevo.${ex?` Ya se exportó a Excel el ${fmtD(ex.fecha)}: si ya está cargada en FinnegansGO, corrígela también allá, porque al aprobarla de nuevo vuelve a salir en el Excel.`:""}`,"Volver a revisión")))return true;
     rdv.estado="revcont";delete rdv.aprobCont;delete rdv.exportada; /* v133 (A-07) */rdHist(rdv,"vuelve a revisión contable",ex?"estaba exportada: "+(ex.archivo||""):"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();return true}
   if(A==="rdFinnEnviar"){await rdFinnEnviar();return true} /* v163 */
+  if(A==="rdFinnAdj"){if(!rdv||!rdPuedeAdjuntar(rdv)||RD_FINN)return true; /* v182 */
+    if(navigator.onLine===false){toast("Necesita señal para adjuntar en FinnegansGO.");return true}
+    const id=rdv.id;toast("Revisando los últimos cambios en OneDrive…");await rdTraerUltimo();{const t=$(".toast");if(t)t.remove()}
+    const r=REND[id]||rdv;if(rdv&&rdv.id===id)rdv=r;const n=rdAdjFaltan(r).length;
+    if(!n){toast("Ya están todos adjuntos.");render();return true}
+    if(!(await ask("¿Adjuntar en FinnegansGO?",`Se ${n===1?"sube 1 archivo":`suben ${n} archivos`} al asiento${r.contab&&r.contab.asiento?" "+r.contab.asiento:""}: ${rdAdjFaltan(r).map(x=>x.k==="resumen"?"el resumen":x.nombre).slice(0,4).join(", ")}${n>4?"…":""}.`,"Adjuntar")))return true;
+    await rdFinnAdjuntar(r,false);return true}
   if(A==="rdContabilizar"){if(!puedeContabilizar(rdv))return true;const o=await askVal("¿Marcar como contabilizada?","Hazlo cuando el asiento ya esté cargado en FinnegansGO.","Marcar contabilizada",`<div class="f"><label for="rdAsN">N° de asiento en FinnegansGO (opcional)</label><input id="rdAsN" data-v="asiento" inputmode="numeric"></div>`);if(!o)return true;
     rdv.estado="contabilizada";rdv.contab={asiento:String(o.asiento||"").trim(),fecha:today(),por:yo()};rdHist(rdv,"contabilizada",rdv.contab.asiento);rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();exito("Rendición contabilizada","");return true}
   if(A==="rdContabTodas"){if(!esContab())return true;const L=Object.values(REND).filter(r=>!r.anulada&&r.estado==="aprobada"&&r.exportada);if(!L.length)return true;
@@ -2502,10 +2545,11 @@ async function rdPdf(r,subir){
     fs.forEach(d=>{const im=IM[d.foto];if(col===0)chk(MH+10);let w=IW,hh=w*im.h/im.w;if(hh>MH){hh=MH;w=hh*im.w/im.h}const x=X+col*(IW+6)+(IW-w)/2;try{doc.addImage(im.data,"JPEG",x,y,w,hh)}catch(e){}doc.setFontSize(8);doc.setFont("helvetica","normal");doc.text(doc.splitTextToSize(`${d.emisor||""} · ${d.fecha?fmtD(d.fecha):""} · ${fmtP(num(d.total))}`,IW)[0],X+col*(IW+6),y+MH+4);col++;if(col===2){col=0;y+=MH+9}});if(col===1)y+=MH+9}
   const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(110);doc.text(`Página ${i} de ${n}`,195,289,{align:"right"});const a=autoriaTxt(r);if(a)doc.text(doc.splitTextToSize("Registro en la app: "+a.charAt(0).toLowerCase()+a.slice(1),150)[0],15,289);doc.setTextColor(0)}
   const name=`Rendicion_${r.periodo}_${limpiaNombre(r.persona?r.persona.nombre:"").replace(/\s+/g,"_")}${(r.n||1)>1?"_"+r.n:""}.pdf`;
+  if(subir==="blob")return{blob:doc.output("blob"),nombre:name}; /* v182: para adjuntarlo en FinnegansGO */
   if(subir){try{await rdSubir(carpetaRend(r),name,doc.output("blob"),"application/pdf")}catch(e){console.warn(e)}return}
   await guardarPDF(doc,name,"Resumen listo.");
 }
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="181"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="182"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
