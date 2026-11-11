@@ -146,6 +146,42 @@ export async function enviarAsiento(env, a, { tokenFinnegans, FINN, reporte }) {
   return [{ ok: true, numero: y ? numeroDe(y) : "", interno: y ? y.NumeroInterno ?? null : null, idExt: a.idExt, debe: a.debe, sinConfirmar: true }, 200];
 }
 
+/* v182 · Adjuntar un archivo al asiento de una rendición (API uploadFileCustom, probada en la v181.1-v181.3 con el AG - 3865)
+   POST /finnegans/adjunto { idExt: "RD-…", nombre: "x.pdf|x.jpg", descripcion, base64 }. Revisa que el asiento exista (GET por
+   IdentificacionExterna; lo recuerda unos minutos) y lo adjunta con uploadFileCustom/subidaNuevoArchivo: clase AsientoGenericoVO,
+   Tipo "10", Empresa FINN_EMPRESA (por defecto 2), Codigo = idExt. La forma antigua (custom/files/upload) responde 405. */
+export const MAX_ADJUNTO = 14_000_000; // caracteres de base64 (unos 10 MB de archivo)
+const EXISTE = new Map();
+export function revisarAdjunto(body) {
+  const idExt = txt(body && body.idExt, 60);
+  if (!/^RD-[A-Za-z0-9]{6,40}$/.test(idExt)) return { error: "Falta el identificador de la rendición." };
+  let nombre = txt(body && body.nombre, 120).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._ -]/g, "_").replace(/^[._ ]+/, "");
+  if (!/\.(pdf|jpe?g|png)$/i.test(nombre) || nombre.length < 5) return { error: "El archivo debe ser PDF o una foto (JPEG o PNG)." };
+  const b64 = String(body && body.base64 || "").replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
+  if (b64.length < 50) return { error: "Falta el archivo." };
+  if (b64.length > MAX_ADJUNTO) return { error: "El archivo es demasiado grande para adjuntarlo (más de 10 MB)." };
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return { error: "El archivo no viene en base64." };
+  return { idExt, nombre, b64, desc: txt(body && body.descripcion, 200) };
+}
+export async function adjuntarArchivo(req, env, { correo, json, esContab, tokenFinnegans, FINN }) {
+  if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
+  if (!(await esContab())) return json({ error: "Solo Contabilidad o el administrador adjuntan en FinnegansGO." }, 403);
+  let body; try { body = await req.json(); } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }
+  const a = revisarAdjunto(body);
+  if (a.error) return json({ error: a.error }, 400);
+  const tok = await tokenFinnegans(env);
+  if (!(EXISTE.get(a.idExt) > Date.now())) {
+    const g = await finn(FINN, `${ENTIDAD}/${encodeURIComponent(a.idExt)}`, tok);
+    if (!(g.ok && asientoDe(g.datos))) return json({ error: g.estado === 404 ? "El asiento de esta rendición no está en FinnegansGO." : "No se pudo revisar el asiento en FinnegansGO.", detalle: motivoFinn(g, tok) }, g.estado === 404 ? 404 : 502);
+    EXISTE.set(a.idExt, Date.now() + 10 * 60e3);
+  }
+  const cuerpo = { clase: "AsientoGenericoVO", Tipo: "10", NombreLogico: a.nombre, Descripcion: a.desc, Empresa: txt(env.FINN_EMPRESA, 10) || "2", Codigo: a.idExt, base64: a.b64 };
+  const r = await finn(FINN, "uploadFileCustom/subidaNuevoArchivo", tok, cuerpo);
+  const st = r.datos && typeof r.datos === "object" && r.datos.status != null ? +r.datos.status : r.estado;
+  if (!r.ok || st !== 200) return json({ error: "FinnegansGO no aceptó el archivo.", detalle: motivoFinn(r, tok), estado: r.estado }, 422);
+  return json({ ok: true, nombre: a.nombre, idExt: a.idExt, por: correo });
+}
+
 export async function contabilizarAsiento(req, env, { correo, json, esContab, tokenFinnegans, FINN, reporte }) {
   if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
   if (!(await esContab())) return json({ error: "Solo Contabilidad o el administrador contabilizan en FinnegansGO." }, 403);
