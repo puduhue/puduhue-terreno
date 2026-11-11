@@ -1,5 +1,5 @@
 /*
-  v181.1-v181.2 · Prueba temporal: adjuntar archivos a un asiento de FinnegansGO (para preparar el adjunto de las fotos de las rendiciones)
+  v181.1-v181.3 · Prueba temporal: adjuntar archivos a un asiento de FinnegansGO (para preparar el adjunto de las fotos de las rendiciones)
   ------------------------------------------------------------------------------------------------------------------------------
   Uso: Administración → Servidor y Finnegans → Conexión con Finnegans, reporte «adjuntoPrueba» (solo el administrador, igual que
   /reporte). Parámetros opcionales, uno por línea:
@@ -98,6 +98,17 @@ export function pdfPrueba(texto) {
   return new TextEncoder().encode(s);
 }
 
+/* v181.3: TransaccionID del asiento; arriba no viene: se busca dentro (AsientoGenericoCotizaciones, AsientoItems) */
+export function transaccionDe(a) {
+  const arriba = a && (a.TransaccionID ?? a.TransaccionId ?? a.transaccionID);
+  if (arriba != null && arriba !== "") return String(arriba);
+  const ver = x => { if (!x || typeof x !== "object") return null;
+    if (Array.isArray(x)) { for (const y of x) { const v = ver(y); if (v) return v; } return null; }
+    if (x.TransaccionID != null && x.TransaccionID !== "") return String(x.TransaccionID);
+    for (const v of Object.values(x)) { const r = typeof v === "object" ? ver(v) : null; if (r) return r; } return null; };
+  for (const k of ["AsientoGenericoCotizaciones", "AsientoItems"]) { const v = ver(a && a[k]); if (v) return v; }
+  return ver(a) || "";
+}
 /* las formas de subir que se prueban, en orden; se detiene en la primera que Finnegans acepte (2xx) */
 export function formasSubir(clases) {
   return [
@@ -114,7 +125,7 @@ async function subirJson(tok, cuerpo) {
 }
 /* adjuntos de una transacción (guía 2975: custom/files/list/{Entidad}/{Código}); se prueban las combinaciones probables */
 export async function listaAdjuntos(tok, idExt, trans) {
-  const combos = [["asientoGenerico", idExt], ["BSTransaccion", trans], ["BSTransaccion", idExt], ["transaccion", trans]].filter(([, c]) => c !== "" && c != null);
+  const combos = [["asientoGenerico", idExt], ["BSTransaccion", trans], ["asientoGenerico", trans], ["transaccion", trans], ["BSTransaccion", idExt]].filter(([, c]) => c !== "" && c != null);
   const est = []; let hallado = null;
   for (const [ent, cod] of combos) {
     const r = await leer(`${TEAM}/custom/files/list/${encodeURIComponent(ent)}/${encodeURIComponent(cod)}?ACCESS_TOKEN=${encodeURIComponent(tok)}`);
@@ -163,9 +174,9 @@ export async function pruebaAdjunto(env, q, { tokenFinnegans, FINN }) {
   }
   if (!asiento) { fila("1. Asiento", `no se encontró ${id}`, sinClave(intentos.join(" · "), tok)); return salida(filas, "asiento"); }
   const { AsientoItems, AsientoItemsAjuste, ...cab } = asiento;
-  const trans = asiento.TransaccionID ?? asiento.TransaccionId ?? asiento.transaccionID ?? "";
+  const trans = transaccionDe(asiento); /* v181.3: en el asiento genérico viene dentro de las cotizaciones y las líneas */
   fila("1. Asiento", `${asiento.Nombre || id} · TransaccionID ${trans || "(no viene)"} · ${Array.isArray(AsientoItems) ? AsientoItems.length : 0} líneas`, sinClave(JSON.stringify(cab).slice(0, 2500), tok));
-  const camposArch = Object.keys(asiento).filter(k => /adjunt|archiv|file|attach|document/i.test(k));
+  const camposArch = Object.keys(asiento).filter(k => /adjunt|archiv|file|attach/i.test(k));
   fila("2. Campos de archivos en el asiento", camposArch.length ? camposArch.join(", ") : "ninguno", camposArch.length ? sinClave(JSON.stringify(Object.fromEntries(camposArch.map(k => [k, asiento[k]]))).slice(0, 1500), tok) : "");
 
   const idExt = asiento.IdentificacionExterna || id, empresa = String(asiento.EmpresaID ?? env.FINN_EMPRESA ?? "2");
