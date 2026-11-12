@@ -2262,3 +2262,15 @@ details>*{box-sizing:border-box}
   body.conlat[data-pant="adm"] .wrap>*{grid-column:1/-1;min-width:0}
   body.conlat[data-pant="adm"] .wrap>.admsec{grid-column:auto}
 }
+
+/* ---------- v185: pago del reembolso (rendición contabilizada) ---------- */
+.rdpago{display:flex;align-items:flex-start;gap:9px;margin:10px 0 0;padding:10px 12px;border-radius:12px;font-size:14.5px;line-height:1.35;background:var(--soft);color:var(--ink)}
+.rdpago>i{flex:none;box-sizing:border-box;width:14px;height:14px;margin:3px 2px 0;border-radius:50%;border:3px solid currentColor}
+.rdpago>svg{flex:none;width:18px;height:18px;margin-top:1px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.rdpago>span{min-width:0}.rdpago b{display:block}.rdpago small{display:block;font-size:13px;margin-top:2px;color:inherit}
+.rdpago.pend>i,.rdpago.pend b{color:var(--act)}.rdpago.pend small{color:var(--muted)} /* espera, no error: azul, no rojo */
+.rdpago.ok{background:var(--b-bg);color:var(--b-ink)}
+.rdpago.fondo{background:none;padding:8px 4px 0;color:var(--muted)}.rdpago.fondo>i{display:none}
+.smsep.fdsepp{display:flex;align-items:baseline;gap:4px}
+.smsep.fdsepp>span{margin-left:auto;font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--ink)}
+.fdnotap{margin:2px 2px 8px}
