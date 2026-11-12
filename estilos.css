@@ -2119,3 +2119,36 @@ details>*{box-sizing:border-box}
 .rdobsarr{margin:0 0 12px}
 /* «Pedir corrección» ocupa lo que mide su texto y «Está bien» (el botón principal) se queda con el resto */
 .accbar.dos .accb .btn[data-a="rdRevObs"]{flex:0 0 auto}
+
+/* v183: resumen arriba de la foto, filas marcadas y lista de documentos */
+.rdcorr{margin:0 0 12px;padding:12px 14px 4px;border-radius:16px;background:var(--m-bg);color:var(--m-ink)}
+.rdcorr.listo{background:var(--b-bg);color:var(--b-ink)}
+.rdcorr-t{display:flex;gap:8px;align-items:center;margin:0;font-size:16px}
+.rdcorr-t svg{width:20px;height:20px;flex:none}
+.rdcorr-s{margin:2px 0 0 28px;font-size:13.5px}
+.rdcorr ul{list-style:none;margin:6px 0 0;padding:0}
+.rdcorr li+li{border-top:1px solid color-mix(in srgb,currentColor 25%,transparent)}
+.rdcorr-i{display:grid;grid-template-columns:minmax(0,1fr) 18px;column-gap:8px;align-items:center;width:100%;min-height:48px;padding:9px 0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.rdcorr-i.fija{cursor:default}
+.rdcorr-et{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-weight:700;font-size:15px}
+.rdcorr-q{font-weight:600;font-size:12.5px}
+.rdcorr-m{grid-column:1;font-size:14.5px;line-height:1.4;color:var(--ink)}
+.rdcorr-i .chev{grid-column:2;grid-row:1/3;width:18px;height:18px}
+.rdcorr-i.ok .rdcorr-q{color:var(--b-ink)}
+.rdok-r.mal{box-shadow:inset 4px 0 0 var(--m-ink);padding-left:14px}
+.rdok-r.bien{box-shadow:inset 4px 0 0 var(--b-ink);padding-left:14px}
+.rdok-msg{grid-column:1/-1;display:flex;gap:6px;align-items:flex-start;margin-top:-2px;font-size:13.5px;line-height:1.35;font-weight:600;color:var(--m-ink)}
+.rdok-r.bien .rdok-msg{color:var(--b-ink)}
+.rdok-msg svg{width:16px;height:16px;flex:none;margin-top:1px}
+.rdok-r.flash{animation:flashf 1.8s ease-out}
+.rdd.mal{box-shadow:inset 4px 0 0 var(--m-ink)}
+.rdd.bien{box-shadow:inset 4px 0 0 var(--b-ink)}
+.rdcl{display:flex;gap:6px;align-items:flex-start;margin-top:4px;font-size:13.5px;line-height:1.35;color:var(--m-ink)}
+.rdcl.bien{color:var(--b-ink);font-weight:600}
+.rdcl svg{width:16px;height:16px;flex:none;margin-top:1px}
+.rdcl-mas{font-weight:600;white-space:nowrap}
+.rdfic.elige{outline:2px solid var(--act);outline-offset:-2px}
+.rdel-cab{display:flex;flex-direction:column;gap:2px;padding:0 0 2px}
+.rdel-cab b{font-size:17px;line-height:1.25}
+.rdel-cab span{font-size:14px;color:var(--muted)}
+.rdok-r.eleg{box-shadow:inset 4px 0 0 var(--m-ink);padding-left:14px}
