@@ -20,7 +20,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
   jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF), zxing-wasm 3.1.4 (código del SII) y heic2any 0.0.4
   (fotos HEIC a JPEG, desde la v125; se carga solo cuando hace falta, desde `compress()` en index.html). Además, `lib/marca-puduhue-2/marcas.js` (desde la v184: `MARCA_HZ` con el símbolo a color en un círculo blanco y la palabra en blanco; la carpeta `marca-puduhue-1` queda para los teléfonos sin actualizar) define
   los logos en base64 (`MARCA`, `MARCA_HZ` y `LOGO`, este último para los PDF), desde la v101.
-- `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, Finnegans, lectura de boletas). Desde la v141 (M-26), la app le habla con un token propio (ámbito `api://<id de la app>/Acceso`, srvFetch en index.html) y el servidor lo revisa él mismo (verificarTokenApi en worker.js); el token de Graph se sigue aceptando hasta que todos tengan la v141. Se publica solo con
+- `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, aviso del pago del reembolso desde la v186, Finnegans, lectura de boletas). Desde la v141 (M-26), la app le habla con un token propio (ámbito `api://<id de la app>/Acceso`, srvFetch en index.html) y el servidor lo revisa él mismo (verificarTokenApi en worker.js); el token de Graph se sigue aceptando hasta que todos tengan la v141. Se publica solo con
   GitHub Actions al subir cambios de `servidor/` a main.
 - `manifest.json`, `icon-*.png`, `badge-96.png`: instalación y notificaciones.
 - `VERSIONES.md`: historial de versiones publicadas (versión, fecha y commit de main, con enlace para ver o recuperar cada una).
@@ -77,7 +77,11 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
   ya se pagó o si se descontó del fondo, con los movimientos de la persona en Finnegans en la cuenta del asiento (los pagos cubren
   primero lo más antiguo); `fdPagoHTML` es la línea bajo el seguimiento; `fdDeuda` separa el saldo a favor en por pagar y en revisión
   (`fdFavorTxt`, `fdFavorTu`, `fdFavorCorto`); `fdP` escribe los negativos con el signo antes del peso y `fdCtasSaldo` deja solo las
-  cuentas con saldo; `fdAutoT` consulta los fondos de todos una vez por sesión (Contabilidad).
+  cuentas con saldo; `fdAutoT` consulta los fondos de todos una vez por sesión (Contabilidad). Desde la v186, aviso cuando llega
+  el pago: lo manda el servidor (`servidor/fondo.js`: `avisosDePago` en la tarea de cada hora, `pagosRecientes`, `textoPago`, ruta
+  `/fondo/pagos`; `Avisos.avisarPagos` en `servidor/push.js` guarda los pagos ya vistos); la app manda el interruptor «Mostrar a cada
+  persona su saldo» con la lista de colaboradores (`fdPadronDatos`) y en el Inicio dice «Te pagaron el reembolso…» por 7 días
+  (`fdSiguiente`).
 - `actas-entrega.js` (v109): 18 textos del acta · 68 capacitaciones (v109) · 97 devoluciones (v77) · 113 datos comunes · 181 pantallas · 441 eventos · 536 PDF · 779 Excel.
 
 ## Carpetas de OneDrive (desde la v118, como en la app)

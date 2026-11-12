@@ -46,10 +46,12 @@
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
   Recordatorios (v84): una tarea programada cada hora (wrangler.toml, [triggers]); a las 9:00 de Santiago en
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
+  Aviso del pago del reembolso (v186): la misma tarea, de lunes a viernes entre las 8 y las 20 h, lee el libro mayor de los fondos
+  y avisa a cada persona cuando aparece el pago de un saldo a su favor (ver fondo.js, avisosDePago).
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
-import { rutasFondo, esContabSrv, contabDef } from "./fondo.js";
+import { rutasFondo, esContabSrv, contabDef, avisosDePago } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
@@ -108,7 +110,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v183.1";
+const VERSION_SERVIDOR = "v186";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -290,6 +292,7 @@ export default {
   async scheduled(ev, env, ctx) {
     if (!env.AVISOS) return;
     ctx.waitUntil(objetoAvisos(env).correrRecordatorios(sujetoDe(env), ev.scheduledTime, false).then(r => console.log("recordatorios", JSON.stringify(r))).catch(e => console.error("recordatorios", e)));
+    ctx.waitUntil(avisosDePago(env, ctx, objetoAvisos(env), reporte, sujetoDe(env), ev.scheduledTime).then(r => console.log("pagos", JSON.stringify(r))).catch(e => console.error("pagos", (e && (e.error || e.message)) || e))); /* v186 */
     ctx.waitUntil(revisionClaude(env, ev.scheduledTime).then(r => r && console.log("clave de Claude", JSON.stringify(r))).catch(e => console.error("clave de Claude", e))); /* v142 */
   }
 };

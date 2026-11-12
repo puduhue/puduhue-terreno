@@ -2274,3 +2274,6 @@ details>*{box-sizing:border-box}
 .smsep.fdsepp{display:flex;align-items:baseline;gap:4px}
 .smsep.fdsepp>span{margin-left:auto;font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--ink)}
 .fdnotap{margin:2px 2px 8px}
+
+/* ---------- v186: «Te pagaron el reembolso» en el Inicio ---------- */
+.ifdx.ok>i{background:var(--sm-v)}
