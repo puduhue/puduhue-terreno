@@ -18,6 +18,9 @@ const fdConf=()=>(MAE&&MAE.fondo)||{};
 const fdVisible=()=>!!fdConf().mostrar;
 const FD_MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"],FD_MESL=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const fdF=(f,largo)=>{const s=String(f||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return"";const [y,m,d]=s.split("-");return `${+d}${largo?" de ":" "}${(largo?FD_MESL:FD_MES)[+m-1]}${y!==today().slice(0,4)?(largo?" de ":" ")+y:""}`};
+/* v187: día y mes, sin año, para la columna angosta de «Movimientos» (el año va en el título del mes); fdAnoOtro da el año solo si no es el actual */
+const fdDM=f=>{const s=String(f||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return"";const [,m,d]=s.split("-");return `${+d} ${FD_MES[+m-1]}`};
+const fdAnoOtro=f=>{const y=String(f||"").slice(0,4);return /^\d{4}$/.test(y)&&y!==today().slice(0,4)?y:""};
 const fdHora=h=>{if(!h)return"";const d=new Date(h);if(isNaN(d))return"";const f=new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10),hh=d.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit",hour12:false});
   return (f===today()?"hoy":f===sumarDias(today(),-1)?"ayer":fdF(f))+" "+hh};
 function fdCacheMio(){try{const x=JSON.parse(localStorage.getItem(FD_K)||"null");return x&&x.correo===meCorreo()?x:null}catch(e){return null}}
@@ -57,6 +60,17 @@ function fdAuto(){
 const fdYaEnFinnegans=(r,movs)=>{if(!r||r.estado!=="aprobada")return false;if(r.exportada)return true;
   const ds=normTxt((r.asiento&&r.asiento.desc)||rdDescAsiento(r));return !!ds&&(movs||[]).some(x=>num(x.m)<0&&normTxt(x.d)===ds)};
 const fdRendDe=rut=>{const n=normRut(rut);return n?Object.values(REND).filter(r=>!r.anulada&&normRut(r.persona&&r.persona.rut)===n):[]};
+/* v187: reembolsos. Un pago (movimiento positivo de tipo «entrega») es un reembolso cuando, en su cuenta, la persona tenía saldo a
+   favor y el pago no lo supera: no le entrega fondos, le paga lo que rindió. Se mira cuenta por cuenta, en orden de fecha (en una
+   misma fecha, primero lo que descuenta, como en fdPago). Devuelve el conjunto de esos movimientos. */
+function fdReemb(movs){
+  const out=new Set(),run={};
+  (movs||[]).filter(x=>x&&x.f).slice().sort((a,b)=>String(a.f).localeCompare(String(b.f))||(num(a.m)<0?0:1)-(num(b.m)<0?0:1)).forEach(x=>{
+    const c=x.c||"",m=num(x.m)||0,antes=run[c]||0;run[c]=antes+m;
+    if(m>0&&x.t==="entrega"&&antes<-0.5&&m<=-antes+0.5)out.add(x)});
+  return out;
+}
+const fdTipoMov=(x,re)=>re?"Reembolso pagado":(FD_TIPO[x.t]||FD_TIPO.otro);
 function fdCalc(p){
   const movs=(p.movs||[]).filter(x=>x&&x.f).slice().sort((a,b)=>String(a.f).localeCompare(String(b.f)));
   const saldo=Math.round(movs.reduce((s,x)=>s+(num(x.m)||0),0));
@@ -66,13 +80,14 @@ function fdCalc(p){
   const cola=[];const usar=q=>{while(q>0.5&&cola.length){const c=cola[0],u=Math.min(q,c.r);c.r-=u;q-=u;if(c.r<=0.5)cola.shift()}};
   movs.forEach(x=>{const m=num(x.m)||0;if(m>0)cola.push({f:String(x.f).slice(0,10),r:m});else usar(-m)});usar(enTram);
   const viejo=porRendir>0.5&&cola.length?cola[0].f:"";
-  const ent=movs.filter(x=>num(x.m)>0&&x.t!=="inicial").pop()||null;
+  const reemb=fdReemb(movs); /* v187 */
+  const ent=movs.filter(x=>num(x.m)>0&&x.t!=="inicial"&&!reemb.has(x)).pop()||null; /* v187: un reembolso no es un fondo entregado */
   const ultRend=[...movs.filter(x=>x.t==="rendicion").map(x=>String(x.f).slice(0,10)),...R.filter(r=>r.enviada&&r.estado!=="borrador").map(r=>String(r.enviada).slice(0,10))].sort().pop()||"";
   /* días sin rendir: desde la última rendición (enviada en la app o contabilizada); si nunca rindió, desde que recibió el fondo.
      Con fondo fijo la plata siempre está afuera: lo que importa es cuánto lleva sin rendir. */
   const base=porRendir>0.5?(ultRend||viejo):"";
   const dias=base?Math.max(0,Math.round((new Date(today()+"T12:00:00Z")-new Date(base+"T12:00:00Z"))/864e5)):0;
-  return{saldo,enTram,enBorr,porRendir,viejo,dias,ent,ultRend,tram,borr,movs,rut:p.rut}; /* v185: rut, para buscar sus rendiciones sin pago */
+  return{saldo,enTram,enBorr,porRendir,viejo,dias,ent,ultRend,tram,borr,movs,reemb,rut:p.rut}; /* v185: rut, para buscar sus rendiciones sin pago */
 }
 const fdNivel=c=>c.porRendir<=0.5?"":c.dias>=FD_DIAS_R?"rr":c.dias>=FD_DIAS_A?"aa":"";
 const FD_TIPO={entrega:"Fondo entregado",rendicion:"Rendición contabilizada",devolucion:"Devolución",inicial:"Saldo inicial",ajuste:"Ajuste contable",otro:"Movimiento"};
@@ -157,11 +172,11 @@ function fdMov(key,deTodos){
   if(!p){toast("No hay movimientos de esa persona.");return}
   const c=colabPorRut(p.rut),k=fdCalc(p),nom=(c&&c.nombre)||p.nombre||p.rut;
   document.querySelectorAll(".fdsheet").forEach(x=>x.remove());
-  let run=0;const conSaldo=k.movs.map((x,i)=>{run+=num(x.m)||0;return Object.assign({},x,{run,i})}).reverse(); /* v169: i = posición, para abrir el detalle */
+  let run=0;const conSaldo=k.movs.map((x,i)=>{run+=num(x.m)||0;return Object.assign({},x,{run,i,re:k.reemb.has(x)})}).reverse(); /* v187: re = reembolso */ /* v169: i = posición, para abrir el detalle */
   const ctas=fdCtas(k),pc=fdPorCta(k.movs),dos=ctas.length>1; /* v170: con dos cuentas, cada fila dice la suya */
   const porMes={};conSaldo.forEach(x=>{const m=String(x.f).slice(0,7);(porMes[m]=porMes[m]||[]).push(x)});
-  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}${dos&&x.c?`<small class="fdmc" title="${esc(fdCtaN(x.c))}">${esc(x.c)}</small>`:""}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fdP(x.run)}</small></span>${FD_CHEV}</button>`};
-  const tram=k.tram.map(r=>`<button class="fdmv fdtr" data-a="fdIrRend" data-id="${esc(r.id)}"><span class="fdmf">${fdF(r.enviada)}</span><span class="fdmt"><b>${esc(rdTitulo(r))}</b><small>${esc(rdEstadoFrase(r).t)}</small></span><span class="fdmm neg">−${fmtP(totalRend(r))}<small>en revisión</small></span></button>`).join("");
+  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(fdTipoMov(x,x.re))} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdDM(x.f)}${dos&&x.c?`<small class="fdmc" title="${esc(fdCtaN(x.c))}">${esc(x.c)}</small>`:""}</span><span class="fdmt"><b>${esc(fdTipoMov(x,x.re))}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fdP(x.run)}</small></span>${FD_CHEV}</button>`};
+  const tram=k.tram.map(r=>`<button class="fdmv fdtr" data-a="fdIrRend" data-id="${esc(r.id)}"><span class="fdmf">${fdDM(r.enviada)}${fdAnoOtro(r.enviada)?`<small class="fdmc">${fdAnoOtro(r.enviada)}</small>`:""}</span><span class="fdmt"><b>${esc(rdTitulo(r))}</b><small>${esc(rdEstadoFrase(r).t)}</small></span><span class="fdmm neg">−${fmtP(totalRend(r))}<small>en revisión</small></span></button>`).join("");
   const m=document.createElement("div");m.className="modal fdsheet";
   m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}">
     <div class="fdsh"><div><h3>${esc(nom)}</h3><p>${esc(fdSubt(k))}</p></div><button class="fdx" data-a="fdCerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
@@ -192,7 +207,8 @@ function fdMvDet(x,lista,p){
   const m=num(x.m)||0,X=x.x||{},nt=s=>normTxt(s||""),ref=x.ref||X.doc||"",desc=X.ds||x.d||"";
   const fila=(k,v)=>v?`<div><dt>${k}</dt><dd>${v}</dd></div>`:"";
   const ef=x.t==="inicial"?"":m>0?"suma a lo que hay por rendir":"descuenta de lo que hay por rendir";
-  const que=FD_QUE[x.t]?FD_QUE[x.t]+(ef?": "+ef:"")+".":ef.charAt(0).toUpperCase()+ef.slice(1)+".";
+  const que=x.re?"Reembolso: Contabilidad pagó lo que la rendición dejó a favor de la persona. No es un fondo por rendir." /* v187 */
+    :FD_QUE[x.t]?FD_QUE[x.t]+(ef?": "+ef:"")+".":ef.charAt(0).toUpperCase()+ef.slice(1)+".";
   const td=X.td&&!nt(ref).includes(nt(X.td))?X.td:"",co=X.co&&!nt(ref).includes(nt(X.co))?X.co:"";
   /* el mismo documento con varias líneas (por ejemplo, una orden de pago que paga varias cosas) */
   const mismos=ref?lista.filter(y=>(y.ref||(y.x&&y.x.doc)||"")===ref):[],tot=mismos.reduce((s,y)=>s+(num(y.m)||0),0);
@@ -248,7 +264,7 @@ function fdXlsxLibro(L,D,d,h){
     k.movs.forEach(m=>{const v=num(m.m)||0,f=String(m.f).slice(0,10),X=m.x||{},desc=X.ds||m.d||"",c=m.c||"";
       if(f<d)ini+=v;run+=v;rc[c]=(rc[c]||0)+v;if(f<=h)fin=run;if(!en(f))return;n++;if(v>0)ent+=v;else ren-=v;
       const r=v<0&&desc?R.find(r=>nt((r.asiento&&r.asiento.desc)||rdDescAsiento(r))===nt(desc)):null;
-      mov.push([x.nom,rut,fdFechaX(f),c?`${c} ${fdCtaN(c)}`:"",FD_TIPO[m.t]||FD_TIPO.otro,m.ref||X.doc||"",X.td||"",X.co||"",desc,X.dt||"",v>0?v:"",v<0?-v:"",Math.round(rc[c]),Math.round(run),r?rdTitulo(r):""])});
+      mov.push([x.nom,rut,fdFechaX(f),c?`${c} ${fdCtaN(c)}`:"",fdTipoMov(m,k.reemb.has(m)),m.ref||X.doc||"",X.td||"",X.co||"",desc,X.dt||"",v>0?v:"",v<0?-v:"",Math.round(rc[c]),Math.round(run),r?rdTitulo(r):""])});
     res.push([x.nom,rut,Math.round(ini),Math.round(ent),Math.round(ren),Math.round(fin),k.saldo,...CT.map(c=>Math.round(pc[c]||0)),k.enTram,Math.max(0,k.porRendir),k.porRendir<-0.5?-k.porRendir:0,k.porRendir>0.5&&(k.ultRend||k.viejo)?k.dias:"",fdFechaX(k.ultRend),k.ent?num(k.ent.m):"",k.ent?fdFechaX(k.ent.f):"",n]);
     k.tram.forEach(r=>rev.push([x.nom,rut,rdTitulo(r),rdEstadoFrase(r).t,fdFechaX(r.enviada),totalRend(r)]));
   });
@@ -2664,4 +2680,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="186"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="187"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

@@ -81,7 +81,9 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
   el pago: lo manda el servidor (`servidor/fondo.js`: `avisosDePago` en la tarea de cada hora, `pagosRecientes`, `textoPago`, ruta
   `/fondo/pagos`; `Avisos.avisarPagos` en `servidor/push.js` guarda los pagos ya vistos); la app manda el interruptor «Mostrar a cada
   persona su saldo» con la lista de colaboradores (`fdPadronDatos`) y en el Inicio dice «Te pagaron el reembolso…» por 7 días
-  (`fdSiguiente`).
+  (`fdSiguiente`). Desde la v187, en «Movimientos»: `fdDM` (día y mes; el año va en el título del mes) y `fdReemb`
+  (un pago que cubre un saldo a favor sin superarlo es un «Reembolso pagado», no un «Fondo entregado»: `fdTipoMov`; `fdCalc` lo deja
+  fuera de «Último fondo»).
 - `actas-entrega.js` (v109): 18 textos del acta · 68 capacitaciones (v109) · 97 devoluciones (v77) · 113 datos comunes · 181 pantallas · 441 eventos · 536 PDF · 779 Excel.
 
 ## Carpetas de OneDrive (desde la v118, como en la app)
