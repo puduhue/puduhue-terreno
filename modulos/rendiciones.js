@@ -71,10 +71,58 @@ function fdCalc(p){
      Con fondo fijo la plata siempre está afuera: lo que importa es cuánto lleva sin rendir. */
   const base=porRendir>0.5?(ultRend||viejo):"";
   const dias=base?Math.max(0,Math.round((new Date(today()+"T12:00:00Z")-new Date(base+"T12:00:00Z"))/864e5)):0;
-  return{saldo,enTram,enBorr,porRendir,viejo,dias,ent,ultRend,tram,borr,movs};
+  return{saldo,enTram,enBorr,porRendir,viejo,dias,ent,ultRend,tram,borr,movs,rut:p.rut}; /* v185: rut, para buscar sus rendiciones sin pago */
 }
 const fdNivel=c=>c.porRendir<=0.5?"":c.dias>=FD_DIAS_R?"rr":c.dias>=FD_DIAS_A?"aa":"";
 const FD_TIPO={entrega:"Fondo entregado",rendicion:"Rendición contabilizada",devolucion:"Devolución",inicial:"Saldo inicial",ajuste:"Ajuste contable",otro:"Movimiento"};
+/* ---------- v185: pago del reembolso ----------
+   Modelo con reembolso: al contabilizar la rendición, el asiento descuenta del fondo; si la persona rindió más de lo que tenía, el
+   saldo queda a su favor hasta que Contabilidad hace la orden de pago. Finnegans no dice qué pago es de qué rendición: se calcula
+   con los movimientos de la persona (los pagos cubren primero lo más antiguo).
+   - fdDeuda(k): del saldo a favor, cuánto está por pagar (ya contabilizado) y cuánto está todavía en revisión en la app.
+   - fdPago(r): pago de una rendición contabilizada: {e:"pend",falta,total} · {e:"ok",f,ref,total} · {e:"fondo"} (se descontó del
+     fondo, no hay reembolso) · null (sin datos de Finnegans, o el asiento todavía no aparece).
+   Lo ve quien rinde (con «Mostrar a cada persona su saldo» activado) y Contabilidad. */
+const fdP=v=>{v=num(v)||0;return v<-0.5?"−"+fmtP(-v):fmtP(v)}; /* montos del fondo: el signo va antes del peso («−$17.100», no «$-17.100») */
+const fdDeuda=k=>{const favor=Math.max(0,-k.porRendir),pagar=Math.min(favor,Math.max(0,-k.saldo));return{favor,pagar,rev:Math.max(0,favor-pagar)}};
+const fdFavorCorto=k=>{const d=fdDeuda(k);return d.pagar>0.5&&d.rev<=0.5?"por pagar":"a favor"};
+const fdFavorTu=k=>{const d=fdDeuda(k);return d.pagar>0.5&&d.rev<=0.5?"te deben":"a tu favor"}; /* Inicio: corto, para que no se corte */
+function fdFavorTxt(k){const d=fdDeuda(k);
+  if(d.pagar>0.5&&d.rev<=0.5)return"te deben: falta el pago del reembolso";
+  if(d.pagar<=0.5)return"a tu favor: se paga cuando tu rendición esté contabilizada";
+  return `a tu favor: ${fmtP(d.pagar)} por pagar y ${fmtP(d.rev)} en revisión`}
+function fdPersonaDe(rut){const n=normRut(rut);if(!n)return null;
+  const de=D=>D&&Array.isArray(D.personas)?D.personas.find(x=>normRut(x.rut)===n)||null:null;
+  const mio=colabsDeCuenta().some(c=>normRut(c.rut)===n);
+  return (mio&&fdVisible()&&de(FD.p))||(esContab()&&de(FD.t))||null}
+function fdPago(r){
+  if(!r||r.anulada||r.estado!=="contabilizada")return null;
+  const p=fdPersonaDe(r.persona&&r.persona.rut);if(!p)return null;
+  const nt=s=>normTxt(s||"").replace(/\s+/g,""),as=nt(r.contab&&r.contab.asiento),ds=nt((r.asiento&&r.asiento.desc)||rdDescAsiento(r));
+  const es=x=>num(x.m)<0&&((!!as&&nt(x.ref||(x.x&&x.x.doc))===as)||(!!ds&&nt((x.x&&x.x.ds)||x.d)===ds));
+  const todos=(p.movs||[]).filter(x=>x&&x.f),mios=todos.filter(es);if(!mios.length)return null;
+  /* solo la cuenta del asiento: quien tiene además un fondo fijo no lo usa para pagar sus rendiciones */
+  const cta=mios[0].c||"",movs=todos.filter(x=>(x.c||"")===cta).sort((a,b)=>String(a.f).localeCompare(String(b.f)));
+  let run=0,deuda=0,nec=0,ult=-1;
+  movs.forEach((x,i)=>{const antes=Math.max(0,-run);run+=num(x.m)||0;if(es(x)){nec+=Math.max(0,Math.max(0,-run)-antes);deuda=Math.max(0,-run);ult=i}});
+  if(ult<0)return null;
+  if(nec<=0.5)return{e:"fondo"};
+  let rem=deuda,pago=null;
+  for(let j=ult+1;j<movs.length&&rem>0.5;j++){const m=num(movs[j].m)||0;if(m>0){rem-=m;if(rem<=0.5)pago=movs[j]}}
+  const falta=Math.min(nec,Math.max(0,rem));
+  if(falta>0.5)return{e:"pend",falta:Math.round(falta),total:Math.round(nec)};
+  return{e:"ok",f:pago?String(pago.f).slice(0,10):"",ref:pago?String(pago.ref||(pago.x&&pago.x.doc)||""):"",total:Math.round(nec)};
+}
+/* Contabilidad: los fondos de todos se consultan una vez por sesión, para saber qué rendiciones siguen sin pago */
+function fdAutoT(){if(esContab()&&!FD.t&&!FD.cargando&&!FD.errT&&!FD.intentoT&&DB&&navigator.onLine!==false){FD.intentoT=1;setTimeout(()=>fdTraer(true,true),0)}}
+function fdPagoHTML(r){
+  if(!r||r.estado!=="contabilizada")return"";
+  const mio=esPropia(r);if(mio&&fdVisible())fdAuto();else fdAutoT();
+  const g=fdPago(r);if(!g)return"";
+  if(g.e==="pend")return `<p class="rdpago pend"><i aria-hidden="true"></i><span><b>Falta el pago del reembolso: ${fmtP(g.falta)}</b>${g.falta<g.total-0.5?`<small>Ya se pagaron ${fmtP(g.total-g.falta)} de ${fmtP(g.total)}.</small>`:""}<small>${mio?"Contabilidad todavía no hace la orden de pago.":"En Finnegans todavía no hay una orden de pago que la cubra."}</small></span></p>`;
+  if(g.e==="ok")return `<p class="rdpago ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4L18 8"/></svg><span><b>Reembolso pagado${g.f?` el ${esc(fdF(g.f,1))}`:""}</b><small>${esc([g.ref,fmtP(g.total)].filter(Boolean).join(" · "))}</small></span></p>`;
+  return `<p class="rdpago fondo"><i aria-hidden="true"></i><span>${mio?"Se descontó de tu fondo por rendir: no hay reembolso que pagar.":"Se descontó del fondo por rendir de la persona: no hay reembolso que pagar."}</span></p>`;
+}
 /* ---- «Mis rendiciones»: tarjeta del fondo ---- */
 function fdTarjeta(){
   if(!fdVisible()||!ME)return"";
@@ -87,15 +135,15 @@ function fdTarjeta(){
   const per=c=>D.personas.find(x=>normRut(x.rut)===normRut(c.rut))||null;
   if(!cs.some(per))return `<section class="fdc" aria-label="Fondo por rendir"><div class="fdh"><b>${cs.length>1?"Fondos por rendir":"Tu fondo por rendir"}</b></div><p class="fdn">${esc(D.aviso||"Todavía no hay datos de tu fondo en Finnegans.")} Si crees que es un error, avísale a Contabilidad.</p></section>`;
   if(cs.length>1)return `<section class="fdc" aria-label="Fondos por rendir"><div class="fdh"><b>Fondos por rendir</b></div>
-    <div class="fdvar">${cs.map(c=>{const k=fdCalc(per(c)||{rut:c.rut,nombre:c.nombre,movs:[]}),n=fdNivel(k);return `<button class="fdvr" data-a="fdMov" data-k="${esc(normRut(c.rut))}"><span>${esc(c.nombre)}${k.dias>=FD_DIAS_A&&k.porRendir>0?`<small class="${esc(n)}">${k.dias} días sin rendir</small>`:""}</span><b class="${k.porRendir<-0.5?"fav":""}">${k.porRendir<-0.5?"A favor "+fmtP(-k.porRendir):fmtP(Math.max(0,k.porRendir))}</b>${ICO.arrow}</button>`}).join("")}</div><div class="fdpie">${pie}</div></section>`;
+    <div class="fdvar">${cs.map(c=>{const k=fdCalc(per(c)||{rut:c.rut,nombre:c.nombre,movs:[]}),n=fdNivel(k);return `<button class="fdvr" data-a="fdMov" data-k="${esc(normRut(c.rut))}"><span>${esc(c.nombre)}${k.dias>=FD_DIAS_A&&k.porRendir>0?`<small class="${esc(n)}">${k.dias} días sin rendir</small>`:""}</span><b class="${k.porRendir<-0.5?"fav":""}">${k.porRendir<-0.5?(fdFavorCorto(k)==="por pagar"?"Por pagar ":"A favor ")+fmtP(-k.porRendir):fmtP(Math.max(0,k.porRendir))}</b>${ICO.arrow}</button>`}).join("")}</div><div class="fdpie">${pie}</div></section>`;
   const c=cs.find(per)||cs[0],p=per(c),k=fdCalc(p),n=fdNivel(k);
   const big=k.porRendir>0.5?`<div class="fdm"><b>${fmtP(k.porRendir)}</b><span>por rendir</span></div>`
-    :k.porRendir<-0.5?`<div class="fdm fav"><b>${fmtP(-k.porRendir)}</b><span>a tu favor: rendiste más de lo que recibiste</span></div>`
+    :k.porRendir<-0.5?`<div class="fdm fav"><b>${fmtP(-k.porRendir)}</b><span>${fdFavorTxt(k)}</span></div>`
     :`<div class="fdm ok"><b>Estás al día</b><span>no tienes fondos por rendir</span></div>`;
   const tit=fdTituloFondo(k); /* v170; v172: misma regla en el Inicio */
   return `<section class="fdc" aria-label="${tit}"><div class="fdh"><b>${tit}</b></div>
     ${big}
-    ${k.enTram>0.5?`<dl class="fdl"><div><dt>Saldo en Contabilidad</dt><dd>${fmtP(k.saldo)}</dd></div><div><dt>Enviado, en revisión</dt><dd>−${fmtP(k.enTram)}</dd></div></dl>`:""}
+    ${k.enTram>0.5?`<dl class="fdl"><div><dt>Saldo en Contabilidad</dt><dd>${fdP(k.saldo)}</dd></div><div><dt>Enviado, en revisión</dt><dd>−${fmtP(k.enTram)}</dd></div></dl>`:""}
     ${k.porRendir>0.5&&(k.ultRend||k.viejo)?`<p class="fdal ${n}">${n?`<b>${k.dias} días sin rendir:</b> `:""}${k.ultRend?`${n?"tu":"Tu"} última rendición fue el ${fdF(k.ultRend,1)}${n?".":` (${haceDias(k.ultRend)}).`}`:`${n?"recibiste":"Recibiste"} el fondo el ${fdF(k.viejo,1)} y todavía no hay rendiciones.`}</p>`:""}
     ${k.enBorr>0.5&&k.porRendir>0.5?`<p class="fdn">En tu rendición sin enviar hay ${fmtP(k.enBorr)}${k.porRendir-k.enBorr>0.5?`; al enviarla te quedarían ${fmtP(k.porRendir-k.enBorr)} por rendir`:k.porRendir-k.enBorr<-0.5?`, ${fmtP(k.enBorr-k.porRendir)} más que tu saldo`:"; con eso quedas al día"}.</p>`:""}
     <div class="fdpie"><span>${k.ent?`Último fondo: <b>${fmtP(num(k.ent.m))}</b> el ${fdF(k.ent.f)}`:"Sin fondos entregados en el período"}${pie}</span><button class="btn" data-a="fdMov" data-k="${esc(normRut(c.rut))}">Movimientos</button></div></section>`;
@@ -111,13 +159,13 @@ function fdMov(key,deTodos){
   let run=0;const conSaldo=k.movs.map((x,i)=>{run+=num(x.m)||0;return Object.assign({},x,{run,i})}).reverse(); /* v169: i = posición, para abrir el detalle */
   const ctas=fdCtas(k),pc=fdPorCta(k.movs),dos=ctas.length>1; /* v170: con dos cuentas, cada fila dice la suya */
   const porMes={};conSaldo.forEach(x=>{const m=String(x.f).slice(0,7);(porMes[m]=porMes[m]||[]).push(x)});
-  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}${dos&&x.c?`<small class="fdmc" title="${esc(fdCtaN(x.c))}">${esc(x.c)}</small>`:""}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fmtP(x.run)}</small></span>${FD_CHEV}</button>`};
+  const fila=x=>{const m=num(x.m)||0;return `<button type="button" class="fdmv fdmvb" data-i="${x.i}" aria-expanded="false" aria-label="${esc(FD_TIPO[x.t]||FD_TIPO.otro)} del ${esc(fdF(x.f,1))}, ${m>0?"más":"menos"} ${esc(fmtP(Math.abs(m)))}: ver detalle"><span class="fdmf">${fdF(x.f)}${dos&&x.c?`<small class="fdmc" title="${esc(fdCtaN(x.c))}">${esc(x.c)}</small>`:""}</span><span class="fdmt"><b>${esc(FD_TIPO[x.t]||FD_TIPO.otro)}</b>${x.ref||x.d?`<small>${esc([x.ref,x.d].filter(Boolean).join(" · "))}</small>`:""}</span><span class="fdmm ${m>0?"pos":"neg"}">${m>0?"+":"−"}${fmtP(Math.abs(m))}<small>saldo ${fdP(x.run)}</small></span>${FD_CHEV}</button>`};
   const tram=k.tram.map(r=>`<button class="fdmv fdtr" data-a="fdIrRend" data-id="${esc(r.id)}"><span class="fdmf">${fdF(r.enviada)}</span><span class="fdmt"><b>${esc(rdTitulo(r))}</b><small>${esc(rdEstadoFrase(r).t)}</small></span><span class="fdmm neg">−${fmtP(totalRend(r))}<small>en revisión</small></span></button>`).join("");
   const m=document.createElement("div");m.className="modal fdsheet";
   m.innerHTML=`<div class="sheet fdhoja" role="dialog" aria-modal="true" aria-label="Movimientos del fondo de ${esc(nom)}">
     <div class="fdsh"><div><h3>${esc(nom)}</h3><p>${esc(fdSubt(k))}</p></div><button class="fdx" data-a="fdCerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <div class="smres fdsum"><div class="${k.porRendir<-0.5?"fav":fdNivel(k)}"><b>${fmtP(Math.abs(k.porRendir))}</b><span>${k.porRendir<-0.5?"a favor":"por rendir"}</span></div><div><b>${fmtP(k.saldo)}</b><span>saldo en Contabilidad</span></div><div><b>${fmtP(k.enTram)}</b><span>en revisión</span></div></div>
-    ${dos?`<div class="fdctas">${ctas.map(c=>`<div><span>${esc(fdCtaN(c))} · ${esc(c)}</span><b>${fmtP(pc[c]||0)}</b></div>`).join("")}</div>`:""}
+    <div class="smres fdsum"><div class="${k.porRendir<-0.5?"fav":fdNivel(k)}"><b>${fmtP(Math.abs(k.porRendir))}</b><span>${k.porRendir<-0.5?fdFavorCorto(k):"por rendir"}</span></div><div><b>${fdP(k.saldo)}</b><span>saldo en Contabilidad</span></div><div><b>${fmtP(k.enTram)}</b><span>en revisión</span></div></div>
+    ${dos?`<div class="fdctas">${ctas.map(c=>`<div><span>${esc(fdCtaN(c))} · ${esc(c)}</span><b>${fdP(pc[c]||0)}</b></div>`).join("")}</div>`:""}
     <div class="fdxls"><button type="button" class="btn" data-a="fdXls" data-k="${esc(key)}" data-t="${deTodos?1:""}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Descargar Excel</button></div>
     ${tram?`<h4>Enviado, todavía no en Finnegans</h4><div class="fdmvs">${tram}</div>`:""}
     <h4>Movimientos en Finnegans</h4>
@@ -154,7 +202,7 @@ function fdMvDet(x,lista,p){
     ${fila("Qué es",esc(que))}
     ${fila("Cuenta",x.c?esc(x.c+" "+fdCtaN(x.c)):"")}
     ${fila("Monto",`<b class="${m>0?"pos":"neg"}">${m>0?"+":"−"}${esc(fmtP(Math.abs(m)))}</b>`)}
-    ${fila("Saldo después",esc(fmtP(x.run)))}
+    ${fila("Saldo después",esc(fdP(x.run)))}
     ${fila("Documento",esc(ref))}
     ${fila("Tipo de documento",esc(td))}
     ${fila("Comprobante",esc(co))}
@@ -173,7 +221,8 @@ const fdPorCta=movs=>{const o={};(movs||[]).forEach(m=>{if(m.c)o[m.c]=(o[m.c]||0
 function fdSubt(k){const c=fdCtas(k);if(!c.length)return "Fondo por rendir · cuenta 110106";
   return c.map((x,i)=>i?fdCtaN(x).toLowerCase():fdCtaN(x)).join(" y ")+` · cuenta${c.length>1?"s":""} ${c.join(" y ")}`}
 /* v172: título de la tarjeta según las cuentas de la persona (Inicio y «Mis rendiciones») */
-const fdTituloFondo=k=>(c=>c.length>1?"Tus fondos":c[0]==="110105"?"Tu fondo fijo":"Tu fondo por rendir")(fdCtas(k));
+const fdCtasSaldo=k=>{const pc=fdPorCta(k&&k.movs);return fdCtas(k).filter(c=>Math.abs(pc[c]||0)>0.5)}; /* v185: cuentas con saldo */
+const fdTituloFondo=k=>(c=>c.length>1?"Tus fondos":(c[0]||fdCtas(k)[0])==="110105"?"Tu fondo fijo":"Tu fondo por rendir")(fdCtasSaldo(k));
 const FD_XLS_MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const fdFechaX=f=>{const s=String(f||"").slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return "";const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 /* formato de números y fechas, ancho de columnas, filtro y fila de títulos fija */
@@ -252,6 +301,10 @@ function fdSiguiente(k){
   if(bo)return b("aa",`Tienes <b>${fmtP(totalRend(bo))}</b> sin enviar en ${esc(fdMin(rdTitulo(bo)))}. Envíala a aprobación.`,bo.id);
   const tr=k.tram.slice().sort((a,b2)=>String(b2.enviada||"").localeCompare(String(a.enviada||"")))[0];
   if(tr)return b("act",`${esc(rdTitulo(tr))}: ${esc(fdMin(rdEstadoFrase(tr).t))}`,tr.id);
+  /* v185: rendición contabilizada con el reembolso sin pagar (la más reciente) */
+  const sp=fdRendDe(k.rut).filter(r=>r.estado==="contabilizada").map(r=>({r,g:fdPago(r)})).filter(x=>x.g&&x.g.e==="pend").sort((a,b2)=>porPer(a.r,b2.r))[0];
+  if(sp)return b("act",`Falta el pago de tu rendición de ${esc(fdMin(rdTitulo(sp.r)))}: <b>${fmtP(sp.g.falta)}</b>.`,sp.r.id);
+  if(fdDeuda(k).pagar>0.5)return b("act","Falta el pago del reembolso: Contabilidad todavía no hace la orden de pago.");
   if(k.porRendir<=0.5)return"";
   const n=fdNivel(k);
   if(k.ultRend)return b(n,`Tu última rendición fue el ${fdF(k.ultRend,1)} (${haceDias(k.ultRend)}).${n?" Rinde lo que tengas pendiente.":""}`);
@@ -259,8 +312,8 @@ function fdSiguiente(k){
   return"";
 }
 function fdCuentasIni(k){
-  const c=fdCtas(k);if(c.length<2)return"";const pc=fdPorCta(k.movs);
-  return `<div class="ifdcu">${c.map(x=>`<span>${esc(fdCtaN(x))}<b>${fmtP(pc[x]||0)}</b></span>`).join("")}</div>`;
+  const c=fdCtasSaldo(k);if(c.length<2)return"";const pc=fdPorCta(k.movs); /* v185: sin las cuentas en cero */
+  return `<div class="ifdcu">${c.map(x=>`<span>${esc(fdCtaN(x))}<b>${fdP(pc[x]||0)}</b></span>`).join("")}</div>`;
 }
 /* ---- Contabilidad: todas las personas ---- */
 function fdLista(){
@@ -287,7 +340,9 @@ function renderFDL(){
     return `<button class="smrow fdrow" data-a="fdMovT" data-k="${esc(fdKey(x.p))}" data-q="${esc(q)}"${hzCoincide(fdQ,q)?"":" hidden"}><span class="fdav ${n}" aria-hidden="true">${esc(ini(x.nom))}</span>
       <span class="smt"><b>${esc(x.nom)}</b><span class="sms">${x.ent?`Último fondo ${fmtP(num(x.ent.m))} el ${fdF(x.ent.f)}`:"Sin fondos en el período"}${x.ultRend&&!n?` · rindió ${haceDias(x.ultRend)}`:!x.ultRend&&x.porRendir>0.5?" · sin rendiciones":""}${fdCtas(x).includes("110105")?" · fondo fijo":""}</span>
       ${n||x.enTram>0.5?`<span class="smch">${n?`<span class="smc ${n}">${x.dias} días sin rendir</span>`:""}${x.enTram>0.5?`<span class="smc cur">En revisión ${fmtP(x.enTram)}</span>`:""}</span>`:""}</span>
-      <span class="fdrm${x.porRendir<-0.5?" fav":""}"><b>${fmtP(Math.abs(x.porRendir))}</b><small>${x.porRendir<-0.5?"a favor":x.porRendir>0.5?"por rendir":"al día"}</small></span></button>`};
+      <span class="fdrm${x.porRendir<-0.5?" fav":""}"><b>${fmtP(x.porRendir<-0.5&&fdDeuda(x).pagar>0.5?fdDeuda(x).pagar:Math.abs(x.porRendir))}</b><small>${x.porRendir<-0.5?(fdDeuda(x).pagar>0.5?"por pagar":"a favor"):x.porRendir>0.5?"por rendir":"al día"}</small></span></button>`};
+  /* v185: el saldo a favor se separa en lo que ya está contabilizado y falta pagar, y lo que todavía está en revisión */
+  const pagar=favor.filter(x=>fdDeuda(x).pagar>0.5),favRev=favor.filter(x=>fdDeuda(x).pagar<=0.5),totPagar=pagar.reduce((s,x)=>s+fdDeuda(x).pagar,0);
   const sp=Math.abs(D.sinPersona)>0.5;
   return head+`<main class="wrap"><h1>Fondos por rendir</h1>
     <p class="lead">Saldo por persona de las cuentas 110106 y 110105: Finnegans menos lo enviado sin contabilizar.</p>
@@ -297,7 +352,8 @@ function renderFDL(){
     <div class="smol">Ordenar por</div><div class="smord" role="group" aria-label="Ordenar">${[["saldo","Saldo"],["dias","Antigüedad"],["nom","Nombre"]].map(o=>`<button data-a="fdOrd" data-o="${o[0]}" aria-pressed="${fdOrd===o[0]}">${o[1]}</button>`).join("")}</div>
     ${L.length>8?`<div class="hzbus" style="margin-top:10px"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="fdbus" type="search" value="${esc(fdQ)}" placeholder="Buscar persona o RUT" aria-label="Buscar persona" autocomplete="off" enterkeyhint="search"></div>`:""}
     <div class="list fdlist" style="margin-top:10px">${con.sort(ord).map(fila).join("")||`<div class="empty">Nadie tiene fondos por rendir.</div>`}</div>
-    ${favor.length?`<div class="smsep">Con saldo a favor <b>${favor.length}</b></div><div class="list fdlist">${favor.sort((a,b)=>a.porRendir-b.porRendir).map(fila).join("")}</div>`:""}
+    ${pagar.length?`<div class="smsep fdsepp">Reembolsos por pagar <b>${pagar.length}</b><span>${fmtP(totPagar)}</span></div><p class="note fdnotap">Rendiciones ya contabilizadas que dejaron a la persona con saldo a favor: falta la orden de pago.</p><div class="list fdlist">${pagar.sort((a,b)=>fdDeuda(b).pagar-fdDeuda(a).pagar).map(fila).join("")}</div>`:""}
+    ${favRev.length?`<div class="smsep">A favor, todavía en revisión <b>${favRev.length}</b></div><div class="list fdlist">${favRev.sort((a,b)=>a.porRendir-b.porRendir).map(fila).join("")}</div>`:""}
     ${alDia.length?`<button class="fdmas" data-a="fdAlDia" aria-expanded="${esc(fdAlDia)}">${fdAlDia?"Ocultar":"Ver"} ${alDia.length===1?"la persona al día":`las ${alDia.length} personas al día`}</button>${fdAlDia?`<div class="list fdlist">${alDia.sort((a,b)=>cmpEs(a.nom,b.nom)).map(fila).join("")}</div>`:""}`:""}
     <div class="btns" style="margin-top:16px"><button class="btn" data-a="fdActualizar" ${FD.cargando?"disabled":""}>${FD.cargando===2?"Consultando Finnegans…":"Actualizar desde Finnegans"}</button><button class="btn fdxt" data-a="fdXls" data-k="*"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Excel de todos</button></div>
     <p class="note">Datos de Finnegans de ${esc(fdHora(D.hora))}${D.desde?`, movimientos desde el ${fdF(D.desde,1)}`:""}. Con saldo y más de ${FD_DIAS_A} días sin rendir en ámbar, más de ${FD_DIAS_R} en rojo, contando desde la última rendición (enviada en la app o contabilizada).</p>
@@ -332,7 +388,7 @@ function rdInicioFondo(){
   const p=D.personas.find(x=>normRut(x.rut)===normRut(cs[0].rut));if(!p)return"";
   const k=fdCalc(p),n=fdNivel(k),tot=Math.max(0,k.saldo),pc=x=>tot>0.5?Math.max(0,Math.min(100,Math.round(x/tot*100))):0;
   const monto=k.porRendir>0.5?`<b class="ifdm">${fmtP(k.porRendir)}</b><span class="ifds">por rendir</span>`
-    :k.porRendir<-0.5?`<b class="ifdm">${fmtP(-k.porRendir)}</b><span class="ifds">a tu favor: rendiste más de lo que recibiste</span>`
+    :k.porRendir<-0.5?`<b class="ifdm">${fmtP(-k.porRendir)}</b><span class="ifds">${fdFavorTu(k)}</span>`
     :`<b class="ifdm ok">Estás al día</b><span class="ifds">no tienes fondos por rendir</span>`;
   const st=[k.enTram>0.5?`<span><i class="t"></i>En revisión<b>${fmtP(k.enTram)}</b></span>`:"",k.enBorr>0.5?`<span><i class="b"></i>Sin enviar<b>${fmtP(k.enBorr)}</b></span>`:""].filter(Boolean);
   const tit=fdTituloFondo(k); /* v172 */
@@ -1556,7 +1612,7 @@ function rdPasosHTML(r){
   const S=rdPasos(r),f=rdEstadoFrase(r),txt={ok:"listo",act:"en curso",dev:"devuelta",na:"no aplica",pend:"pendiente"};
   return `<div class="rdst" role="group" aria-label="Seguimiento de la rendición">
     <ol class="rdsteps">${S.map((s,i)=>`<li class="p-${s.st}${i<S.length-1&&S[i+1].st!=="pend"?" p-sig":""}" aria-label="${s.t}: ${txt[s.st]}${s.s?`, ${esc(s.s)}`:""}"><span class="rdsc">${RD_ICO[s.st]||(s.st==="act"?"<i></i>":"")}</span><b>${s.t}</b><small>${esc(s.s||"")}</small></li>`).join("")}</ol>
-    <p class="rdsf ${f.k||""}">${esc(f.t)}</p></div>`;
+    <p class="rdsf ${f.k||""}">${esc(f.t)}</p>${fdPagoHTML(r)}</div>`;
 }
 const rdMiniHTML=r=>`<span class="rdmini" aria-hidden="true">${rdPasos(r).map(s=>`<i class="p-${s.st}"></i>`).join("")}</span>`;
 /* documentos: navegación entre ellos */
@@ -1580,7 +1636,11 @@ function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtP(num(d.total
 /* tras subir varios juntos: abrir el primero en modo revisión */
 function rdTrasSubir(r,keys){keys=keys.filter(Boolean);if(keys.length<2||!rdv||rdv.id!==r.id||view!=="rdv")return;
   RD_COLA={rid:r.id,keys};rdd=r.docs[keys[0]];if(rdd)go("rdd");window.scrollTo(0,0)}
-function rdEstadoChip(r){const e=r.estado||"borrador";const cls=e==="aprobada"||e==="contabilizada"?"ok":e==="enviada"||e==="revcont"?"camb":e==="observada"?"nueva":"";return `<span class="xp ${cls}" ${cls?"":'style="background:var(--soft);color:var(--muted)"'}>${RD_ESTADO[e]||e}</span>`}
+function rdEstadoChip(r){const e=r.estado||"borrador";
+  const g=e==="contabilizada"?fdPago(r):null; /* v185: contabilizada con el reembolso sin pagar, o ya pagado */
+  if(g&&g.e==="pend")return `<span class="xp camb">Falta el pago</span>`;
+  if(g&&g.e==="ok")return `<span class="xp ok">Pagada</span>`;
+  const cls=e==="aprobada"||e==="contabilizada"?"ok":e==="enviada"||e==="revcont"?"camb":e==="observada"?"nueva":"";return `<span class="xp ${cls}" ${cls?"":'style="background:var(--soft);color:var(--muted)"'}>${RD_ESTADO[e]||e}</span>`}
 /* v178: fila de una rendición anulada o eliminada (lista «Anuladas y eliminadas» de Contabilidad): dice qué pasó, cuándo y quién,
    en vez del estado que tenía («Borrador») */
 const RDC_ANU=`<span class="rdc-i anu" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/><path d="M10 11v5.5M14 11v5.5"/></svg></span>`;
@@ -1603,7 +1663,7 @@ function renderRD(){
     const otras=equipo.filter(r=>!pj.includes(r)).sort((a,b)=>String(b.periodo).localeCompare(String(a.periodo))).slice(0,30);
     body=`<h2>Esperando tu aprobación<span class="cnt">${pj.length}</span></h2><div class="list">${pj.sort(porEnvio).map(r=>rdCard(r,"jef")).join("")||`<div class="empty">No hay rendiciones esperando tu aprobación.</div>`}</div>${otras.length?`<h2>Tu equipo</h2><div class="list">${otras.map(r=>rdCard(r,"jef")).join("")}</div>`:""}<p class="note">Revisa que cada gasto corresponda al trabajo. Después de tu aprobación, Contabilidad revisa la imputación contable.</p>`;
   }else if(rdTab==="cont"){
-    rdOrgsAuto();
+    rdOrgsAuto();if(todas.some(r=>r.estado==="contabilizada"))fdAutoT(); /* v185: para marcar las que siguen sin pago */
     const sinJ=todas.filter(r=>r.estado==="enviada"&&sinJefatura(r)).sort(porEnvio),rev=todas.filter(r=>r.estado==="revcont").sort(porEnvio),apr=todas.filter(r=>r.estado==="aprobada").sort(porEnvio),enJ=todas.filter(r=>r.estado==="enviada"&&!sinJefatura(r)).sort(porEnvio);
     const cont=todas.filter(r=>r.estado==="contabilizada").sort((a,b)=>String(b.contab&&b.contab.fecha||"").localeCompare(String(a.contab&&a.contab.fecha||""))).slice(0,20);
     const listas=apr.filter(r=>!r.exportada&&!rdAsiento(r).bloq),esperan=listas.filter(r=>rdAsiento(r).pend),nExp=apr.filter(r=>r.exportada).length; /* v133 (A-07) */
@@ -2600,4 +2660,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="184"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="185"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

@@ -72,7 +72,12 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
   (vista rdcol, rdColClick; escribe celda por celda en el Excel de _maestros con la API de Excel). Desde la v183, antes de
   `disConfHTML`: datos por corregir (`rdcItems` junta lo que falta, lo pedido al revisar y las reglas contables; `rdcResumenHTML` es el
   resumen arriba de la foto; `rdcMarca` marca la fila del dato; `RD_ELIGE` es el documento en que quien revisa elige el dato de
-  «Pedir corrección», que se guarda en `d.obsCampo` y `d.obsValor`).
+  «Pedir corrección», que se guarda en `d.obsCampo` y `d.obsValor`). Desde la v185, antes de la tarjeta del fondo
+  (`«Mis rendiciones»: tarjeta del fondo`): pago del reembolso. `fdPago(r)` dice si a una rendición contabilizada le falta el pago, si
+  ya se pagó o si se descontó del fondo, con los movimientos de la persona en Finnegans en la cuenta del asiento (los pagos cubren
+  primero lo más antiguo); `fdPagoHTML` es la línea bajo el seguimiento; `fdDeuda` separa el saldo a favor en por pagar y en revisión
+  (`fdFavorTxt`, `fdFavorTu`, `fdFavorCorto`); `fdP` escribe los negativos con el signo antes del peso y `fdCtasSaldo` deja solo las
+  cuentas con saldo; `fdAutoT` consulta los fondos de todos una vez por sesión (Contabilidad).
 - `actas-entrega.js` (v109): 18 textos del acta · 68 capacitaciones (v109) · 97 devoluciones (v77) · 113 datos comunes · 181 pantallas · 441 eventos · 536 PDF · 779 Excel.
 
 ## Carpetas de OneDrive (desde la v118, como en la app)
