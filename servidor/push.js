@@ -10,6 +10,7 @@
 */
 import { DurableObject } from "cloudflare:workers";
 import { santiago, armarRecordatorios, validarAgenda, HORA_RECORDATORIOS } from "./recordatorios.js";
+import { textoPago } from "./fondo.js"; /* v186: aviso del pago del reembolso */
 
 const te = new TextEncoder();
 const b64u = {
@@ -158,6 +159,24 @@ export class Avisos extends DurableObject {
   /* v94: lista de colaboradores (correo → RUT) para el saldo del fondo por rendir; la publica Contabilidad */
   async guardarPadron(p) { await this.ctx.storage.put("fondo:padron", p); return true; }
   async leerPadron() { return (await this.ctx.storage.get("fondo:padron")) || null; }
+  /* v186: avisos del pago del reembolso. «pagos» guarda las claves de los pagos ya vistos (los de los últimos 60 días). La primera
+     vez solo toma nota; después avisa los nuevos a los correos de la persona, si Contabilidad muestra el saldo a cada persona. */
+  async estadoPagos() { const x = await this.ctx.storage.get("pagos"); return x ? { desde: x.desde, hora: x.hora, vistos: (x.k || []).length, ultimo: x.ultimo || null } : null; }
+  async avisarPagos(eventos, correos, activo, sujeto, fecha) {
+    const st = await this.ctx.storage.get("pagos"), vistos = new Set(st ? st.k || [] : []);
+    const nuevos = st ? eventos.filter(e => !vistos.has(e.k)) : [];
+    const res = { fecha, pagos: eventos.length, nuevos: nuevos.length, avisos: 0, enviadas: 0, sinEquipos: 0, primera: !st, activo: !!activo };
+    if (activo && nuevos.length) {
+      const por = {}; for (const e of nuevos) (por[e.rut] = por[e.rut] || []).push(e);
+      for (const [rut, L] of Object.entries(por)) {
+        const para = (correos && correos[rut]) || []; if (!para.length) continue;
+        const n = textoPago(L), r = await this.enviar(para, { titulo: n.titulo, texto: n.texto, url: "./?rdtab=mias", etiqueta: "pago-reembolso" }, sujeto);
+        res.avisos++; res.enviadas += r.enviadas; res.sinEquipos += r.sinEquipos.length;
+      }
+    }
+    await this.ctx.storage.put("pagos", { desde: st ? st.desde : fecha, hora: new Date().toISOString(), k: eventos.map(e => e.k), ultimo: res.avisos ? { fecha, avisos: res.avisos, enviadas: res.enviadas } : (st && st.ultimo) || null });
+    return res;
+  }
   async estadoRec() { const a = await this.leerAgenda(); return { agenda: a ? a.generado : null, ultimo: (await this.ctx.storage.get("rec:ultimo")) || null }; }
   async correrRecordatorios(sujeto, cuando, forzar) {
     const ahora = new Date(cuando || Date.now()), s = santiago(ahora);

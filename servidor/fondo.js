@@ -14,6 +14,7 @@
     FINN_PARAMS_FONDO   parámetros extra del Libro Mayor (ej.: PARAMWEBREPORT_Empresa=2).
 */
 /* v138 (B-15): Contabilidad = variable CORREOS_CONTAB de Cloudflare (separados por coma); el código público ya no trae correos */
+import { santiago } from "./recordatorios.js";
 export const contabDef = env => String((env && env.CORREOS_CONTAB) || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
 const MAX_PERSONAS = 400;
 const normK = k => String(k).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
@@ -101,7 +102,9 @@ export function validarPadron(b, dominio) {
     org: p.org && typeof p.org === "object" ? { codigo: String(p.org.codigo || "").slice(0, 30), nombre: String(p.org.nombre || "").slice(0, 120) } : null,
   })).filter(p => normRut(p.rut));
   const contab = (Array.isArray(b && b.contab) ? b.contab : []).map(x => String(x || "").trim().toLowerCase()).filter(x => x.endsWith(dominio)).slice(0, 10);
-  return { personas, contab };
+  /* v186: el interruptor «Mostrar a cada persona su saldo» de la app; sin él (versiones anteriores) queda en null */
+  const mostrar = b && b.mostrar === true ? true : b && b.mostrar === false ? false : null;
+  return { personas, contab, mostrar };
 }
 const esDe = (p, mv) => {
   const oc = normTxt(mv.oc), on = normTxt(mv.on);
@@ -149,6 +152,49 @@ async function mayorFondo(env, ctx, reporte, forzar) {
   if (cache) ctx.waitUntil(cache.put(clave, new Response(JSON.stringify(x), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" } })));
   return forzar ? { ...x, crudo: rs.flatMap(r => r.crudo.slice(0, 3)) } : x;
 }
+/* ---------- v186: aviso cuando llega el pago del reembolso ----------
+   Modelo con reembolso: la rendición contabilizada deja el saldo de la persona a su favor y Contabilidad lo paga con una orden de
+   pago. El servidor mira el libro mayor cada hora (días hábiles, de 8 a 20 h) y avisa los pagos nuevos. */
+export const PAGOS_DIAS = 60, PAGOS_DESDE_H = 8, PAGOS_HASTA_H = 20;
+const MESES_P = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const pesos = n => "$" + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const fechaTxt = f => { const m = String(f || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${+m[3]} de ${MESES_P[+m[2] - 1]}` : ""; };
+/* pagos de los últimos días que cubren un saldo a favor: por persona y cuenta, en orden de fecha (en una misma fecha, primero lo que
+   descuenta). Cada uno: rut, k (clave para no avisarlo dos veces), m (lo que cubre del saldo a favor), f, ref y queda (lo que sigue
+   a favor de la persona en esa cuenta después de todos los movimientos). */
+export function pagosRecientes(personas, hoy, dias = PAGOS_DIAS) {
+  const desde = new Date(Date.parse(hoy + "T12:00:00Z") - dias * 864e5).toISOString().slice(0, 10), out = [];
+  for (const p of personas || []) {
+    const rut = normRut(p.rut); if (!rut) continue;
+    const porCta = {}; for (const mv of p.movs || []) if (mv && mv.f) (porCta[mv.c || ""] = porCta[mv.c || ""] || []).push(mv);
+    for (const [c, L] of Object.entries(porCta)) {
+      L.sort((a, b) => String(a.f).localeCompare(String(b.f)) || (a.m < 0 ? 0 : 1) - (b.m < 0 ? 0 : 1));
+      let run = 0; const mios = [];
+      for (const mv of L) {
+        const debe = Math.max(0, -run); run += mv.m || 0;
+        if (mv.m > 0 && mv.t === "entrega" && debe > 0.5 && String(mv.f) >= desde) mios.push({ rut, k: [rut, c, mv.f, mv.ref || "", mv.m].join("|"), m: Math.round(Math.min(mv.m, debe)), f: String(mv.f).slice(0, 10), ref: mv.ref || "", c });
+      }
+      const queda = Math.round(Math.max(0, -run)); for (const e of mios) { e.queda = queda; out.push(e); }
+    }
+  }
+  return out;
+}
+/* texto de la notificación para una persona (uno o varios pagos nuevos) */
+export function textoPago(L) {
+  const tot = L.reduce((s, e) => s + e.m, 0), ult = L.slice().sort((a, b) => String(a.f).localeCompare(String(b.f))).pop(), queda = Math.max(...L.map(e => e.queda || 0));
+  const fin = queda > 0.5 ? ` Todavía quedan ${pesos(queda)} por pagar.` : " Ya no tienes reembolsos pendientes.";
+  if (L.length === 1) return { titulo: `Te pagaron el reembolso: ${pesos(tot)}`, texto: `${[ult.ref, fechaTxt(ult.f) ? "del " + fechaTxt(ult.f) : ""].filter(Boolean).join(" ")}.${fin}`.replace(/^\./, "Contabilidad registró el pago.") };
+  return { titulo: `Te pagaron reembolsos por ${pesos(tot)}`, texto: `${L.length} pagos; el último, ${[ult.ref, fechaTxt(ult.f) ? "del " + fechaTxt(ult.f) : ""].filter(Boolean).join(" ")}.${fin}` };
+}
+/* lo llama la tarea programada de cada hora: lee el libro mayor y le pasa los pagos al almacenamiento, que avisa los nuevos */
+export async function avisosDePago(env, ctx, obj, reporte, sujeto, cuando, forzar) {
+  const s = santiago(new Date(cuando || Date.now()));
+  if (!forzar && (s.dow > 5 || s.hora < PAGOS_DESDE_H || s.hora > PAGOS_HASTA_H)) return { omitido: "fuera de horario" };
+  const padron = obj && await obj.leerPadron(); if (!padron || !(padron.personas || []).length) return { omitido: "sin lista de colaboradores" };
+  const M = await mayorFondo(env, ctx, reporte, false), g = agrupar(M.movs, padron, null);
+  const correos = {}; for (const p of padron.personas) if ((p.correos || []).length) correos[normRut(p.rut)] = p.correos;
+  return obj.avisarPagos(pagosRecientes(g.personas.filter(p => correos[normRut(p.rut)]), s.fecha), correos, padron.mostrar === true, sujeto, s.fecha);
+}
 /* rutas /fondo… */
 /* v134: ¿es de Contabilidad (o el administrador)? Lista fija o la que publica Contabilidad junto con el padrón del fondo */
 export async function esContabSrv(obj, correo, admin, env) {
@@ -169,6 +215,14 @@ export async function rutasFondo(req, env, ctx, url, correo, json, admin, obj, r
     if (v.personas.length < 3) return json({ error: "La lista de colaboradores viene casi vacía; no se reemplazó." }, 400);
     await obj.guardarPadron({ ...v, hora: new Date().toISOString(), por: correo });
     return json({ ok: true, personas: v.personas.length });
+  }
+  if (url.pathname === "/fondo/pagos") { /* v186: diagnóstico del aviso de pagos (Contabilidad o el administrador) */
+    if (!esContab) return json({ error: "Solo Contabilidad ve el estado de los avisos de pago." }, 403);
+    const M = await mayorFondo(env, ctx, reporte, false), g = agrupar(M.movs, padron, null), nom = {}; for (const p of padron.personas) nom[normRut(p.rut)] = p.nombre;
+    const con = new Set(padron.personas.filter(p => (p.correos || []).length).map(p => normRut(p.rut)));
+    const rec = pagosRecientes(g.personas.filter(p => con.has(normRut(p.rut))), santiago().fecha);
+    return json({ ok: true, activo: padron.mostrar === true, mostrar: padron.mostrar == null ? null : padron.mostrar, estado: obj && obj.estadoPagos ? await obj.estadoPagos() : null, dias: PAGOS_DIAS,
+      recientes: rec.map(e => ({ nombre: nom[e.rut] || "", f: e.f, ref: e.ref, cuenta: e.c, m: e.m, queda: e.queda })) });
   }
   if (url.pathname !== "/fondo") return json({ error: "Ruta no encontrada." }, 404);
   const todos = url.searchParams.get("todos") === "1", diag = url.searchParams.get("diag") === "1";

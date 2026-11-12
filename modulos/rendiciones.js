@@ -26,7 +26,8 @@ async function fdFuente(todos,forzar){if(todos)await fdPadron(false);return awai
 /* lista de colaboradores para el servidor (correo → RUT → organización en Finnegans): así cada persona recibe solo lo suyo.
    La publica Contabilidad (o el administrador) al abrir «Fondos por rendir» o al activar el saldo para todos. */
 let FD_PADRON_OK=0;
-function fdPadronDatos(){return{personas:colabs().filter(c=>c.rut&&c.activo!==false).map(c=>{const o=orgPorRut(c.rut);return{rut:c.rut,nombre:c.nombre,correos:correosDe(c),org:o?{codigo:o[0],nombre:o[1]}:null}}),contab:contabCorreos()}}
+function fdPadronDatos(){return{mostrar:fdVisible(), /* v186: el servidor avisa los pagos solo si el saldo se muestra a cada persona */
+  personas:colabs().filter(c=>c.rut&&c.activo!==false).map(c=>{const o=orgPorRut(c.rut);return{rut:c.rut,nombre:c.nombre,correos:correosDe(c),org:o?{codigo:o[0],nombre:o[1]}:null}}),contab:contabCorreos()}}
 async function fdPadron(forzar){
   if(!esContab()||(!forzar&&Date.now()-FD_PADRON_OK<30*60e3))return;
   const d=fdPadronDatos();if(d.personas.length<3)return;
@@ -102,7 +103,7 @@ function fdPago(r){
   const es=x=>num(x.m)<0&&((!!as&&nt(x.ref||(x.x&&x.x.doc))===as)||(!!ds&&nt((x.x&&x.x.ds)||x.d)===ds));
   const todos=(p.movs||[]).filter(x=>x&&x.f),mios=todos.filter(es);if(!mios.length)return null;
   /* solo la cuenta del asiento: quien tiene además un fondo fijo no lo usa para pagar sus rendiciones */
-  const cta=mios[0].c||"",movs=todos.filter(x=>(x.c||"")===cta).sort((a,b)=>String(a.f).localeCompare(String(b.f)));
+  const cta=mios[0].c||"",movs=todos.filter(x=>(x.c||"")===cta).sort((a,b)=>String(a.f).localeCompare(String(b.f))||(num(a.m)<0?0:1)-(num(b.m)<0?0:1)); /* v186: en una misma fecha, primero lo que descuenta */
   let run=0,deuda=0,nec=0,ult=-1;
   movs.forEach((x,i)=>{const antes=Math.max(0,-run);run+=num(x.m)||0;if(es(x)){nec+=Math.max(0,Math.max(0,-run)-antes);deuda=Math.max(0,-run);ult=i}});
   if(ult<0)return null;
@@ -305,6 +306,9 @@ function fdSiguiente(k){
   const sp=fdRendDe(k.rut).filter(r=>r.estado==="contabilizada").map(r=>({r,g:fdPago(r)})).filter(x=>x.g&&x.g.e==="pend").sort((a,b2)=>porPer(a.r,b2.r))[0];
   if(sp)return b("act",`Falta el pago de tu rendición de ${esc(fdMin(rdTitulo(sp.r)))}: <b>${fmtP(sp.g.falta)}</b>.`,sp.r.id);
   if(fdDeuda(k).pagar>0.5)return b("act","Falta el pago del reembolso: Contabilidad todavía no hace la orden de pago.");
+  /* v186: reembolso pagado en los últimos 7 días (para quien no tiene las notificaciones activadas) */
+  const pg=fdRendDe(k.rut).filter(r=>r.estado==="contabilizada").map(r=>({r,g:fdPago(r)})).filter(x=>x.g&&x.g.e==="ok"&&x.g.f&&x.g.f>=sumarDias(today(),-7)&&x.g.f<=today()).sort((a,b2)=>String(b2.g.f).localeCompare(String(a.g.f)))[0];
+  if(pg)return b("ok",`Te pagaron el reembolso de ${esc(fdMin(rdTitulo(pg.r)))}: <b>${fmtP(pg.g.total)}</b> (${esc(fdF(pg.g.f))}).`,pg.r.id);
   if(k.porRendir<=0.5)return"";
   const n=fdNivel(k);
   if(k.ultRend)return b(n,`Tu última rendición fue el ${fdF(k.ultRend,1)} (${haceDias(k.ultRend)}).${n?" Rinde lo que tengas pendiente.":""}`);
@@ -2660,4 +2664,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="185"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="186"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
