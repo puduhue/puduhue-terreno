@@ -68,7 +68,10 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
 - `rendiciones.js`: 7 fondo por rendir (v94) · 192 botón «Rendir» y tarjeta (v96) · 270 lectura de boletas (v98) · 496 `MÓDULO:
   Rendiciones` (tipos de gasto, maestros, roles) · 665 avisos por correo (v78) y agenda (v84) · 823 link ?rd=, motor contable, lectura
   con IA · 1052 pantallas (v92) · 1580 acciones y PDF (v81) · 1780 OneDrive y Excel mensual. Desde la v117, cerca de la línea 1613: editar colaboradores y aprobadores
-  (vista rdcol, rdColClick; escribe celda por celda en el Excel de _maestros con la API de Excel).
+  (vista rdcol, rdColClick; escribe celda por celda en el Excel de _maestros con la API de Excel). Desde la v183, antes de
+  `disConfHTML`: datos por corregir (`rdcItems` junta lo que falta, lo pedido al revisar y las reglas contables; `rdcResumenHTML` es el
+  resumen arriba de la foto; `rdcMarca` marca la fila del dato; `RD_ELIGE` es el documento en que quien revisa elige el dato de
+  «Pedir corrección», que se guarda en `d.obsCampo` y `d.obsValor`).
 - `actas-entrega.js` (v109): 18 textos del acta · 68 capacitaciones (v109) · 97 devoluciones (v77) · 113 datos comunes · 181 pantallas · 441 eventos · 536 PDF · 779 Excel.
 
 ## Carpetas de OneDrive (desde la v118, como en la app)
