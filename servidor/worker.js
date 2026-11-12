@@ -38,6 +38,9 @@
   Firma por link (v154): ver firma.js. Usa el mismo Durable Object AVISOS; no requiere variables.
   Contabilizar en FinnegansGO (v163): POST /finnegans/asiento, solo Contabilidad y el administrador; ver contabilizar.js.
     Desde la v182, POST /finnegans/adjunto adjunta al asiento el Resumen PDF y cada documento (API uploadFileCustom).
+  Prueba de adjuntos en órdenes de compra (v183.1, temporal): reporte «ocPrueba» en la pantalla de prueba de Finnegans de la app,
+    solo el administrador. Lee la guía de Finnegans, lista o muestra órdenes de compra y, con oc=… y subir=1, adjunta un PDF de
+    prueba para saber qué «clase» pide uploadFileCustom. Ver ocprueba.js. Quitar al terminar la prueba.
     FINN_EMPRESA      (texto)   opcional. Empresa de Finnegans de los asientos; por defecto 2 (CAPAC SPA, como el Excel)
     FINN_PARAMS_COTIZACION (texto) opcional (v163.3). Parámetros del reporte MONEDACOTIZACION (ej.: PARAMWEBREPORT_Moneda=DOLARES)
   Fondo por rendir (v94): ver fondo.js. Usa el reporte libroMayor directo (no hace falta agregarlo a FINN_REPORTES).
@@ -51,6 +54,7 @@ import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
+import { pruebaOC } from "./ocprueba.js"; /* v183.1: prueba temporal de adjuntos en órdenes de compra */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -104,7 +108,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v182";
+const VERSION_SERVIDOR = "v183.1";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -270,6 +274,8 @@ export default {
       // /reporte?nombre=X&PARAMWEBREPORT_...=... → solo reportes autorizados en FINN_REPORTES
       if (url.pathname === "/reporte") {
         const pedido = (url.searchParams.get("nombre") || "").trim();
+        /* v183.1: «ocPrueba» → guía de Finnegans, órdenes de compra y PDF de prueba adjunto (solo el administrador; ver ocprueba.js) */
+        if (pedido.toLowerCase() === "ocprueba") return json({ ...(await pruebaOC(env, url.searchParams, { tokenFinnegans, FINN })), consultadoPor: correo });
         const lista = (env.FINN_REPORTES || "").split(",").map(s => s.trim()).filter(Boolean).concat(env.FINN_REPORTE_STOCK ? [env.FINN_REPORTE_STOCK.trim()] : []);
         const nombre = lista.find(n => n.toLowerCase() === pedido.toLowerCase());
         if (!nombre) return json({ error: `El reporte ${pedido || "(sin nombre)"} no está autorizado en el servidor. Agrégalo en la variable FINN_REPORTES de Cloudflare.` }, 403);
