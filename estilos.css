@@ -2152,3 +2152,113 @@ details>*{box-sizing:border-box}
 .rdel-cab b{font-size:17px;line-height:1.25}
 .rdel-cab span{font-size:14px;color:var(--muted)}
 .rdok-r.eleg{box-shadow:inset 4px 0 0 var(--m-ink);padding-left:14px}
+
+/* ---------- v184: la app en el computador ----------
+   Todo va dentro de @media (min-width:1100px) y casi todo cuelga de body.conlat, la clase que latSync pone solo cuando la
+   pantalla es ancha y hay sesión: en el teléfono y en la tablet vertical no se aplica nada de esto. */
+@media (min-width:1100px){
+  /* --- marco: menú a la izquierda, contenido a la derecha --- */
+  body.conlat{--latw:264px;--colw:1040px}
+  body.conlat #app{margin-left:var(--latw)}
+  body.conlat .tabbar{display:none!important}
+  .lat{position:fixed;left:0;top:0;bottom:0;width:var(--latw);z-index:16;display:flex;flex-direction:column;gap:6px;padding:18px 14px 14px;
+    background:linear-gradient(180deg,var(--lx-hero2),var(--lx-hero) 55%);color:#F2F7FC;border-right:1px solid rgba(255,255,255,.08);overflow-y:auto}
+  .lat-logo{padding:2px 8px 14px}
+  .lat-logo img{display:block;height:38px;width:auto}
+  .lat button{font:inherit;color:inherit;border:0;background:none;text-align:left}
+  .lat-nuevo{display:flex;align-items:center;justify-content:center;gap:8px;height:46px;margin:0 2px 12px;border-radius:14px;background:#FFFFFF!important;color:#17324D!important;font-weight:800;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.22);transition:transform .12s,box-shadow .12s}
+  .lat-nuevo:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.28)}
+  .lat-nuevo .lat-mas{display:inline-flex}
+  .lat-nuevo .lat-mas svg{width:20px;height:20px}
+  .lat-lista{display:flex;flex-direction:column;gap:2px;flex:1 1 auto;min-height:0}
+  .lat-it{position:relative;display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;font-size:15px;font-weight:600;color:rgba(242,247,252,.86)!important;transition:background-color .12s,color .12s}
+  .lat-it:hover{background:rgba(255,255,255,.08)}
+  .lat-it.on{background:rgba(255,255,255,.14);color:#FFFFFF!important}
+  .lat-it.on::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:4px;border-radius:0 4px 4px 0;background:#FFFFFF}
+  .lat-i{display:inline-flex;flex:0 0 22px}
+  .lat-i svg{width:22px;height:22px}
+  .lat-t{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lat-n{flex:0 0 auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;background:#2F6FD0;color:#FFFFFF;font-size:12px;font-weight:800;line-height:22px;text-align:center}
+  .lat-n.urg{background:#C62828}
+  .lat-sep{height:1px;margin:10px 8px;background:rgba(255,255,255,.14)}
+  .lat-pie{display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid rgba(255,255,255,.14)}
+  .lat-cta{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px}
+  .lat-cta:hover,.lat-tema:hover{background:rgba(255,255,255,.08)}
+  .lat-cta .tbav{flex:0 0 34px;width:34px;height:34px;font-size:13px;background:#FFFFFF;color:#17324D}
+  .lat-ct{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+  .lat-ct b{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lat-ct small{font-size:12px;color:rgba(242,247,252,.7)}
+  .lat-tema{flex:0 0 40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:12px}
+  .lat-tema svg{width:20px;height:20px}
+  .lat :focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}
+  /* lo que va fijo en pantalla se corre con el menú */
+  body.conlat .foot,body.conlat .mudanza{left:var(--latw)}
+  body.conlat .toast,body.conlat .tdesh,body.conlat .updbar,body.conlat .ptr{left:calc(50% + var(--latw) / 2)}
+  /* sin barra abajo no hace falta el espacio que se le dejaba */
+  body.conlat.contab .wrap{padding-bottom:64px}
+  body.conlat.contab .sesbar{bottom:24px}
+
+  /* --- Inicio: encabezado bajo (el logo y los módulos están en el menú) y cuerpo en dos columnas --- */
+  body.conlat .lx-hero{display:grid;grid-template-columns:minmax(0,max-content) minmax(240px,1fr) auto;grid-template-areas:"fecha buscar estado" "saludo buscar estado";column-gap:16px;align-items:center;
+    padding:26px max(24px,calc((100% - var(--colw)) / 2)) 78px;border-radius:0}
+  body.conlat .lx-hero>*{max-width:none!important;margin-left:0!important;margin-right:0!important}
+  body.conlat .lx-hero>.lx-top{grid-area:estado;align-self:center}
+  body.conlat .lx-hero .lx-logo,body.conlat .lx-hero .lx-tema,body.conlat .lx-hero>.ihacc-f,body.conlat .lx-hero>.ihbtn{display:none}
+  body.conlat .lx-hero>.lx-date{grid-area:fecha;margin-top:0;align-self:end}
+  body.conlat .lx-hero>.lx-h1{grid-area:saludo;font-size:28px;align-self:start}
+  body.conlat .lx-hero>.lx-sub{grid-column:1/-1}
+  body.conlat .lx-hero>.lx-bus{grid-area:buscar;margin-top:0;align-self:center;justify-self:end;width:100%;max-width:460px!important}
+  body.conlat .lx-hero>.lx-hills{position:absolute;margin:0}
+  body.conlat .wrap.lx-main:has(>.ifd){display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,372px);column-gap:20px;align-items:start;grid-auto-flow:dense}
+  body.conlat .wrap.lx-main:has(>.ifd)>*{grid-column:1/-1;min-width:0}
+  body.conlat .wrap.lx-main:has(>.ifd)>.ifd{grid-column:2}
+  body.conlat .wrap.lx-main:has(>.ifd)>.lx-hoy,body.conlat .wrap.lx-main:has(>.ifd)>.ini-aldia{grid-column:1}
+
+  /* --- un solo ancho para todas las pantallas; las de formulario, más angostas para que los campos no queden estirados --- */
+  body.conlat .wrap{max-width:calc(var(--colw) + 32px)}
+  body.conlat .top .in{max-width:calc(var(--colw) + 32px)}
+  body.conlat[data-pant="edit"],body.conlat[data-pant="axe"]{--colw:920px}
+  body.conlat[data-pant="clv"],body.conlat[data-pant="clcat"],body.conlat[data-pant="cbv"],body.conlat[data-pant="pickDev"],body.conlat[data-pant="finn"]{--colw:860px}
+
+  /* --- botones y buscadores: su tamaño, no todo el ancho --- */
+  body.conlat .wrap>.btns{justify-content:flex-start}
+  body.conlat .wrap>.btns>.btn{flex:0 1 auto!important;width:auto!important;min-width:210px} /* algunos traen flex:1 en el atributo style */
+  body.conlat .wrap>.start:has(>.acc){grid-template-columns:repeat(auto-fit,minmax(260px,340px))!important}
+  body.conlat .wrap>.search,body.conlat .wrap>.hzbus,body.conlat .ppanel>.hzbus,body.conlat .wrap>.smord{max-width:520px}
+
+  /* --- portadas de módulo (Actas, Check list): las opciones en columnas --- */
+  body.conlat[data-pant="axhub"] .wrap>.start{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px}
+  body.conlat[data-pant="clhub"] .wrap>.start{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px}
+  body.conlat[data-pant="axhub"] .start>.big,body.conlat[data-pant="clhub"] .start>.big{min-height:128px}
+
+  /* --- acta de vivienda y actas de entrega: los ítems del check list en dos columnas --- */
+  body.conlat[data-pant="edit"] .wrap>.sec,body.conlat[data-pant="axe"] .wrap>.sec{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;align-items:start}
+  body.conlat[data-pant="edit"] .wrap>.sec>*,body.conlat[data-pant="axe"] .wrap>.sec>*{grid-column:1/-1;min-width:0}
+  body.conlat[data-pant="edit"] .wrap>.sec>.it,body.conlat[data-pant="axe"] .wrap>.sec>.it{grid-column:auto}
+
+  /* --- Check list: predios y hallazgos en dos columnas --- */
+  body.conlat[data-pant="cl"] .smlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;background:none;border:0;border-radius:0;overflow:visible}
+  body.conlat[data-pant="cl"] .smlist>.smrow{border:1px solid var(--line);border-radius:16px;background:var(--card)}
+  body.conlat[data-pant="clp"] .ppanel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;align-items:start}
+  body.conlat[data-pant="clp"] .ppanel>*{grid-column:1/-1;min-width:0}
+  body.conlat[data-pant="clp"] .ppanel>.it{grid-column:auto;height:100%}
+
+  /* --- Stock: los cuatro filtros en una fila --- */
+  body.conlat[data-pant="stock"] .skf.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+  /* --- Rendiciones: «Mis rendiciones» con el fondo por rendir al lado; la rendición, con su avance (Envío › Jefatura › Contabilidad › Finnegans) al lado --- */
+  body.conlat[data-pant="rd"] .wrap:has(>.fdc){display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,384px);column-gap:24px;align-content:start}
+  body.conlat[data-pant="rd"] .wrap:has(>.fdc)>*{grid-column:1;min-width:0}
+  body.conlat[data-pant="rd"] .wrap:has(>.fdc)>.fdc{grid-column:2;grid-row:1/span 60;align-self:start;position:sticky;top:76px;margin-top:14px}
+  body.conlat[data-pant="rdv"] .wrap:has(>.rdst){display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,384px);column-gap:24px;align-content:start}
+  body.conlat[data-pant="rdv"] .wrap:has(>.rdst)>*{grid-column:1;min-width:0}
+  body.conlat[data-pant="rdv"] .wrap:has(>.rdst)>.rdst{grid-column:2;grid-row:1/span 60;align-self:start;position:sticky;top:76px;margin-top:14px}
+  body.conlat[data-pant="rdm"] .wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;align-content:start}
+  body.conlat[data-pant="rdm"] .wrap>*{grid-column:1/-1;min-width:0}
+  body.conlat[data-pant="rdm"] .wrap>.rdmf{grid-column:auto}
+
+  /* --- Administración: las secciones en dos columnas --- */
+  body.conlat[data-pant="adm"] .wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;align-content:start;align-items:start}
+  body.conlat[data-pant="adm"] .wrap>*{grid-column:1/-1;min-width:0}
+  body.conlat[data-pant="adm"] .wrap>.admsec{grid-column:auto}
+}

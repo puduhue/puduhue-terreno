@@ -18,7 +18,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
   separa las bibliotecas en cachés propias y muestra las notificaciones.
 - `lib/<biblioteca>-<versión>/`: bibliotecas de terceros, sin cambios: MSAL 3.30.0 (inicio de sesión), SheetJS 0.20.3 mini (Excel; desde la v140, M-30; la carpeta de la 0.18.5 queda para los teléfonos sin actualizar),
   jsPDF 2.5.1 (PDF), pdf.js 6.3.289 (ver PDF), zxing-wasm 3.1.4 (código del SII) y heic2any 0.0.4
-  (fotos HEIC a JPEG, desde la v125; se carga solo cuando hace falta, desde `compress()` en index.html). Además, `lib/marca-puduhue-1/marcas.js` define
+  (fotos HEIC a JPEG, desde la v125; se carga solo cuando hace falta, desde `compress()` en index.html). Además, `lib/marca-puduhue-2/marcas.js` (desde la v184: `MARCA_HZ` con el símbolo a color en un círculo blanco y la palabra en blanco; la carpeta `marca-puduhue-1` queda para los teléfonos sin actualizar) define
   los logos en base64 (`MARCA`, `MARCA_HZ` y `LOGO`, este último para los PDF), desde la v101.
 - `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, Finnegans, lectura de boletas). Desde la v141 (M-26), la app le habla con un token propio (ámbito `api://<id de la app>/Acceso`, srvFetch en index.html) y el servidor lo revisa él mismo (verificarTokenApi en worker.js); el token de Graph se sigue aceptando hasta que todos tengan la v141. Se publica solo con
   GitHub Actions al subir cambios de `servidor/` a main.
@@ -34,7 +34,7 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
 ## Carga
 `<head>`: metas, manifest, `<script src="lib/...">` de MSAL, SheetJS y jsPDF (normales: la app los usa al cargar) y
 `<link rel="stylesheet" href="estilos.css?v=NN">`. `<body>`: `<div id="app">` con «Cargando…» y, en este orden:
-`lib/marca-puduhue-1/marcas.js` → código general (inline) → `modulos/checklist.js` → `bodega.js` → `rendiciones.js` →
+`lib/marca-puduhue-2/marcas.js` → código general (inline) → `modulos/checklist.js` → `bodega.js` → `rendiciones.js` →
 `actas-entrega.js` → arranque (inline: registro del service worker e `init()`). Todos son scripts normales y comparten las
 variables globales; el orden es el mismo que tenían en el archivo único. Si falta un módulo, el arranque muestra «No se pudo cargar
 la app» con «Reintentar». Los escuchadores globales (`document/window.addEventListener`) de los módulos se quedaron en index.html,
@@ -56,6 +56,7 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
 | (v121, tras Administración) | `v121: permisos por persona y módulo` | Permisos por persona (Administración › Permisos): PERM, permVe/permAgrega, vista perm; se guarda en OneDrive en Apps de terreno/_config/Permisos_app.json |
 | (v122, tras «Datos fijos del protocolo») | `v122: casa de familia o casa de huéspedes` | Tipo de vivienda de las actas (`a.casa`: familia/huespedes, `esHuesp`), reglamento de convivencia (`REGL`, `REGL_PLAN`, `reglHTML`); en el PDF, `secReglamento` (Anexo 4) junto a «PDF» |
 | (v139, tras `function status()`) | `v139: número en el ícono de la app` | Número en el ícono (insignia/insigniaYa, setAppBadge; base «puduhue-insignia» que lee sw.js; el servidor manda el número con insigniaDe en servidor/push.js) y hoja «Subiendo fotos» al cerrar (esperarFotos, llamada en los 5 cierres) |
+| (v184, antes de `const TB_RAIZ=`) | `escritorio: menú lateral` | Solo con 1.100 px de ancho o más: menú fijo a la izquierda (`#lateral`, `latSync` después de `tbSync` en cada render; `latAncho`, `latModDe`) en lugar de la barra de abajo. Sus botones usan la acción `latIr` (al inicio de `onClickAccion`): guarda con `flush`, suelta el registro abierto (`cur`, `clv`, `cbv`, `rdv`, `rdd`) y sigue con la acción de siempre. `body.conlat` y `body[data-pant]` (la pantalla abierta) solo existen con el menú. El CSS está al final de estilos.css, todo dentro de `@media (min-width:1100px)`: bajo ese ancho no cambia nada |
 | 2423-2498 | `---------- Inicio ----------` | Pantalla de inicio |
 | 2499-fin | `Actualización automática` | Aviso de versión nueva |
 
@@ -96,6 +97,7 @@ Ojo: `saludo` y `fechaLarga` están definidas dos veces (cerca de «Pantalla de 
 - **Paridad entre módulos:** cuando se agrega o corrige algo en un módulo (eliminar borrador, anular con motivo, Excel consolidado,
   «⋯», fotos), revisar los demás módulos y dejarlos iguales.
 - **Fotos:** botones Cámara y Galería en cada campo de foto; en el computador, «Subir foto».
+- **Computador (v184):** lo que sea solo para el computador va dentro de `@media (min-width:1100px)` y con `body.conlat`, para no tocar el teléfono; un módulo o un botón nuevo de la barra de abajo se agrega también al menú (`latSync`).
 - **Diseño:** sensación de app nativa, buen contraste en modo noche y día, y que se vea bien en el computador. Cambios visuales grandes,
   primero en vista previa con aprobación de Benja.
 - **Textos:** español neutro, simple, sin modismos chilenos.
