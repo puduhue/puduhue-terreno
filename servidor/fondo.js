@@ -182,9 +182,11 @@ export function pagosRecientes(personas, hoy, dias = PAGOS_DIAS) {
 /* texto de la notificación para una persona (uno o varios pagos nuevos) */
 export function textoPago(L) {
   const tot = L.reduce((s, e) => s + e.m, 0), ult = L.slice().sort((a, b) => String(a.f).localeCompare(String(b.f))).pop(), queda = Math.max(...L.map(e => e.queda || 0));
-  const fin = queda > 0.5 ? ` Todavía quedan ${pesos(queda)} por pagar.` : " Ya no tienes reembolsos pendientes.";
-  if (L.length === 1) return { titulo: `Te pagaron el reembolso: ${pesos(tot)}`, texto: `${[ult.ref, fechaTxt(ult.f) ? "del " + fechaTxt(ult.f) : ""].filter(Boolean).join(" ")}.${fin}`.replace(/^\./, "Contabilidad registró el pago.") };
-  return { titulo: `Te pagaron reembolsos por ${pesos(tot)}`, texto: `${L.length} pagos; el último, ${[ult.ref, fechaTxt(ult.f) ? "del " + fechaTxt(ult.f) : ""].filter(Boolean).join(" ")}.${fin}` };
+  /* v188: el servidor ve la orden de pago en el libro mayor, no la transferencia del banco: el texto no dice «te pagaron» */
+  const doc = [ult.ref, fechaTxt(ult.f) ? "del " + fechaTxt(ult.f) : ""].filter(Boolean).join(" ");
+  const fin = " La transferencia puede tardar unos días." + (queda > 0.5 ? ` Quedan ${pesos(queda)} por pagar.` : "");
+  if (L.length === 1) return { titulo: `Pago de tu reembolso registrado: ${pesos(tot)}`, texto: `Contabilidad registró el pago${doc ? " (" + doc + ")" : ""}.${fin}` };
+  return { titulo: `Pagos de tus reembolsos registrados: ${pesos(tot)}`, texto: `Contabilidad registró ${L.length} pagos${doc ? "; el último, " + doc : ""}.${fin}` };
 }
 /* lo llama la tarea programada de cada hora: lee el libro mayor y le pasa los pagos al almacenamiento, que avisa los nuevos */
 export async function avisosDePago(env, ctx, obj, reporte, sujeto, cuando, forzar) {
