@@ -70,7 +70,7 @@ function fdReemb(movs){
     if(m>0&&x.t==="entrega"&&antes<-0.5&&m<=-antes+0.5)out.add(x)});
   return out;
 }
-const fdTipoMov=(x,re)=>re?"Reembolso pagado":(FD_TIPO[x.t]||FD_TIPO.otro);
+const fdTipoMov=(x,re)=>re?"Pago de reembolso": /* v188: es la orden de pago registrada en Finnegans, no la transferencia */(FD_TIPO[x.t]||FD_TIPO.otro);
 function fdCalc(p){
   const movs=(p.movs||[]).filter(x=>x&&x.f).slice().sort((a,b)=>String(a.f).localeCompare(String(b.f)));
   const saldo=Math.round(movs.reduce((s,x)=>s+(num(x.m)||0),0));
@@ -135,8 +135,8 @@ function fdPagoHTML(r){
   if(!r||r.estado!=="contabilizada")return"";
   const mio=esPropia(r);if(mio&&fdVisible())fdAuto();else fdAutoT();
   const g=fdPago(r);if(!g)return"";
-  if(g.e==="pend")return `<p class="rdpago pend"><i aria-hidden="true"></i><span><b>Falta el pago del reembolso: ${fmtP(g.falta)}</b>${g.falta<g.total-0.5?`<small>Ya se pagaron ${fmtP(g.total-g.falta)} de ${fmtP(g.total)}.</small>`:""}<small>${mio?"Contabilidad todavía no hace la orden de pago.":"En Finnegans todavía no hay una orden de pago que la cubra."}</small></span></p>`;
-  if(g.e==="ok")return `<p class="rdpago ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4L18 8"/></svg><span><b>Reembolso pagado${g.f?` el ${esc(fdF(g.f,1))}`:""}</b><small>${esc([g.ref,fmtP(g.total)].filter(Boolean).join(" · "))}</small></span></p>`;
+  if(g.e==="pend")return `<p class="rdpago pend"><i aria-hidden="true"></i><span><b>Falta el pago del reembolso: ${fmtP(g.falta)}</b>${g.falta<g.total-0.5?`<small>Ya se registró el pago de ${fmtP(g.total-g.falta)} de ${fmtP(g.total)}.</small>`:""}<small>${mio?"Contabilidad todavía no hace la orden de pago.":"En Finnegans todavía no hay una orden de pago que la cubra."}</small></span></p>`;
+  if(g.e==="ok")return `<p class="rdpago ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4L18 8"/></svg><span><b>Pago registrado${g.f?` el ${esc(fdF(g.f,1))}`:""}</b><small>${esc([g.ref,fmtP(g.total)].filter(Boolean).join(" · "))}</small><small>La transferencia puede tardar unos días.</small></span></p>`; /* v188: la app ve la orden de pago en Finnegans, no el banco */
   return `<p class="rdpago fondo"><i aria-hidden="true"></i><span>${mio?"Se descontó de tu fondo por rendir: no hay reembolso que pagar.":"Se descontó del fondo por rendir de la persona: no hay reembolso que pagar."}</span></p>`;
 }
 /* ---- «Mis rendiciones»: tarjeta del fondo ---- */
@@ -207,7 +207,7 @@ function fdMvDet(x,lista,p){
   const m=num(x.m)||0,X=x.x||{},nt=s=>normTxt(s||""),ref=x.ref||X.doc||"",desc=X.ds||x.d||"";
   const fila=(k,v)=>v?`<div><dt>${k}</dt><dd>${v}</dd></div>`:"";
   const ef=x.t==="inicial"?"":m>0?"suma a lo que hay por rendir":"descuenta de lo que hay por rendir";
-  const que=x.re?"Reembolso: Contabilidad pagó lo que la rendición dejó a favor de la persona. No es un fondo por rendir." /* v187 */
+  const que=x.re?"Reembolso: orden de pago de Contabilidad por lo que la rendición dejó a favor de la persona. No es un fondo por rendir." /* v187, v188 */
     :FD_QUE[x.t]?FD_QUE[x.t]+(ef?": "+ef:"")+".":ef.charAt(0).toUpperCase()+ef.slice(1)+".";
   const td=X.td&&!nt(ref).includes(nt(X.td))?X.td:"",co=X.co&&!nt(ref).includes(nt(X.co))?X.co:"";
   /* el mismo documento con varias líneas (por ejemplo, una orden de pago que paga varias cosas) */
@@ -324,7 +324,7 @@ function fdSiguiente(k){
   if(fdDeuda(k).pagar>0.5)return b("act","Falta el pago del reembolso: Contabilidad todavía no hace la orden de pago.");
   /* v186: reembolso pagado en los últimos 7 días (para quien no tiene las notificaciones activadas) */
   const pg=fdRendDe(k.rut).filter(r=>r.estado==="contabilizada").map(r=>({r,g:fdPago(r)})).filter(x=>x.g&&x.g.e==="ok"&&x.g.f&&x.g.f>=sumarDias(today(),-7)&&x.g.f<=today()).sort((a,b2)=>String(b2.g.f).localeCompare(String(a.g.f)))[0];
-  if(pg)return b("ok",`Te pagaron el reembolso de ${esc(fdMin(rdTitulo(pg.r)))}: <b>${fmtP(pg.g.total)}</b> (${esc(fdF(pg.g.f))}).`,pg.r.id);
+  if(pg)return b("ok",`Contabilidad registró el pago de tu rendición de ${esc(fdMin(rdTitulo(pg.r)))}: <b>${fmtP(pg.g.total)}</b> (${esc(fdF(pg.g.f))}).`,pg.r.id); /* v188 */
   if(k.porRendir<=0.5)return"";
   const n=fdNivel(k);
   if(k.ultRend)return b(n,`Tu última rendición fue el ${fdF(k.ultRend,1)} (${haceDias(k.ultRend)}).${n?" Rinde lo que tengas pendiente.":""}`);
@@ -1659,7 +1659,7 @@ function rdTrasSubir(r,keys){keys=keys.filter(Boolean);if(keys.length<2||!rdv||r
 function rdEstadoChip(r){const e=r.estado||"borrador";
   const g=e==="contabilizada"?fdPago(r):null; /* v185: contabilizada con el reembolso sin pagar, o ya pagado */
   if(g&&g.e==="pend")return `<span class="xp camb">Falta el pago</span>`;
-  if(g&&g.e==="ok")return `<span class="xp ok">Pagada</span>`;
+  if(g&&g.e==="ok")return `<span class="xp ok">Pago registrado</span>`; /* v188 */
   const cls=e==="aprobada"||e==="contabilizada"?"ok":e==="enviada"||e==="revcont"?"camb":e==="observada"?"nueva":"";return `<span class="xp ${cls}" ${cls?"":'style="background:var(--soft);color:var(--muted)"'}>${RD_ESTADO[e]||e}</span>`}
 /* v178: fila de una rendición anulada o eliminada (lista «Anuladas y eliminadas» de Contabilidad): dice qué pasó, cuándo y quién,
    en vez del estado que tenía («Borrador») */
@@ -2680,4 +2680,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="187"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="188"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
