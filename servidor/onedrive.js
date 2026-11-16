@@ -102,9 +102,12 @@ export async function graphApp(env, ruta, op = {}, reintento = true) {
 const errGraph = async r => { let j = {}; try { j = await r.json(); } catch (e) {} return ((j.error && (j.error.code + ": " + j.error.message)) || String(r.status)).slice(0, 300); };
 
 /* /od/prueba: comprueba la credencial (token), la lectura de «Apps de terreno» y, con ?escribir=1, la escritura */
-export async function rutasOneDrive(req, env, url, { correo, json, autorizado }) {
+export async function rutasOneDrive(req, env, url, { correo, json, autorizado }, extra) {
   if (!url.pathname.startsWith("/od/")) return null;
+  if (url.pathname === "/od/rend" && extra && extra.rend) return extra.rend(); /* v194: rendiciones (rendod.js; cualquier cuenta, con reglas) */
   if (!autorizado) return json({ error: "Solo el administrador puede usar esta ruta." }, 403);
+  if (url.pathname === "/od/avisos" && req.method === "GET" && extra && extra.avisos) { /* v194: lo que no cumplió las reglas */
+    const L = await extra.avisos.odLeer(); return json({ ok: true, modo: extra.modo, total: L.length, avisos: L.slice(-100).reverse() }); }
   if (url.pathname !== "/od/prueba" || req.method !== "GET") return json({ error: "Ruta desconocida." }, 404);
   if (!odListo(env)) return json({ ok: false, paso: "clave", error: /BEGIN RSA PRIVATE KEY/.test(String(env.OD_CLAVE_PRIVADA || "")) ? "La clave del certificado está en formato PKCS#1; se necesita PKCS#8 («BEGIN PRIVATE KEY»)." : "Falta la clave del certificado del servidor (OD_CLAVE_PRIVADA) en Cloudflare." }, 503);
   const c = odConfig(env), res = { ok: false, client: c.client, raiz: c.raiz };
