@@ -1246,6 +1246,35 @@ const totalRend=r=>docsDe(r).reduce((s,d)=>s+(num(d.total)||0),0);
 const centroDoc=(r,d)=>d.centro||PREDIO_CENTRO[d.predio]||"";
 /* v133 (M-17): N° de boleta o factura sin ceros a la izquierda ni otros signos; orden de llegada de dos documentos */
 const folioNorm=f=>{const s=String(f||"").trim(),n=s.replace(/\D/g,"").replace(/^0+/,"");return n||s.toUpperCase()};
+/* v189: posibles duplicados. Antes (v133) solo boletas sin RUT con el mismo total y fecha, y quien rinde lo veía como «dato
+   en blanco». Ahora: mismo total y misma fecha, o mismo total y mismo N° (4 o más dígitos), cualquiera sea el tipo; no con RUT
+   válidos distintos ni en peajes (se repiten). Mismo RUT y N° sigue siendo «Documento duplicado» (bloquea). */
+const rdDupRut=x=>x.rut&&rutValido(x.rut)?normRut(x.rut):"";
+function rdDupPar(d,y){
+  if(!y||y===d)return false;const t=Math.round(num(d.total));if(!(t>0)||Math.round(num(y.total))!==t)return false;
+  if(d.tipo==="peaje"||y.tipo==="peaje")return false;
+  const ra=rdDupRut(d),rb=rdDupRut(y);if(ra&&rb&&ra!==rb)return false;
+  const fo=f=>{const s=folioNorm(f);return /^\d{4,}$/.test(s)?s:""},fa=fo(d.folio),fb=fo(y.folio);
+  if(ra&&ra===rb&&d.folio&&y.folio&&folioNorm(d.folio)===folioNorm(y.folio))return false; /* ese caso bloquea (v133) */
+  return (!!d.fecha&&d.fecha===y.fecha)||(!!fa&&fa===fb)}
+function rdDupDe(r,d){
+  const par=y=>rdDupPar(d,y)&&docAntes(y,d);
+  let y=Object.values(r.docs||{}).find(par);if(y)return{otra:r,y};
+  for(const x of Object.values(REND)){if(!x||x.id===r.id||x.anulada)continue;y=Object.values(x.docs||{}).find(par);if(y)return{otra:x,y}}
+  return null}
+const rdDupDonde=(r,x)=>x.otra===r?"en esta rendición":`en ${esMiaR(x.otra)?"tu rendición":"la rendición de "+((x.otra.persona&&x.otra.persona.nombre)||"otra persona")} de ${periodoTxt(x.otra.periodo).toLowerCase()}`;
+const rdDupTxt=(r,d,x)=>`Posible duplicado: ${rdDupDonde(r,x)} ya hay un documento de ${x.y.emisor||"emisor sin nombre"}${x.y.fecha?` del ${fmtD(x.y.fecha)}`:""} por ${fmtP(num(x.y.total))} (mismo total y ${d.fecha&&d.fecha===x.y.fecha?"fecha":"número"}).${d.noDup?" Quien rinde indicó que es otro gasto.":" Si es el mismo gasto, elimina este documento."}`;
+const esDupMsg=m=>/^Posible duplicado:/.test(m);
+/* al terminar de leer la foto: si se parece a otro documento, preguntar una vez */
+async function rdPreguntarDup(r,d,x){
+  d.dupPreg=true;let otro=false;const h=e=>{if(e.target&&e.target.closest&&e.target.closest('.modal [data-m="no"]'))otro=true};
+  document.addEventListener("click",h,true);
+  const si=await ask("¿Documento repetido?",`Se parece a un documento que ya está ${rdDupDonde(r,x)}: ${x.y.emisor||"sin emisor"}${x.y.fecha?`, ${fmtD(x.y.fecha)}`:""}, ${fmtP(num(x.y.total))}. Si es el mismo gasto (por ejemplo, otra foto del mismo comprobante), elimínalo para no rendirlo dos veces.`,"Eliminar este",true,"","Es otro gasto");
+  document.removeEventListener("click",h,true);
+  if(si&&r.docs&&r.docs[d.k]===d&&editaPersona(r)){delete r.docs[d.k];if(rdd===d)rdd=null;r.actualizado=new Date().toISOString();await saveRend(r,true);
+    if(view==="rdd"&&rdv===r)go("rdv");else render();
+    deshacer("Documento eliminado.",async()=>{if(r.docs[d.k])return;r.docs[d.k]=d;r.actualizado=new Date().toISOString();await saveRend(r,true);render()},()=>{if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d)});return}
+  if(otro)d.noDup=true;r.actualizado=new Date().toISOString();await saveRend(r,true);render()}
 const docAntes=(x,y)=>{const a=String(x.creado||""),b=String(y.creado||"");return a<b||(a===b&&String(x.k||"")<String(y.k||""))};
 /* Problemas de un documento: b impide enviar · a advertencia (se envía igual y quien revisa la ve) */
 function problemasDoc2(r,d){
@@ -1270,11 +1299,8 @@ function problemasDoc2(r,d){
     if(otra){const quien_=otra.persona&&otra.persona.nombre||quien(otra.creadoPor)||"otra persona",mia=esMiaR(otra);
       b.push(`Documento duplicado: esta boleta o factura (mismo RUT y número) ya está en ${mia?"tu rendición":"la rendición de "+quien_} de ${periodoTxt(otra.periodo).toLowerCase()} (${(RD_ESTADO[otra.estado]||otra.estado||"").toLowerCase()}). Debe quedar en una sola rendición: elimínala de una de las dos.`)}
     else if(Object.values(r.docs||{}).some(igual))b.push("Documento duplicado: esta boleta o factura (mismo RUT y número) está dos veces en esta misma rendición. Elimina una.")}
-  /* v133 (M-17): boletas sin RUT con el mismo total y fecha: posible duplicado (aviso en la más nueva; los peajes se repiten) */
-  if(d.tipo==="boleta"&&!(d.rut&&rutValido(d.rut))&&num(d.total)>0&&d.fecha){
-    const par=y=>y!==d&&y.tipo==="boleta"&&!(y.rut&&rutValido(y.rut))&&Math.round(num(y.total))===Math.round(num(d.total))&&y.fecha===d.fecha&&docAntes(y,d);
-    const otra=Object.values(r.docs||{}).some(par)?r:Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(par));
-    if(otra)a.push(otra===r?"Posible duplicado: en esta rendición hay otra boleta sin RUT con el mismo total y fecha. Si es la misma, elimina una.":`Posible duplicado: ${esMiaR(otra)?"tu rendición":"la rendición de "+(otra.persona&&otra.persona.nombre||"otra persona")} de ${periodoTxt(otra.periodo).toLowerCase()} tiene una boleta sin RUT con el mismo total y fecha. Si es la misma, elimina una.`)}
+  /* v189: posible duplicado (mismo total y fecha, o mismo total y N°, en cualquier tipo); aviso en el más nuevo */
+  {const x=rdDupDe(r,d);if(x)a.push(rdDupTxt(r,d,x))}
   /* v133 (M-16): la lectura con IA dice que la foto no se lee o no es una boleta o factura */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
@@ -1371,7 +1397,7 @@ function rdAsiento(r){
   const c=colabDe(r),per=String(r.periodo||"").split("-");
   const desc=rdDescAsiento(r);
   D.forEach(d=>{
-    problemasDoc2(r,d).b.forEach(m=>add("b",m,d.k));
+    {const P=problemasDoc2(r,d);P.b.forEach(m=>add("b",m,d.k));P.a.filter(esDupMsg).forEach(m=>add("r",m,d.k))} /* v189: posibles duplicados en «Por revisar» */
     const im=imputar(r,d);im.al.forEach(a=>al.push(Object.assign({},a,{k:d.k})));
     const tot=Math.round(num(d.total));if(!im.cuenta||!(tot>0))return;
     const fac=im.cuenta==="210201"||im.cuenta==="210203";
@@ -1577,6 +1603,8 @@ async function leerDoc(r,d){
     try{const k="rd-lecturas-"+periodoActual();localStorage.setItem(k,String((+localStorage.getItem(k)||0)+1))}catch(e){}
   }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento."};console.warn("lectura",e)}
   finally{listo();delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
+  /* v189: si se parece a otro documento, preguntar una vez (solo quien rinde, mientras la puede editar) */
+  if(!d.dupPreg&&!d.noDup&&r.docs&&r.docs[d.k]===d&&editaPersona(r)){const x=rdDupDe(r,d);if(x)await rdPreguntarDup(r,d,x)}
 }
 async function leerPendientes(){
   /* v133 (B-12): una lectura que quedó en «Leyendo…» porque la app se cerró a mitad vuelve a «pendiente» y se lee de nuevo */
@@ -1761,7 +1789,9 @@ function rdDocCard(r,d){
   const L=editable?rdcItems(r,d,P):[],pend=L.filter(x=>!x.ok);
   if(L.length){/* v183: el dato y el motivo van en su línea */}
   else if(d.estadoRev==="obs")ch.push(`<span class="xp nueva">Por corregir</span>`);else if(d.estadoRev==="ok")ch.push(`<span class="xp ok">Revisada</span>`);
-  if(P.a.length&&editable)ch.push(`<span class="xp camb">${P.a.length} ${P.a.length===1?"dato en blanco":"datos en blanco"}</span>`);
+  {const nD=P.a.filter(esDupMsg).length,nB=P.a.length-nD; /* v189 */
+    if(nD&&editable&&!d.noDup)ch.push(`<span class="xp nueva">Posible duplicado</span>`);
+    if(nB&&editable)ch.push(`<span class="xp camb">${nB} ${nB===1?"dato en blanco":"datos en blanco"}</span>`)}
   if(d.aj&&Object.keys(d.aj).length)ch.push(`<span class="xp camb">Ajuste contable</span>`);
   {const gs=d.gastoIA||d.gastoHist;if(editable&&(d.centroSug||gs))ch.push(`<span class="xp sug">${d.centroSug&&gs?"Centro y tipo sugeridos":gs?"Tipo sugerido":"Centro sugerido"}</span>`)}
   if(!ch.length&&editable&&!L.length)ch.push(`<span class="xp ok">Completa</span>`);
@@ -2319,9 +2349,9 @@ async function rdClick(A,b){
     const c=colabDe(rdv);let j=c?jefaturaDe(c):null;if(j&&j.correo&&(j.correo===meCorreo()||correosDe(c).includes(j.correo)))j=null;
     const devCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&!!rdv.aprobJef,cambio=devCont&&rdCambioDesdeDev(rdv); /* v133 (M-14) */
     const vuelveCont=devCont&&!cambio,eraObs=rdv.estado==="observada";
-    const adv=D.reduce((n,d)=>n+docAdvertencias(rdv,d).length,0);
+    const adv=D.reduce((n,d)=>n+docAdvertencias(rdv,d).filter(m=>!esDupMsg(m)).length,0),nDup=D.filter(d=>!d.noDup&&docAdvertencias(rdv,d).some(esDupMsg)).length; /* v189 */
     const quienRev=vuelveCont?"Vuelve a revisión de Contabilidad, que recibirá un aviso por correo.":cambio&&j&&j.correo?`Como agregaste, quitaste o cambiaste el monto de documentos, vuelve a aprobación de ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:j&&j.correo?`La aprueba ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:"No tienes jefatura asignada: la revisa Contabilidad, que recibirá un aviso por correo.";
-    if(!(await ask(vuelveCont?"¿Reenviar la rendición?":"¿Enviar a aprobación?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))}. ${quienRev}${adv?` Hay ${adv} ${adv===1?"dato en blanco":"datos en blanco"} que quien revisa podrá completar.`:""} Después de enviar no se puede modificar hasta que la revisen.`,"Enviar")))return true;
+    if(!(await ask(vuelveCont?"¿Reenviar la rendición?":"¿Enviar a aprobación?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))}. ${quienRev}${nDup?` Hay ${nDup===1?"un posible duplicado":`${nDup} posibles duplicados`}: revisa que no sea el mismo gasto dos veces.`:""}${adv?` Hay ${adv} ${adv===1?"dato en blanco":"datos en blanco"} que quien revisa podrá completar.`:""} Después de enviar no se puede modificar hasta que la revisen.`,"Enviar")))return true;
     if(!vuelveCont){rdv.jefatura=j;delete rdv.aprobJef}
     /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
     const directo=!vuelveCont&&!(j&&j.correo);
@@ -2680,4 +2710,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="188"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="189"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
