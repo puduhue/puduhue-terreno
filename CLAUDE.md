@@ -74,7 +74,9 @@ Ordenado por versión. Donde salió un módulo queda una línea `/* v102/v103: �
   resumen arriba de la foto; `rdcMarca` marca la fila del dato; `RD_ELIGE` es el documento en que quien revisa elige el dato de
   «Pedir corrección», que se guarda en `d.obsCampo` y `d.obsValor`). Desde la v189, junto a `docAntes`: posibles duplicados
   (`rdDupDe` compara mismo total y fecha, o mismo total y N°; al terminar la lectura pregunta «¿Documento repetido?»; `d.noDup` si la
-  persona dijo que es otro gasto y `d.dupPreg` para no volver a preguntar). Desde la v185, antes de la tarjeta del fondo
+  persona dijo que es otro gasto y `d.dupPreg` para no volver a preguntar). Desde la v191, antes de `disModoConf`: `rdLeyendo(d,P)` dice si la app
+  todavía está leyendo la foto; mientras tanto no se avisa que faltan datos (resumen de arriba de la foto, barra de abajo y lista
+  de la rendición), solo «Leyendo el documento…». Desde la v185, antes de la tarjeta del fondo
   (`«Mis rendiciones»: tarjeta del fondo`): pago del reembolso. `fdPago(r)` dice si a una rendición contabilizada le falta el pago, si
   ya se pagó o si se descontó del fondo, con los movimientos de la persona en Finnegans en la cuenta del asiento (los pagos cubren
   primero lo más antiguo); `fdPagoHTML` es la línea bajo el seguimiento; `fdDeuda` separa el saldo a favor en por pagar y en revisión
