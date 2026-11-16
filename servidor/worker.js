@@ -47,6 +47,8 @@
   días hábiles revisa la agenda de pendientes que deja la app y avisa (ver recordatorios.js).
   Aviso del pago del reembolso (v186): la misma tarea, de lunes a viernes entre las 8 y las 20 h, lee el libro mayor de los fondos
   y avisa a cada persona cuando aparece el pago de un saldo a su favor (ver fondo.js, avisosDePago).
+  OneDrive con la credencial propia del servidor (v193.1): ver onedrive.js (secreto OD_CLAVE_PRIVADA; ruta /od/prueba, solo el
+    administrador). Es la etapa 1 del plan para que solo el servidor escriba en Rendiciones.
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
@@ -55,6 +57,7 @@ import { santiago } from "./recordatorios.js";
 import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
+import { rutasOneDrive, odListo } from "./onedrive.js"; /* v193.1: OneDrive con la credencial propia del servidor (certificado) */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -108,7 +111,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v190.1";
+const VERSION_SERVIDOR = "v193.1";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -205,7 +208,7 @@ export default {
     if (pide === "https://benjaminbarrientoscardenas-glitch.github.io" && env.AVISOS && url0(req).pathname !== "/salud") ctx.waitUntil(objetoAvisos(env).contarAntiguo(hoyChile()).catch(() => {}));
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
     const url = new URL(req.url);
-    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null, firmaPorLink: !!env.AVISOS });
+    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, oneDriveServidor: odListo(env), modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null, firmaPorLink: !!env.AVISOS });
     /* v154: firma por link: la persona que firma abre /f/<link> sin cuenta (el link es la autorización) */
     if (url.pathname.startsWith("/f/")) { const av = env.AVISOS ? objetoAvisos(env) : null;
       const r = await rutasFirmaPublica(req, env, ctx, url, av, av ? (m, t) => av.enviar([m.por], { titulo: "Firma recibida", texto: `${(m.acta && m.acta.nombre) || "La persona"} firmó: ${(m.acta && m.acta.titulo) || "el documento"}.`, url: "./", etiqueta: "fl-" + t.slice(0, 10) }, sujetoDe(env)) : null);
@@ -235,6 +238,8 @@ export default {
     try {
       // /yo → roles de quien pide (v138, B-15): administrador, Contabilidad y la lista de Contabilidad
       if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env) });
+      // /od/... → OneDrive con la credencial del servidor (v193.1; por ahora solo /od/prueba, del administrador)
+      const rod = await rutasOneDrive(req, env, url, { correo, json, autorizado }); if (rod) return rod;
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)
       const rp = await rutasPush(req, env, url, correo, json, autorizado, esContab); if (rp) return rp;
       // /firma/... → firma por link (v154; cualquier cuenta de Puduhue)
