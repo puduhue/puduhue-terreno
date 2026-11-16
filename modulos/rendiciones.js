@@ -467,6 +467,9 @@ async function disRendirArchivos(files,op){
 
 /* ---- 1) documento: tarjeta para confirmar en vez del formulario ---- */
 let DIS_EDK=null;
+/* v191: la app está leyendo la foto y todavía no hay datos que revisar (con el código del SII ya leído y solo centro o tipo de
+   gasto por elegir, la tarjeta se muestra igual: no cuenta) */
+const rdLeyendo=(d,P)=>(d.lectura||{}).estado==="leyendo"&&!(d.timbre&&lecSoloElegir(P));
 function disModoConf(r,d,editP,P){
   if(!editP||!d||DIS_EDK===d.k)return null;const le=d.lectura||{};
   if(le.estado==="leyendo"&&!(d.timbre&&lecSoloElegir(P)))return"leyendo";
@@ -1676,8 +1679,9 @@ function rdNavHTML(r,d){const N=rdNavLista(r,d);if(N.keys.length<2||N.i<0)return
 }
 async function rdIrDoc(k){if(!rdv||!k||!rdv.docs[k])return;await flush();RD_ELIGE=null;rdd=rdv.docs[k];go("rdd");window.scrollTo(0,0)}
 function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtP(num(d.total)):"Sin total";
-  const nf=editaPersona(r)?problemasDoc2(r,d).b.length:0; /* v179 (quien rinde): cuántos datos faltan para enviar */
-  const res=accRes(N.keys.length>1&&N.i>=0?`${N.cola?"Nuevo":"Documento"} ${N.i+1} de ${N.keys.length}`:"Documento",nf?`<em>${nf===1?"Falta 1 dato":`Faltan ${nf} datos`} para enviar</em>`:`${esc(d.emisor||"Sin emisor")} · ${tot}`);
+  const Pd=editaPersona(r)?problemasDoc2(r,d):null,ley=!!Pd&&DIS_EDK!==d.k&&rdLeyendo(d,Pd); /* v191: mientras lee, no se cuentan */
+  const nf=Pd&&!ley?Pd.b.length:0; /* v179 (quien rinde): cuántos datos faltan para enviar */
+  const res=accRes(N.keys.length>1&&N.i>=0?`${N.cola?"Nuevo":"Documento"} ${N.i+1} de ${N.keys.length}`:"Documento",ley?"Leyendo el documento…":nf?`<em>${nf===1?"Falta 1 dato":`Faltan ${nf} datos`} para enviar</em>`:`${esc(d.emisor||"Sin emisor")} · ${tot}`);
   if(rdRevisa(r)&&RD_ELIGE===d.k)return accBar("rddbar",accRes("Pedir corrección","Toca el dato que hay que corregir"),`<button class="btn" data-a="rdElCancelar">Cancelar</button>`);
   if(rdRevisa(r))return accBar("rddbar",res,`<button class="btn" data-a="rdRevObs">Pedir corrección</button>`+(d.estadoRev==="ok"?(N.sig?`<button class="btn pri" data-a="rdIrDoc" data-k="${esc(N.sig)}">Siguiente</button>`:`<button class="btn pri" data-a="rdVolver">Listo</button>`):`<button class="btn pri" data-a="rdRevOk">Está bien</button>`));
   return accBar("rddbar",res,N.sig?`<button class="btn pri" data-a="rdIrDoc" data-k="${esc(N.sig)}">Siguiente</button>`:`<button class="btn pri" data-a="rdVolver">Listo</button>`)}
@@ -1786,7 +1790,7 @@ function rdDocCard(r,d){
   /* v96: como mucho dos etiquetas por documento, la más importante primero */
   const ch=[];
   if(le.estado==="leyendo")ch.push(`<span class="xp" style="background:var(--soft);color:var(--muted)">Leyendo…</span>`);else if(le.estado==="pendiente")ch.push(`<span class="xp camb">Pendiente de lectura</span>`);else if(le.estado==="error")ch.push(`<span class="xp nueva">Lectura falló</span>`);
-  const L=editable?rdcItems(r,d,P):[],pend=L.filter(x=>!x.ok);
+  const L=editable?rdcItems(r,d,P,{sinFalta:rdLeyendo(d,P)}):[],pend=L.filter(x=>!x.ok); /* v191: mientras lee, sin lo que falta */
   if(L.length){/* v183: el dato y el motivo van en su línea */}
   else if(d.estadoRev==="obs")ch.push(`<span class="xp nueva">Por corregir</span>`);else if(d.estadoRev==="ok")ch.push(`<span class="xp ok">Revisada</span>`);
   {const nD=P.a.filter(esDupMsg).length,nB=P.a.length-nD; /* v189 */
@@ -1948,7 +1952,7 @@ function renderRDD(){
   return `<div class="top rddtop"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rdVolver">${esc(rdTituloCorto(r))}</button><div class="ttl">Documento</div>${estadoChip()}</div></div></div>
   <main class="wrap rddw${conf||fic?" conf":""}${fic?" fic":""}">
     ${rdNavHTML(r,d)}
-    ${(()=>{const rev=rdRevisa(r);if(!editP&&!rev)return"";return rdcResumenHTML(rdcItems(r,d,P,{cont:rev&&verC,sinPedido:rev,sinFalta:!(conf||fic)}),editP||editC,editP)})()}
+    ${(()=>{const rev=rdRevisa(r);if(!editP&&!rev)return"";return rdcResumenHTML(rdcItems(r,d,P,{cont:rev&&verC,sinPedido:rev,sinFalta:!(conf||fic)||conf==="leyendo"}),editP||editC,editP)})()}
     <div class="rdfoto" id="rdFotoBox">${d.foto?(fotoSrc(d.foto)?`<img src="${esc(fotoSrc(d.foto))}" alt="Documento" data-a="foto" data-ref="${esc(d.foto)}" data-k="${esc(d.k)}">`:`<div class="empty">La foto se está cargando…</div>`):`<div class="empty">Sin foto</div>`}
       ${rdPdfInfo(d)}${editP?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}</div>
     ${conf?disConfHTML(r,d,P,conf):fic?disFichaHTML(r,d,P,editC):""}<div class="rdform"${conf||fic?" hidden":""}>
@@ -2710,4 +2714,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="190"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="191"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
