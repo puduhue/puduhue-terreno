@@ -1635,7 +1635,8 @@ function rdPasos(r){
   if(e==="borrador"){S[0].st="act";S[0].s="por enviar"}
   else if(e==="observada"){S[0].st="act";S[0].s="reenviar"}
   else{S[0].st="ok";S[0].s=r.enviada?fmtD(r.enviada):""}
-  if(sinJ){S[1].st="na";S[1].s="no aplica"}
+  if(sinJ&&idx<1&&!colabs().length){S[1].s="por confirmar"} /* v193: todavía no se pudo leer la lista de colaboradores */
+  else if(sinJ){S[1].st="na";S[1].s="no aplica"}
   else if(r.aprobJef){S[1].st="ok";S[1].s=fmtD(String(r.aprobJef.fecha).slice(0,10))}
   else if(idx>=2){S[1].st="ok"}
   else{S[1].s=jn;if(e==="enviada")S[1].st="act"}
@@ -2350,6 +2351,9 @@ async function rdClick(A,b){
     const r=rdv;delete r.docs[d.k];rdd=null;rdTouch();go("rdv");
     deshacer("Documento eliminado.",()=>{if(rdv!==r||view!=="rdv")return;r.docs[d.k]=d;rdTouch();render()},()=>{if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d)});return true}
   if(A==="rdEnviar"){if(!editaPersona(rdv))return true;const D=docsDe(rdv);if(!D.length)return true;const inc=D.filter(d=>!docCompleto(rdv,d)).length;if(inc){toast(`Faltan datos en ${inc} ${inc===1?"documento":"documentos"}.`);return true}
+    /* v193: sin la lista de colaboradores (no se pudo leer _maestros) no se sabe quién aprueba: no se envía, para que la
+       rendición no pase directo a Contabilidad saltándose a la jefatura */
+    if(!colabs().length){if(await ask("Todavía no se puede enviar","La app no ha podido leer la lista de colaboradores, así que no sabe quién aprueba tu rendición. Con señal, toca «Sincronizar» y vuelve a enviar. Si sigue igual, pide ayuda a TI. Tus documentos quedan guardados.","Sincronizar",false,"","Cerrar"))pull(true);return true}
     const c=colabDe(rdv);let j=c?jefaturaDe(c):null;if(j&&j.correo&&(j.correo===meCorreo()||correosDe(c).includes(j.correo)))j=null;
     const devCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&!!rdv.aprobJef,cambio=devCont&&rdCambioDesdeDev(rdv); /* v133 (M-14) */
     const vuelveCont=devCont&&!cambio,eraObs=rdv.estado==="observada";
@@ -2714,4 +2718,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="192"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="193"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
