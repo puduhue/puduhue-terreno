@@ -122,7 +122,11 @@ export class Avisos extends DurableObject {
   async contarAntiguo(fecha) { const x = (await this.ctx.storage.get("antiguo")) || { total: 0, desde: fecha, dias: {} }; x.total++; x.ultimo = fecha; x.dias[fecha] = (x.dias[fecha] || 0) + 1;
     const ks = Object.keys(x.dias).sort(); while (ks.length > 30) delete x.dias[ks.shift()]; await this.ctx.storage.put("antiguo", x); return x.total; }
   /* v194: avisos de las reglas de Rendiciones (rendod.js): los últimos 300, para revisar antes de pasar a «bloquear» */
-  async odAnotar(e) { const L = (await this.ctx.storage.get("od:avisos")) || []; L.push(e); while (L.length > 300) L.shift(); await this.ctx.storage.put("od:avisos", L); return L.length; }
+  async odAnotar(e, ahora = Date.now()) { const L = (await this.ctx.storage.get("od:avisos")) || []; L.push(e); while (L.length > 300) L.shift(); await this.ctx.storage.put("od:avisos", L);
+    /* v195.1: ¿toca avisar al administrador? Como máximo una notificación cada 30 minutos; la siguiente dice cuántos hubo entremedio */
+    const p = (await this.ctx.storage.get("od:push")) || { hora: 0, sin: 0 }; p.sin++;
+    if (ahora - p.hora < 30 * 60000) { await this.ctx.storage.put("od:push", p); return { total: L.length, avisar: false }; }
+    const n = p.sin; await this.ctx.storage.put("od:push", { hora: ahora, sin: 0 }); return { total: L.length, avisar: true, n }; }
   async odLeer() { return (await this.ctx.storage.get("od:avisos")) || []; }
   async leerAntiguo() { const x = await this.ctx.storage.get("antiguo"); return x ? { total: x.total, desde: x.desde, ultimo: x.ultimo } : { total: 0 }; }
   /* v141.1 (M-26): cómo llega la sesión (api: permiso propio; graph: token de Graph), por día, con huellas de correo (no correos) */

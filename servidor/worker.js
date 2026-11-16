@@ -52,6 +52,7 @@
   Rendiciones guarda por el servidor (v194): ver rendod.js. POST /od/rend (cualquier cuenta, con reglas por rol), GET /od/avisos
     (administrador). OD_MODO (texto) «aviso» (por defecto: anota y deja pasar) o «bloquear»; OD_REND = "no" lo apaga.
     Desde la v195, también los archivos: /od/subida (sesión de carga), /od/maestros, /od/celdas y /od/borrar (rendod.js).
+    Desde la v195.1, cada aviso se notifica al administrador (CORREOS_ACTUALIZAR), como máximo una vez cada 30 minutos.
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
@@ -115,7 +116,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v195";
+const VERSION_SERVIDOR = "v195.1";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
