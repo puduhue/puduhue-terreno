@@ -25,6 +25,17 @@
   Interruptor: con OD_REND = "no", /yo dice odRend: false y la app vuelve a escribir directo (mientras la gente tenga permiso de editar).
 */
 import { odConfig, odListo, graphApp } from "./onedrive.js";
+import { sujetoDe } from "./push.js";
+/* v195.1: anota lo que no cumplió una regla y, como máximo cada 30 minutos, avisa al administrador con una notificación */
+export async function anotarAviso(env, avisos, e) {
+  if (!avisos) return;
+  const x = await avisos.odAnotar(e);
+  if (!x || !x.avisar) return;
+  const admins = String(env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+  if (!admins.length) return;
+  const mas = x.n > 1 ? ` (${x.n} desde el último aviso)` : "";
+  await avisos.enviar(admins, { titulo: "Rendiciones: un cambio fuera de las reglas", texto: `${e.correo}: ${(e.reglas || [])[0] || "regla"}${mas}. ${e.modo === "bloquear" ? "No se guardó." : "Se guardó igual (modo aviso)."}`, url: "./", etiqueta: "od-aviso" }, sujetoDe(env));
+}
 
 export const RD_ROOT = "01RAJ2KQBLDIZGFMASZVCIDO2PGKXQW5VY"; /* carpeta Rendiciones (la misma de modulos/rendiciones.js, RD.root) */
 const ID_OK = /^[A-Za-z0-9_-]{4,80}$/;
@@ -187,7 +198,7 @@ export async function rutaRend(req, env, ctx, { correo, json, autorizado, esCont
     }
     if (viol.length) {
       const e = { hora: new Date().toISOString(), modo: odModo(env), op, id, correo, estado: antes ? antes.estado || "borrador" : null, nuevo: op === "put" ? b.datos.estado || "borrador" : null, reglas: viol.slice(0, 10) };
-      if (avisos) ctx.waitUntil(avisos.odAnotar(e).catch(() => {}));
+      if (avisos) ctx.waitUntil(anotarAviso(env, avisos, e).catch(() => {}));
       if (odModo(env) === "bloquear") return json({ error: "No tienes permiso para este cambio: " + viol[0] + ".", reglas: viol, status: 403 }, 403);
     }
     const h = {}; if (b.ifMatch || etag0) h["If-Match"] = b.ifMatch || etag0;
@@ -248,7 +259,7 @@ export function revisarSubida(M, ruta, nombre, quien) {
 async function anotarOBloquear(env, ctx, avisos, json, e) {
   if (!e.reglas.length) return null;
   const x = { hora: new Date().toISOString(), modo: odModo(env), ...e, reglas: e.reglas.slice(0, 10) };
-  if (avisos) ctx.waitUntil(avisos.odAnotar(x).catch(() => {}));
+  if (avisos) ctx.waitUntil(anotarAviso(env, avisos, x).catch(() => {}));
   return odModo(env) === "bloquear" ? json({ error: "No tienes permiso para este cambio: " + e.reglas[0] + ".", reglas: e.reglas, status: 403 }, 403) : null;
 }
 export async function rutasArchivos(req, env, ctx, url, { correo, nombre, json, autorizado, esContab, avisos }) {
