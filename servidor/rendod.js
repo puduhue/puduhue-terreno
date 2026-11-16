@@ -40,7 +40,7 @@ function orden(x) { if (Array.isArray(x)) return x.map(orden); if (x && typeof x
 
 /* ---------- la lista de colaboradores (maestros.json), leída por el servidor con su credencial, guardada 5 minutos ---------- */
 let MAE = null, MAE_T = 0;
-export function odOlvidarMaestros() { MAE = null; MAE_T = 0; DATOS_ID = null; CONF_ID = null; }
+export function odOlvidarMaestros() { MAE = null; MAE_T = 0; DATOS_ID = null; CONF_ID = null; for (const k of Object.keys(CARP)) delete CARP[k]; }
 export async function maestrosSrv(env, ahora = Date.now()) {
   if (MAE && ahora - MAE_T < 300000) return MAE;
   const c = odConfig(env);
@@ -203,6 +203,106 @@ export async function rutaRend(req, env, ctx, { correo, json, autorizado, esCont
     if (!r.ok) return json({ error: `OneDrive no guardó la rendición (${r.status}).`, status: r.status }, 502);
     const it = await r.json();
     return json({ ok: true, eTag: it.eTag, id: it.id, avisos: viol.length || undefined });
+  } catch (e) {
+    return json({ error: (e && e.error) || "Error al guardar en OneDrive.", status: (e && e.status) || 502 }, (e && e.status) || 502);
+  }
+}
+
+/* ======================================================================================================================
+   v195: archivos de Rendiciones por el servidor (fotos y PDF de los documentos, PDF de la rendición, Excel del mes,
+   Importaciones FinnegansGO, maestros). El servidor no recibe los bytes: crea una «sesión de carga» de OneDrive para ese
+   archivo y le da a la app su dirección (uploadUrl), que solo sirve para subir ESE archivo y no lleva la sesión de nadie.
+     POST /od/subida  { ruta: [carpetas desde Rendiciones], nombre }  → { ok, uploadUrl }
+     POST /od/maestros { datos }                                      → { ok, eTag }   (maestros.json; Contabilidad y admin)
+     POST /od/celdas  { archivo, hoja, addr, valor }                  → { ok }         (Excel de _maestros; Contabilidad y admin)
+     POST /od/borrar  { id }                                          → { ok }         (una foto o PDF dentro de Rendiciones)
+   Las reglas que dependen de quién pide siguen OD_MODO (aviso: anota y deja pasar; bloquear: 403); las rutas fuera de lo
+   permitido se rechazan siempre (400).
+   ====================================================================================================================== */
+export const limpiaNombre = t => String(t || "").normalize("NFC").replace(/[\\/:*?"<>|#%&{}~]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+const EXT_DOC = /\.(jpe?g|png|pdf|heic|webp)$/i;
+const RUTA_OK = s => typeof s === "string" && s.length > 0 && s.length <= 100 && !/[\\/:*?"<>|#%]/.test(s) && s.trim() === s && s !== "." && s !== "..";
+const CARP = {};
+async function carpetaRd(env, segs) {
+  let p = RD_ROOT, k = "";
+  for (const s of segs) { k += "/" + s; p = CARP[k] || (CARP[k] = await idHijo(env, p, s, true)); }
+  return p;
+}
+export function odOlvidarCarpetas() { for (const k of Object.keys(CARP)) delete CARP[k]; }
+/* qué archivo es y quién puede subirlo: { error } (400 siempre) o { reglas: [...] } (según OD_MODO) */
+export function revisarSubida(M, ruta, nombre, quien) {
+  if (!Array.isArray(ruta) || !ruta.length || ruta.length > 2 || !ruta.every(RUTA_OK)) return { error: "Carpeta no válida." };
+  if (!RUTA_OK(nombre) || nombre.length > 150) return { error: "Nombre de archivo no válido." };
+  const libre = quien.admin || quien.contab;
+  if (ruta[0] === "_maestros" && ruta.length === 1) return { reglas: libre ? [] : ["solo Contabilidad sube archivos a los maestros"] };
+  if (ruta[0] === "Importaciones FinnegansGO" && ruta.length === 1) {
+    if (!/\.xlsx$/i.test(nombre)) return { error: "En Importaciones FinnegansGO solo van Excel." };
+    return { reglas: libre ? [] : ["solo Contabilidad sube importaciones para FinnegansGO"] }; }
+  if (!/^\d{4}-\d{2}$/.test(ruta[0])) return { error: "Carpeta no válida." };
+  if (ruta.length === 1) return nombre === `Rendiciones_${ruta[0]}.xlsx` ? { reglas: [] } : { error: "En la carpeta del mes solo va su Excel." };
+  if (!EXT_DOC.test(nombre)) return { error: "Solo fotos o PDF." };
+  if (libre) return { reglas: [] };
+  const nombres = [quien.nombre].concat(colabs(M).filter(c => correosDe(c).includes(quien.correo)).map(c => c.nombre)).map(limpiaNombre).filter(Boolean);
+  return { reglas: nombres.includes(ruta[1]) ? [] : [`sube a la carpeta de «${ruta[1]}», que no es la suya`] };
+}
+async function anotarOBloquear(env, ctx, avisos, json, e) {
+  if (!e.reglas.length) return null;
+  const x = { hora: new Date().toISOString(), modo: odModo(env), ...e, reglas: e.reglas.slice(0, 10) };
+  if (avisos) ctx.waitUntil(avisos.odAnotar(x).catch(() => {}));
+  return odModo(env) === "bloquear" ? json({ error: "No tienes permiso para este cambio: " + e.reglas[0] + ".", reglas: e.reglas, status: 403 }, 403) : null;
+}
+export async function rutasArchivos(req, env, ctx, url, { correo, nombre, json, autorizado, esContab, avisos }) {
+  const rutas = ["/od/subida", "/od/maestros", "/od/celdas", "/od/borrar"];
+  if (!rutas.includes(url.pathname)) return null;
+  if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
+  if (!odRendActivo(env)) return json({ error: "El servidor no está guardando rendiciones en OneDrive.", status: 503 }, 503);
+  let b; try { b = await req.json(); } catch (e) { return json({ error: "Pedido sin JSON." }, 400); }
+  const c = odConfig(env), d = encodeURIComponent(c.drive), quien = { correo, nombre, admin: autorizado, contab: await esContab() };
+  try {
+    if (url.pathname === "/od/subida") {
+      const M = await maestrosSrv(env), ruta = b.ruta, arch = String(b.nombre || "");
+      const v = revisarSubida(M, ruta, arch, quien); if (v.error) return json({ error: v.error }, 400);
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: "subida", id: ruta.join("/") + "/" + arch, correo, reglas: v.reglas }); if (no) return no;
+      const carpeta = await carpetaRd(env, ruta);
+      const r = await graphApp(env, `/drives/${d}/items/${carpeta}:/${encodeURIComponent(arch)}:/createUploadSession`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item: { "@microsoft.graph.conflictBehavior": "replace" } }) });
+      if (!r.ok) { if (r.status === 404) odOlvidarCarpetas(); return json({ error: `OneDrive no abrió la carga (${r.status}).`, status: r.status }, 502); }
+      const s = await r.json(); return json({ ok: true, uploadUrl: s.uploadUrl, vence: s.expirationDateTime });
+    }
+    if (url.pathname === "/od/maestros") {
+      if (!b.datos || typeof b.datos !== "object" || Array.isArray(b.datos)) return json({ error: "Faltan los maestros." }, 400);
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: "maestros", id: "maestros.json", correo, reglas: quien.admin || quien.contab ? [] : ["solo Contabilidad cambia la lista de colaboradores"] }); if (no) return no;
+      const r = await graphApp(env, `/drives/${d}/items/${await carpetaRd(env, ["_maestros"])}:/maestros.json:/content`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b.datos) });
+      if (!r.ok) return json({ error: `OneDrive no guardó los maestros (${r.status}).`, status: r.status }, 502);
+      MAE = null; return json({ ok: true, eTag: (await r.json()).eTag });
+    }
+    if (url.pathname === "/od/celdas") {
+      const arch = String(b.archivo || ""), hoja = String(b.hoja || ""), addr = String(b.addr || "");
+      if (!RUTA_OK(arch) || !/\.xlsx$/i.test(arch) || !hoja || hoja.length > 60 || !/^[A-Z]{1,3}[0-9]{1,6}$/.test(addr)) return json({ error: "Celda no válida." }, 400);
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: "celdas", id: `${arch}!${hoja}!${addr}`, correo, reglas: quien.admin || quien.contab ? [] : ["solo Contabilidad cambia la lista de colaboradores"] }); if (no) return no;
+      let r = await graphApp(env, `/drives/${d}/items/${await carpetaRd(env, ["_maestros"])}:/${encodeURIComponent(arch)}?$select=id`);
+      if (!r.ok) return json({ error: `No se encontró «${arch}» en los maestros (${r.status}).`, status: r.status }, r.status === 404 ? 404 : 502);
+      const id = (await r.json()).id;
+      r = await graphApp(env, `/drives/${d}/items/${id}/workbook/worksheets/${encodeURIComponent(hoja)}/range(address='${addr}')`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [[b.valor == null ? "" : b.valor]] }) });
+      if (!r.ok) return json({ error: `Excel no guardó la celda ${addr} (${r.status}).`, status: r.status }, r.status === 423 || r.status === 409 ? r.status : 502);
+      return json({ ok: true });
+    }
+    if (url.pathname === "/od/borrar") {
+      const id = String(b.id || ""); if (!/^01[A-Z0-9]{20,}$/i.test(id)) return json({ error: "Id no válido." }, 400);
+      let r = await graphApp(env, `/drives/${d}/items/${id}?$select=id,name,parentReference,folder`);
+      if (r.status === 404) return json({ ok: true, yaNoEstaba: true });
+      if (!r.ok) return json({ error: `No se pudo leer el archivo (${r.status}).`, status: r.status }, 502);
+      const it = await r.json();
+      /* sube por las carpetas (persona → mes → Rendiciones) por id: no depende de la ruta, que Graph puede no mostrar */
+      const padre = async x => { const q = await graphApp(env, `/drives/${d}/items/${x}?$select=id,name,parentReference`); return q.ok ? q.json() : null; };
+      const pid = (it.parentReference || {}).id, p1 = pid ? await padre(pid) : null, p2 = p1 && (p1.parentReference || {}).id ? await padre(p1.parentReference.id) : null;
+      const m = p1 && p2 && (p2.parentReference || {}).id === RD_ROOT && /^\d{4}-\d{2}$/.test(p2.name) ? [null, p2.name, p1.name] : null;
+      if (it.folder || !m || !EXT_DOC.test(it.name || "")) return json({ error: "Solo se eliminan fotos o PDF de una rendición." }, 400);
+      const v = revisarSubida(await maestrosSrv(env), [m[1], m[2]], it.name, quien);
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: "borrar", id: m[1] + "/" + m[2] + "/" + it.name, correo, reglas: v.reglas || [] }); if (no) return no;
+      r = await graphApp(env, `/drives/${d}/items/${id}`, { method: "DELETE" });
+      if (!r.ok && r.status !== 404) return json({ error: `OneDrive no eliminó el archivo (${r.status}).`, status: r.status }, 502);
+      return json({ ok: true });
+    }
   } catch (e) {
     return json({ error: (e && e.error) || "Error al guardar en OneDrive.", status: (e && e.status) || 502 }, (e && e.status) || 502);
   }
