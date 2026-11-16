@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-iSl6W4hAVCtRH8YZb62WbwRPM/vcbp7ltfd0EquazYQ=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-nWwk5YZdSg5Ia7piWrtUyW512wFXHNnonRgC+HIDbLY=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=193">
+<link rel="stylesheet" href="estilos.css?v=194">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="193";
+const APP_VER="194";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -564,8 +564,21 @@ function mezclarRegistro(base,loc,rem){
 const QUE_COL={visitas:"La visita",rendiciones:"La rendición",conteos:"El conteo"};
 const deRegistro=(col,o)=>!o?"":col==="rendiciones"?(o.persona&&o.persona.nombre)||"":col==="conteos"?o.bodega||"":col==="visitas"?o.predio||"":o.trabajador||o.conductor||o.recibe||o.tema||o.predio||"";
 const nombreRegistro=(col,o)=>{const q=QUE_COL[col]||"El acta",d=deRegistro(col,o);return q+(d?" de "+d:"")};
+/* v194: Rendiciones guarda sus registros por el servidor (revisa quién puede cambiar qué y escribe con su credencial).
+   Las lecturas siguen directas. Los errores se traducen a los de gfetch para que la cola y la combinación sigan igual. */
+const odRendCol=col=>col==="rendiciones"&&!!rolesSrv().odRend;
+async function odRendPedir(cuerpo){
+  let r;try{r=await srvFetch("/od/rend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cuerpo)})}catch(e){if(e&&e.code)throw e;throw{code:"network"}}
+  let j={};try{j=await r.json()}catch(e){}
+  if(r.ok&&j.ok)return j;
+  if(r.status===412)throw{code:"graph",status:412,detail:j.error};
+  if(r.status===404)throw{code:"not_found"};
+  if(r.status===401)throw{code:"auth"};
+  if(r.status===403||r.status===400)throw{code:"graph",status:r.status,detail:j.error||"el servidor no aceptó el cambio"}; /* de ese registro: los demás siguen */
+  throw{code:"graph",status:503,detail:j.error||"el servidor no respondió"}} /* la cola espera y reintenta */
 /* copia completa de una versión que no quedó, en <colección>/_conflictos (nunca se descarta trabajo) */
 async function guardarConflicto(col,id,version,motivo,campos){
+  if(odRendCol(col)){const f=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);await odRendPedir({op:"conflicto",id,nombre:`${id} ${f} ${uid().slice(-4)}.json`,por:yo()||null,motivo,campos:campos||[],version});return}
   const folder=await carpetaCol(col);let dir;try{dir=(await gjson(`/drives/${M365.drive}/items/${folder}:/_conflictos?$select=id`)).id}catch(e){if(e.code!=="not_found")throw e;dir=(await crearCarpeta(folder,"_conflictos")).id}
   const f=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19),cuerpo=JSON.stringify({guardado:new Date().toISOString(),por:yo()||null,motivo,campos:campos||[],version});
   await gfetch(`/drives/${M365.drive}/items/${dir}:/${encName(`${id} ${f} ${uid().slice(-4)}.json`)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body:cuerpo})}
@@ -584,7 +597,8 @@ async function subirRegistro(col,id,a){
       if(mez.c.length&&!copia){await guardarConflicto(col,id,mez.lGana?rem:local,"Cambiado en dos teléfonos: quedó la versión más reciente",mez.c);copia=true}
       if(igual(datos,rem))return{datos:rem,etag:meta.eTag,mez,base0}}
     const h={"Content-Type":"application/json"};if(meta&&!IFM_NO)h["If-Match"]=meta.eTag;
-    try{const r=await gfetch(ruta+":/content",{method:"PUT",headers:h,body:JSON.stringify(datos)});const it=await r.json();return{datos,etag:it.eTag,mez,base0}}
+    try{if(odRendCol(col)){const j=await odRendPedir({op:"put",id,datos,ifMatch:h["If-Match"]||null});return{datos,etag:j.eTag,mez,base0}} /* v194 */
+      const r=await gfetch(ruta+":/content",{method:"PUT",headers:h,body:JSON.stringify(datos)});const it=await r.json();return{datos,etag:it.eTag,mez,base0}}
     catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta&&meta.eTag;continue}if(i<3&&e&&e.code==="not_found")continue;throw e}
   }
 }
@@ -621,7 +635,7 @@ async function borrarRegistro(col,id,e0){const ruta=await rutaRegistro(col,id),e
     let ok=!!e0&&meta.eTag===e0,rem=null;
     if(!ok){rem=await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json();ok=!e0&&esBorradorCol(col,rem)}
     if(!ok){rem.id=id;REMOTE[col][id]=rem;ETAGS[ek]=meta.eTag;guardarEtags();if(IDB.db)IDB.put("remote",ek,rem).catch(()=>{});return{restaurado:rem}}
-    try{await gfetch(ruta,{method:"DELETE",headers:IFM_NO?{}:{"If-Match":meta.eTag}});limpiar();return{}}
+    try{if(odRendCol(col))await odRendPedir({op:"delete",id,ifMatch:IFM_NO?null:meta.eTag});else await gfetch(ruta,{method:"DELETE",headers:IFM_NO?{}:{"If-Match":meta.eTag}});limpiar();return{}}
     catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta.eTag;continue}if(e&&e.code==="not_found"){limpiar();return{}}throw e}
   }
 }
@@ -3117,9 +3131,9 @@ const ROLES_K="actas-roles";
 function rolesSrv(){try{const x=JSON.parse(localStorage.getItem(ROLES_K)||"null");return x&&ME&&x.correo===String(ME.correo||"").toLowerCase()?x:{}}catch(e){return{}}}
 let ROLES_PIDIENDO=false;
 async function rolesTraer(forzar){
-  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3)return false;
+  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3&&"odRend" in x)return false;
   ROLES_PIDIENDO=true;
-  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),hora:Date.now()};
+  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),odRend:!!j.odRend,hora:Date.now()};
     const antes=JSON.stringify([x.admin,x.contab,x.lista]);try{localStorage.setItem(ROLES_K,JSON.stringify(n))}catch(e){}
     if(antes!==JSON.stringify([n.admin,n.contab,n.lista])&&loaded)render();return true}
   catch(e){console.warn("roles",e);return false}finally{ROLES_PIDIENDO=false}}
@@ -3797,10 +3811,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=193"></script>
-<script src="modulos/bodega.js?v=193"></script>
-<script src="modulos/rendiciones.js?v=193"></script>
-<script src="modulos/actas-entrega.js?v=193"></script>
+<script src="modulos/checklist.js?v=194"></script>
+<script src="modulos/bodega.js?v=194"></script>
+<script src="modulos/rendiciones.js?v=194"></script>
+<script src="modulos/actas-entrega.js?v=194"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
