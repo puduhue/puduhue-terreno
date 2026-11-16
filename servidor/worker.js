@@ -51,6 +51,7 @@
     administrador). Es la etapa 1 del plan para que solo el servidor escriba en Rendiciones.
   Rendiciones guarda por el servidor (v194): ver rendod.js. POST /od/rend (cualquier cuenta, con reglas por rol), GET /od/avisos
     (administrador). OD_MODO (texto) «aviso» (por defecto: anota y deja pasar) o «bloquear»; OD_REND = "no" lo apaga.
+    Desde la v195, también los archivos: /od/subida (sesión de carga), /od/maestros, /od/celdas y /od/borrar (rendod.js).
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
@@ -60,7 +61,7 @@ import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from 
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
 import { rutasOneDrive, odListo } from "./onedrive.js";
-import { rutaRend, odRendActivo, odModo } from "./rendod.js"; /* v194: Rendiciones guarda por el servidor, con reglas */ /* v193.1: OneDrive con la credencial propia del servidor (certificado) */
+import { rutaRend, rutasArchivos, odRendActivo, odModo } from "./rendod.js"; /* v194: Rendiciones guarda por el servidor, con reglas */ /* v193.1: OneDrive con la credencial propia del servidor (certificado) */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -114,7 +115,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v194";
+const VERSION_SERVIDOR = "v195";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -243,6 +244,7 @@ export default {
       if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env), odRend: odRendActivo(env) }); /* v194: odRend = Rendiciones guarda por el servidor */
       // /od/... → OneDrive con la credencial del servidor (v193.1; por ahora solo /od/prueba, del administrador)
       const av = env.AVISOS ? objetoAvisos(env) : null;
+      const rar = await rutasArchivos(req, env, ctx, url, { correo, nombre: yo.displayName || "", json, autorizado, esContab, avisos: av }); if (rar) return rar; /* v195: fotos, PDF, Excel y maestros de Rendiciones */
       const rod = await rutasOneDrive(req, env, url, { correo, json, autorizado }, { avisos: av, modo: odModo(env), rend: () => rutaRend(req, env, ctx, { correo, json, autorizado, esContab, avisos: av }) }); if (rod) return rod;
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)
       const rp = await rutasPush(req, env, url, correo, json, autorizado, esContab); if (rp) return rp;
