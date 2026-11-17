@@ -23,7 +23,10 @@ privado puduhue/puduhue-terreno-herramientas: leer su CLAUDE.md y su README ante
 - `servidor/`: Cloudflare Worker «puduhue-terreno» (notificaciones, recordatorios, aviso del pago del reembolso desde la v186, Finnegans, lectura de boletas). Desde la v141 (M-26), la app le habla con un token propio (ámbito `api://<id de la app>/Acceso`, srvFetch en index.html) y el servidor lo revisa él mismo (verificarTokenApi en worker.js); el token de Graph se sigue aceptando hasta que todos tengan la v141. Desde el servidor v193.1, `onedrive.js` entra a OneDrive
   con su propia credencial (aplicación «Puduhue Terreno Servidor» con certificado, secreto `OD_CLAVE_PRIVADA`, escritura solo en
   «Apps de terreno»); desde el v194, `rendod.js` guarda los registros de Rendiciones (`POST /od/rend`) y, desde el v195, sus archivos (`/od/subida`, sesión de carga; `/od/maestros`, `/od/celdas`, `/od/borrar`), y revisa quién puede cambiar
-  qué (`revisarRendicion`; `OD_MODO` aviso/bloquear; `/od/avisos`). En la app (v194-v195): `odRendCol`, `odPedir` antes de
+  qué (`revisarRendicion`; `OD_MODO` aviso/bloquear; `/od/avisos`). Desde el v196, `rendlee.js` también lee por las personas
+  (`/od/rend/bajar` con copia en el Durable Object, `/od/rend/leer`, `/od/maestros/leer`, `/od/permisos/leer`, `/od/archivo`):
+  cada uno ve solo lo suyo y nadie necesita acceso a la carpeta (`OD_LEE`; `/yo` dice `odLee`). En la app (v194-v196):
+  `odRendCol`, `odLeeCol`, `pullColSrv`, `metaRegistro`, `leerArchivo`, `odPedir` antes de
   `guardarConflicto` en index.html; `/yo` dice `odRend`. Plan completo: docs/plan_servidor_onedrive.md en herramientas. Se publica solo con
   GitHub Actions al subir cambios de `servidor/` a main.
 - `manifest.json`, `icon-*.png`, `badge-96.png`: instalación y notificaciones.
