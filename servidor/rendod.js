@@ -86,6 +86,13 @@ export function correosDueno(M, r) {
   return L;
 }
 
+/* lo que el registro de cambios guarda de cada rendición (lo justo para saber quién la ve y qué archivos tiene; v196-v197) */
+export function metaDe(r, eTag) {
+  const p = (r && r.persona) || {}, f = [];
+  Object.values((r && r.docs) || {}).forEach(d => { [d && d.foto, d && d.pdf].forEach(x => { if (/^a:/.test(String(x || ""))) f.push(String(x).slice(2)); }); });
+  return { e: eTag, c: String((r && r.cuenta) || "").toLowerCase(), pc: String(p.correo || "").toLowerCase(), rut: p.rut || "", j: String(((r && r.jefatura) || {}).correo || "").toLowerCase(), f };
+}
+
 /* ---------- reglas ---------- */
 const TECNICOS = ["id", "_col", "_etag", "actualizado"];
 const cambiadas = (a, b) => { const ks = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]); return [...ks].filter(k => !TECNICOS.includes(k) && !igual((a || {})[k], (b || {})[k])); };
@@ -206,6 +213,7 @@ export async function rutaRend(req, env, ctx, { correo, json, autorizado, esCont
       const r = await graphApp(env, ruta, { method: "DELETE", headers: h });
       if (r.status === 412) return json({ error: "La rendición cambió en OneDrive.", status: 412 }, 412);
       if (!r.ok && r.status !== 404) return json({ error: `OneDrive no eliminó la rendición (${r.status}).`, status: r.status }, 502);
+      if (avisos && avisos.rlAplicar) await avisos.rlAplicar({ [id]: null }).catch(() => {}); /* v197: al registro de cambios */
       return json({ ok: true, avisos: viol.length || undefined });
     }
     h["Content-Type"] = "application/json";
@@ -213,6 +221,7 @@ export async function rutaRend(req, env, ctx, { correo, json, autorizado, esCont
     if (r.status === 412) return json({ error: "La rendición cambió en OneDrive.", status: 412 }, 412);
     if (!r.ok) return json({ error: `OneDrive no guardó la rendición (${r.status}).`, status: r.status }, 502);
     const it = await r.json();
+    if (avisos && avisos.rlAplicar) await avisos.rlAplicar({ [id]: { meta: metaDe(b.datos, it.eTag), data: b.datos } }).catch(() => {}); /* v197: al registro de cambios, al instante */
     return json({ ok: true, eTag: it.eTag, id: it.id, avisos: viol.length || undefined });
   } catch (e) {
     return json({ error: (e && e.error) || "Error al guardar en OneDrive.", status: (e && e.status) || 502 }, (e && e.status) || 502);

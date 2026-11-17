@@ -13,22 +13,18 @@
     /od/permisos/leer {}                           → { eTag, datos } con solo lo de quien pide (el administrador, todo); { vacio: true } si no hay
     /od/archivo      { id }                        → los bytes de una foto o PDF de una rendición que puede ver
   Para no leer todas las rendiciones de OneDrive en cada pedido, el servidor guarda una copia en el Durable Object (AVISOS):
-  «rl:idx» (por rendición: eTag, cuenta, correo y RUT de la persona, jefatura y las fotos/PDF «a:») y «rl:d:<id>» (la rendición).
-  En cada /od/rend/bajar lista _datos (solo nombres y eTag) y vuelve a leer solo las que cambiaron.
+  desde la v197, un registro de cambios numerado (rl:m:, rl:d:, rl:s:, rl:seq en push.js): cada escritura por /od/rend lo
+  actualiza al instante y /od/rend/cambios {cursor} devuelve solo lo cambiado desde ese número, de a 300 (como las apps grandes).
+  Cada 2 minutos como máximo se compara con OneDrive (conciliar) por si alguien cambió algo directo allá.
   Interruptor: OD_LEE = "no" → /yo dice odLee: false y la app vuelve a leer directo (para quien tenga acceso a la carpeta).
 */
 import { odConfig, graphApp } from "./onedrive.js";
-import { odRendActivo, maestrosSrv, correosDueno, carpetaDatos, idHijo, correosDe, RD_ROOT } from "./rendod.js";
+import { odRendActivo, maestrosSrv, correosDueno, carpetaDatos, idHijo, correosDe, RD_ROOT, metaDe } from "./rendod.js";
+export { metaDe };
 
 export const odLeeActivo = env => odRendActivo(env) && String(env.OD_LEE || "").toLowerCase() !== "no";
 const ID_OK = /^[A-Za-z0-9_-]{4,80}$/;
 
-/* lo que el índice guarda de cada rendición (lo justo para saber quién la ve y qué archivos tiene) */
-export function metaDe(r, eTag) {
-  const p = (r && r.persona) || {}, f = [];
-  Object.values((r && r.docs) || {}).forEach(d => { [d && d.foto, d && d.pdf].forEach(x => { if (/^a:/.test(String(x || ""))) f.push(String(x).slice(2)); }); });
-  return { e: eTag, c: String((r && r.cuenta) || "").toLowerCase(), pc: String(p.correo || "").toLowerCase(), rut: p.rut || "", j: String(((r && r.jefatura) || {}).correo || "").toLowerCase(), f };
-}
 export function puedeVer(M, m, quien) {
   if (quien.admin || quien.contab) return true;
   if (!m) return false;
@@ -37,8 +33,11 @@ export function puedeVer(M, m, quien) {
 }
 async function enParalelo(L, n, fn) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, L.length) }, async () => { while (i < L.length) { const x = L[i++]; await fn(x); } })); }
 
-/* lista _datos, actualiza el índice con lo que cambió y devuelve { idx, frescos } */
-export async function indiceAlDia(env, avisos) {
+/* v197: compara OneDrive con el registro de cambios (por si alguien cambió algo directo en OneDrive: Contabilidad o el
+   administrador, o un teléfono con una versión anterior) y le da un número nuevo a lo que cambió. Como máximo cada 2 minutos. */
+export const CADA_CONCILIAR = 120000;
+export async function conciliar(env, avisos, forzar = false, ahora = Date.now()) {
+  const est = await avisos.rlEstado(); if (!forzar && ahora - est.lista < CADA_CONCILIAR) return { saltado: true };
   const c = odConfig(env), d = encodeURIComponent(c.drive), datos = await carpetaDatos(env);
   const vistos = {}; let url = `/drives/${d}/items/${datos}/children?$select=id,name,eTag&$top=999`;
   while (url) {
@@ -46,33 +45,59 @@ export async function indiceAlDia(env, avisos) {
     const j = await r.json(); (j.value || []).forEach(it => { if (/\.json$/i.test(it.name || "")) vistos[it.name.replace(/\.json$/i, "")] = it; });
     url = j["@odata.nextLink"] || null;
   }
-  const idx = (await avisos.odIdx()) || {}, frescos = {}, cambios = {};
-  const leer = Object.keys(vistos).filter(id => !idx[id] || idx[id].e !== vistos[id].eTag);
+  const metas = await avisos.rlMetas(), cambios = {};
+  const leer = Object.keys(vistos).filter(id => !metas[id] || metas[id].borrado || metas[id].e !== vistos[id].eTag);
   await enParalelo(leer, 6, async id => {
     const r = await graphApp(env, `/drives/${d}/items/${vistos[id].id}/content`); if (!r.ok) return;
     let x = null; try { x = await r.json(); } catch (e) { return; }
-    idx[id] = metaDe(x, vistos[id].eTag); frescos[id] = x; cambios[id] = x;
+    cambios[id] = { meta: metaDe(x, vistos[id].eTag), data: x };
   });
-  Object.keys(idx).forEach(id => { if (!vistos[id]) { delete idx[id]; cambios[id] = null; } });
-  if (Object.keys(cambios).length) await avisos.odIdxCambiar(idx, cambios);
-  return { idx, frescos };
+  Object.keys(metas).forEach(id => { if (!vistos[id] && !metas[id].borrado) cambios[id] = null; });
+  if (Object.keys(cambios).length) await avisos.rlAplicar(cambios);
+  await avisos.rlListado(ahora);
+  return { cambios: Object.keys(cambios).length };
 }
+/* versión de la lista de colaboradores (si cambia, quién ve qué puede cambiar: el teléfono vuelve a bajar todo lo suyo) */
+const VV = new WeakMap();
+export function versionVis(M) { if (!M) return "0"; if (VV.has(M)) return VV.get(M); const t = JSON.stringify([M.colab || [], M.aprob || []]); let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; const v = (h >>> 0).toString(36); VV.set(M, v); return v; }
+export const PAGINA = 300;
 
 export async function rutasLectura(req, env, ctx, url, { correo, json, crudo, autorizado, esContab, avisos }) {
-  const rutas = ["/od/rend/bajar", "/od/rend/leer", "/od/maestros/leer", "/od/permisos/leer", "/od/archivo"];
+  const rutas = ["/od/rend/bajar", "/od/rend/cambios", "/od/rend/leer", "/od/maestros/leer", "/od/permisos/leer", "/od/archivo", "/sync/medida", "/od/medidas"];
   if (!rutas.includes(url.pathname)) return null;
-  if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
+  if (req.method !== "POST" && !(url.pathname === "/od/medidas" && req.method === "GET")) return json({ error: "Usa POST." }, 405);
   if (!odLeeActivo(env) || !avisos) return json({ error: "El servidor no está leyendo rendiciones.", status: 503 }, 503);
-  let b = {}; try { b = await req.json(); } catch (e) {}
+  let b = {}; if (req.method === "POST") try { b = await req.json(); } catch (e) {}
   const c = odConfig(env), d = encodeURIComponent(c.drive), quien = { correo, admin: autorizado, contab: await esContab() };
   try {
-    if (url.pathname === "/od/rend/bajar") {
-      const { idx, frescos } = await indiceAlDia(env, avisos), M = await maestrosSrv(env), con = (b && b.conocidos) || {};
-      const vis = Object.keys(idx).filter(id => puedeVer(M, idx[id], quien));
-      const faltan = vis.filter(id => con[id] !== idx[id].e), guardados = faltan.filter(id => !frescos[id]);
-      const otros = guardados.length ? await avisos.odDatos(guardados) : {};
-      const datos = {}; faltan.forEach(id => { const x = frescos[id] || otros[id]; if (x) datos[id] = x; });
-      return json({ ok: true, lista: vis.map(id => [id, idx[id].e]), datos });
+    if (url.pathname === "/od/rend/bajar") { /* v196 (lo usan los teléfonos que no tienen la v197): todo lo visible, con eTag */
+      await conciliar(env, avisos);
+      const metas = await avisos.rlMetas(), M = await maestrosSrv(env), con = (b && b.conocidos) || {};
+      const vis = Object.keys(metas).filter(id => !metas[id].borrado && puedeVer(M, metas[id], quien));
+      const faltan = vis.filter(id => con[id] !== metas[id].e), datos = faltan.length ? await avisos.odDatos(faltan) : {};
+      return json({ ok: true, lista: vis.map(id => [id, metas[id].e]), datos });
+    }
+    if (url.pathname === "/od/rend/cambios") { /* v197: solo lo que cambió desde el cursor, de a PAGINA */
+      await conciliar(env, avisos);
+      const M = await maestrosSrv(env), v = versionVis(M), [cs, cv] = String((b && b.cursor) || "").split(":");
+      const desde = cv === v && /^\d+$/.test(cs || "") ? +cs : 0;
+      const pg = await avisos.rlDesde(desde, PAGINA), ver = [], fuera = [];
+      for (const x of pg.lista) { if (!x.m || x.m.borrado || !puedeVer(M, x.m, quien)) { if (desde) fuera.push(x.id); } else ver.push([x.id, x.m.e]); }
+      const datos = ver.length ? await avisos.odDatos(ver.map(x => x[0])) : {};
+      const ultimo = pg.lista.length ? pg.lista[pg.lista.length - 1].s : (pg.mas ? desde : Math.max(desde, pg.seq));
+      return json({ ok: true, completo: !desde, cambios: ver.filter(x => datos[x[0]]).map(x => [x[0], x[1], datos[x[0]]]), fuera, cursor: `${ultimo}:${v}`, mas: pg.mas });
+    }
+    if (url.pathname === "/sync/medida") { /* v197: cuánto tardó la sincronización en este teléfono */
+      const n = x => Math.max(0, Math.min(600000, Math.round(+x || 0)));
+      const partes = {}; Object.entries((b && b.partes) || {}).slice(0, 20).forEach(([k, x]) => { if (/^[a-z]{2,20}$/i.test(k)) partes[k] = n(x); });
+      ctx.waitUntil(avisos.syncMedir({ hora: new Date().toISOString(), correo, ver: String((b && b.ver) || "").slice(0, 10), total: n(b && b.total), partes, cambios: n(b && b.cambios) }).catch(() => {}));
+      return json({ ok: true });
+    }
+    if (url.pathname === "/od/medidas") { /* v197: resumen para el administrador */
+      if (!quien.admin) return json({ error: "Solo el administrador." }, 403);
+      const L = await avisos.syncMedidas(), med = a => { const x = a.filter(y => y >= 0).sort((p, q) => p - q); return x.length ? x[Math.floor(x.length / 2)] : null; }, p90 = a => { const x = [...a].sort((p, q) => p - q); return x.length ? x[Math.min(x.length - 1, Math.floor(x.length * 0.9))] : null; };
+      const partes = {}; L.forEach(m => Object.entries(m.partes || {}).forEach(([k, x]) => (partes[k] = partes[k] || []).push(x)));
+      return json({ ok: true, total: L.length, mediana: med(L.map(m => m.total)), p90: p90(L.map(m => m.total)), partes: Object.fromEntries(Object.entries(partes).map(([k, a]) => [k, med(a)])), ultimas: L.slice(-20).reverse() });
     }
     if (url.pathname === "/od/rend/leer") {
       const id = String(b.id || ""); if (!ID_OK.test(id)) return json({ error: "Id no válido." }, 400);
@@ -112,8 +137,8 @@ export async function rutasLectura(req, env, ctx, url, { correo, json, crudo, au
     if (url.pathname === "/od/archivo") {
       const id = String(b.id || ""); if (!/^01[A-Z0-9]{20,}$/i.test(id)) return json({ error: "Id no válido." }, 400);
       if (!quien.admin && !quien.contab) {
-        const idx = (await avisos.odIdx()) || {}, M = await maestrosSrv(env);
-        const ok = Object.values(idx).some(m => (m.f || []).includes(id) && puedeVer(M, m, quien));
+        const metas = await avisos.rlMetas(), M = await maestrosSrv(env);
+        const ok = Object.values(metas).some(m => !m.borrado && (m.f || []).includes(id) && puedeVer(M, m, quien));
         if (!ok) return json({ error: "No es un archivo de una rendición tuya.", status: 403 }, 403);
       }
       const r = await graphApp(env, `/drives/${d}/items/${id}/content`);

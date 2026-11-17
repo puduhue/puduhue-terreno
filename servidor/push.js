@@ -128,10 +128,33 @@ export class Avisos extends DurableObject {
     if (ahora - p.hora < 30 * 60000) { await this.ctx.storage.put("od:push", p); return { total: L.length, avisar: false }; }
     const n = p.sin; await this.ctx.storage.put("od:push", { hora: ahora, sin: 0 }); return { total: L.length, avisar: true, n }; }
   async odLeer() { return (await this.ctx.storage.get("od:avisos")) || []; }
-  /* v196: copia de las rendiciones para leerlas por el servidor (rendlee.js): índice y cada rendición */
-  async odIdx() { return (await this.ctx.storage.get("rl:idx")) || {}; }
-  async odIdxCambiar(idx, cambios) { await this.ctx.storage.put("rl:idx", idx);
-    for (const [id, d] of Object.entries(cambios || {})) { if (d === null) await this.ctx.storage.delete("rl:d:" + id); else await this.ctx.storage.put("rl:d:" + id, d); } }
+  /* v196: cada rendición guardada (rl:d:<id>) para leerla por el servidor (rendlee.js) */
+  /* v197: registro de cambios de Rendiciones (como las apps grandes: «dame lo que cambió desde el cambio N»).
+     rl:m:<id> = { e, c, pc, rut, j, f, s } (o { borrado: true, s }) · rl:d:<id> = la rendición · rl:s:<seq> = id · rl:seq = último número.
+     Cada cambio recibe un número nuevo y borra su número anterior, así el registro tiene una entrada por rendición (más las borradas). */
+  async rlMetas() { const m = await this.ctx.storage.list({ prefix: "rl:m:" }); const o = {}; for (const [k, v] of m) o[k.slice(5)] = v; return o; }
+  async rlAplicar(cambios) {
+    let seq = (await this.ctx.storage.get("rl:seq")) || 0; const S = this.ctx.storage, n = x => String(x).padStart(12, "0");
+    for (const [id, c] of Object.entries(cambios || {})) {
+      const prev = await S.get("rl:m:" + id); if (prev && prev.s) await S.delete("rl:s:" + n(prev.s));
+      if (!c && (!prev || prev.borrado)) continue;
+      seq++; await S.put("rl:s:" + n(seq), id);
+      if (!c) { await S.put("rl:m:" + id, { borrado: true, s: seq }); await S.delete("rl:d:" + id); }
+      else { await S.put("rl:m:" + id, { ...c.meta, s: seq }); await S.put("rl:d:" + id, c.data); }
+    }
+    await S.put("rl:seq", seq); return seq;
+  }
+  async rlDesde(cursor, limite) {
+    const n = x => String(x).padStart(12, "0"), L = await this.ctx.storage.list({ prefix: "rl:s:", start: "rl:s:" + n((+cursor || 0) + 1), limit: limite + 1 });
+    const filas = [...L], mas = filas.length > limite, usar = filas.slice(0, limite), out = [];
+    for (const [k, id] of usar) out.push({ id, s: +k.slice(5), m: await this.ctx.storage.get("rl:m:" + id) });
+    return { lista: out, mas, seq: (await this.ctx.storage.get("rl:seq")) || 0 };
+  }
+  async rlEstado() { return { seq: (await this.ctx.storage.get("rl:seq")) || 0, lista: (await this.ctx.storage.get("rl:lista")) || 0 }; }
+  async rlListado(t) { await this.ctx.storage.put("rl:lista", t); await this.ctx.storage.delete("rl:idx"); /* el índice de la v196 ya no se usa */ }
+  /* v197: medidas de la sincronización que mandan los teléfonos (las últimas 500) */
+  async syncMedir(x) { const L = (await this.ctx.storage.get("sync:medidas")) || []; L.push(x); while (L.length > 500) L.shift(); await this.ctx.storage.put("sync:medidas", L); }
+  async syncMedidas() { return (await this.ctx.storage.get("sync:medidas")) || []; }
   async odDatos(ids) { const out = {}; for (const id of ids || []) { const x = await this.ctx.storage.get("rl:d:" + id); if (x) out[id] = x; } return out; }
   async leerAntiguo() { const x = await this.ctx.storage.get("antiguo"); return x ? { total: x.total, desde: x.desde, ultimo: x.ultimo } : { total: 0 }; }
   /* v141.1 (M-26): cómo llega la sesión (api: permiso propio; graph: token de Graph), por día, con huellas de correo (no correos) */
