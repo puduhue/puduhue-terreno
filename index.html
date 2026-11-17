@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Q0dt8orxz0ji3+HGNFozuUenQPqEwxNVBiGo0ouQIkE=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-jDounYlalEVn2hIr0mTypjJiWYsmokzFSQUCNP+wG00=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=195">
+<link rel="stylesheet" href="estilos.css?v=196">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="195";
+const APP_VER="196";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -447,7 +447,22 @@ async function cacheRecortar(forzar,max){
   if(tot<=max)return 0;L.sort((a,b)=>a.t-b.t);let borr=0;
   for(const x of L){if(tot<=max*0.75)break;try{await IDB.del("cache",x.k);tot-=x.n;borr++;const u=FOTO[x.k];if(u&&String(u).startsWith("blob:")){try{URL.revokeObjectURL(u)}catch(e){}delete FOTO[x.k]}}catch(e){}}
   return borr}
+/* v196: Rendiciones se baja por el servidor: solo las rendiciones que la persona puede ver, y solo las nuevas o cambiadas */
+const odLeeCol=col=>col==="rendiciones"&&!!rolesSrv().odLee;
+async function pullColSrv(col){const R=REMOTE[col],con={};Object.keys(R).forEach(id=>{const e=ETAGS[rkey(col,id)];if(e)con[id]=e});
+  const j=await odPedir("/od/rend/bajar",{conocidos:con});let cambios=0;const vistos=new Set();
+  for(const [id,e] of (j.lista||[])){vistos.add(id);const ek=rkey(col,id);if(ETAGS[ek]===e&&R[id])continue;const d=(j.datos||{})[id];if(!d)continue;
+    d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=e;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}
+  for(const id of Object.keys(R)){if(!vistos.has(id)&&!LOCAL[id]){delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++}}
+  return cambios}
+/* v196: la versión que está en OneDrive de un registro (para combinar antes de subir o eliminar) */
+async function metaRegistro(col,id,ruta){if(odLeeCol(col)){const j=await odPedir("/od/rend/leer",{id});return{id:null,eTag:j.eTag,_datos:j.datos}}return gjson(ruta+"?$select=id,eTag")}
+/* v196: un archivo por id; si OneDrive no deja (403/404) y Rendiciones lee por el servidor, se le pide al servidor */
+async function odArchivo(id){let r;try{r=await srvFetch("/od/archivo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})}catch(e){if(e&&e.code)throw e;throw{code:"network"}}
+  if(r.ok)return r;if(r.status===404)throw{code:"not_found"};if(r.status===403)throw{code:"forbidden"};throw{code:"graph",status:r.status}}
+async function leerArchivo(fid){try{return await gfetch(`/drives/${M365.drive}/items/${fid}/content`)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")&&rolesSrv().odLee)return odArchivo(fid);throw e}}
 async function pullCol(col){
+  if(odLeeCol(col))return pullColSrv(col); /* v196 */
   const folder=await carpetaCol(col);const R=REMOTE[col];
   let url=`/drives/${M365.drive}/items/${folder}/children?$select=id,name,eTag,lastModifiedDateTime,size&$top=200`;const vistos=new Set();let cambios=0;
   while(url){const pg=await gjson(url);const baja=[];
@@ -591,14 +606,14 @@ async function guardarConflicto(col,id,version,motivo,campos){
 const rutaRegistro=async(col,id)=>`/drives/${M365.drive}/items/${await carpetaCol(col)}:/${encName(id+".json")}`;
 /* sube un registro: con If-Match si OneDrive tiene la versión de partida; si tiene otra, combina; si ya no existe, avisa */
 async function subirRegistro(col,id,a){
-  const ruta=await rutaRegistro(col,id),local=clean(a);delete local.id;delete local._col;delete local._etag;
+  const ruta=odLeeCol(col)?"":await rutaRegistro(col,id),local=clean(a); /* v196: con odLee no se ubica la carpeta */delete local.id;delete local._col;delete local._etag;
   const e0=a._etag||null,base0=e0?baseDe(col,id,e0):null;let copia=false,r412=null;
   for(let i=0;;i++){
-    let meta=null;try{meta=await gjson(ruta+"?$select=id,eTag")}catch(e){if(e.code!=="not_found")throw e}
+    let meta=null;try{meta=await metaRegistro(col,id,ruta)}catch(e){if(e.code!=="not_found")throw e}
     if(meta&&r412&&meta.eTag===r412)IFM_NO=true; /* OneDrive rechazó la versión sin que cambiara: se sube sin If-Match */
     if(!meta&&e0){await guardarConflicto(col,id,local,"Eliminado en otro teléfono");return{eliminado:true}}
     let datos=local,mez=null;
-    if(meta&&meta.eTag!==e0){const rem=await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json();delete rem.id;
+    if(meta&&meta.eTag!==e0){const rem=(meta._datos?JSON.parse(JSON.stringify(meta._datos)):await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json());delete rem.id;
       mez=mezclarRegistro(base0,local,rem);datos=mez.r;mez.base=!!base0;mez.trajo=!igual(datos,local);
       if(mez.c.length&&!copia){await guardarConflicto(col,id,mez.lGana?rem:local,"Cambiado en dos teléfonos: quedó la versión más reciente",mez.c);copia=true}
       if(igual(datos,rem))return{datos:rem,etag:meta.eTag,mez,base0}}
@@ -631,15 +646,15 @@ async function aplicarSubida(col,id,a,stamp,res){const ek=rkey(col,id);
     if(res.mez.trajo&&VISTAS_COL[col].includes(view))(ab?sinPerderFoco(render):renderFondo())}}
 /* elimina un registro en OneDrive solo si sigue siendo la versión que se eliminó en este teléfono (o un borrador, en la cola antigua) */
 const esBorradorCol=(col,o)=>!o||(col==="conteos"?o.estado!=="cerrado":col==="rendiciones"?o.estado==="borrador":o.estado!=="cerrada");
-async function borrarRegistro(col,id,e0){const ruta=await rutaRegistro(col,id),ek=rkey(col,id);
+async function borrarRegistro(col,id,e0){const ruta=odLeeCol(col)?"":await rutaRegistro(col,id),ek=rkey(col,id);
   const limpiar=()=>{delete REMOTE[col][id];delete ETAGS[ek];guardarEtags();if(IDB.db)IDB.del("remote",ek).catch(()=>{});baseBorrar(ek)};
   let r412=null;
   for(let i=0;;i++){
-    let meta=null;try{meta=await gjson(ruta+"?$select=id,eTag")}catch(e){if(e.code!=="not_found")throw e}
+    let meta=null;try{meta=await metaRegistro(col,id,ruta)}catch(e){if(e.code!=="not_found")throw e}
     if(!meta){limpiar();return{}}
     if(r412&&meta.eTag===r412)IFM_NO=true;
     let ok=!!e0&&meta.eTag===e0,rem=null;
-    if(!ok){rem=await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json();ok=!e0&&esBorradorCol(col,rem)}
+    if(!ok){rem=(meta._datos?JSON.parse(JSON.stringify(meta._datos)):await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json());ok=!e0&&esBorradorCol(col,rem)}
     if(!ok){rem.id=id;REMOTE[col][id]=rem;ETAGS[ek]=meta.eTag;guardarEtags();if(IDB.db)IDB.put("remote",ek,rem).catch(()=>{});return{restaurado:rem}}
     try{if(odRendCol(col))await odRendPedir({op:"delete",id,ifMatch:IFM_NO?null:meta.eTag});else await gfetch(ruta,{method:"DELETE",headers:IFM_NO?{}:{"If-Match":meta.eTag}});limpiar();return{}}
     catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta.eTag;continue}if(e&&e.code==="not_found"){limpiar();return{}}throw e}
@@ -677,7 +692,7 @@ function pedirFoto(ref){
     try{
       if(IDB.db){const c=await IDB.get("cache",ref);const b=await recBlob(c);if(b){FOTO[ref]=URL.createObjectURL(b);return}}
       if(!DB||navigator.onLine===false)return;
-      const fid=ref.slice(2);let r;if(esItemId(fid))r=await gfetch(`/drives/${M365.drive}/items/${fid}/content`);else{const f=await asegurarCarpetas();r=await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(fid+".jpg")}:/content`)}const b=await r.blob();
+      const fid=ref.slice(2);let r;if(esItemId(fid))r=await leerArchivo(fid); /* v196 */else{const f=await asegurarCarpetas();r=await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(fid+".jpg")}:/content`)}const b=await r.blob();
       if(!b||!b.size)return;FOTO[ref]=URL.createObjectURL(b);
       try{if(IDB.db)await IDB.put("cache",ref,{data:await b.arrayBuffer(),type:b.type||"image/jpeg"})}catch(e){}
     }catch(e){if(e&&e.code==="not_found")LOST[ref]=true}
@@ -1189,6 +1204,10 @@ async function permCarpeta(crear){
 async function permPull(){
   if(!DB||navigator.onLine===false||!ME)return false;
   if(PERM_PEND&&esAdmin())return await permSubir();
+  if(rolesSrv().odLee&&!esAdmin()){const j=await odPedir("/od/permisos/leer",{}); /* v196 */
+    if(j.vacio){if(!Object.keys(PERM.personas).length)return false;PERM=permVacio();PERM_ETAG="";permLocal();return true}
+    if(j.eTag===PERM_ETAG)return false;const x=j.datos||{};
+    PERM={personas:x.personas||{},nombres:x.nombres&&typeof x.nombres==="object"?x.nombres:{},actualizado:x.actualizado||"",por:x.por||""};PERM_ETAG=j.eTag||"";permLocal();return true}
   const leer=async()=>{const d=await permCarpeta(false);if(!d)return null;
     try{return await gjson(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}?$select=id,eTag`)}catch(e){if(e.code==="not_found")return null;throw e}};
   let usaba=false;try{usaba=!!localStorage.getItem(PERM_DIR_K)}catch(e){}
@@ -3137,9 +3156,9 @@ const ROLES_K="actas-roles";
 function rolesSrv(){try{const x=JSON.parse(localStorage.getItem(ROLES_K)||"null");return x&&ME&&x.correo===String(ME.correo||"").toLowerCase()?x:{}}catch(e){return{}}}
 let ROLES_PIDIENDO=false;
 async function rolesTraer(forzar){
-  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3&&"odRend" in x)return false;
+  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3&&"odLee" in x)return false;
   ROLES_PIDIENDO=true;
-  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),odRend:!!j.odRend,hora:Date.now()};
+  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),odRend:!!j.odRend,odLee:!!j.odLee,hora:Date.now()};
     const antes=JSON.stringify([x.admin,x.contab,x.lista]);try{localStorage.setItem(ROLES_K,JSON.stringify(n))}catch(e){}
     if(antes!==JSON.stringify([n.admin,n.contab,n.lista])&&loaded)render();return true}
   catch(e){console.warn("roles",e);return false}finally{ROLES_PIDIENDO=false}}
@@ -3817,10 +3836,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=195"></script>
-<script src="modulos/bodega.js?v=195"></script>
-<script src="modulos/rendiciones.js?v=195"></script>
-<script src="modulos/actas-entrega.js?v=195"></script>
+<script src="modulos/checklist.js?v=196"></script>
+<script src="modulos/bodega.js?v=196"></script>
+<script src="modulos/rendiciones.js?v=196"></script>
+<script src="modulos/actas-entrega.js?v=196"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
