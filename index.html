@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-jDounYlalEVn2hIr0mTypjJiWYsmokzFSQUCNP+wG00=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-RqhoGgOwAL/b+zrzAYeKnZa81DtWFBSmjx33hl9KmDg=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=196">
+<link rel="stylesheet" href="estilos.css?v=197">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="196";
+const APP_VER="197";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -447,9 +447,28 @@ async function cacheRecortar(forzar,max){
   if(tot<=max)return 0;L.sort((a,b)=>a.t-b.t);let borr=0;
   for(const x of L){if(tot<=max*0.75)break;try{await IDB.del("cache",x.k);tot-=x.n;borr++;const u=FOTO[x.k];if(u&&String(u).startsWith("blob:")){try{URL.revokeObjectURL(u)}catch(e){}delete FOTO[x.k]}}catch(e){}}
   return borr}
+/* v197: cuánto tardó la sincronización (se ve en SYNC_INFO.tiempos; el servidor junta las de todos, como máximo cada 10 minutos) */
+const SM_K="actas-sync-medida";
+function syncMedida(total,partes,cambios){SYNC_INFO.tiempos={total,partes,hora:new Date().toISOString()};
+  try{if(!rolesSrv().odCambios||navigator.onLine===false)return;const t=+localStorage.getItem(SM_K)||0;if(Date.now()-t<10*60e3)return;localStorage.setItem(SM_K,String(Date.now()));
+    srvFetch("/sync/medida",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({total,partes,cambios,ver:APP_VER})}).catch(()=>{})}catch(e){}}
+/* v197: Rendiciones por cursor: «lo que cambió desde el cambio N», de a 300; «fuera» = lo que ya no le corresponde */
+const RLC_K=()=>"actas-rl-cursor:"+meCorreo();
+async function pullColCambios(col){const R=REMOTE[col];let cursor="";try{cursor=localStorage.getItem(RLC_K())||""}catch(e){}
+  if(!Object.keys(R).length)cursor=""; /* sin copia en el teléfono: todo desde cero */
+  let cambios=0,vistos=null;const quitar=id=>{delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++};
+  for(let i=0;i<500;i++){const j=await odPedir("/od/rend/cambios",{cursor});
+    if(j.completo&&!vistos)vistos=new Set();
+    for(const [id,e,d] of (j.cambios||[])){if(vistos)vistos.add(id);const ek=rkey(col,id);if(ETAGS[ek]===e&&R[id])continue;
+      d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=e;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}
+    for(const id of (j.fuera||[]))if(R[id]&&!LOCAL[id])quitar(id);
+    cursor=j.cursor||"";if(!j.mas)break}
+  if(vistos)for(const id of Object.keys(R))if(!vistos.has(id)&&!LOCAL[id])quitar(id);
+  try{localStorage.setItem(RLC_K(),cursor)}catch(e){}
+  return cambios}
 /* v196: Rendiciones se baja por el servidor: solo las rendiciones que la persona puede ver, y solo las nuevas o cambiadas */
 const odLeeCol=col=>col==="rendiciones"&&!!rolesSrv().odLee;
-async function pullColSrv(col){const R=REMOTE[col],con={};Object.keys(R).forEach(id=>{const e=ETAGS[rkey(col,id)];if(e)con[id]=e});
+async function pullColSrv(col){const R=REMOTE[col],con={};if(rolesSrv().odCambios)return pullColCambios(col); /* v197 */Object.keys(R).forEach(id=>{const e=ETAGS[rkey(col,id)];if(e)con[id]=e});
   const j=await odPedir("/od/rend/bajar",{conocidos:con});let cambios=0;const vistos=new Set();
   for(const [id,e] of (j.lista||[])){vistos.add(id);const ek=rkey(col,id);if(ETAGS[ek]===e&&R[id])continue;const d=(j.datos||{})[id];if(!d)continue;
     d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=e;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}
@@ -479,15 +498,22 @@ async function pull(manual){
   pulling=true;SYNC_INFO.estado="bajando";status();
   try{
     while(syncing)await new Promise(r=>setTimeout(r,200)); /* v106 (M-02): un solo candado para bajar y subir */
-    let cambios=0,nSin=0,eSin=null;for(const col of Object.keys(M365.cols)){let c=0;
+    /* v197: todo a la vez, no en fila (como las apps grandes), midiendo cuánto tarda cada parte */
+    const T0=performance.now(),ms={},medir=(k,p)=>{const t=performance.now();return p.finally(()=>{ms[k]=Math.round(performance.now()-t)})};
+    const cols=Object.keys(M365.cols);let cambios=0,nSin=0,eSin=null,eOtro=null;
+    const extras=[
+      medir("catalogo",(async()=>{try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")renderFondo()}}catch(e){console.warn("catálogo",e)}})()),
+      medir("stock",(async()=>{try{if(await stockPull()&&(view==="stock"||view==="launch"))renderFondo()}catch(e){console.warn("stock",e)}})()),
+      medir("maestros",(async()=>{try{if(await rdMaePull()&&/^rd/.test(view))renderFondo()}catch(e){console.warn("maestros rendiciones",e)}})()),
+      medir("permisos",(async()=>{try{if(await permPull())renderFondo()}catch(e){console.warn("permisos",e)}})())];
+    await Promise.all(cols.map(col=>medir(col,(async()=>{let c=0;
       /* v132 (M-24): sin acceso a la carpeta de un módulo (403, o 404 de la carpeta), se sigue con los demás */
-      try{c=await pullAcceso(col)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")){SIN_ACCESO[col]=e.code;nSin++;eSin=e;continue}throw e}
-      cambios+=c;if(c||manual)emitir(col)}
-    if(nSin===Object.keys(M365.cols).length)throw eSin;
-    try{if(await cargarCatalogo()){cambios++;if(view==="cl"||view==="clcat")renderFondo()}}catch(e){console.warn("catálogo",e)}
-    try{if(await stockPull()&&(view==="stock"||view==="launch"))renderFondo()}catch(e){console.warn("stock",e)}
-    try{if(await rdMaePull()&&/^rd/.test(view))renderFondo()}catch(e){console.warn("maestros rendiciones",e)}
-    try{if(await permPull())renderFondo()}catch(e){console.warn("permisos",e)}
+      try{c=await pullAcceso(col)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")){SIN_ACCESO[col]=e.code;nSin++;eSin=e;return}eOtro=eOtro||e;return}
+      cambios+=c;if(c||manual)emitir(col)})())));
+    await Promise.all(extras);
+    if(eOtro)throw eOtro;
+    if(nSin===cols.length)throw eSin;
+    syncMedida(Math.round(performance.now()-T0),ms,cambios);
     if(CAT_PEND&&esAdmin())await guardarCatalogo(false);
     guardarEtags();SYNC_INFO.ultima=new Date().toISOString();SYNC_INFO.error="";if(noWrite){noWrite=false;schedSync(1000)} /* v106 (A-03) */try{localStorage.setItem(LK,SYNC_INFO.ultima)}catch(e){}
     if(manual)toast(sinAccesoTxt()||(cambios?`Actualizado: ${cambios} ${cambios===1?"registro":"registros"} con cambios.`:"Todo al día."),sinAccesoTxt()?6000:0);
@@ -3156,9 +3182,9 @@ const ROLES_K="actas-roles";
 function rolesSrv(){try{const x=JSON.parse(localStorage.getItem(ROLES_K)||"null");return x&&ME&&x.correo===String(ME.correo||"").toLowerCase()?x:{}}catch(e){return{}}}
 let ROLES_PIDIENDO=false;
 async function rolesTraer(forzar){
-  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3&&"odLee" in x)return false;
+  if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3&&"odCambios" in x)return false;
   ROLES_PIDIENDO=true;
-  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),odRend:!!j.odRend,odLee:!!j.odLee,hora:Date.now()};
+  try{const j=await workerFetch("/yo");const n={correo:String(j.correo||ME.correo||"").toLowerCase(),admin:!!j.admin,contab:!!j.contab,lista:(Array.isArray(j.contabCorreos)?j.contabCorreos:[]).map(c=>String(c).toLowerCase()),odRend:!!j.odRend,odLee:!!j.odLee,odCambios:!!j.odCambios,hora:Date.now()};
     const antes=JSON.stringify([x.admin,x.contab,x.lista]);try{localStorage.setItem(ROLES_K,JSON.stringify(n))}catch(e){}
     if(antes!==JSON.stringify([n.admin,n.contab,n.lista])&&loaded)render();return true}
   catch(e){console.warn("roles",e);return false}finally{ROLES_PIDIENDO=false}}
@@ -3836,10 +3862,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=196"></script>
-<script src="modulos/bodega.js?v=196"></script>
-<script src="modulos/rendiciones.js?v=196"></script>
-<script src="modulos/actas-entrega.js?v=196"></script>
+<script src="modulos/checklist.js?v=197"></script>
+<script src="modulos/bodega.js?v=197"></script>
+<script src="modulos/rendiciones.js?v=197"></script>
+<script src="modulos/actas-entrega.js?v=197"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
