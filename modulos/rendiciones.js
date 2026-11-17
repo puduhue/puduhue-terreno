@@ -975,6 +975,8 @@ function jefaturaDe(c){
 async function rdMaeLocal(){try{if(IDB.db){const d=await IDB.get("remote","rend/maestros");if(d&&d.hora){MAE=d;MAE_ETAG=d.etag||""}}}catch(e){}}
 async function rdMaePull(){
   if(!DB||navigator.onLine===false)return false;
+  if(rolesSrv().odLee){const j=await odPedir("/od/maestros/leer",{etag:MAE?MAE_ETAG:""}); /* v196 */
+    if(j.vacio||j.igual)return false;const d=j.datos;d.etag=j.eTag;MAE=d;MAE_ETAG=j.eTag;try{if(IDB.db)await IDB.put("remote","rend/maestros",d)}catch(e){}return true}
   let meta=null;try{meta=await gjson(`/drives/${M365.drive}/items/${RD.root}:/${RD.maeDir}/${RD.maeFile}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e;return false}
   if(meta.eTag===MAE_ETAG&&MAE)return false;
   const r=await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const d=await r.json();d.etag=meta.eTag;MAE=d;MAE_ETAG=meta.eTag;
@@ -2622,7 +2624,7 @@ async function rdPdfBlob(d){
   const ref=d.pdf;if(!ref)return null;
   if(IDB.db){const rec=await IDB.get("fotos",ref).catch(()=>null)||await IDB.get("cache",ref).catch(()=>null);const b=await recBlob(rec);if(b)return new Blob([b],{type:"application/pdf"})}
   if(ref.startsWith("a:")&&DB&&navigator.onLine!==false&&esItemId(ref.slice(2))){
-    try{const x=await gfetch(`/drives/${M365.drive}/items/${ref.slice(2)}/content`);const b=await x.blob();
+    try{const x=await leerArchivo(ref.slice(2));const b=await x.blob(); /* v196 */
       if(b&&b.size){try{if(IDB.db)await IDB.put("cache",ref,{data:await b.arrayBuffer(),type:"application/pdf"})}catch(e){}return new Blob([b],{type:"application/pdf"})}}catch(e){console.warn("pdf",e)}}
   return null}
 async function rdAbrirPdf(r,d){
@@ -2683,7 +2685,8 @@ function rdXlsxLibro(RS){
   const w2=XLSX.utils.aoa_to_sheet(res);w2["!cols"]=[{wch:30},{wch:24},{wch:24},{wch:12},{wch:14},{wch:26},{wch:26},{wch:12},{wch:22},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Resumen");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
-async function rdXlsxUpload(periodo){await rdSubir([periodo],`Rendiciones_${periodo}.xlsx`,new Blob([rdXlsxBuild(periodo)]),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+/* v196: con odLee, quien rinde solo tiene sus rendiciones: el Excel del mes lo rearma Contabilidad (o el administrador) */
+async function rdXlsxUpload(periodo){if(rolesSrv().odLee&&!esContab())return;await rdSubir([periodo],`Rendiciones_${periodo}.xlsx`,new Blob([rdXlsxBuild(periodo)]),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
 async function rdArchivos(r){
   try{if(Object.values(r.docs||{}).some(d=>(d.foto&&QF[d.foto])||(d.pdf&&QF[d.pdf]))){setTimeout(()=>rdArchivos(r),20000);return}
     await rdPdf(r,true);
@@ -2723,4 +2726,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="195"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="196"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
