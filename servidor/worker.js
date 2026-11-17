@@ -55,6 +55,8 @@
     Desde la v195.1, cada aviso se notifica al administrador (CORREOS_ACTUALIZAR), como máximo una vez cada 30 minutos.
   Rendiciones LEE por el servidor (v196): ver rendlee.js. /od/rend/bajar, /od/rend/leer, /od/maestros/leer, /od/permisos/leer,
     /od/archivo; cada persona ve solo lo suyo. OD_LEE = "no" lo apaga.
+  Sincronización por cursor (v197): /od/rend/cambios (registro de cambios numerado en el Durable Object), /sync/medida (los
+    teléfonos mandan cuánto tardó) y /od/medidas (resumen, administrador).
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
@@ -119,7 +121,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v196";
+const VERSION_SERVIDOR = "v197";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -246,7 +248,7 @@ export default {
 
     try {
       // /yo → roles de quien pide (v138, B-15): administrador, Contabilidad y la lista de Contabilidad
-      if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env), odRend: odRendActivo(env), odLee: odLeeActivo(env) }); /* v194: odRend = Rendiciones guarda por el servidor */
+      if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env), odRend: odRendActivo(env), odLee: odLeeActivo(env), odCambios: odLeeActivo(env) }); /* v197: odCambios = sincronización por cursor */ /* v194: odRend = Rendiciones guarda por el servidor */
       // /od/... → OneDrive con la credencial del servidor (v193.1; por ahora solo /od/prueba, del administrador)
       const av = env.AVISOS ? objetoAvisos(env) : null;
       const rle = await rutasLectura(req, env, ctx, url, { correo, json, crudo, autorizado, esContab, avisos: av }); if (rle) return rle; /* v196 */
