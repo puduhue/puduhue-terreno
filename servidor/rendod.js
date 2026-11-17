@@ -148,7 +148,7 @@ export function revisarRendicion(M, antes, despues, quien) {
 
 /* ---------- carpetas ---------- */
 let DATOS_ID = null, CONF_ID = null;
-async function idHijo(env, padre, nombre, crear) {
+export async function idHijo(env, padre, nombre, crear) {
   const c = odConfig(env), d = encodeURIComponent(c.drive);
   let r = await graphApp(env, `/drives/${d}/items/${padre}:/${encodeURIComponent(nombre)}?$select=id`);
   if (r.ok) return (await r.json()).id;
@@ -158,7 +158,7 @@ async function idHijo(env, padre, nombre, crear) {
   if (r.status === 409) return idHijo(env, padre, nombre, false);
   throw { status: 502, error: `No se pudo crear «${nombre}» en OneDrive (${r.status}).` };
 }
-const carpetaDatos = async env => DATOS_ID || (DATOS_ID = await idHijo(env, RD_ROOT, "_datos", true));
+export const carpetaDatos = async env => DATOS_ID || (DATOS_ID = await idHijo(env, RD_ROOT, "_datos", true));
 const carpetaConflictos = async env => CONF_ID || (CONF_ID = await idHijo(env, await carpetaDatos(env), "_conflictos", true));
 
 /* ---------- la ruta ---------- */

@@ -128,6 +128,11 @@ export class Avisos extends DurableObject {
     if (ahora - p.hora < 30 * 60000) { await this.ctx.storage.put("od:push", p); return { total: L.length, avisar: false }; }
     const n = p.sin; await this.ctx.storage.put("od:push", { hora: ahora, sin: 0 }); return { total: L.length, avisar: true, n }; }
   async odLeer() { return (await this.ctx.storage.get("od:avisos")) || []; }
+  /* v196: copia de las rendiciones para leerlas por el servidor (rendlee.js): índice y cada rendición */
+  async odIdx() { return (await this.ctx.storage.get("rl:idx")) || {}; }
+  async odIdxCambiar(idx, cambios) { await this.ctx.storage.put("rl:idx", idx);
+    for (const [id, d] of Object.entries(cambios || {})) { if (d === null) await this.ctx.storage.delete("rl:d:" + id); else await this.ctx.storage.put("rl:d:" + id, d); } }
+  async odDatos(ids) { const out = {}; for (const id of ids || []) { const x = await this.ctx.storage.get("rl:d:" + id); if (x) out[id] = x; } return out; }
   async leerAntiguo() { const x = await this.ctx.storage.get("antiguo"); return x ? { total: x.total, desde: x.desde, ultimo: x.ultimo } : { total: 0 }; }
   /* v141.1 (M-26): cómo llega la sesión (api: permiso propio; graph: token de Graph), por día, con huellas de correo (no correos) */
   async contarSesion(modo, correo, fecha) {
