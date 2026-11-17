@@ -2116,9 +2116,9 @@ async function rdMaeCargar(files){
   if(!sub.length){toast(mal.length?`No se reconoció el formato de: ${mal.join(", ")}.`:"No se eligió ningún archivo.");return}
   nuevo.hora=hora;nuevo.por=yo();
   try{
-    const dir=await rdCarpeta([RD.maeDir]);
-    for(const f of sub){try{await gfetch(`/drives/${M365.drive}/items/${dir}:/${encName(f.name)}:/content`,{method:"PUT",headers:{"Content-Type":f.type||"application/octet-stream"},body:f})}catch(e){console.warn("maestro",f.name,e)}}
-    const up=await gfetch(`/drives/${M365.drive}/items/${dir}:/${RD.maeFile}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(nuevo)});const it=await up.json();
+    const od=!!rolesSrv().odRend,dir=od?null:await rdCarpeta([RD.maeDir]);
+    for(const f of sub){try{if(od)await rdSubir([RD.maeDir],f.name,f,f.type||"application/octet-stream");else await gfetch(`/drives/${M365.drive}/items/${dir}:/${encName(f.name)}:/content`,{method:"PUT",headers:{"Content-Type":f.type||"application/octet-stream"},body:f})}catch(e){console.warn("maestro",f.name,e)}}
+    const it=await rdMaeEscribir(dir,nuevo);
     nuevo.etag=it.eTag;MAE=nuevo;MAE_ETAG=it.eTag;try{if(IDB.db)await IDB.put("remote","rend/maestros",nuevo)}catch(e){}
     const nombres=Object.fromEntries(MAE_TIPOS.map(x=>[x[0],x[1]]));nombres.aprob="Aprobadores";nombres.dist="Distribuciones";
     toast(`Maestros actualizados: ${[...new Set(ok)].map(k=>nombres[k]||k).join(", ")}.${mal.length?` No se reconoció: ${mal.join(", ")}.`:""}`);
@@ -2129,8 +2129,7 @@ async function rdMaeCargar(files){
 async function rdMaeGuardar(fn){
   try{await rdMaePull()}catch(e){}
   const nuevo=JSON.parse(JSON.stringify(MAE||{}));delete nuevo.etag;nuevo.archivos=nuevo.archivos||{};fn(nuevo);nuevo.hora=new Date().toISOString();nuevo.por=yo();
-  const dir=await rdCarpeta([RD.maeDir]);
-  const up=await gfetch(`/drives/${M365.drive}/items/${dir}:/${RD.maeFile}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(nuevo)});const it=await up.json();
+  const it=await rdMaeEscribir(rolesSrv().odRend?null:await rdCarpeta([RD.maeDir]),nuevo);
   nuevo.etag=it.eTag;MAE=nuevo;MAE_ETAG=it.eTag;try{if(IDB.db)await IDB.put("remote","rend/maestros",nuevo)}catch(e){}
   return nuevo;
 }
@@ -2255,7 +2254,8 @@ async function rdColExcelAplicar(ops){
   const nom=(MAE&&MAE.archivos&&MAE.archivos.colab&&MAE.archivos.colab.nombre)||"Colaboradores_y_Aprobaciones_Rendiciones.xlsx";
   const dir=await rdCarpeta([RD.maeDir]);const it=await gjson(`/drives/${M365.drive}/items/${dir}:/${encName(nom)}`);
   const base=`/drives/${M365.drive}/items/${it.id}/workbook/worksheets/`;
-  const poner=(hoja,addr,val)=>gfetch(`${base}${encodeURIComponent(hoja)}/range(address='${addr}')`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({values:[[val]]})});
+  const poner=(hoja,addr,val)=>rolesSrv().odRend?odPedir("/od/celdas",{archivo:nom,hoja,addr,valor:val}) /* v195 */
+    :gfetch(`${base}${encodeURIComponent(hoja)}/range(address='${addr}')`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({values:[[val]]})});
   for(const op of ops){
     const hoja=RDCOL_HOJA[op.tipo];const ur=await gjson(`${base}${encodeURIComponent(hoja)}/usedRange?$select=address,values`);
     const m=/!?\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(String(ur.address||"").split("!").pop()||"");if(!m)throw{error:"No se pudo leer la hoja "+hoja+"."};
@@ -2653,7 +2653,12 @@ async function rdCarpeta(segs){let parent=RD.root,path="";
     if(!id){const x=await crearCarpeta(parent,seg);id=x.id}
     RDPATH[path]=id;parent=id}return parent}
 const carpetaRend=r=>[r.periodo,limpiaNombre(r.persona?r.persona.nombre:"Sin nombre")];
-async function rdSubir(segs,name,blob,type){const f=await rdCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10): PDF de hasta 15 MB, por partes */
+async function rdSubir(segs,name,blob,type){
+  if(rolesSrv().odRend){const s=await odPedir("/od/subida",{ruta:segs,nombre:name});return subirPorSesion(s,blob)} /* v195: el servidor abre la carga */
+  const f=await rdCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10): PDF de hasta 15 MB, por partes */
+/* v195: maestros.json por el servidor (con odRend) o directo */
+async function rdMaeEscribir(dir,nuevo){if(rolesSrv().odRend)return odPedir("/od/maestros",{datos:nuevo});
+  const up=await gfetch(`/drives/${M365.drive}/items/${dir}:/${RD.maeFile}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(nuevo)});return up.json()}
 function rdXlsxBuild(periodo,soloId){return rdXlsxLibro(Object.values(REND).filter(r=>r.periodo===periodo&&!r.anulada&&(!soloId||r.id===soloId)))}
 /* v166: cómo se contabilizó (para el Excel) */
 const rdFormaContab=r=>!r||r.estado!=="contabilizada"?"":r.contab&&r.contab.finnegans?"Directo a FinnegansGO":r.exportada?"Excel para FinnegansGO":"Marcar contabilizada";
@@ -2718,4 +2723,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="194"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="195"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
