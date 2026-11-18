@@ -954,9 +954,18 @@ const colabPorRut=rut=>{const n=normRut(rut);return n?colabs().find(c=>normRut(c
    (solo si ese correo es de un único colaborador: las cuentas compartidas de predio siguen eligiendo quién rinde) */
 const colabPorCorreo=co=>{co=String(co||"").toLowerCase();if(!/@/.test(co))return null;const L=colabs().filter(c=>c.activo!==false&&correosDe(c).includes(co));return L.length===1?L[0]:null};
 const colabDe=r=>!(r&&r.persona)?null:r.persona.rut?colabPorRut(r.persona.rut):colabPorCorreo(r.persona.correo);
-/* v74: las rendiciones enviadas sin jefatura (antes pasaban por un paso de «jefatura» que aprobaba Contabilidad) quedan directo en revisión contable */
+/* v74: las rendiciones enviadas sin jefatura quedaban directo en revisión contable.
+   v199 (Benja: «Todos deberían tener jefatura»): ya no. Esperan en «Sin jefatura asignada» hasta que la lista de colaboradores les
+   da una jefatura; entonces pasan a esa jefatura, con su aviso. Lo hace el teléfono de Contabilidad al sincronizar o al guardar la
+   lista (el nombre de la función se mantiene: la llama index.html). Si la lista dice «Sin jefatura» (elegida a propósito), pasa a
+   revisión contable, como antes. */
+const SIN_JEF="Sin jefatura",sinJefDecidida=c=>!!(c&&normTxt(c.jefe)===normTxt(SIN_JEF));
 function rdSinJefaturaADirecto(){if(!ME||!esContab())return;
-  Object.values(REND).forEach(r=>{if(!r||r.anulada||r.estado!=="enviada"||!sinJefatura(r)||r.aprobJef)return;r.estado="revcont";rdHist(r,"pasa directo a Contabilidad (sin jefatura)");r.actualizado=new Date().toISOString();saveRend(r)})}
+  Object.values(REND).forEach(r=>{if(!r||r.anulada||r.estado!=="enviada"||!sinJefatura(r)||r.aprobJef)return;
+    const c=colabDe(r);if(sinJefDecidida(c)){r.estado="revcont";rdHist(r,"pasa directo a Contabilidad (sin jefatura)");r.actualizado=new Date().toISOString();saveRend(r);return}
+    const j=c?jefaturaDe(c):null;if(!j||!j.correo||correosDe(c).includes(String(j.correo).toLowerCase()))return;
+    r.jefatura=j;rdHist(r,"jefatura asignada",j.nombre||j.correo);r.actualizado=new Date().toISOString();saveRend(r);
+    rdAvisar(r,"enviada","",{asignada:true}).catch(e=>console.warn("correo",e))})}
 /* deja guardado el RUT en las rendiciones que no lo tienen (lo hace Contabilidad o la misma persona al abrir la app) */
 function rdCompletarRut(){if(!colabs().length||!ME)return;
   Object.values(REND).forEach(r=>{if(!r||r.anulada||!r.persona||r.persona.rut)return;if(!(esContab()||esMiaR(r)))return;
@@ -966,7 +975,7 @@ function contabNombres(){const l=aprobadores().filter(a=>a.rol==="cont").map(a=>
 const esContab=()=>!!(ME&&(contabCorreos().includes(meCorreo())||esAdmin()));
 /* Jefatura que aprueba: la columna puede traer un nombre (se busca su correo en Aprobadores o en Colaboradores) o directamente un correo */
 function jefaturaDe(c){
-  if(!c||!c.jefe)return null;const j=String(c.jefe).trim();
+  if(!c||!c.jefe||sinJefDecidida(c))return null;const j=String(c.jefe).trim(); /* v199: «Sin jefatura» elegida */
   if(/@/.test(j)){const co=j.toLowerCase();const a=aprobadores().find(x=>x.correo===co)||colabs().find(x=>correosDe(x).includes(co));return{nombre:a?a.nombre:co,correo:co}}
   const n=normTxt(j);const a=aprobadores().find(x=>normTxt(x.nombre)===n&&x.correo);if(a)return{nombre:a.nombre,correo:a.correo};
   const c2=colabs().find(x=>normTxt(x.nombre)===n&&correosDe(x).length);if(c2)return{nombre:c2.nombre,correo:correosDe(c2)[0]};
@@ -990,7 +999,7 @@ function esPropia(r){if(!ME||!r||!r.persona)return false;if(r.persona.id===ME.id
 const esMiaR=r=>!!(ME&&r&&(esPropia(r)||(r.cuenta&&r.cuenta===meCorreo())));
 const soyJefeDe=r=>!!(ME&&r&&r.jefatura&&r.jefatura.correo&&r.jefatura.correo===meCorreo());
 const sinJefatura=r=>!(r&&r.jefatura&&r.jefatura.correo);
-const puedeJefatura=r=>!!(r&&r.estado==="enviada"&&!esPropia(r)&&(soyJefeDe(r)||(sinJefatura(r)&&esContab())));
+const puedeJefatura=r=>!!(r&&r.estado==="enviada"&&!esPropia(r)&&soyJefeDe(r)); /* v199: la que no tiene jefatura espera a que se le asigne (antes la aprobaba Contabilidad) */
 /* v133 (M-15): quien la aprobó como jefatura no la aprueba también en Contabilidad */
 const aprobeJef=r=>!!(ME&&r&&r.aprobJef&&r.aprobJef.por&&r.aprobJef.por.id===ME.id);
 const correoAprobJef=r=>r&&r.aprobJef&&r.jefatura&&r.jefatura.correo?String(r.jefatura.correo).toLowerCase():"";
@@ -1063,10 +1072,12 @@ function rdCorreo(r,ev,op){
   const nombres=aPersona?nom:ev==="enviada"&&!aCont?(r.jefatura.nombre||nombreDeCorreo(para[0])):listaNombres(para.map(nombreDeCorreo));
   const saludo=aPersona?primerNombre(nom):para.length===1?primerNombre(nombres):"";
   let asunto="",intro="",accion="",detalle=[],queAccion="";
-  if(ev==="enviada"&&aCont){asunto=`${op.corregida?"Rendición corregida para revisión contable":"Rendición para revisión contable"}: ${nom} · ${per} · ${tot}`;
+  if(ev==="enviada"&&aCont&&r.estado==="enviada"){asunto=`Rendición sin jefatura asignada: ${nom} · ${per} · ${tot}`; /* v199 */
+    intro=`${nom} ${op.corregida?"corrigió y volvió a enviar":"envió"} su rendición de ${perm}, pero no tiene jefatura en la lista de colaboradores. Asígnala en Rendiciones › Contabilidad › Maestros contables › Colaboradores y aprobadores: la rendición pasa sola a esa jefatura.`;accion="Ver la rendición";queAccion="La rendición quedó enviada"}
+  else if(ev==="enviada"&&aCont){asunto=`${op.corregida?"Rendición corregida para revisión contable":"Rendición para revisión contable"}: ${nom} · ${per} · ${tot}`;
     intro=op.corregida?`${nom} corrigió y volvió a enviar su rendición de ${perm} a revisión contable.`:`${nom} envió su rendición de ${perm} directo a revisión contable (no tiene jefatura asignada).`;accion="Revisar la imputación";queAccion="La rendición quedó enviada"}
   else if(ev==="enviada"){asunto=`${op.corregida?"Rendición corregida por aprobar":"Rendición por aprobar"}: ${nom} · ${per} · ${tot}`;
-    const tu=para.length>1?"para aprobación":"para tu aprobación";intro=op.corregida?`${nom} corrigió y volvió a enviar su rendición de ${perm} ${tu}.`:`${nom} envió su rendición de ${perm} ${tu}.`;accion="Revisar y aprobar";queAccion="La rendición quedó enviada"}
+    const tu=para.length>1?"para aprobación":"para tu aprobación";intro=op.asignada?`Contabilidad asignó la jefatura de ${nom} en la lista de colaboradores: su rendición de ${perm} queda ${tu}.`:op.corregida?`${nom} corrigió y volvió a enviar su rendición de ${perm} ${tu}.`:`${nom} envió su rendición de ${perm} ${tu}.`;accion="Revisar y aprobar";queAccion="La rendición quedó enviada"}
   else if(ev==="aprobJef"){asunto=`Rendición para revisión contable: ${nom} · ${per} · ${tot}`;intro=`${act} aprobó la rendición de ${nom} de ${perm}. Ahora queda en revisión contable.`;accion="Revisar la imputación";queAccion="La rendición quedó aprobada"}
   else if(ev==="reenvCont"){asunto=`Rendición corregida para revisión contable: ${nom} · ${per} · ${tot}`;intro=`${nom} corrigió su rendición de ${perm} y la volvió a enviar a revisión contable.`;accion="Revisar la imputación";queAccion="La rendición quedó reenviada"}
   else if(ev==="devuelta"){asunto=`Tu rendición de ${perm} fue devuelta con observaciones`;intro=`${act} devolvió tu rendición de ${perm}. Revisa las observaciones, corrige y vuelve a enviarla.`;accion="Ver las observaciones";queAccion="La rendición quedó devuelta";
@@ -1638,13 +1649,14 @@ function rdPasos(r){
   else if(e==="observada"){S[0].st="act";S[0].s="reenviar"}
   else{S[0].st="ok";S[0].s=r.enviada?fmtD(r.enviada):""}
   if(sinJ&&idx<1&&!colabs().length){S[1].s="por confirmar"} /* v193: todavía no se pudo leer la lista de colaboradores */
+  else if(sinJ&&e==="enviada"){S[1].st="act";S[1].s="por asignar"} /* v199 */
   else if(sinJ){S[1].st="na";S[1].s="no aplica"}
   else if(r.aprobJef){S[1].st="ok";S[1].s=fmtD(String(r.aprobJef.fecha).slice(0,10))}
   else if(idx>=2){S[1].st="ok"}
   else{S[1].s=jn;if(e==="enviada")S[1].st="act"}
   if(r.aprobCont){S[2].st="ok";S[2].s=fmtD(String(r.aprobCont.fecha).slice(0,10))}
   else if(idx>=3)S[2].st="ok";
-  else if(e==="revcont"||(e==="enviada"&&sinJ))S[2].st="act";
+  else if(e==="revcont")S[2].st="act";
   if(e==="contabilizada"){S[3].st="ok";S[3].s=r.contab&&r.contab.asiento?rdNumAs(r.contab.asiento):fmtD(r.contab&&r.contab.fecha)}
   else if(e==="aprobada"){S[3].st="act";S[3].s=r.exportada?"Excel listo":"por registrar"}
   if(e==="observada"){const i=(r.devueltaEn==="revcont"||sinJ)?2:1;S[i].st="dev";S[i].s="devolvió"}
@@ -1655,7 +1667,7 @@ function rdEstadoFrase(r){
   if(e==="borrador")return{t:n?`Sin enviar · ${n} ${n===1?"documento":"documentos"}. Cuando estén completos, envíala a aprobación.`:"Sin enviar. Agrega las facturas y boletas del mes."};
   if(e==="observada"){const h=(r.hist||[]).filter(x=>x.a==="devuelta").pop();
     return{t:`Devuelta${h?` por ${quien(h.por)} el ${fmtD(isoLocal(h.fecha))}`:""}: corrige lo pedido y reenvíala.`,k:"dev"}}
-  if(e==="enviada"){const jn=rdJefNombre(r);return{t:jn?`Esperando la aprobación de ${jn} ${dt}.`:`Esperando la revisión de ${contabNombres()} ${dt}.`,k:tarde?"tarde":"act"}}
+  if(e==="enviada"){const jn=rdJefNombre(r);return{t:jn?`Esperando la aprobación de ${jn} ${dt}.`:`Falta asignar ${esPropia(r)?"tu":"la"} jefatura en la lista de colaboradores ${dt}. La asigna Contabilidad.`,k:tarde?"tarde":"act"}}
   if(e==="revcont")return{t:`En revisión contable (${contabNombres()}) ${dt}.`,k:tarde?"tarde":"act"};
   if(e==="aprobada")return{t:`Aprobada. Falta registrarla en FinnegansGO ${dt}.`,k:"act"};
   if(e==="contabilizada")return{t:`Contabilizada${r.contab&&r.contab.fecha?` el ${fmtD(r.contab.fecha)}`:""}${r.contab&&r.contab.asiento?` · asiento ${rdNumAs(r.contab.asiento)}`:""}.`,k:"ok"};
@@ -1700,17 +1712,29 @@ function rdEstadoChip(r){const e=r.estado||"borrador";
    en vez del estado que tenía («Borrador») */
 const RDC_ANU=`<span class="rdc-i anu" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/><path d="M10 11v5.5M14 11v5.5"/></svg></span>`;
 const rdAnuPor=r=>{const x=r.anulada,q=x&&x.por?quien(x.por):"";return q&&normTxt(q)!==normTxt((r.persona&&r.persona.nombre)||"")?` · por ${esc(q)}`:""};
+/* v199: pestaña Contabilidad: qué falta en cada rendición y resumen con filtros (pedido de Benja, 18-11-2026) */
+let rdContF="";
+/* qué falta: t = texto, w = cuánto lleva (en rojo desde 3 días esperando), k = de quién es el paso (esp: de otra persona; acc: de
+   Contabilidad; dev: devuelta a quien rinde) */
+function rdFalta(r){const e=r.estado,sj=sinJefatura(r),hE=haceDias(r.enviada),env=hE?`enviada ${hE}`:"",dt=rdDesdeTxt(r),tarde=rdDiasEspera(r)>=3;
+  if(e==="enviada"&&!sj){const jn=(r.jefatura&&r.jefatura.nombre)||rdJefNombre(r);return{t:`Falta la aprobación de ${jn||"la jefatura"}`,w:env,k:"esp",tarde}}
+  if(e==="enviada")return{t:"Falta asignar jefatura",w:env,k:"fal",tarde}; /* v199: retenida hasta que la lista le da una jefatura */
+  if(e==="observada")return{t:"Devuelta para corregir",w:haceDias(rdDesde(r)),k:"dev",tarde};
+  if(e==="revcont")return{t:"Falta revisión contable",w:dt,k:"acc",tarde};
+  if(e==="aprobada")return{t:"Por contabilizar",w:dt,k:"acc",tarde};
+  return null}
+const rdFaltaHTML=f=>`<span class="rdcf k-${f.k}"><i aria-hidden="true"></i><span class="rdct"><b>${esc(f.t)}</b>${f.w?`<small class="rdcw${f.tarde?" tarde":""}">${esc(f.w.charAt(0).toUpperCase()+f.w.slice(1))}</small>`:""}</span></span>`;
 function rdCard(r,ctx){const D=docsDe(r),n=D.length,inc=D.filter(d=>!docCompleto(r,d)).length;const nom=ctx||!esPropia(r)||colabsDeCuenta().length>1;
   let extra="";if(ctx==="cont"&&(r.estado==="revcont"||r.estado==="aprobada")){const A=rdAsiento(r);extra=A.bloq?` · <span style="color:var(--m-ink)">${A.bloq} por corregir</span>`:A.pend?` · ${A.pend} por crear en Finnegans`:A.al.length?` · ${A.al.length} por revisar`:" · asiento cuadrado"}
-  const X=r.anulada;
-  return `<button class="bod rdc${X?" anu":""}" data-a="rdAbrir" data-id="${esc(r.id)}">${X?RDC_ANU:disRdIco(r)}<span class="rdc-x"><span class="bodn">${esc(rdTitulo(r))}${nom?` · ${esc(r.persona?r.persona.nombre:"")}`:""}</span><span class="bodm">${n} ${n===1?"documento":"documentos"}${X?rdAnuPor(r):`${inc&&(r.estado==="borrador"||r.estado==="observada")?` · ${inc} por completar`:""}${extra}${r.exportada&&r.estado==="aprobada"?" · exportada":""}`}</span><span class="bodc rdc-e">${X?`<span class="xp rdanux">${X.eliminada?"Eliminada":"Anulada"} el ${esc(fmtD(X.fecha))}</span>`:rdMiniHTML(r)+rdEstadoChip(r)}${(x=>x.includes("xp ok")?"":x)(chipSync(r))}</span></span><b class="rdc-v">${fmtP(totalRend(r))}</b>${ICO.arrow}</button>`}
+  const X=r.anulada,F=ctx==="cont"&&!X?rdFalta(r):null,pn=r.persona&&r.persona.nombre||"",pp=ctx==="cont"&&pn; /* v199: en Contabilidad, la persona primero */
+  return `<button class="bod rdc${X?" anu":""}${F?" rdcc":""}" data-a="rdAbrir" data-id="${esc(r.id)}">${X?RDC_ANU:disRdIco(r)}<span class="rdc-x"><span class="bodn">${pp?esc(pn):`${esc(rdTitulo(r))}${nom?` · ${esc(pn)}`:""}`}</span><span class="bodm">${pp?`${esc(rdTitulo(r))} · `:""}${n} ${n===1?"documento":"documentos"}${X?rdAnuPor(r):`${inc&&(r.estado==="borrador"||r.estado==="observada")?` · ${inc} por completar`:""}${extra}${r.exportada&&r.estado==="aprobada"?" · exportada":""}`}</span><span class="bodc rdc-e">${X?`<span class="xp rdanux">${X.eliminada?"Eliminada":"Anulada"} el ${esc(fmtD(X.fecha))}</span>`:F?rdFaltaHTML(F):rdMiniHTML(r)+rdEstadoChip(r)}${(x=>x.includes("xp ok")?"":x)(chipSync(r))}</span></span><b class="rdc-v">${fmtP(totalRend(r))}</b>${ICO.arrow}</button>`}
 function renderRD(){
   const head=band("Rendiciones");
   const todas=Object.values(REND).filter(r=>!r.anulada);
   const equipo=todas.filter(r=>soyJefeDe(r)),pj=equipo.filter(r=>puedeJefatura(r));
   const verJef=equipo.length>0,verCont=esContab();
   if(rdTab==="jef"&&!verJef)rdTab="mias";if(rdTab==="cont"&&!verCont)rdTab="mias";
-  const nCont=verCont?todas.filter(r=>puedeContab(r)||(sinJefatura(r)&&puedeJefatura(r))).length:0;
+  const nCont=verCont?todas.filter(r=>puedeContab(r)||(r.estado==="enviada"&&sinJefatura(r)&&!esPropia(r))).length:0;
   const tabs=verJef||verCont?`<div class="filt" style="margin-top:14px"><button class="fb" data-a="rdTab" data-t="mias" aria-pressed="${rdTab==="mias"}">Mis rendiciones</button>${verJef?`<button class="fb" data-a="rdTab" data-t="jef" aria-pressed="${rdTab==="jef"}">Por aprobar${pj.length?` (${pj.length})`:""}</button>`:""}${verCont?`<button class="fb" data-a="rdTab" data-t="cont" aria-pressed="${rdTab==="cont"}">Contabilidad${nCont?` (${nCont})`:""}</button>`:""}</div>`:"";
   const porEnvio=(a,b)=>String(a.enviada||"").localeCompare(String(b.enviada||""));
   let body="";
@@ -1719,22 +1743,28 @@ function renderRD(){
     body=`<h2>Esperando tu aprobación<span class="cnt">${pj.length}</span></h2><div class="list">${pj.sort(porEnvio).map(r=>rdCard(r,"jef")).join("")||`<div class="empty">No hay rendiciones esperando tu aprobación.</div>`}</div>${otras.length?`<h2>Tu equipo</h2><div class="list">${otras.map(r=>rdCard(r,"jef")).join("")}</div>`:""}<p class="note">Revisa que cada gasto corresponda al trabajo. Después de tu aprobación, Contabilidad revisa la imputación contable.</p>`;
   }else if(rdTab==="cont"){
     rdOrgsAuto();if(todas.some(r=>r.estado==="contabilizada"))fdAutoT(); /* v185: para marcar las que siguen sin pago */
-    const sinJ=todas.filter(r=>r.estado==="enviada"&&sinJefatura(r)).sort(porEnvio),rev=todas.filter(r=>r.estado==="revcont").sort(porEnvio),apr=todas.filter(r=>r.estado==="aprobada").sort(porEnvio),enJ=todas.filter(r=>r.estado==="enviada"&&!sinJefatura(r)).sort(porEnvio);
+    const sinJ=todas.filter(r=>r.estado==="enviada"&&sinJefatura(r)).sort(porEnvio),rev=todas.filter(r=>r.estado==="revcont").sort(porEnvio),apr=todas.filter(r=>r.estado==="aprobada").sort(porEnvio),enJ=todas.filter(r=>r.estado==="enviada"&&!sinJefatura(r)).sort(porEnvio),obs=todas.filter(r=>r.estado==="observada"&&r.enviada).sort((a,b)=>String(rdDesde(a)).localeCompare(String(rdDesde(b))));
     const cont=todas.filter(r=>r.estado==="contabilizada").sort((a,b)=>String(b.contab&&b.contab.fecha||"").localeCompare(String(a.contab&&a.contab.fecha||""))).slice(0,20);
     const listas=apr.filter(r=>!r.exportada&&!rdAsiento(r).bloq),esperan=listas.filter(r=>rdAsiento(r).pend),nExp=apr.filter(r=>r.exportada).length; /* v133 (A-07) */
     /* proveedores y personas que faltan en Finnegans, de todas las rendiciones en curso */
     const porCrear={};todas.filter(r=>["enviada","revcont","aprobada"].includes(r.estado)).forEach(r=>rdAsiento(r).al.filter(a=>a.n==="p").forEach(a=>{const k=normRut(a.rut);const x=porCrear[k]=porCrear[k]||{rut:a.rut,nombre:a.nombre,tipo:a.tipo,quien:new Set()};x.quien.add(r.persona&&r.persona.nombre||"")}));
     const PC=Object.values(porCrear).sort((a,b)=>cmpEs(a.nombre,b.nombre));
-    body=`${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
-    <div class="btns" style="margin-top:8px"><button class="btn" data-a="rdMae">Maestros contables</button><button class="btn" data-a="rdXlsxMes" data-p="${periodoActual()}">Excel de documentos del mes</button><button class="btn" data-a="rdXlsxRango">Excel de rendiciones</button><button class="btn" data-a="fdl">Fondos por rendir</button></div>
-    ${PC.length?`<h2>Por crear en Finnegans<span class="cnt">${PC.length}</span></h2><div class="info" style="border-left:5px solid var(--act)">Créalos en Finnegans con este RUT; la app los detecta sola. Mientras tanto se pueden aprobar, pero su Excel espera.<ul>${PC.map(x=>`<li><b>${esc(x.nombre)}</b> · RUT ${esc(x.rut)} · ${esc(x.tipo)} · rendición de ${esc([...x.quien].filter(Boolean).join(", "))}</li>`).join("")}</ul></div><div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Ya los creé: revisar en Finnegans"}</button></div>`:""}
-    <h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>
-    ${sinJ.length?`<h2>Sin jefatura asignada<span class="cnt">${sinJ.length}</span></h2><p class="note">Quien rinde no tiene jefatura en la lista de colaboradores: Contabilidad aprueba ambos pasos.</p><div class="list">${sinJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
-    <h2>Aprobadas, por contabilizar<span class="cnt">${apr.length}</span></h2>
+    /* v199: resumen arriba («3 en jefatura · 1 devuelta · 2 por revisar · 4 por contabilizar»); al tocar uno se filtra la lista */
+    const F=rdContF,ve=k=>!F||F===k;
+    const RES=[["jef",enJ.length,"En jefatura"],["dev",obs.length,obs.length===1?"Devuelta":"Devueltas"],["rev",rev.length+sinJ.length,"Por revisar"],["apr",apr.length,"Por contabilizar"]];
+    const cel=([k,n,t])=>`<button class="rdcr${n?"":" cero"}" data-a="rdContF" data-f="${k}" aria-pressed="${F===k}"><b>${n}</b><span>${t}</span></button>`;
+    const resHTML=`<section class="rdcres" aria-label="Rendiciones enviadas, por paso"><div class="rdcg"><p class="rdcgh">Esperan a otros</p><div class="rdcgl">${RES.slice(0,2).map(cel).join("")}</div></div><div class="rdcg acc"><p class="rdcgh">Contabilidad</p><div class="rdcgl">${RES.slice(2).map(cel).join("")}</div></div></section>${F?`<p class="rdcfil">Solo «${esc((RES.find(x=>x[0]===F)||[])[2]||"").toLowerCase()}» · <button class="lnk" data-a="rdContF" data-f="">Ver todas</button></p>`:""}`;
+    body=`${resHTML}${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
+    <div class="btns rdctools"><button class="btn" data-a="rdMae">Maestros contables</button><button class="btn" data-a="rdXlsxMes" data-p="${periodoActual()}">Excel de documentos del mes</button><button class="btn" data-a="rdXlsxRango">Excel de rendiciones</button><button class="btn" data-a="fdl">Fondos por rendir</button></div>
+    ${PC.length&&(ve("rev")||F==="apr")?`<h2>Por crear en Finnegans<span class="cnt">${PC.length}</span></h2><div class="info" style="border-left:5px solid var(--act)">Créalos en Finnegans con este RUT; la app los detecta sola. Mientras tanto se pueden aprobar, pero su Excel espera.<ul>${PC.map(x=>`<li><b>${esc(x.nombre)}</b> · RUT ${esc(x.rut)} · ${esc(x.tipo)} · rendición de ${esc([...x.quien].filter(Boolean).join(", "))}</li>`).join("")}</ul></div><div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Ya los creé: revisar en Finnegans"}</button></div>`:""}
+    ${ve("rev")?`<h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>`:""}
+    ${sinJ.length&&ve("rev")?`<h2>Sin jefatura asignada<span class="cnt">${sinJ.length}</span></h2><p class="note">Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button>: la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura».</p><div class="list">${sinJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
+    ${ve("apr")?`<h2>Aprobadas, por contabilizar<span class="cnt">${apr.length}</span></h2>
     ${apr.length?`<div class="btns"><button class="btn pri" data-a="rdImpTodas" ${listas.length?"":"disabled"} style="flex:1">Excel para FinnegansGO (${listas.length} ${listas.length===1?"asiento":"asientos"})</button></div>${nExp?`<p class="note">${nExp} ${nExp===1?"ya se exportó y no entra":"ya se exportaron y no entran"} en este Excel. Para descargar una de nuevo, ábrela.</p>`:""}${esperan.length?`<p class="note">${esperan.length} ${esperan.length===1?"espera":"esperan"} un proveedor o persona por crear en Finnegans; al descargar, la app revisa Finnegans y deja fuera solo ${esperan.length===1?"esa":"esas"} si todavía falta.</p>`:""}${apr.some(r=>r.exportada)?`<div class="btns"><button class="btn" data-a="rdContabTodas">Marcar las exportadas como contabilizadas</button></div>`:""}`:""}
-    <div class="list">${apr.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones aprobadas pendientes.</div>`}</div>
-    ${enJ.length?`<h2>En revisión de jefatura<span class="cnt">${enJ.length}</span></h2><div class="list">${enJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
-    ${cont.length?`<h2>Contabilizadas recientes</h2><div class="list">${cont.map(r=>rdCard(r,"cont")).join("")}</div>`:""}${(A=>A.length?`<details class="rdanu"><summary><b>Anuladas y eliminadas</b> (${A.length})</summary><p class="note">Rendiciones que alguien eliminó o que Contabilidad anuló. No cuentan en las listas, en el fondo por rendir ni en el Excel. Abre una para ver el motivo o restaurarla.</p><div class="list">${A.map(r=>rdCard(r,"cont")).join("")}</div></details>`:"")(Object.values(REND).filter(r=>r&&r.anulada&&docsDe(r).length).sort((a,b)=>String(b.anulada.fecha||"").localeCompare(String(a.anulada.fecha||""))).slice(0,30))}${rdRevisionHTML()}`;
+    <div class="list">${apr.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones aprobadas pendientes.</div>`}</div>`:""}
+    ${(enJ.length&&!F)||F==="jef"?`<h2>En revisión de jefatura<span class="cnt">${enJ.length}</span></h2><div class="list">${enJ.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando a su jefatura.</div>`}</div>`:""}
+    ${(obs.length&&!F)||F==="dev"?`<h2>Devueltas para corregir<span class="cnt">${obs.length}</span></h2><p class="note">Esperan que quien rinde corrija lo pedido y la reenvíe.</p><div class="list">${obs.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones devueltas.</div>`}</div>`:""}
+    ${F?"":`${cont.length?`<h2>Contabilizadas recientes</h2><div class="list">${cont.map(r=>rdCard(r,"cont")).join("")}</div>`:""}${(A=>A.length?`<details class="rdanu"><summary><b>Anuladas y eliminadas</b> (${A.length})</summary><p class="note">Rendiciones que alguien eliminó o que Contabilidad anuló. No cuentan en las listas, en el fondo por rendir ni en el Excel. Abre una para ver el motivo o restaurarla.</p><div class="list">${A.map(r=>rdCard(r,"cont")).join("")}</div></details>`:"")(Object.values(REND).filter(r=>r&&r.anulada&&docsDe(r).length).sort((a,b)=>String(b.anulada.fecha||"").localeCompare(String(a.anulada.fecha||""))).slice(0,30))}${rdRevisionHTML()}`}`;
   }else{
     const p=periodoActual(),cs=colabsDeCuenta(),act=misRend().filter(r=>r.periodo===p),ant=misRend().filter(r=>r.periodo!==p);
     const falta=cs.length>1?cs.some(c=>!act.some(r=>normRut(r.persona&&r.persona.rut)===normRut(c.rut)&&rdEditable(r))):!act.some(rdEditable);
@@ -1764,14 +1794,14 @@ function rdRevisionDatos(){
   /* rendiciones en curso */
   Object.values(REND).filter(r=>r&&!r.anulada&&r.estado!=="contabilizada").forEach(r=>{const nom=(r.persona&&r.persona.nombre)||"Sin nombre",tit=`${nom} · ${rdTitulo(r)}`;
     if(!(r.persona&&r.persona.rut)&&!colabDe(r))A("Rendiciones en curso","b",`${tit}: sin RUT de quien rinde. Elige la persona en la rendición (Persona que rinde).`,r.id);
-    if(r.estado==="enviada"&&!(r.jefatura&&r.jefatura.correo))A("Rendiciones en curso","r",`${tit}: enviada sin jefatura; pasa a Contabilidad al sincronizar.`,r.id)});
+    if(r.estado==="enviada"&&!(r.jefatura&&r.jefatura.correo))A("Rendiciones en curso","r",`${tit}: enviada sin jefatura; espera hasta que se le asigne una en la lista.`,r.id)});
   /* colaboradores */
   const C=colabs().filter(c=>c.activo!==false);const porCorreo={};
   C.forEach(c=>{const nom=c.nombre||"(sin nombre)";
     if(!c.rut||!rutValido(c.rut))A("Lista de colaboradores","b",`${nom}: ${c.rut?"RUT "+c.rut+" no es válido":"falta el RUT"}.`);
     const cos=correosDe(c);if(!cos.length)A("Lista de colaboradores","b",`${nom}: sin correo Microsoft; no puede entrar a la app con su cuenta.`);cos.forEach(co=>(porCorreo[co]=porCorreo[co]||[]).push(nom));
-    if(!c.jefe)A("Lista de colaboradores","r",`${nom}: sin jefatura; sus rendiciones pasan directo a Contabilidad.`);
-    else{const j=jefaturaDe(c);if(!j||!j.correo)A("Lista de colaboradores","b",`${nom}: la jefatura «${c.jefe}» no tiene correo en Aprobadores ni en Colaboradores.`)}
+    if(!c.jefe)A("Lista de colaboradores","r",`${nom}: sin jefatura asignada; sus rendiciones esperan hasta que se le asigne una (o «Sin jefatura» si aprueba solo Contabilidad).`);
+    else if(!sinJefDecidida(c)){const j=jefaturaDe(c);if(!j||!j.correo)A("Lista de colaboradores","b",`${nom}: la jefatura «${c.jefe}» no tiene correo en Aprobadores ni en Colaboradores.`)}
     if(c.centro&&!centroExiste(c.centro))A("Lista de colaboradores","b",`${nom}: el centro por defecto ${c.centro} no existe.`);
     if(c.cuenta&&maeTiene("cuentas")&&!MAE.cuentas[c.cuenta])A("Lista de colaboradores","b",`${nom}: la cuenta del fondo ${c.cuenta} no está en el plan de cuentas.`)});
   Object.entries(porCorreo).filter(([,L])=>L.length>1).forEach(([co,L])=>A("Lista de colaboradores","i",`${co} lo usan ${L.length} personas (${L.join(", ")}): la app pregunta quién rinde.`));
@@ -1897,6 +1927,7 @@ function renderRDV(){
   if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>
       ${disTip("rdsolo",`Solo sirven <b>facturas y boletas</b>, en foto o en PDF.${ESCRITORIO()?" También puedes arrastrar las fotos o los PDF a esta página.":""}`,"rdsolo")}
       ${D.length?`${inc?`<p class="note">Faltan datos obligatorios en ${inc} ${inc===1?"documento":"documentos"} (foto, total, tipo de documento, centro de costo, tipo de gasto o RUT de la factura). <button class="lnk" data-a="rdDoc" data-k="${esc(D.find(d=>!docCompleto(r,d)).k)}">Ir ${inc===1?"al documento":"al primero"}</button></p>`:adv?`<p class="note">${adv} ${adv===1?"dato queda en blanco":"datos quedan en blanco"}; se puede enviar igual y quien revisa los completa.</p>`:""}`:""}`;
+  else if(esContab()&&r.estado==="enviada"&&sinJefatura(r)&&!esPropia(r))acciones=`<div class="info netbox"><b>Falta asignar la jefatura.</b> Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button> y la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura»: pasa a revisión contable.</div>`; /* v199 */
   else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Revisa cada documento: «Está bien» o «Pedir corrección».</p>`;
   else if(esContab()&&r.estado==="revcont"&&aprobeJef(r)&&!esPropia(r))acciones=`<p class="note">La aprobaste como jefatura: la revisión contable la hace otra persona de Contabilidad.</p>`;
   else if(con)acciones=`${A&&A.bloq?`<p class="note">Corrige lo que está en «Por corregir» (toca el documento) para poder aprobar.</p>`:""}`;
@@ -2184,7 +2215,7 @@ let rdColQ="",RDCOL_EXCEL="";
 const rdColJefes=()=>aprobadores().filter(a=>a.rol==="jef"&&a.nombre).map(a=>a.nombre);
 function rdColCentros(){const m=new Map(CENTROS_DEF.map(x=>[x[0],x[1]]));if(maeTiene("centros"))Object.entries(MAE.centros).forEach(([k,v])=>{if(!m.has(k))m.set(k,(v&&v.n)||k)});return [...m.entries()].sort((a,b)=>cmpEs(a[1],b[1]))}
 function rdColFaltan(c){const o=[];if(!c.rut||!rutValido(c.rut))o.push("RUT");if(!correosDe(c).length)o.push("correo");if(!c.centro)o.push("centro");else if(!centroExiste(c.centro))o.push("el centro no existe");
-  if(!c.jefe)o.push("jefatura");else{const j=jefaturaDe(c);if(!j||!j.correo)o.push("la jefatura no tiene correo")}return o}
+  if(!c.jefe)o.push("jefatura");else if(!sinJefDecidida(c)){const j=jefaturaDe(c);if(!j||!j.correo)o.push("la jefatura no tiene correo")}return o}
 /* quienes rinden con su cuenta y no están en la lista (por ejemplo, una persona nueva): se pueden agregar con un toque */
 /* v128: el nombre es el de quien tiene la cuenta. Si Contabilidad asignó la rendición a alguien de la lista («Persona que rinde»),
    r.persona trae el nombre de esa persona con el correo de la cuenta que la creó: se usa creadoPor (si creó con ese correo) */
@@ -2200,7 +2231,7 @@ function rdColListaHTML(){
   const fila=c=>{const f=c.activo===false?[]:rdColFaltan(c);return `<button class="rdcc${c.activo===false?" inact":""}" data-a="rdColEd" data-k="${esc(normRut(c.rut)||"n:"+c.nombre)}">
     <span class="rdcc-t"><b>${esc(c.nombre||"Sin nombre")}</b><span class="tag ${c.activo===false?"none":f.length?"borrador":"cerrada"}">${c.activo===false?"Inactivo":f.length?"Incompleto":"Completo"}</span></span>
     <span class="rdcc-l">${esc([c.rut?rutLimpio(c.rut):"",correosDe(c).join(", ")].filter(Boolean).join(" · ")||"Sin RUT ni correo")}</span>
-    <span class="rdcc-l">${esc(c.jefe?"Aprueba "+c.jefe:"Sin jefatura")} · ${esc(c.centro?centroNombre(c.centro):"Sin centro")}</span>${f.length?`<span class="rdcc-f">Falta: ${esc(f.join(", "))}</span>`:""}</button>`};
+    <span class="rdcc-l">${esc(sinJefDecidida(c)?"Sin jefatura: aprueba Contabilidad":c.jefe?"Aprueba "+c.jefe:"Sin jefatura asignada")} · ${esc(c.centro?centroNombre(c.centro):"Sin centro")}</span>${f.length?`<span class="rdcc-f">Falta: ${esc(f.join(", "))}</span>`:""}</button>`};
   return C.map(fila).join("")||`<div class="empty">${q?"Nadie coincide con la búsqueda.":"La lista está vacía."}</div>`}
 function renderRDCol(){
   if(!esContab())return band("Colaboradores","rdMae","Maestros")+`<main class="wrap"><p class="note">Solo Contabilidad y administración editan la lista.</p></main>`;
@@ -2209,7 +2240,7 @@ function renderRDCol(){
     <h1>Colaboradores y aprobadores</h1>
     <p class="lead">Quién rinde y quién le aprueba. Los cambios se guardan también en el Excel de <b>_maestros</b>.</p>
     ${pend||RDCOL_EXCEL?`<div class="info netbox"><b>El Excel no está al día.</b> ${esc(RDCOL_EXCEL||`Hay ${pend} ${pend===1?"cambio":"cambios"} por pasar al Excel.`)} La app ya usa los cambios. <button class="lnk" data-a="rdColReint">Reintentar</button></div>`:""}
-    ${F.length?`<h2>Rinden y no están en la lista<span class="cnt">${F.length}</span></h2><p class="note" style="margin-top:0">Sin estar en la lista, sus rendiciones salen sin RUT y van directo a Contabilidad.</p><div class="list">${F.map(x=>`<div class="rdcc"><span class="rdcc-t"><b>${esc(x.nombre)}</b><span class="tag borrador">Fuera de la lista</span></span><span class="rdcc-l">${esc(x.correo)} · ${x.n} ${x.n===1?"rendición":"rendiciones"}</span><button class="btn pri" data-a="rdColNuevo" data-n="${esc(x.nombre)}" data-c="${esc(x.correo)}" style="margin-top:8px">Agregar a la lista</button></div>`).join("")}</div>`:""}
+    ${F.length?`<h2>Rinden y no están en la lista<span class="cnt">${F.length}</span></h2><p class="note" style="margin-top:0">Sin estar en la lista, sus rendiciones salen sin RUT y esperan en Contabilidad hasta que se agreguen con su jefatura.</p><div class="list">${F.map(x=>`<div class="rdcc"><span class="rdcc-t"><b>${esc(x.nombre)}</b><span class="tag borrador">Fuera de la lista</span></span><span class="rdcc-l">${esc(x.correo)} · ${x.n} ${x.n===1?"rendición":"rendiciones"}</span><button class="btn pri" data-a="rdColNuevo" data-n="${esc(x.nombre)}" data-c="${esc(x.correo)}" style="margin-top:8px">Agregar a la lista</button></div>`).join("")}</div>`:""}
     <h2>Colaboradores<span class="cnt">${colabs().length}</span></h2>
     ${inc?`<p class="note" style="margin-top:0">${inc} ${inc===1?"persona tiene":"personas tienen"} datos por completar.</p>`:""}
     <div class="btns"><button class="btn pri" data-a="rdColNuevo">+ Agregar colaborador</button></div>
@@ -2234,7 +2265,7 @@ async function rdColForm(c,nuevo){
       <div class="f"><label for="rcR">RUT</label><input id="rcR" data-v="rut" value="${esc(v.rut)}" inputmode="text" autocomplete="off" placeholder="12.345.678-5"></div>
       <div class="f"><label for="rcM">Correo Microsoft (@puduhue.cl)</label><input id="rcM" data-v="correo" value="${esc(v.correo)}" type="email" autocomplete="off" placeholder="nombre@puduhue.cl"><span class="hint">Si usa la cuenta del predio, esa cuenta. Varios correos, separados por coma.</span></div>
       <div class="f"><label for="rcC">Centro por defecto</label><select id="rcC" data-v="centro"><option value="">Elegir…</option>${op(CE.map(([k,n])=>[k,n+" ("+k+")"]).concat(v.centro&&!CE.some(x=>x[0]===v.centro)?[[v.centro,v.centro+" (no existe)"]]:[]),v.centro)}</select></div>
-      <div class="f"><label for="rcJ">Jefatura que aprueba</label><select id="rcJ" data-v="jefe"><option value="">Sin jefatura (aprueba Contabilidad)</option>${op(J.map(n=>[n,n]).concat(v.jefe&&!J.some(n=>normTxt(n)===normTxt(v.jefe))?[[v.jefe,v.jefe+" (no está en Aprobadores)"]]:[]),J.find(n=>normTxt(n)===normTxt(v.jefe))||v.jefe)}</select></div>
+      <div class="f"><label for="rcJ">Jefatura que aprueba</label><select id="rcJ" data-v="jefe"><option value="">Sin jefatura asignada (sus rendiciones esperan)</option><option value="${SIN_JEF}"${sinJefDecidida(v)?" selected":""}>Sin jefatura (aprueba Contabilidad)</option>${op(J.map(n=>[n,n]).concat(v.jefe&&!sinJefDecidida(v)&&!J.some(n=>normTxt(n)===normTxt(v.jefe))?[[v.jefe,v.jefe+" (no está en Aprobadores)"]]:[]),J.find(n=>normTxt(n)===normTxt(v.jefe))||v.jefe)}</select></div>
       <div class="f"><label for="rcF">Tipo de fondo</label><select id="rcF" data-v="fondo">${op([["Fondo por rendir","Fondo por rendir"],["Fondo fijo","Fondo fijo"]].concat(["Fondo por rendir","Fondo fijo"].includes(v.fondo)?[]:[[v.fondo,v.fondo]]),v.fondo)}</select></div>
       <div class="f"><label for="rcCu">Cuenta del fondo</label><input id="rcCu" data-v="cuenta" value="${esc(v.cuenta)}" inputmode="numeric" autocomplete="off"><span class="hint">110106 Fondos por rendir · 110105 Fondo fijo</span></div>
       <div class="f"><label for="rcO">Observaciones</label><input id="rcO" data-v="obs" value="${esc(v.obs)}" autocomplete="off"></div>
@@ -2330,7 +2361,8 @@ async function rdClick(A,b){
   if(A==="rdRecProbar"){rdRecProbar();return true}
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
   if(A==="rd"){await flush();rdv=null;rdd=null;await rdPurgarVacias();go("rd");return true}
-  if(A==="rdTab"){rdTab=b.dataset.t;render();return true}
+  if(A==="rdTab"){rdTab=b.dataset.t;rdContF="";render();return true}
+  if(A==="rdContF"){const f=b.dataset.f||"";rdContF=rdContF===f?"":f;render();return true} /* v199 */
   if(A==="rdMae"){go("rdm");return true}
   if(A==="rdPick"){if(rdv&&rdd&&!rdRO(rdv))rdPick(b.dataset.f);return true}
   if(A==="rdUsarRut"){if(rdv&&rdd&&!rdRO(rdv))rdSetCampo("rut",b.dataset.v);return true}
@@ -2360,12 +2392,13 @@ async function rdClick(A,b){
     const devCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&!!rdv.aprobJef,cambio=devCont&&rdCambioDesdeDev(rdv); /* v133 (M-14) */
     const vuelveCont=devCont&&!cambio,eraObs=rdv.estado==="observada";
     const adv=D.reduce((n,d)=>n+docAdvertencias(rdv,d).filter(m=>!esDupMsg(m)).length,0),nDup=D.filter(d=>!d.noDup&&docAdvertencias(rdv,d).some(esDupMsg)).length; /* v189 */
-    const quienRev=vuelveCont?"Vuelve a revisión de Contabilidad, que recibirá un aviso por correo.":cambio&&j&&j.correo?`Como agregaste, quitaste o cambiaste el monto de documentos, vuelve a aprobación de ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:j&&j.correo?`La aprueba ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:"No tienes jefatura asignada: la revisa Contabilidad, que recibirá un aviso por correo.";
+    const quienRev=vuelveCont?"Vuelve a revisión de Contabilidad, que recibirá un aviso por correo.":cambio&&j&&j.correo?`Como agregaste, quitaste o cambiaste el monto de documentos, vuelve a aprobación de ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:j&&j.correo?`La aprueba ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:sinJefDecidida(c)?"No tienes jefatura: la revisa Contabilidad, que recibirá un aviso por correo.":"No tienes jefatura en la lista de colaboradores: Contabilidad recibirá un aviso para asignarla y después la aprueba tu jefatura.";
     if(!(await ask(vuelveCont?"¿Reenviar la rendición?":"¿Enviar a aprobación?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))}. ${quienRev}${nDup?` Hay ${nDup===1?"un posible duplicado":`${nDup} posibles duplicados`}: revisa que no sea el mismo gasto dos veces.`:""}${adv?` Hay ${adv} ${adv===1?"dato en blanco":"datos en blanco"} que quien revisa podrá completar.`:""} Después de enviar no se puede modificar hasta que la revisen.`,"Enviar")))return true;
     if(!vuelveCont){rdv.jefatura=j;delete rdv.aprobJef}
-    /* v74: sin jefatura con correo, la rendición pasa directo a revisión de Contabilidad (un solo paso de aprobación) */
-    const directo=!vuelveCont&&!(j&&j.correo);
-    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;delete rdv.huellaDev;D.forEach(d=>{d.estadoRev=undefined;d.obsRev="";delete d.obsCampo;delete d.obsValor});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada",cambio?"cambió documentos después de la devolución de Contabilidad":"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();esperarFotos(rdv.id);rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
+    /* v199: sin jefatura con correo, la rendición espera en Contabilidad a que se le asigne una (antes, v74, pasaba directo a
+       revisión contable). Solo con «Sin jefatura» elegida en la lista sigue pasando directo. */
+    const sinJ=!vuelveCont&&!(j&&j.correo),directo=sinJ&&sinJefDecidida(c);
+    delete rdv.aprobCont;rdv.estado=vuelveCont||directo?"revcont":"enviada";rdv.enviada=today();rdv.comentario="";delete rdv.devueltaEn;delete rdv.huellaDev;D.forEach(d=>{d.estadoRev=undefined;d.obsRev="";delete d.obsCampo;delete d.obsValor});rdHist(rdv,vuelveCont?"reenviada a Contabilidad":directo?"enviada directo a Contabilidad (sin jefatura)":"enviada",cambio?"cambió documentos después de la devolución de Contabilidad":sinJ&&!directo?"sin jefatura asignada":"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();esperarFotos(rdv.id);rdAvisar(rdv,vuelveCont?"reenvCont":"enviada",vuelveCont||directo?"Rendición enviada a Contabilidad.":sinJ?"Rendición enviada. Contabilidad asignará tu jefatura.":"Rendición enviada a aprobación.",{corregida:eraObs}).catch(e=>console.warn("correo",e));return true}
   if(A==="rdRestaurar"){const r=rdv;if(!r||!r.anulada||!esContab())return true;
     if(!(await ask("¿Restaurar esta rendición?","Vuelve a las listas, al fondo por rendir y al Excel, en el estado que tenía. Queda registrado en el historial.","Restaurar")))return true;
     const x=r.anulada;delete r.anulada;rdHist(r,"restaurada",x&&x.motivo?"estaba "+(x.eliminada?"eliminada":"anulada")+": "+x.motivo:"");r.actualizado=new Date().toISOString();await saveRend(r);render();toast("Rendición restaurada.");
@@ -2726,4 +2759,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="198"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="199"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
