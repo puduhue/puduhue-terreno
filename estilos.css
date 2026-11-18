@@ -2277,3 +2277,36 @@ details>*{box-sizing:border-box}
 
 /* ---------- v186: «Te pagaron el reembolso» en el Inicio ---------- */
 .ifdx.ok>i{background:var(--sm-v)}
+/* v199: pestaña Contabilidad de Rendiciones: resumen del flujo con filtros arriba y qué falta en cada rendición */
+.rdcres{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);margin:14px 0 8px;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.rdcg{display:flex;flex-direction:column;min-width:0}
+.rdcg.acc{background:var(--soft);border-left:1px solid var(--line)}
+.rdcgh{margin:0;padding:9px 12px 0;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.rdcg.acc .rdcgh{color:var(--act)}
+.rdcgl{display:grid;grid-template-columns:repeat(2,minmax(min-content,1fr));flex:1}
+.rdcr{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;padding:6px 12px 12px;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rdcr b{font-size:26px;line-height:1.1;font-weight:800;font-variant-numeric:tabular-nums}
+.rdcr span{font-size:12.5px;text-wrap:balance;line-height:1.2;font-weight:600;color:var(--muted)}
+.rdcg.acc .rdcr b{color:var(--act)}
+.rdcg.acc .rdcr span{color:var(--ink)}
+.rdcr.cero b{color:var(--muted)!important;font-weight:700}
+.rdcr::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:transparent}
+.rdcr[aria-pressed="true"]::after{background:var(--act)}
+.rdcr[aria-pressed="true"] span{color:var(--ink);font-weight:800}
+.rdcr:active{opacity:.6}
+.rdcfil{margin:0 0 6px;font-size:13.5px;color:var(--muted)}
+/* herramientas de Contabilidad: una fila compacta (en el teléfono se desliza de lado) */
+.btns.rdctools{margin-top:6px;gap:8px}
+.btns.rdctools .btn{padding:8px 14px;font-size:14px;white-space:nowrap}
+@media (max-width:759px){.btns.rdctools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-right:-16px;padding-right:16px}.btns.rdctools::-webkit-scrollbar{display:none}.btns.rdctools .btn{flex:none}}
+/* qué falta en cada rendición: punto de color, el paso y debajo cuánto lleva (en rojo desde 3 días esperando) */
+.rdcf{display:flex;align-items:flex-start;gap:8px;min-width:0;flex-basis:100%;margin-top:2px}
+.rdcf>i{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:var(--muted)}
+.rdcf.k-acc>i{background:var(--act)}
+.rdcf.k-dev>i,.rdcf.k-fal>i{background:var(--m-ink)}
+.rdcf.k-esp>i{background:var(--r-ink)}
+.rdct{display:flex;flex-direction:column;min-width:0}
+.rdct b{font-size:14px;line-height:1.3;font-weight:700;color:var(--ink)}
+.rdcw{font-size:13px;line-height:1.3;font-weight:500;color:var(--muted)}
+.rdcw.tarde{font-weight:700;color:var(--m-ink)}
+@media (min-width:1100px){body.conlat .rdcr:hover b{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}}
