@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-BOlBy+Y0gTEvotvEik7anazAxpi8tSzjvDi8aIkdsKk=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-7Sg2p44tIAwq1qgHDOuZ52WBExASepzpy0ceHFGDQYA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=200">
+<link rel="stylesheet" href="estilos.css?v=201">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="200";
+const APP_VER="201";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -3419,6 +3419,22 @@ let INST_EVT=null;
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();INST_EVT=e;instPintar()});
 window.addEventListener("appinstalled",()=>{INST_EVT=null;instMarcar();instPintar();toast("App instalada: ábrela desde el ícono Puduhue Terreno.")});
 const esAndroid=()=>/Android/i.test(navigator.userAgent);
+/* v201: en Android solo Chrome instala bien la app. Samsung Internet y otros arman su propio paquete, que Google Play Protect
+   bloquea («se diseñó para una versión anterior de Android»). En esos navegadores se ofrece abrirla en Chrome. */
+const NAV_ANDROID=[[/SamsungBrowser/,"Samsung Internet"],[/EdgA\//,"Edge"],[/OPR\/|OPT\/|Opera/,"Opera"],[/Firefox\//,"Firefox"],[/MiuiBrowser|XiaoMi/,"el navegador de Xiaomi"],[/HuaweiBrowser/,"el navegador de Huawei"],[/HeyTapBrowser/,"el navegador del teléfono"],[/YaBrowser/,"Yandex"],[/UCBrowser/,"UC Browser"],[/DuckDuckGo/,"DuckDuckGo"],[/; wv\)/,"otra app"]];
+const navAndroid=()=>{const u=navigator.userAgent;const x=NAV_ANDROID.find(([r])=>r.test(u));return x?x[1]:""};
+const esAndroidOtro=()=>esAndroid()&&!!navAndroid();
+const chromeURL=()=>`intent://${location.host}${location.pathname.replace(/index\.html$/,"")}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent("https://play.google.com/store/apps/details?id=com.android.chrome")};end`;
+const navAndroidTxt=()=>{const n=navAndroid();return n==="otra app"?"una página abierta dentro de otra app":n};
+/* v201 (Benja: «Y no puede redireccionarte directo a chrome?»): la primera vez en este navegador intenta abrir Chrome solo, una
+   sola vez por teléfono, sin datos sin subir y no a mitad del inicio de sesión. Si el navegador no deja abrir otra app sin un
+   toque, no pasa nada y queda el botón «Abrir en Chrome». */
+const A_CHROME_K="actas-a-chrome";
+let irAChrome=u=>{location.href=u};
+function instAChromeAuto(){
+  try{if(localStorage.getItem(A_CHROME_K))return;if(Object.keys(LOCAL||{}).length||Object.keys(QF||{}).length)return;
+    if(/[#&?](code|state|error)=/.test(location.href))return;localStorage.setItem(A_CHROME_K,String(Date.now()))}catch(e){return}
+  setTimeout(()=>{try{irAChrome(chromeURL())}catch(e){}},700)}
 const esIOSApp=()=>esIOS()&&!/Safari\//.test(navigator.userAgent); /* abierto dentro de otra app (correo, WhatsApp…) */
 const navIOS=()=>{const u=navigator.userAgent;return /CriOS/.test(u)?"Chrome":/EdgiOS/.test(u)?"Edge":/FxiOS/.test(u)?"Firefox":"Safari"};
 function instMarcar(){try{localStorage.setItem(INST_OK_K,"1");localStorage.removeItem(INST_NO_K)}catch(e){}}
@@ -3434,6 +3450,7 @@ function instCardHTML(login){
   if(!instPosible()||!(esIOS()||esAndroid())||instPospuesto())return"";
   try{if(localStorage.getItem(MUDANZA_K))return""}catch(e){} /* la bienvenida de la mudanza ya trae este paso */
   const ios=esIOS();
+  if(esAndroidOtro()){instAChromeAuto();return `<div class="info pushc lx-inst lx-instch"><div class="lx-insth"><img src="icon-192.png" alt="" class="lx-insti"><div><b>Instala la app desde Chrome</b><br><span>Desde ${esc(navAndroidTxt())}, Android bloquea la instalación. Ábrela en Chrome y ahí toca «Instalar app». ${CUENTA?"En Chrome inicias sesión de nuevo; si tienes algo sin subir, sincroniza antes.":""}</span></div></div><div class="btns"><a class="btn pri" href="${esc(chromeURL())}" data-chrome="1">Abrir en Chrome</a><button class="btn" data-a="instNo">Ahora no</button></div></div>`} /* v201 */
   const txt=ios&&login?"Hazlo antes de iniciar sesión: así inicias sesión una sola vez, dentro de la app."
     :"Queda con su ícono en la pantalla de inicio, funciona sin señal y te puede avisar con notificaciones. Se hace una sola vez.";
   const boton=INST_EVT?`<button class="btn pri" data-a="instalar">Instalar app</button>`:`<button class="btn pri" data-a="instGuia">Cómo instalarla</button>`;
@@ -3442,7 +3459,7 @@ function instCardHTML(login){
 /* enlace en el pie, en el computador (Chrome o Edge). v190: no en el teléfono ni la tablet, que ya tienen la tarjeta */
 const instPieHTML=()=>INST_EVT&&!appInstalada()&&!DIR_ANTIGUA&&!(esIOS()||esAndroid())?` · <button class="lnk" data-a="instalar">Instalar como programa</button>`:"";
 async function instInstalar(){
-  if(!INST_EVT){instGuia();return}
+  if(!INST_EVT||esAndroidOtro()){instGuia();return} /* v201 */
   const e=INST_EVT;INST_EVT=null; /* el aviso del navegador se puede usar una sola vez */
   try{await e.prompt();const r=await e.userChoice;if(r&&r.outcome==="accepted")instMarcar();else toast("No se instaló. Puedes hacerlo cuando quieras desde el menú del navegador.")}
   catch(x){instGuia();return}
@@ -3473,9 +3490,10 @@ function instGuia(motivo){
         <li><span class="ig-t">Toca <b>Agregar</b>, arriba a la derecha.</span><span class="ig-n">Si aparece la opción «Abrir como app web», déjala activada.</span>${IG.confirmar}</li>
         <li><span class="ig-t">Abre <b>Puduhue Terreno</b> desde el ícono nuevo.</span><span class="ig-n">${CUENTA?"La primera vez inicias sesión de nuevo (el iPhone guarda la app aparte de Safari). ":""}${motivo==="notif"?"Ahí toca <b>Activar notificaciones</b>.":"Desde ahí funciona sin señal y puede avisarte con notificaciones."}</span>${IG.icono}</li></ol>`;
   }else if(and){
-    cuerpo=`<ol class="ig-pasos">
-        <li><span class="ig-t">Toca el menú <b>⋮</b>, arriba a la derecha.</span><span class="ig-n">Si abriste el enlace desde otra app (correo, WhatsApp), primero elige <b>Abrir en Chrome</b>.</span>${IG.menuAndroid}</li>
-        <li><span class="ig-t">Toca <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</span><span class="ig-n">En Samsung Internet: menú <b>≡</b> (abajo) → <b>Agregar página a</b> → <b>Pantalla de inicio</b>.</span>${IG.instalarAndroid}</li>
+    const otro=esAndroidOtro(); /* v201: fuera de Chrome, primero abrirla en Chrome */
+    cuerpo=(otro?`<div class="info" style="margin:6px 0 12px"><b>Primero ábrela en Chrome.</b> Estás en ${esc(navAndroidTxt())}, y desde ahí Android bloquea la instalación («app no segura»). En Chrome se instala sin problema.<div class="btns"><a class="btn pri" href="${esc(chromeURL())}" data-chrome="1">Abrir en Chrome</a></div></div>`:"")+`<ol class="ig-pasos">
+        <li><span class="ig-t">${otro?"En Chrome, toca":"Toca"} el menú <b>⋮</b>, arriba a la derecha.</span><span class="ig-n">${otro?"Si Chrome no está instalado, el botón te lleva a Google Play para instalarlo.":"Si abriste el enlace desde otra app (correo, WhatsApp), primero elige <b>Abrir en Chrome</b>."}</span>${IG.menuAndroid}</li>
+        <li><span class="ig-t">Toca <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</span><span class="ig-n">Usa siempre Chrome: desde otros navegadores (por ejemplo, Samsung Internet) Android bloquea la app.</span>${IG.instalarAndroid}</li>
         <li><span class="ig-t">Confirma con <b>Instalar</b>.</span><span class="ig-n">${motivo==="notif"?"Abre la app desde el ícono nuevo y toca <b>Activar notificaciones</b>.":"Abre la app desde el ícono nuevo de Puduhue Terreno."}</span></li></ol>`;
   }else{
     cuerpo=`<ol class="ig-pasos">
@@ -3862,10 +3880,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=200"></script>
-<script src="modulos/bodega.js?v=200"></script>
-<script src="modulos/rendiciones.js?v=200"></script>
-<script src="modulos/actas-entrega.js?v=200"></script>
+<script src="modulos/checklist.js?v=201"></script>
+<script src="modulos/bodega.js?v=201"></script>
+<script src="modulos/rendiciones.js?v=201"></script>
+<script src="modulos/actas-entrega.js?v=201"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
