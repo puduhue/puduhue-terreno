@@ -256,17 +256,33 @@ const tipoArea=a=>a==="bodega"?"bodega":a==="camioneta"?"camionetas":esAreaHu(a)
 const enTipo=(tipo,area)=>tipoArea(area)===tipo;
 let clTipo="visitas";const KC=()=>CLK[clTipo];
 const areasDe=tipo=>AREAS.filter(a=>enTipo(tipo,a.id));
+/* v198: predios con su propia lista de puntos en el check list de visitas, todos en una sola sección «Predio» (pedido de Benja,
+   18-11-2026). San Francisco: todos los de Oficina y 3 de Sala de ordeña. Los demás predios y el catálogo no cambian. */
+const AREA_UNICA={id:"unico",name:"Predio",blocks:[]};
+const PRED_SOLO={"san francisco":{areas:["oficina"],claves:["cl-30","cl-31","cl-32"]}};
+const predSolo=p=>PRED_SOLO[String(p||"").trim().toLowerCase()]||null;
+/* áreas para las pestañas, el informe y el Excel: las del catálogo más «Predio» */
+const areasVis=tipo=>tipo==="visitas"?[AREA_UNICA].concat(areasDe(tipo)):areasDe(tipo);
+const PRED_CACHE=new WeakMap();
+function predItems(L,P){let o=PRED_CACHE.get(L);if(o)return o;
+  const sel=L.filter(i=>P.areas.includes(i.area)||P.claves.includes(i.key));
+  const fams=[],grs=[];sel.forEach(i=>{if(!fams.includes(i.fam))fams.push(i.fam);const g=i.fam+"|"+i.group;if(!grs.includes(g))grs.push(g)});
+  o=sel.map((i,k)=>({i,k})).sort((a,b)=>(fams.indexOf(a.i.fam)-fams.indexOf(b.i.fam))||(grs.indexOf(a.i.fam+"|"+a.i.group)-grs.indexOf(b.i.fam+"|"+b.i.group))||(a.k-b.k))
+    .map(x=>Object.assign({},x.i,{area:AREA_UNICA.id,areaName:AREA_UNICA.name,areaOrig:x.i.area}));
+  PRED_CACHE.set(L,o);return o}
 /* Cómo se nombra un ítem en listas: por área en el check list de visitas; por grupo en el de bodega (tiene una sola área) */
 const etqIt=(it,tipo)=>(tipo||clTipo)!=="visitas"?it.group:it.areaName;
 /* Secciones para resúmenes: las áreas, o los tipos de ítem cuando hay una sola área (bodega) */
-function seccionesDe(tipo,items){const as=areasDe(tipo).filter(a=>items.some(i=>i.area===a.id));let S;
-  if(as.length>1){S=as.map(a=>({name:a.name,f:i=>i.area===a.id}));S.col="Área"}else{S=[...new Set(items.map(i=>i.fam))].map(f=>({name:f,f:i=>i.fam===f}));S.col="Tipo"}return S}
+function seccionesDe(tipo,items){const as=areasVis(tipo).filter(a=>items.some(i=>i.area===a.id));let S;
+  if(as.length>1||as.some(a=>a===AREA_UNICA)){S=as.map(a=>({name:a.name,f:i=>i.area===a.id}));S.col="Área"}else{S=[...new Set(items.map(i=>i.fam))].map(f=>({name:f,f:i=>i.fam===f}));S.col="Tipo"}return S}
 /* Ítems de una visita: su copia propia (desde la v46) o el catálogo vigente, más los ítems retirados que esa visita sí evaluó; solo los de su check list */
 /* v116: los ítems del catálogo guardado en cada visita se arman una vez por visita (se usaban en cada tarjeta y predio) */
 const ITEMS_CAT=new WeakMap();
-function itemsDe(v){const t=tipoDe(v);if(v&&v.catalogo){let m=ITEMS_CAT.get(v.catalogo);if(!m){m={};ITEMS_CAT.set(v.catalogo,m)}return m[t]||(m[t]=v.catalogo.map(expandir).filter(i=>enTipo(t,i.area)))}return CL_ITEMS.filter(i=>enTipo(t,i.area)&&(!i.retirado||(v&&v.items&&v.items[i.key]&&v.items[i.key].e)))}
-function itemDe(v,key){if(v&&v.catalogo){const r=v.catalogo.find(x=>x[0]===key);if(r)return expandir(r)}return CL_BYKEY[key]||null}
-function catalogoUnion(vs,tipo){tipo=tipo||"visitas";const m={};CL_ITEMS.forEach(i=>{if(enTipo(tipo,i.area))m[i.key]=i});vs.forEach(v=>itemsDe(v).forEach(i=>{if(!m[i.key])m[i.key]=Object.assign({},i,{retirado:true})}));return Object.values(m).sort((a,b)=>(a.orden??999)-(b.orden??999))}
+function itemsDe(v){const L=itemsDe0(v),P=v&&tipoDe(v)==="visitas"&&predSolo(v.predio);return P?predItems(L,P):L}
+function itemsDe0(v){const t=tipoDe(v);if(v&&v.catalogo){let m=ITEMS_CAT.get(v.catalogo);if(!m){m={};ITEMS_CAT.set(v.catalogo,m)}return m[t]||(m[t]=v.catalogo.map(expandir).filter(i=>enTipo(t,i.area)))}return CL_ITEMS.filter(i=>enTipo(t,i.area)&&(!i.retirado||(v&&v.items&&v.items[i.key]&&v.items[i.key].e)))}
+function itemDe(v,key){if(v&&tipoDe(v)==="visitas"&&predSolo(v.predio))return itemsDe(v).find(i=>i.key===key)||null;if(v&&v.catalogo){const r=v.catalogo.find(x=>x[0]===key);if(r)return expandir(r)}return CL_BYKEY[key]||null}
+function catalogoUnion(vs,tipo,predio){const P=(tipo||"visitas")==="visitas"&&predSolo(predio);if(P)return predItems(catalogoUnion(vs,tipo),P).map(i=>Object.assign({},i));
+  tipo=tipo||"visitas";const m={};CL_ITEMS.forEach(i=>{if(enTipo(tipo,i.area))m[i.key]=i});vs.forEach(v=>itemsDe(v).forEach(i=>{if(!m[i.key])m[i.key]=Object.assign({},i,{retirado:true})}));return Object.values(m).sort((a,b)=>(a.orden??999)-(b.orden??999))}
 const CAT_HEAD=["Código","Área","Tipo","Grupo","Nº","Ítem","Referencia","Cómo verificar","Clave","Retirado","Orden"];
 function catalogoAExcel(){const wb=XLSX.utils.book_new();const rows=[CAT_HEAD];
   CL_ITEMS.forEach(i=>rows.push([i.key,i.areaName,i.fam,i.group,i.n,i.txt,i.prot||"",i.evid||"",i.star?"Sí":"",i.retirado?"Sí":"",i.orden]));
@@ -676,7 +692,7 @@ function cmInfoHTML(v,ro){const a=actaPatente(v.predio),ve=(a&&a.veh)||{},i=cmKm
 function clProgHTML(){const sc=puntaje(clv),T=itemsDe(clv).length;const pct=Math.round(sc.rev/T*100);return `<div class="prog" id="clprog"><span>${sc.rev} de ${T} revisados</span><span class="meter"><i style="width:${pct}%"></i></span><span>${sc.pct!==null?`${sc.pct} % cumpl.`:""}</span></div>`}
 function renderCLV(){
   const v=clv,prev=visitaAnterior(v),ro=clRO();const TODOS=itemsDe(v),KV=CLK[tipoDe(v)];
-  const AR=areasDe(tipoDe(v)).filter(a=>TODOS.some(i=>i.area===a.id));if(AR.length&&!AR.some(a=>a.id===clArea))clArea=AR[0].id;
+  const AR=areasVis(tipoDe(v)).filter(a=>TODOS.some(i=>i.area===a.id));if(AR.length&&!AR.some(a=>a.id===clArea))clArea=AR[0].id;
   const areaItems=TODOS.filter(i=>i.area===clArea);
   /* v136 (M-09): «Hallazgos anteriores» = hallazgos abiertos de las visitas cerradas (no solo de la visita anterior) */
   const HZ=hallazgos(v.predio,tipoDe(v)),hzAb=k=>!!(HZ[k]&&HZ[k].estado==="abierto");
@@ -1012,7 +1028,7 @@ function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   const vs=validas(p,tipo).filter(v=>v.estado==="cerrada");const wb=XLSX.utils.book_new();const anul=visitasDe(p,tipo).filter(v=>v.anulada);
   const H=hallazgos(p,tipo);
   const head=["Área","Tipo","Código","Ítem","Referencia","Cómo verificar"].concat(vs.map(v=>`V${esc(v.n)} ${fmtD(v.fecha)}`)).concat(["Estado hallazgo","Abierto desde","Acción","Responsable","Plazo","Última observación"]);
-  const rows=[head];const UNION=catalogoUnion(vs,tipo);const SEC=seccionesDe(tipo,UNION);
+  const rows=[head];const UNION=catalogoUnion(vs,tipo,p);const SEC=seccionesDe(tipo,UNION);
   UNION.forEach(it=>{const h=H[it.key];rows.push([it.areaName,it.fam,codigo(it)+(it.star?" ★":"")+(it.retirado?" (retirado)":""),it.txt,it.prot,it.evid].concat(vs.map(v=>{const r=v.items&&v.items[it.key];return r&&r.e?lblE(r.e,it):""})).concat([h?(h.estado==="abierto"?"Abierto":h.estado==="cerrado"?`Corregido en V${h.cerrado.v}`:"OK"):"",h&&h.estado==="abierto"?`V${h.desde.v} ${fmtD(h.desde.fecha)}`:"",h&&h.estado==="abierto"?h.plan.acc:"",h&&h.estado==="abierto"?h.plan.resp:"",h&&h.estado==="abierto"?fmtD(h.plan.plazo):"",h&&h.ultima?h.ultima.obs:""]))});
   const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:14},{wch:16},{wch:9},{wch:60},{wch:32},{wch:30}].concat(vs.map(()=>({wch:14}))).concat([{wch:18},{wch:16},{wch:40},{wch:22},{wch:12},{wch:40}]);ws["!freeze"]={xSplit:4,ySplit:1};
   XLSX.utils.book_append_sheet(wb,ws,"Check list");
@@ -1184,4 +1200,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="197"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="198"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
