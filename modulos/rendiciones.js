@@ -1677,7 +1677,7 @@ const RD_ICO={ok:`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4
 function rdPasosHTML(r){
   const S=rdPasos(r),f=rdEstadoFrase(r),txt={ok:"listo",act:"en curso",dev:"devuelta",na:"no aplica",pend:"pendiente"};
   return `<div class="rdst" role="group" aria-label="Seguimiento de la rendición">
-    <ol class="rdsteps">${S.map((s,i)=>`<li class="p-${s.st}${i<S.length-1&&S[i+1].st!=="pend"?" p-sig":""}" aria-label="${s.t}: ${txt[s.st]}${s.s?`, ${esc(s.s)}`:""}"><span class="rdsc">${RD_ICO[s.st]||(s.st==="act"?"<i></i>":"")}</span><b>${s.t}</b><small>${esc(s.s||"")}</small></li>`).join("")}</ol>
+    <ol class="rdsteps">${S.map((s,i)=>`<li class="p-${s.st}${i<S.length-1&&s.st!=="pend"&&S[i+1].st!=="pend"?" p-sig":""}" aria-label="${s.t}: ${txt[s.st]}${s.s?`, ${esc(s.s)}`:""}"><span class="rdsc">${RD_ICO[s.st]||(s.st==="act"?"<i></i>":"")}</span><b>${s.t}</b><small>${esc(s.s||"")}</small></li>`).join("")}</ol>
     <p class="rdsf ${f.k||""}">${esc(f.t)}</p>${fdPagoHTML(r)}</div>`;
 }
 const rdMiniHTML=r=>`<span class="rdmini" aria-hidden="true">${rdPasos(r).map(s=>`<i class="p-${s.st}"></i>`).join("")}</span>`;
@@ -2759,4 +2759,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="199"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="200"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
