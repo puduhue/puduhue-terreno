@@ -2310,3 +2310,19 @@ details>*{box-sizing:border-box}
 .rdcw{font-size:13px;line-height:1.3;font-weight:500;color:var(--muted)}
 .rdcw.tarde{font-weight:700;color:var(--m-ink)}
 @media (min-width:1100px){body.conlat .rdcr:hover b{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}}
+/* v200: revisión visual (Benja: «dale una revisada a toda la visual de la app, tanto móvil como pc»). Solo el computador
+   (con el menú de la izquierda); el teléfono no cambia. */
+@media (min-width:1100px){
+  /* la tabla del asiento contable se calculaba desde el centro de la pantalla completa y quedaba corrida bajo el menú (se perdía
+     la columna Cuenta): ahora usa el ancho del contenido y, en la rendición abierta, ocupa todo el ancho bajo los pasos */
+  body.conlat .asw{width:auto;margin-left:0;margin-right:0}
+  body.conlat[data-pant="rdv"] .wrap:has(>.rdst)>.asw{grid-column:1/-1}
+  /* ficha del documento: la imputación cabe en su columna (Debe y Haber a la vista, sin deslizar) */
+  body.conlat .wrap.rddw .asi{min-width:0}
+  body.conlat .wrap.rddw .asi th,body.conlat .wrap.rddw .asi td{padding-left:6px;padding-right:6px}
+  /* foto del documento: «Clic para ampliar» va arriba de la foto (abajo tapaba el segundo botón, «Volver a leer») */
+  body.conlat .rddw.conf .rdfoto:has(>img)::after{top:10px;bottom:auto}
+}
+/* v200: catálogo del check list en el teléfono: Referencia, Cómo verificar, Grupo y Área uno debajo del otro (lado a lado se
+   cortaba el texto; Benja: «Si dale»). Solo en el catálogo (.it.cat); en el computador siguen lado a lado. */
+@media (max-width:759px){.it.cat .plan2{grid-template-columns:1fr}}
