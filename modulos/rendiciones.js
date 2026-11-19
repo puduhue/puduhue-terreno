@@ -508,7 +508,7 @@ function rdcItems(r,d,P,o){o=o||{};const L=[];
   if(d.estadoRev==="obs"&&!o.sinPedido)L.push({c:RDC_DE_CAMPO[d.obsCampo]||"",m:d.obsRev||"Revisa este documento. Mira el comentario de la rendición.",t:"pedido",ok:rdcCorregido(r,d)});
   return L}
 function rdcResumenHTML(L,edita,quienRinde){if(!L.length)return"";const n=L.filter(x=>!x.ok).length,nA=L.filter(x=>!x.ok&&x.t==="aviso").length,nC=n-nA; /* v203 */
-  const tit=nC?`Hay que corregir ${nC===1?"1 dato":nC+" datos"}${nA?` y ${nA===1?"1 aviso":nA+" avisos"}`:""}`:nA?`${nA===1?"1 aviso":nA+" avisos"} · se puede enviar`:"Corregiste lo pedido";
+  const tit=nC?`Hay que corregir ${nC===1?"1 dato":nC+" datos"}${nA?` y ${nA===1?"1 aviso":nA+" avisos"}`:""}`:nA?`${nA===1?"1 aviso":nA+" avisos"}${quienRinde?" · se puede enviar":" para revisar"}`:"Corregiste lo pedido";
   const sub=n?(edita?"Toca cada uno para ir al dato.":""):(quienRinde?"Cuando termines con los demás documentos, toca «Reenviar» en la rendición.":"");
   return `<section class="rdcorr${nC?"":nA?" aviso":" listo"}" aria-label="Datos por corregir"><p class="rdcorr-t">${n?ICO_ALERTA:RDFIC_OK}<b>${tit}</b></p>${sub?`<p class="rdcorr-s">${sub}</p>`:""}<ul>${L.map(x=>{
     const et=x.c?RDC_DATO[x.c][1]:"Otro",q=x.t==="pedido"?`<span class="rdcorr-q">${x.ok?"Corregido":"Lo pidió quien revisó"}</span>`:x.t==="cont"?`<span class="rdcorr-q">Regla contable</span>`:x.t==="aviso"?`<span class="rdcorr-q">Aviso</span>`:""; /* v203: el título ya dice que se puede enviar */
@@ -1299,20 +1299,23 @@ async function rdPreguntarDup(r,d,x){
 /* v202 (Benja: «que deje enviarlo igualmente… si no, igual estamos siendo demasiado restrictivos»): «Ticket / vale» y «Otro» no
    bloquean; avisan y Contabilidad decide. «Revisa el N°»: mismo RUT y N° con otro total y otra fecha (la lectura pudo tomar otro
    número, como la dirección del local). */
-const noBolMsg=d=>d.tipo==="otro"?"No es boleta ni factura chilena. Puedes enviarlo, pero Contabilidad puede rechazarlo."
+/* v207: a quien revisa (jefatura, Contabilidad) le hablan como revisor; a quien rinde, como siempre */
+const rdOtroMira=r=>!!(r&&ME&&!esMiaR(r));
+const noBolMsg=(d,r)=>rdOtroMira(r)?(d.tipo==="otro"?"No es boleta ni factura chilena. Contabilidad decide si lo acepta.":"No es boleta ni factura: es el comprobante de la tarjeta. Contabilidad decide si lo acepta.")
+  :d.tipo==="otro"?"No es boleta ni factura chilena. Puedes enviarlo, pero Contabilidad puede rechazarlo."
   :"No es boleta ni factura: parece el comprobante de la tarjeta. Lo correcto es la boleta (suele venir arriba en el mismo papel). Puedes enviarlo, pero Contabilidad puede rechazarlo.";
 /* v203: documento en otra moneda: el servidor manda cambio {moneda, monto, valor, fecha} y el total ya en pesos */
 function rdAplicarCambio(d,x){const c=x&&x.cambio;if(!c||!c.moneda||!(+c.monto>0)){if(x&&(!x.moneda||String(x.moneda).toUpperCase()==="CLP")){delete d.moneda;delete d.montoMoneda;delete d.tc;delete d.tcFecha}return}
   d.moneda=c.moneda;d.montoMoneda=+c.monto;if(+c.valor>0){d.tc=+c.valor;d.tcFecha=c.fecha||"";d.total=Math.round(d.montoMoneda*d.tc)}else{delete d.tc;delete d.tcFecha}d.neto=0;d.iva=0}
 const fmtMon=(m,v)=>`${m==="USD"?"US$":m==="EUR"?"€":m+" "}${Number(v).toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-const monMsg=d=>d.tc?`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)} × ${fmtMon("$",d.tc).replace("$ ","$")} (${d.moneda==="EUR"?"euro":"dólar observado"} del ${fmtD(d.tcFecha)}) = ${fmtP(Math.round(d.montoMoneda*d.tc))}. Si el banco te cobró otro monto en pesos, corrige el total.`
-  :`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)}. Escribe el total en pesos que te cobró el banco.`;
+const monMsg=(d,r)=>{const o=rdOtroMira(r);return d.tc?`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)} × ${fmtMon("$",d.tc).replace("$ ","$")} (${d.moneda==="EUR"?"euro":"dólar observado"} del ${fmtD(d.tcFecha)}) = ${fmtP(Math.round(d.montoMoneda*d.tc))}.${o?"":" Si el banco te cobró otro monto en pesos, corrige el total."}`
+  :`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)}. ${o?"Falta el total en pesos que cobró el banco.":"Escribe el total en pesos que te cobró el banco."}`};
 const esMonMsg=m=>/^En (dólares|euros):/.test(m);
 /* v203: texto corto de un problema, para la lista (el detalle queda en la ficha) */
 function msgCorto(m){m=String(m||"");
   const T=[[/^Falta el tipo de gasto/,"Falta el tipo de gasto"],[/^Falta el centro de costo/,"Falta el centro de costo"],[/^Falta la foto/,"Falta la foto"],[/^Falta el total/,"Falta el total"],
     [/^Falta el RUT/,"Falta el RUT del emisor"],[/^Revisa el N°/,"N° repetido con otra boleta"],[/^No es boleta ni factura/,"No es boleta ni factura"],[/^Documento duplicado/,"Documento repetido"],
-    [/^Posible duplicado/,"Posible duplicado"],[/^En (dólares|euros)/,"En dólares: revisa el total en pesos"],[/^La fecha es futura/,"Fecha futura"],[/^Tipo de documento no válido/,"Tipo de documento no válido"],[/^El RUT .* no calza|^El RUT .* incompleto/,"RUT con error"]];
+    [/^Posible duplicado/,"Posible duplicado"],[/^En (dólares|euros):.*= \$[\d.]+\.$/,"En dólares, pasado a pesos"],[/^En (dólares|euros)/,"En dólares: revisa el total en pesos"],[/^La fecha es futura/,"Fecha futura"],[/^Tipo de documento no válido/,"Tipo de documento no válido"],[/^El RUT .* no calza|^El RUT .* incompleto/,"RUT con error"]];
   const x=T.find(([r])=>r.test(m));if(x)return x[1];const s=m.split(/(?<=\.)\s/)[0].replace(/\.$/,"");return s.length>60?s.slice(0,57)+"…":s}
 const esNoBolMsg=m=>/^No es boleta ni factura/.test(m),esNumMsg=m=>/^Revisa el N°/.test(m);
 const docAntes=(x,y)=>{const a=String(x.creado||""),b=String(y.creado||"");return a<b||(a===b&&String(x.k||"")<String(y.k||""))};
@@ -1323,7 +1326,7 @@ function problemasDoc2(r,d){
   if(!(num(d.total)>0))b.push("Falta el total.");
   /* v133 (M-16): con timbre de nota de crédito, guía o nota de débito no sirve aunque se cambie el tipo a mano */
   if(d.timbre&&d.timbre.td&&!TD_TIPO98[d.timbre.td]&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`El timbre del SII dice «${TD_NOMBRE98[d.timbre.td]||"otro documento"}», que no sirve para rendir aunque se cambie el tipo. Elimina el documento o cambia la foto.`);
-  else if((d.tipo==="vale"||d.tipo==="otro")&&r.estado!=="aprobada"&&r.estado!=="contabilizada")a.push(noBolMsg(d)); /* v202: se envía igual; Contabilidad decide */
+  else if((d.tipo==="vale"||d.tipo==="otro")&&r.estado!=="aprobada"&&r.estado!=="contabilizada")a.push(noBolMsg(d,r)); /* v202: se envía igual; Contabilidad decide */
   else if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
   if(d.tipo==="peaje"&&gastoDe(d)&&!esGastoPeaje(d))b.push("Un comprobante de peaje solo se rinde con el tipo de gasto «Peajes / barcaza». Cambia el tipo de gasto o el tipo de documento.");
   /* en facturas y boletas de honorarios el RUT viene impreso y Finnegans lo exige; en boletas es opcional */
@@ -1348,7 +1351,7 @@ function problemasDoc2(r,d){
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
   if(d.lectura&&d.lectura.estado==="error")a.push("La lectura automática falló; los datos quedan como los escribas.");
-  if(d.moneda&&+d.montoMoneda>0)a.push(monMsg(d)); /* v203 */
+  if(d.moneda&&+d.montoMoneda>0)a.push(monMsg(d,r)); /* v203 */
   if(!d.emisor)a.push("Sin nombre del emisor.");
   if(d.tipo!=="vale"&&d.tipo!=="otro"&&d.tipo!=="peaje"){if(!d.rut&&!rutObl)a.push("Sin RUT del emisor.");if(!d.folio)a.push("Sin número de boleta o factura.")}
   if(!d.fecha)a.push("Sin fecha.");else{const per=r.periodo;const f=String(d.fecha).slice(0,7);const [y,m]=per.split("-").map(Number);const ant=new Date(y,m-2,1);const antP=`${ant.getFullYear()}-${String(ant.getMonth()+1).padStart(2,"0")}`;if(f!==per&&f!==antP)a.push(`La fecha ${fmtD(d.fecha)} no corresponde al período (${periodoTxt(per)} o el mes anterior).`)}
@@ -1759,6 +1762,7 @@ function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtP(num(d.total
 function rdTrasSubir(r,keys){keys=keys.filter(Boolean);if(keys.length<2||!rdv||rdv.id!==r.id||view!=="rdv")return;
   RD_COLA={rid:r.id,keys};rdd=r.docs[keys[0]];if(rdd)go("rdd");window.scrollTo(0,0)}
 function rdEstadoChip(r){const e=r.estado||"borrador";
+  if(e==="enviada"&&puedeJefatura(r))return `<span class="xp camb">Espera tu aprobación</span>`; /* v207 */
   const g=e==="contabilizada"?fdPago(r):null; /* v185: contabilizada con el reembolso sin pagar, o ya pagado */
   if(g&&g.e==="pend")return `<span class="xp camb">Falta el pago</span>`;
   if(g&&g.e==="ok")return `<span class="xp ok">Pago registrado</span>`; /* v188 */
@@ -2002,7 +2006,7 @@ function renderRDV(){
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rd">Rendiciones</button><div class="ttl">${esc(rdTitulo(r))}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(rdTitulo(r))}</h1>
-    <div class="lx-sync sks ${r.estado==="aprobada"||r.estado==="contabilizada"?"ok":r.estado==="observada"?"no":r.estado==="borrador"?"":"camb"}"><div class="lx-syncl"><span class="lx-synct">${RD_ESTADO[r.estado]||r.estado} · ${fmtP(totalRend(r))}</span><span class="lx-syncs">${esc(r.persona?r.persona.nombre:"")}${r.persona&&r.persona.rut?` · ${esc(r.persona.rut)}`:""} · ${D.length} ${D.length===1?"documento":"documentos"}</span></div></div>
+    <div class="lx-sync sks ${r.estado==="aprobada"||r.estado==="contabilizada"?"ok":r.estado==="observada"?"no":r.estado==="borrador"?"":"camb"}"><div class="lx-syncl"><span class="lx-synct">${r.estado==="enviada"&&puedeJefatura(r)?"Espera tu aprobación":RD_ESTADO[r.estado]||r.estado} · ${fmtP(totalRend(r))}</span><span class="lx-syncs">${esc(r.persona?r.persona.nombre:"")}${r.persona&&r.persona.rut?` · ${esc(r.persona.rut)}`:""} · ${D.length} ${D.length===1?"documento":"documentos"}</span></div></div>
     ${rdPasosHTML(r)}
     ${r.comentario?`<div class="info netbox"><b>Comentario de ${r.devueltaEn==="revcont"?"Contabilidad":"revisión"}:</b> ${esc(r.comentario)}</div>`:""}
     ${acciones}
@@ -2449,7 +2453,7 @@ async function rdClick(A,b){
   if(A==="rdRecVer"){rdRecVer();return true}
   if(A==="rdRecProbar"){rdRecProbar();return true}
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
-  if(A==="rd"){await flush();rdv=null;rdd=null;await rdPurgarVacias();go("rd");return true}
+  if(A==="rd"){await flush();rdv=null;rdd=null;await rdPurgarVacias();if(Object.values(REND).some(r=>!r.anulada&&puedeJefatura(r)))rdTab="jef";go("rd");return true} /* v207: lo que espera su aprobación, primero */
   if(A==="rdTab"){rdTab=b.dataset.t;rdContF="";render();return true}
   if(A==="rdContF"){const f=b.dataset.f||"";rdContF=rdContF===f?"":f;render();return true} /* v199 */
   if(A==="rdMae"){go("rdm");return true}
@@ -2849,4 +2853,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="206"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="207"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
