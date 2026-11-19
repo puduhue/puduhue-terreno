@@ -2452,3 +2452,12 @@ details>*{box-sizing:border-box}
 .rdcpago.hay .rdcpb span{color:var(--ink)}
 .rdcpb[aria-pressed="true"]{border-color:var(--act);box-shadow:inset 0 -3px 0 var(--act)}
 .rdcpago .btn{flex:none}
+
+/* v210: «Pagos pendientes», primera herramienta de Contabilidad, a lo ancho */
+.rdherr.rdpagos{grid-column:1/-1;text-align:left}
+.rdpt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rdps{font-size:13px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rdpagos.err .rdps{color:var(--m-ink);white-space:normal}
+.rdpn{flex:none;min-width:24px;height:24px;border-radius:12px;padding:0 7px;display:grid;place-items:center;background:var(--sm-r);color:var(--card);font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.rdpv{flex:none;width:20px;height:20px;fill:none;stroke:var(--act);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.rdpagos[aria-pressed="true"]{border-color:var(--act);box-shadow:inset 0 -3px 0 var(--act)}
