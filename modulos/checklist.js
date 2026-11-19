@@ -390,7 +390,7 @@ function visitaAbierta(predio,tipo){return validas(predio,tipo).find(v=>v.estado
 function visitaAnterior(v){const L=validas(v.predio,tipoDe(v)).filter(x=>x.estado==="cerrada"&&x.id!==v.id&&(x.n<v.n));return L[L.length-1]||null}
 function puntaje(v,filtro){
   let s=0,n=0,rev=0;itemsDe(v).forEach(it=>{if(filtro&&!filtro(it))return;const r=v.items&&v.items[it.key];if(!r||!r.e)return;rev++;if(r.e==="NA")return;s+=SCORE[r.e];n++});
-  return{pct:n?Math.round(s/n*100):null,n,rev};
+  return{pct:n?Math.round(s/n*100):null,n,rev,s};
 }
 /* Hallazgos derivados del historial de visitas cerradas: un ítem está abierto si su última evaluación fue Parcial o No cumple */
 function hallazgos(predio,tipo){
@@ -552,6 +552,7 @@ function renderCLHub(){
     <div class="start" style="grid-template-columns:1fr">
       ${clHubVer().map(([t,a,nom,desc],i)=>`<button class="big ${i===1?"dev":"ent"}" data-a="${esc(a)}"><strong>${nom}</strong><span>${desc}</span><span><b>${clHubCnt(t)}</b></span></button>`).join("")}
     </div>
+    ${rkEntrada("visitas")}
   </main>`;
 }
 function renderCL(){
@@ -559,11 +560,236 @@ function renderCL(){
   return `${band(clNom(K.tipo),"clHub","Check list")}
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${clNom(K.tipo)}</h1>
+    ${rkEntrada(K.tipo,true)}
     ${semListaHTML()}
     <p class="note">${clTipo==="bodega"?`Orden, aseo y seguridad de la bodega de cada predio: ${nAct} ítems.`:clTipo==="camionetas"?`Revisión de cada camioneta con los puntos del acta de entrega: ${nAct} ítems. Aparecen las camionetas con acta de entrega en la app.`:clTipo==="huespedes"?`Inspección de la casa de huéspedes de cada predio: ${nAct} puntos con Cumple, Parcial, No cumple o N/A.`:`Control y Gestión: ${nAct} ítems por predio.`}</p>
     ${clTipo==="camionetas"?`<div class="btns"><button class="btn" data-a="clcOtra">+ Camioneta sin acta en la app</button></div>`:""}
     ${esAdmin()?`<p class="note">Catálogo: ${nAct} ítems activos${nTot-nAct?` y ${nTot-nAct} retirados`:""} · <button class="lnk" data-a="clCat">Editar catálogo</button></p>`:""}
   </main>`;
+}
+
+/* ---------- v205: ranking de cumplimiento (pedido de Benja, 19-11-2026) ----------
+   «Una sección donde se pueda ver el ranking desde que empezaron los check list: todas las visitas con sus porcentajes y un
+   ponderado a la fecha, un puntaje al total a la fecha… que se pueda extraer un informe».
+   Puntaje a la fecha de cada predio (o bodega o camioneta): todos los puntos revisados en sus visitas cerradas del período,
+   con el mismo valor que el porcentaje de una visita (Cumple 1, Parcial 0,5, No cumple 0; N/A no cuenta). Es un promedio
+   ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más que una con pocos.
+   Pantalla «clrk» (desde el inicio del Check list y desde cada lista), informe PDF y Excel. Las visitas anuladas y las que
+   siguen en curso no cuentan. */
+let rkTipo="visitas",rkPer="todo",rkVolver="clHub",clPVolver=null,rkMD="",rkMH="";
+/* período: [clave, texto largo, texto del botón]; «Meses» (pedido de Benja): de un mes a otro, elegidos en dos listas */
+const RK_PER=[["todo","Desde el inicio","Todo"],["anio","Este año","Este año"],["90","Últimos 90 días","90 días"],["meses","Elegir meses","Meses"]];
+const RK_MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const rkMesTxt=k=>RK_MES[+k.slice(5,7)-1]+" "+k.slice(0,4);
+/* meses que se pueden elegir: desde el de la primera visita cerrada de ese check list hasta el mes actual */
+function rkMesesDisp(tipo){
+  const f=Object.values(VIS).filter(v=>v&&!v.anulada&&v.estado==="cerrada"&&tipoDe(v)===tipo&&/^\d{4}-\d\d/.test(String(v.fecha||""))).map(v=>String(v.fecha).slice(0,7)).sort();
+  const b=today().slice(0,7);let a=f[0]&&f[0]<b?f[0]:b;const L=[];
+  while(a<=b&&L.length<240){L.push(a);let y=+a.slice(0,4),m=+a.slice(5,7)+1;if(m>12){m=1;y++}a=`${y}-${String(m).padStart(2,"0")}`}
+  return L}
+/* rango de fechas del período (desde y hasta inclusive, AAAA-MM-DD; vacío = sin límite) */
+function rkRango(per,tipo){
+  if(per==="anio")return{desde:today().slice(0,4)+"-01-01",hasta:""};
+  if(per==="90")return{desde:sumarDias(today(),-90),hasta:""};
+  if(per==="meses"){const L=rkMesesDisp(tipo);let d=L.includes(rkMD)?rkMD:L[Math.max(0,L.length-3)],h=L.includes(rkMH)?rkMH:L[L.length-1];if(d>h){const t=d;d=h;h=t}
+    return{desde:d+"-01",hasta:h+"-31",md:d,mh:h,L}}
+  return{desde:"",hasta:""}}
+const rkPerTxt=(per,R)=>{const g=R&&R.rg||{};return per==="anio"?`Año ${today().slice(0,4)}`:per==="90"?"Últimos 90 días":per==="meses"&&g.md?(g.md===g.mh?rkMesTxt(g.md):`De ${rkMesTxt(g.md)} a ${rkMesTxt(g.mh)}`):`Desde el inicio${R&&R.desde?` (${fmtD(R.desde)})`:""}`};
+const rkNum=x=>x===null||x===undefined?"–":(Math.round(x*10)/10).toLocaleString("es-CL",{minimumFractionDigits:1,maximumFractionDigits:1});
+const rkTipos=()=>clHubVer().map(x=>x[0]);
+const RK_CORTO={visitas:"Predios",bodega:"Bodegas",camionetas:"Camionetas",huespedes:"Casas"};
+const rkFc=f=>{const t=fmtD(f);return t.length===10?t.slice(0,6)+t.slice(8):t}; /* 19-11-26 */
+const rkFcH=f=>`<span class="rknw">${esc(rkFc(f))}</span>`; /* en pantalla, sin cortar la fecha en el guion */
+const RK_ICO=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5.5a4 4 0 0 1-8 0V4z"/><path d="M8 6.5H5.2v1.2A3.3 3.3 0 0 0 8.4 11M16 6.5h2.8v1.2a3.3 3.3 0 0 1-3.2 3.3M12 13.5V17M9 20h6M10 17h4v3h-4z"/></svg>`;
+function rkUnidad(u,tipo,rg){
+  const vs=validas(u,tipo).filter(v=>{const f=String(v.fecha||"");return v.estado==="cerrada"&&(!rg.desde||f>=rg.desde)&&(!rg.hasta||f<=rg.hasta)});
+  let s=0,n=0;const L=vs.map(v=>{const p=puntaje(v);s+=p.s;n+=p.n;return{id:v.id,n:v.n,fecha:v.fecha,revisor:v.revisor||"",pct:p.pct,s:p.s,nn:p.n}});
+  const C=L.filter(x=>x.pct!==null),ult=C[C.length-1]||null,ant=C[C.length-2]||null,pri=C[0]||null;
+  return{u,vis:L,s,n,acc:n?s/n*100:null,ult,ant,pri,dif:ult&&ant?ult.pct-ant.pct:null,mejora:ult&&pri&&C.length>1?ult.pct-pri.pct:null,
+    mejor:C.length?Math.max(...C.map(x=>x.pct)):null,peor:C.length?Math.min(...C.map(x=>x.pct)):null,ha:abiertos(u,tipo).length};
+}
+function rkDatos(tipo,per){
+  const rg=rkRango(per,tipo),U=new Set(unidadesCL(tipo));
+  Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.estado==="cerrada"&&tipoDe(v)===tipo&&v.predio)U.add(v.predio)});
+  const all=[...U].map(u=>rkUnidad(u,tipo,rg));
+  const con=all.filter(x=>x.acc!==null).sort((a,b)=>(b.acc-a.acc)||((b.ult?b.ult.pct:0)-(a.ult?a.ult.pct:0))||a.u.localeCompare(b.u,"es"));
+  let pos=0,prev=null;con.forEach((x,i)=>{const r=Math.round(x.acc*10);if(r!==prev){pos=i+1;prev=r}x.pos=pos});
+  const sin=all.filter(x=>x.acc===null).map(x=>x.u).sort((a,b)=>a.localeCompare(b,"es"));
+  const S=con.reduce((t,x)=>t+x.s,0),N=con.reduce((t,x)=>t+x.n,0),V=[].concat(...con.map(x=>x.vis.map(v=>Object.assign({u:x.u},v))));
+  const M={};V.forEach(v=>{const k=String(v.fecha||"").slice(0,7);if(!/^\d{4}-\d\d$/.test(k))return;const m=M[k]||(M[k]={k,s:0,n:0,c:0});m.s+=v.s;m.n+=v.nn;m.c++});
+  const meses=Object.values(M).sort((a,b)=>a.k.localeCompare(b.k)).map(m=>Object.assign(m,{pct:m.n?m.s/m.n*100:null}));
+  const fechas=V.map(v=>v.fecha).filter(Boolean).sort();
+  const mej=con.filter(x=>x.mejora!==null&&x.mejora>0).sort((a,b)=>b.mejora-a.mejora)[0]||null;
+  return{tipo,per,rg,con,sin,gen:N?S/N*100:null,nv:V.length,V,meses,desde:fechas[0]||"",hasta:fechas[fechas.length-1]||"",mej,
+    bajo:con.filter(x=>Math.round(x.acc)<80).length,sobre:con.filter(x=>Math.round(x.acc)>=90).length};
+}
+/* tarjeta de acceso (inicio del Check list y cada lista) */
+function rkEntrada(tipo,corta){
+  let top=[];try{top=rkDatos(tipo,"todo").con.slice(0,3)}catch(e){console.warn(e)}
+  const sub=top.length?top.map(x=>`${x.pos}.º ${esc(x.u)} ${rkNum(x.acc)} %`).join(" · "):`Se arma con las visitas cerradas de cada ${esc(CLK[tipo].uni)}`;
+  return `<button class="rkent${corta?" corta":""}" data-a="clRk" data-t="${esc(tipo)}"><span class="rkico">${RK_ICO}</span><span class="rkxt"><b>Ranking${corta?"":" de cumplimiento"}</b><span>${sub}</span></span>${SEM_CHEV}</button>`;
+}
+function rkVisChips(x){
+  const L=x.vis.filter(v=>v.pct!==null),ver=L.slice(-8),resto=L.length-ver.length;
+  return `<span class="rkvs" aria-label="Cumplimiento por visita">${resto?`<span class="rkmas">+${resto}</span>`:""}${ver.map(v=>`<span class="rkv ${semColor(v.pct)}" title="Visita ${esc(v.n)} · ${fmtD(v.fecha)}: ${v.pct} %"><small>V${esc(v.n)}</small>${v.pct}</span>`).join("")}</span>`;
+}
+function rkFila(x){
+  const c=semColor(Math.round(x.acc)),nv=x.vis.length,d=x.dif;
+  const tr=d===null?"":`<span class="rktr ${d>0?"sube":d<0?"baja":"igual"}" title="Última visita comparada con la anterior">${d>0?"↑":d<0?"↓":"="} ${d===0?"igual":Math.abs(d)+(Math.abs(d)===1?" pt":" pts")}</span>`;
+  return `<button class="rkrow" data-a="clRkPredio" data-p="${esc(x.u)}"><span class="rkpos${x.pos<=3?" p"+x.pos:""}">${x.pos}</span>
+    <span class="rkt"><b>${esc(x.u)}</b><span class="rks">${nv===1?`1 visita · ${rkFcH(x.ult.fecha)}`:`${nv} visitas · última ${x.ult.pct} % el ${rkFcH(x.ult.fecha)}`}</span>
+      <span class="rkbar" aria-hidden="true"><i class="${c}" style="width:${Math.max(2,Math.min(100,x.acc)).toFixed(1)}%"></i></span>${rkVisChips(x)}</span>
+    <span class="rkp"><b class="${c}">${rkNum(x.acc)}<small> %</small></b>${tr}</span></button>`;
+}
+function rkPodio(con){
+  if(con.length<3)return"";const P=[con[1],con[0],con[2]];
+  return `<div class="rkpod" aria-label="Primeros lugares">${P.map(x=>`<button class="rkpd p${x.pos<=3?x.pos:3}" data-a="clRkPredio" data-p="${esc(x.u)}"><span class="rkmed">${x.pos}</span><b>${esc(x.u)}</b><span class="rkpv">${rkNum(x.acc)} %</span><i aria-hidden="true"></i></button>`).join("")}</div>`;
+}
+function rkMesesHTML(meses){
+  const L=meses.slice(-12);if(L.length<2)return"";const anios=new Set(L.map(m=>m.k.slice(0,4))).size>1;
+  const alto=p=>p===null?0:Math.min(100,Math.max(4,(p-40)/60*100));
+  return `<div class="evo rkevo"><div class="evt"><span>Puntaje general por mes</span><span class="evl">- - meta 90 %</span></div>
+    <div class="evb">${L.map(m=>{const p=m.pct===null?null:Math.round(m.pct),k=semColor(p),mm=RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):"");
+      return `<div class="evc" role="img" aria-label="${mm}: ${p===null?"sin puntaje":p+" %"}, ${m.c} ${m.c===1?"visita":"visitas"}"><span class="evp ${k}">${p===null?"–":p}</span><span class="evr"><i class="${esc(k)}" style="height:${alto(p)}%"></i></span><span class="evn">${mm}</span></div>`}).join("")}</div></div>`;
+}
+function renderCLRank(){
+  const T=rkTipos().includes(rkTipo)?rkTipo:"visitas",K=CLK[T],R=rkDatos(T,rkPer),tipos=rkTipos();
+  const g=R.rg,op=(L,v)=>L.map(k=>`<option value="${esc(k)}"${k===v?" selected":""}>${esc(rkMesTxt(k))}</option>`).join("");
+  const per=`<div class="smord rkper" role="group" aria-label="Período">${RK_PER.map(([k,t,c])=>`<button data-a="clRkPer" data-o="${k}" aria-pressed="${k===rkPer}" title="${esc(t)}">${c}</button>`).join("")}</div>${rkPer==="meses"&&g.L?`<div class="rkmeses">
+      <div class="f"><label for="rkMD">Desde</label><select id="rkMD" data-rk="md">${op(g.L,g.md)}</select></div><div class="f"><label for="rkMH">Hasta</label><select id="rkMH" data-rk="mh">${op(g.L,g.mh)}</select></div></div>`:""}`;
+  const sel=tipos.length>1?`<div class="smord rktipo" role="group" aria-label="Check list" style="grid-template-columns:repeat(${tipos.length},minmax(0,1fr))">${tipos.map(t=>`<button data-a="clRkTipo" data-t="${t}" aria-pressed="${t===T}">${esc(RK_CORTO[t]||clNom(t))}</button>`).join("")}</div>`:"";
+  const gc=semColor(R.gen===null?null:Math.round(R.gen));
+  const hero=R.con.length?`<div class="rkhero"><div class="rkg"><span class="rkgl">Puntaje general</span><b class="${gc}">${rkNum(R.gen)}<small> %</small></b>
+      <span class="rkgs">${R.nv} ${R.nv===1?"visita cerrada":"visitas cerradas"} en ${R.con.length} ${R.con.length===1?K.uni:K.unis}${R.desde?` · ${R.desde===R.hasta?rkFcH(R.desde):`${rkFcH(R.desde)} al ${rkFcH(R.hasta)}`}`:""}</span></div>
+      <div class="smres rkres"><div><b class="v">${R.sobre}</b><span>con 90 % o más</span></div><div${R.bajo?' class="rr"':""}><b>${R.bajo}</b><span>bajo 80 %</span></div><div><b>${R.mej?`+${R.mej.mejora}`:"–"}</b><span>${R.mej?`mayor mejora: ${esc(R.mej.u)}`:"mayor mejora"}</span></div></div></div>`:"";
+  const lista=R.con.length?`${rkPodio(R.con)}<h2 class="rkh">Ranking</h2>
+      <div class="smley"><span><i class="v"></i>90 % o más</span><span><i class="a"></i>80 a 89 %</span><span><i class="r"></i>menos de 80 %</span></div>
+      <div class="list rklist">${R.con.map(rkFila).join("")}</div>`
+    :`<div class="empty">${rkPer==="todo"?`Todavía no hay visitas cerradas en ${esc(clNom(T))}.`:"No hay visitas cerradas en este período."}</div>`;
+  const sin=R.sin.length&&R.con.length?`<div class="smsep">${rkPer==="todo"?"Sin visitas cerradas":"Sin visitas cerradas en el período"} <b>${R.sin.length}</b></div><div class="smsin">${R.sin.map(u=>`<button class="smsc" data-a="clRkPredio" data-p="${esc(u)}">${esc(u)}</button>`).join("")}</div>`:"";
+  return `${band("Ranking",rkVolver,rkVolver==="clHub"?"Check list":clNom(T))}
+  <main class="wrap rkwrap"><div class="pendslot">${slotHTML()}</div>
+    <h1>Ranking de cumplimiento</h1>
+    <p class="lead">${esc(clNom(T))} · ${esc(rkPerTxt(rkPer,R))}</p>
+    ${sel}${per}${hero}${lista}${rkMesesHTML(R.meses)}${sin}
+    <details class="info rkcomo"><summary><b>¿Cómo se calcula?</b></summary>
+      <p>Cada punto revisado vale: <b>Cumple</b> 1, <b>Parcial</b> 0,5 y <b>No cumple</b> 0. Los <b>N/A</b> no cuentan.</p>
+      <p>El <b>puntaje a la fecha</b> junta todos los puntos de todas las visitas cerradas del ${esc(K.uni)} en el período: puntos obtenidos dividido por puntos revisados. Es un promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más.</p>
+      <p>Ejemplo: una visita con 40 puntos y 36 obtenidos (90 %) y otra con 20 puntos y 14 obtenidos (70 %) dan (36 + 14) ÷ (40 + 20) = <b>83,3 %</b>.</p>
+      <p>Las visitas en curso y las anuladas no cuentan. Las flechas comparan la última visita con la anterior.</p></details>
+    <div class="btns rkbtns"><button class="btn pri" data-a="clRkPdf" ${R.con.length?"":"disabled"}>Informe PDF</button><button class="btn" data-a="clRkXlsx" ${R.con.length?"":"disabled"}>Excel</button></div>
+  </main>`;
+}
+/* «Meses»: al elegir un mes en «Desde» o «Hasta» (si quedan al revés, el otro se mueve al mismo mes) */
+function rkChange(ev){const t=ev.target;if(!t||!t.dataset||!t.dataset.rk)return;const g=rkRango("meses",rkTipo);let d=g.md,h=g.mh;
+  if(t.dataset.rk==="md"){d=t.value;if(h<d)h=d}else{h=t.value;if(d>h)d=h}rkMD=d;rkMH=h;render()}
+/* Excel: ranking, todas las visitas y el puntaje por mes */
+function rkXlsxBuild(R){
+  const K=CLK[R.tipo],U=K.Unis.replace(/s$/,""),wb=XLSX.utils.book_new(),pct=x=>x===null||x===undefined?"":Math.round(x*10)/1000;
+  const r1=[["Posición",U,"Visitas cerradas","Puntaje a la fecha","Puntos obtenidos","Puntos revisados","Primera visita","Última visita","Última visita: cumplimiento","Visita anterior: cumplimiento","Cambio (puntos)","Mejor visita","Peor visita","Mejora desde la primera (puntos)","Hallazgos abiertos hoy"]];
+  R.con.forEach(x=>r1.push([x.pos,x.u,x.vis.length,pct(x.acc),Math.round(x.s*10)/10,x.n,x.pri?fmtD(x.pri.fecha):"",x.ult?fmtD(x.ult.fecha):"",x.ult?x.ult.pct/100:"",x.ant?x.ant.pct/100:"",x.dif===null?"":x.dif,x.mejor===null?"":x.mejor/100,x.peor===null?"":x.peor/100,x.mejora===null?"":x.mejora,x.ha]));
+  R.sin.forEach(u=>r1.push(["",u,0,"","","","","","","","","","","",""]));
+  r1.push([]);r1.push(["Puntaje general","",R.nv,pct(R.gen)]);r1.push(["Período",rkPerTxt(R.per,R)]);r1.push(["Emitido",fmtD(today())]);
+  r1.push(["Cálculo","Cumple 1, Parcial 0,5, No cumple 0; N/A no cuenta. Puntaje a la fecha = puntos obtenidos ÷ puntos revisados de todas las visitas cerradas del período."]);
+  const w1=XLSX.utils.aoa_to_sheet(r1);w1["!cols"]=[8,22,10,12,12,12,13,13,14,14,10,11,11,14,12].map(w=>({wch:w}));
+  for(let r=1;r<r1.length;r++)[3,8,9,11,12].forEach(c=>{const cell=w1[XLSX.utils.encode_cell({r,c})];if(cell&&typeof cell.v==="number")cell.z=c===3?"0.0%":"0%"});
+  XLSX.utils.book_append_sheet(wb,w1,"Ranking");
+  const r2=[[U,"Posición en el ranking","Visita","Fecha","Revisor","Cumplimiento","Puntos obtenidos","Puntos revisados"]];
+  R.con.forEach(x=>x.vis.forEach(v=>r2.push([x.u,x.pos,v.n,fmtD(v.fecha),v.revisor,v.pct===null?"":v.pct/100,Math.round(v.s*10)/10,v.nn])));
+  const w2=XLSX.utils.aoa_to_sheet(r2);w2["!cols"]=[22,10,8,12,24,13,12,12].map(w=>({wch:w}));
+  for(let r=1;r<r2.length;r++){const cell=w2[XLSX.utils.encode_cell({r,c:5})];if(cell&&typeof cell.v==="number")cell.z="0%"}
+  XLSX.utils.book_append_sheet(wb,w2,"Todas las visitas");
+  const r3=[["Mes","Visitas cerradas","Puntaje general"]];R.meses.forEach(m=>r3.push([RK_MES[+m.k.slice(5,7)-1]+" "+m.k.slice(0,4),m.c,pct(m.pct)]));
+  const w3=XLSX.utils.aoa_to_sheet(r3);w3["!cols"]=[{wch:12},{wch:14},{wch:14}];
+  for(let r=1;r<r3.length;r++){const cell=w3[XLSX.utils.encode_cell({r,c:2})];if(cell&&typeof cell.v==="number")cell.z="0.0%"}
+  XLSX.utils.book_append_sheet(wb,w3,"Por mes");
+  return XLSX.write(wb,{bookType:"xlsx",type:"array"});
+}
+const rkArchivo=(R,ext)=>`Ranking_check_list_${(RK_CORTO[R.tipo]||R.tipo).toLowerCase()}_${R.per==="todo"?"desde_el_inicio":R.per==="anio"?today().slice(0,4):R.per==="meses"&&R.rg.md?(R.rg.md===R.rg.mh?R.rg.md:R.rg.md+"_a_"+R.rg.mh):"90_dias"}_${fmtD(today())}.${ext}`.replace(/[\/\\]/g,"-");
+async function rkXlsx(){
+  const R=rkDatos(rkTipo,rkPer);if(!R.con.length)return;
+  const buf=rkXlsxBuild(R);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),rkArchivo(R,"xlsx"),"Excel del ranking listo.");
+}
+/* Informe PDF: resumen, ranking, todas las visitas y puntaje por mes */
+function rkPdfBuild(R){
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const L=15,W=180;let y=10;
+  const K=CLK[R.tipo],U=K.Unis.replace(/s$/,"");
+  const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282){nueva();return true}return false};
+  const COL={v:[30,110,50],a:[150,110,20],r:[170,40,40],n:[110,110,110]},FILL={v:[226,240,224],a:[244,236,206],r:[246,222,222],n:[240,240,240]};
+  const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];
+  const titulo=t=>{chk(14);d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(...AZ);d.text(t,L,y);d.setTextColor(0);y+=6.5};
+  /* encabezado (igual al informe de una visita) */
+  try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
+  d.setFont("helvetica","bold");d.setFontSize(15);d.setTextColor(...AZ);d.text("Ranking de cumplimiento · "+clNom(R.tipo),L+28,y+9);
+  d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");
+  d.text(`${rkPerTxt(R.per,R)}${R.hasta?` · última visita ${fmtD(R.hasta)}`:""} · emitido el ${fmtD(today())}`,L+28,y+16);d.setTextColor(0);
+  d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
+  /* resumen */
+  const gc=semColor(R.gen===null?null:Math.round(R.gen));
+  d.setFillColor(242,245,248);d.roundedRect(L,y-2,W,27,2,2,"F");
+  d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(90);d.text("Puntaje general",L+4,y+3);
+  d.setFont("helvetica","bold");d.setFontSize(22);d.setTextColor(...COL[gc]);d.text(rkNum(R.gen)+" %",L+4,y+13);
+  d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(90);d.text(`${R.nv} ${R.nv===1?"visita cerrada":"visitas cerradas"} · ${R.con.length} ${R.con.length===1?K.uni:K.unis}`,L+4,y+20);
+  const top=R.con[0];
+  const KP=[["Primer lugar",top?top.u:"-",top?rkNum(top.acc)+" %":"",COL.v],["Con 90 % o más",String(R.sobre),R.sobre===1?K.uni:K.unis,COL.v],["Bajo 80 %",String(R.bajo),R.bajo===1?K.uni:K.unis,R.bajo?COL.r:[90,90,90]],["Mayor mejora",R.mej?R.mej.u:"-",R.mej?`+${R.mej.mejora} puntos`:"",AZ]];
+  KP.forEach(([t,v,s,c],i)=>{const x=L+60+i*30;d.setFillColor(255);d.roundedRect(x,y,28.5,21,1.5,1.5,"F");d.setFont("helvetica","normal");d.setFontSize(7);d.setTextColor(90);d.text(t,x+14.25,y+4.5,{align:"center"});
+    d.setFont("helvetica","bold");let fs=v.length>4?9.5:16;d.setFontSize(fs);while(d.getTextWidth(v)>26.5&&fs>6.5){fs-=0.5;d.setFontSize(fs)}d.setTextColor(...c);d.text(v,x+14.25,y+(v.length>4?12:13),{align:"center"});
+    d.setFont("helvetica","normal");d.setFontSize(7);d.setTextColor(90);d.text(s,x+14.25,y+18,{align:"center"})});
+  d.setTextColor(0);y+=32;
+  /* 1. ranking */
+  titulo(`Ranking (${R.con.length})`);
+  const cR=[{t:"N.º",w:10,c:1},{t:U,w:40},{t:"Visitas",w:15,c:1},{t:"Puntaje a la fecha",w:49},{t:"Última visita",w:24,c:1},{t:"Cambio",w:16,c:1},{t:"Mejor / peor",w:26,c:1}];
+  const thR=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.3);let x=L;cR.forEach(c=>{c.c?d.text(c.t,x+c.w/2,y,{align:"center"}):d.text(c.t,x+1.5,y);x+=c.w});d.setFont("helvetica","normal");y+=4};
+  thR();
+  const MED=[[201,162,39],[150,160,170],[184,115,51]];
+  R.con.forEach(x=>{const h=8.5;if(chk(h))thR();const yc=y+5.2;let cx=L;const c=semColor(Math.round(x.acc));
+    if(x.pos<=3){d.setFillColor(...MED[x.pos-1]);d.circle(cx+5,yc-1.3,3,"F");d.setTextColor(255)}else d.setTextColor(60);
+    d.setFont("helvetica","bold");d.setFontSize(8.5);d.text(String(x.pos),cx+5,yc,{align:"center"});d.setTextColor(0);cx+=cR[0].w;
+    d.setFontSize(9);d.text(d.splitTextToSize(x.u,cR[1].w-2)[0],cx+1.5,yc);cx+=cR[1].w;
+    d.setFont("helvetica","normal");d.text(String(x.vis.length),cx+cR[2].w/2,yc,{align:"center"});cx+=cR[2].w;
+    d.setFillColor(236,239,243);d.roundedRect(cx+1.5,yc-3,30,3.6,1,1,"F");d.setFillColor(...COL[c]);d.roundedRect(cx+1.5,yc-3,Math.max(1,30*Math.min(100,x.acc)/100),3.6,1,1,"F");
+    d.setFont("helvetica","bold");d.setTextColor(...COL[c]);d.text(rkNum(x.acc)+" %",cx+cR[3].w-1.5,yc,{align:"right"});d.setTextColor(0);d.setFont("helvetica","normal");cx+=cR[3].w;
+    d.text(x.ult?`${x.ult.pct} % · ${fmtD(x.ult.fecha).slice(0,5)}`:"-",cx+cR[4].w/2,yc,{align:"center"});cx+=cR[4].w;
+    if(x.dif!==null){d.setTextColor(...(x.dif>0?COL.v:x.dif<0?COL.r:[90,90,90]));d.text(x.dif===0?"igual":(x.dif>0?"+":"-")+Math.abs(x.dif)+" pts",cx+cR[5].w/2,yc,{align:"center"});d.setTextColor(0)}else d.text("-",cx+cR[5].w/2,yc,{align:"center"});cx+=cR[5].w;
+    d.text(x.mejor===null?"-":`${x.mejor} % / ${x.peor} %`,cx+cR[6].w/2,yc,{align:"center"});
+    d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
+  if(R.sin.length){y+=3;d.setFont("helvetica","italic");d.setFontSize(8.3);d.setTextColor(90);const l=d.splitTextToSize(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`,W);chk(l.length*3.8+2);d.text(l,L,y+1);y+=l.length*3.8+1;d.setTextColor(0);d.setFont("helvetica","normal")}
+  y+=6;
+  /* 2. todas las visitas (una fila por unidad, una columna por visita; de a 10 columnas) */
+  const maxV=Math.max(1,...R.con.map(x=>x.vis.length)),POR=10;
+  for(let b=0;b<maxV;b+=POR){const nC=Math.min(POR,maxV-b),wU=40,wA=20,wc=(W-wU-wA)/POR;
+    titulo(b===0?`Todas las visitas${maxV>POR?` (visitas 1 a ${Math.min(POR,maxV)})`:""}`:`Todas las visitas (visitas ${b+1} a ${b+nC})`);
+    const th=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.text(U,L+1.5,y);for(let i=0;i<nC;i++)d.text(`${b+i+1}.ª`,L+wU+i*wc+wc/2,y,{align:"center"});d.text("A la fecha",L+W-wA/2,y,{align:"center"});d.setFont("helvetica","normal");y+=3};
+    th();
+    R.con.forEach(x=>{const h=10;if(chk(h))th();d.setFont("helvetica","bold");d.setFontSize(8.5);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,wU-2)[0],L+1.5,y+6);
+      for(let i=0;i<nC;i++){const v=x.vis[b+i];const cx=L+wU+i*wc;if(!v)continue;const k=semColor(v.pct);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.6,y+1,wc-1.2,h-2,1,1,"F");
+        d.setFont("helvetica","bold");d.setFontSize(8.3);d.setTextColor(...COL[k]);d.text(v.pct===null?"-":v.pct+" %",cx+wc/2,y+5,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.3);d.setTextColor(90);d.text(rkFc(v.fecha),cx+wc/2,y+8.2,{align:"center"});d.setTextColor(0)}
+      const k=semColor(Math.round(x.acc));d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(...COL[k]);d.text(rkNum(x.acc)+" %",L+W-wA/2,y+6,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
+      d.setDrawColor(230);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
+    y+=6}
+  /* 3. puntaje general por mes */
+  const MS=R.meses.slice(-12);
+  if(MS.length>=2){chk(62);titulo("Puntaje general por mes");const H=40,x0=L+8,wb=(W-12)/MS.length,base=y+H,alto=p=>p===null?0:Math.min(1,Math.max(0.04,(p-40)/60))*H;
+    d.setDrawColor(200);d.setLineDashPattern([1.2,1.2],0);const y90=base-alto(90);d.line(x0,y90,L+W,y90);d.setLineDashPattern([],0);d.setFontSize(7);d.setTextColor(110);d.text("90 %",L,y90+1);
+    d.line(x0,base,L+W,base);d.setDrawColor(0);
+    const anios=new Set(MS.map(m=>m.k.slice(0,4))).size>1;
+    MS.forEach((m,i)=>{const p=m.pct===null?null:Math.round(m.pct),k=semColor(p),hh=alto(p),bx=x0+i*wb+wb*0.2,bw=wb*0.6;d.setFillColor(...COL[k]);if(hh)d.roundedRect(bx,base-hh,bw,hh,0.8,0.8,"F");
+      d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(...COL[k]);d.text(p===null?"-":p+" %",bx+bw/2,base-hh-1.5,{align:"center"});
+      d.setFont("helvetica","normal");d.setFontSize(7.3);d.setTextColor(90);d.text(RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):""),bx+bw/2,base+4,{align:"center"});d.text(`${m.c} ${m.c===1?"visita":"visitas"}`,bx+bw/2,base+7.5,{align:"center"})});
+    d.setTextColor(0);y=base+18}
+  /* 4. cómo se calcula */
+  titulo("Cómo se calcula");d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(60);
+  const nota=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. Las visitas en curso y las anuladas no cuentan. «Cambio» compara la última visita con la anterior. Colores: verde 90 % o más, amarillo 80 a 89 %, rojo menos de 80 %.`;
+  const nl=d.splitTextToSize(nota,W);chk(nl.length*3.8+4);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*3.8+3;d.setTextColor(0);
+  const n=d.getNumberOfPages();const por=ME&&ME.nombre?`Emitido por ${ME.nombre} el ${fmtD(today())}`:`Emitido el ${fmtD(today())}`;
+  for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});d.text(por,15,289);d.setTextColor(0)}
+  return d;
+}
+async function rkPdf(){
+  if(!window.jspdf){toast("No se pudo cargar el generador de PDF.");return}
+  const R=rkDatos(rkTipo,rkPer);if(!R.con.length)return;toast("Preparando el informe…");
+  let d;try{d=rkPdfBuild(R)}catch(e){console.error(e);toast("No se pudo generar el informe.");return}
+  await guardarPDF(d,rkArchivo(R,"pdf"),"Informe listo.");
 }
 
 /* ---------- Pantalla: un predio (visitas, hallazgos, Excel) ---------- */
@@ -646,7 +872,7 @@ function renderCLPredio(){
     <p class="note" style="margin-top:0">Carpeta <b>Check list de cumplimiento / ${KC().carpeta} / ${esc(p)}</b>: un Excel con todas las visitas (una columna por visita, hoja de hallazgos y hoja de fotos con enlaces) y una carpeta por visita con sus fotos y el informe PDF. El Excel se actualiza solo al cerrar una visita.</p>
     <div class="btns" style="margin-top:8px"><button class="btn" data-a="clXlsx" data-p="${esc(p)}" ${vv.some(v=>v.estado==="cerrada")&&DB?"":"disabled"}>Actualizar Excel ahora</button></div>
     ${esAdmin()?`${disTip("mnvis","En el «⋯» de una visita cerrada puedes <b>anularla</b>: deja de contar para los hallazgos y el porcentaje, pero queda registrada. Se puede restaurar.")}`:""}`;
-  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="${KC().act}">${KC().Unis}</button><div class="ttl">${clTipo==="bodega"?"Bodega · ":clTipo==="camionetas"?"Camioneta · ":clTipo==="huespedes"?"Casa de huéspedes · ":""}${esc(p)}</div>${estadoChip()}</div></div></div>
+  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px">${clPVolver==="rk"?`<button class="back" data-a="clRk">Ranking</button>`:`<button class="back" data-a="${KC().act}">${KC().Unis}</button>`}<div class="ttl">${clTipo==="bodega"?"Bodega · ":clTipo==="camionetas"?"Camioneta · ":clTipo==="huespedes"?"Casa de huéspedes · ":""}${esc(p)}</div>${estadoChip()}</div></div></div>
   <main class="wrap"><div class="pendslot">${slotHTML()}</div>
     <h1>${esc(p)}</h1>${clTipo==="camionetas"?`<p class="lead" style="margin-top:-6px">${esc(cmDesc(p))}</p>`:""}
     <div class="start" style="grid-template-columns:1fr">
@@ -861,13 +1087,21 @@ async function catClick(A,b){
 async function clClick(A,b){
   if(A.startsWith("clCat")){return catClick(A,b)}
   if(A==="clHall"){clHallazgoModal(clPredio,b.dataset.k);return true}
-  if(A==="clHub"){await flush();clv=null;go("clhub");return true}
-  if(A==="cl"||A==="clb"||A==="clc"||A==="clh"){await flush();clv=null;clTipo=A==="clb"?"bodega":A==="clc"?"camionetas":A==="clh"?"huespedes":"visitas";go("cl");return true}
+  if(A==="clHub"){await flush();clv=null;clPVolver=null;go("clhub");return true}
+  if(A==="cl"||A==="clb"||A==="clc"||A==="clh"){await flush();clv=null;clPVolver=null;clTipo=A==="clb"?"bodega":A==="clc"?"camionetas":A==="clh"?"huespedes":"visitas";go("cl");return true}
   if(A==="clRes"){if(clRO()||!["huespedes","visitas"].includes(tipoDe(clv)))return true; /* v152: también en Visitas a predios */const r=b.dataset.r;if(CH_RES[r]&&r!==chResProp(clv))clv.resultado=r;else delete clv.resultado;clTouch();const s=$("#chres");if(s)s.outerHTML=chResHTML(clv,false);return true}
   if(A==="clcOtra"){const o=await askVal("Camioneta sin acta","Escribe la patente. Conviene registrar también su acta de entrega en Actas → Entrega y devolución de vehículos.","Seguir",`<div class="f"><label for="cmPatIn">Patente</label><input id="cmPatIn" data-v="pat" autocapitalize="characters" autocomplete="off" placeholder="Ej.: WBHD30"></div>`);
     const p=normPat(o&&o.pat);if(!p)return true;clPredio=p;clPTab=null;clHzF="todos";clHzQ="";go("clp");window.scrollTo(0,0);return true}
-  if(A==="clPredio"){clPredio=b.dataset.p;clPTab=null;clHzF="todos";clHzQ="";go("clp");window.scrollTo(0,0);return true}
+  if(A==="clPredio"){clPVolver=null;clPredio=b.dataset.p;clPTab=null;clHzF="todos";clHzQ="";go("clp");window.scrollTo(0,0);return true}
   if(A==="clOrden"){clOrdenSet(b.dataset.o);render();return true}
+  /* v204: ranking */
+  if(A==="clRk"){await flush();clv=null;const t=b.dataset.t||rkTipo;rkTipo=rkTipos().includes(t)?t:"visitas";
+    if(view==="cl")rkVolver=KC().act;else if(view==="clhub")rkVolver="clHub";go("clrk");return true}
+  if(A==="clRkTipo"){if(rkTipos().includes(b.dataset.t))rkTipo=b.dataset.t;render();return true}
+  if(A==="clRkPer"){if(RK_PER.some(x=>x[0]===b.dataset.o))rkPer=b.dataset.o;render();return true}
+  if(A==="clRkPredio"){clTipo=rkTipo;clPredio=b.dataset.p;clPTab="vis";clHzF="todos";clHzQ="";clPVolver="rk";go("clp");window.scrollTo(0,0);return true}
+  if(A==="clRkPdf"){await rkPdf();return true}
+  if(A==="clRkXlsx"){await rkXlsx();return true}
   if(A==="clPTab"){clPTab=b.dataset.t==="vis"?"vis":"hz";render();return true}
   if(A==="clHzF"){clHzF=b.dataset.f||"todos";render();return true}
   if(A==="clVisTodas"){clVisTodas[clTipo+"|"+clPredio]=true;render();return true}
@@ -1200,4 +1434,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="204"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="205"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
