@@ -1008,7 +1008,10 @@ const puedeJefatura=r=>!!(r&&r.estado==="enviada"&&!esPropia(r)&&soyJefeDe(r)); 
 /* v133 (M-15): quien la aprobó como jefatura no la aprueba también en Contabilidad */
 const aprobeJef=r=>!!(ME&&r&&r.aprobJef&&r.aprobJef.por&&r.aprobJef.por.id===ME.id);
 const correoAprobJef=r=>r&&r.aprobJef&&r.jefatura&&r.jefatura.correo?String(r.jefatura.correo).toLowerCase():"";
-const puedeContab=r=>!!(r&&r.estado==="revcont"&&esContab()&&!esPropia(r)&&!aprobeJef(r));
+/* v211: con «Contabilidad revisa sus propias rendiciones» (MAE.autoCont.on, mientras falta alguien en Contabilidad) */
+const rdAutoCont=()=>!!(MAE&&MAE.autoCont&&MAE.autoCont.on);
+const contPropiaOk=r=>!esPropia(r)||rdAutoCont();
+const puedeContab=r=>!!(r&&r.estado==="revcont"&&esContab()&&contPropiaOk(r)&&!aprobeJef(r));
 const puedeContabilizar=r=>!!(r&&r.estado==="aprobada"&&esContab());
 const editaPersona=r=>!!(r&&esMiaR(r)&&(r.estado==="borrador"||r.estado==="observada"));
 const rdRO=r=>!(editaPersona(r)||puedeContab(r));
@@ -1196,7 +1199,7 @@ function rdAgenda(){
     if(r.estado==="enviada"||r.estado==="revcont"){
       const cont=r.estado==="revcont"||sinJefatura(r);
       const aj=r.estado==="revcont"?correoAprobJef(r):"";
-      const para=(cont?contabCorreos():[r.jefatura.correo]).map(x=>String(x||"").toLowerCase()).filter(x=>/@/.test(x)&&!propios.includes(x)&&x!==aj); /* nadie aprueba lo propio ni los dos pasos (v133) */
+      const para=(cont?contabCorreos():[r.jefatura.correo]).map(x=>String(x||"").toLowerCase()).filter(x=>/@/.test(x)&&(!propios.includes(x)||(cont&&rdAutoCont()))&&x!==aj); /* nadie aprueba lo propio ni los dos pasos (v133); v211: salvo con autoCont */
       if(para.length)aprobar.push({para,rid:r.id,rol:cont?"cont":"jef",persona:per.nombre||"",periodo:r.periodo,total:fmtP(totalRend(r)),desde:rdDesde(r)});
     }else if(rdEditable(r)){
       const n=docsDe(r).length;if(!n&&r.estado!=="observada")return;
@@ -2020,7 +2023,7 @@ function renderRDV(){
   const r=rdv,D=docsDe(r),edit=editaPersona(r),jef=puedeJefatura(r),con=puedeContab(r),ctz=puedeContabilizar(r);
   const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).length,0);
   const c=colabDe(r),jefE=r.jefatura||(c?jefaturaDe(c):null);
-  const verAsi=esContab()&&r.estado!=="borrador"&&!esPropia(r)||con||ctz;const AX=verAsi&&D.length?rdAsientoExcel(r):null,A=AX?AX.A:null; /* v133 (M-18) */
+  const verAsi=esContab()&&r.estado!=="borrador"&&contPropiaOk(r)||con||ctz;const AX=verAsi&&D.length?rdAsientoExcel(r):null,A=AX?AX.A:null; /* v133 (M-18) */
   let acciones="";
   if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>
       ${disTip("rdsolo",`Solo sirven <b>facturas y boletas</b>, en foto o en PDF.${ESCRITORIO()?" También puedes arrastrar las fotos o los PDF a esta página.":""}`,"rdsolo")}
@@ -2028,7 +2031,7 @@ function renderRDV(){
   else if(esContab()&&r.estado==="enviada"&&sinJefatura(r)&&!esPropia(r))acciones=`<div class="info netbox"><b>Falta asignar la jefatura.</b> Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button> y la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura»: pasa a revisión contable.</div>`; /* v199 */
   else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Revisa cada documento: «Está bien» o «Pedir corrección».</p>`;
   else if(esContab()&&r.estado==="revcont"&&aprobeJef(r)&&!esPropia(r))acciones=`<p class="note">La aprobaste como jefatura: la revisión contable la hace otra persona de Contabilidad.</p>`;
-  else if(con)acciones=`${A&&A.bloq?`<p class="note">Corrige lo que está en «Por corregir» (toca el documento) para poder aprobar.</p>`:""}`;
+  else if(con)acciones=`${esPropia(r)?`<p class="note">Es tu propia rendición: la revisas tú porque está activa «Contabilidad revisa sus propias rendiciones». La aprobación queda anotada como propia.</p>`:""}${A&&A.bloq?`<p class="note">Corrige lo que está en «Por corregir» (toca el documento) para poder aprobar.</p>`:""}`;
   else if(ctz)acciones=`<div class="btns"><button class="btn pri" data-a="rdFinnEnviar" style="flex:1" ${RD_FINN?"disabled":""}>${RD_FINN?"Enviando a FinnegansGO…":"Contabilizar en FinnegansGO"}</button></div><div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button><button class="btn" data-a="rdContabilizar" style="flex:1">Marcar contabilizada</button></div><div class="btns"><button class="btn" data-a="rdReabrir">Volver a revisión contable</button></div><p class="note">«Contabilizar en FinnegansGO» envía el asiento directo, le adjunta el resumen y cada documento, y la deja contabilizada con el número de asiento. El Excel y «Marcar contabilizada» son para cargarla a mano.</p>`; /* v163 */
   else if(esContab()&&r.estado==="contabilizada")acciones=`${(n=>rdPuedeAdjuntar(r)?n?`<div class="btns"><button class="btn pri" data-a="rdFinnAdj" style="flex:1" ${RD_FINN?"disabled":""}>${RD_FINN==="adj"?"Adjuntando en FinnegansGO…":`Adjuntar documentos en FinnegansGO (${n})`}</button></div><p class="note">Sube al asiento el resumen y cada documento que todavía no está adjunto.</p>`:`<p class="note">El resumen y ${(m=>m===1?"el documento":`los ${m} documentos`)(rdAdjLista(r).length-1)} están adjuntos al asiento en FinnegansGO.</p>`:"")(rdPuedeAdjuntar(r)?rdAdjFaltan(r).length:0)}<div class="btns"><button class="btn" data-a="rdImpUna">Excel para FinnegansGO</button></div>`; /* v182 */
   const resR=accRes(fmtP(totalRend(r)),`${D.length} ${D.length===1?"documento":"documentos"}${inc&&edit?` · <em>faltan datos en ${inc}</em>`:(jef||con)?`${(n=>n?` · ${n} ${n===1?"revisado":"revisados"}`:"")(D.filter(d=>d.estadoRev==="ok").length)}${obs?` · ${obs} por corregir`:""}`:""}`);
@@ -2073,7 +2076,7 @@ function renderRDD(){
   const fic=!editP&&DIS_EDK!==d.k; /* v179 (quien revisa): ficha en vez del formulario */
   const sugC=editP&&d.centroSug&&centro,sugG=editP&&(d.gastoIA||d.gastoHist)&&cat;
   const pideBU=(cat&&cat.bu)||/^4106/.test(im.cuenta),servs=distServicios(),pideDist=cat&&cat.dist&&(servs.length||d.dist);
-  const verC=esContab()&&(r.estado==="revcont"||r.estado==="aprobada"||r.estado==="contabilizada"||(r.estado==="enviada"&&sinJefatura(r)))&&!esPropia(r);
+  const verC=esContab()&&(r.estado==="revcont"||r.estado==="aprobada"||r.estado==="contabilizada"||(r.estado==="enviada"&&sinJefatura(r)))&&contPropiaOk(r);
   let contHTML="";
   if(verC){const A=rdAsiento(r);const mias=A.lineas.filter(l=>l.lado==="D"&&l.docs.includes(d.k));const al=A.al.filter(a=>a.k===d.k);const aj=d.aj||{};
     const nm=(v,f)=>v?`<span class="hint">${esc(f(v)||"no está en el maestro")}</span>`:"";
@@ -2380,9 +2383,13 @@ function renderRDCol(){
     <h2>Aprobadores<span class="cnt">${A.length}</span></h2>
     <div class="list">${A.map(a=>`<button class="rdcc" data-a="rdAprEd" data-c="${esc(a.correo||"")}" data-n="${esc(a.nombre)}"><span class="rdcc-t"><b>${esc(a.nombre)}</b><span class="tag ${a.rol==="cont"?"cerrada":"borrador"}">${a.rol==="cont"?"Contabilidad":"Jefatura"}</span></span><span class="rdcc-l">${esc(a.correo||"Sin correo")}</span><span class="rdcc-l">${a.rol==="jef"?(n=>`${n} ${n===1?"persona":"personas"} a cargo`)(colabs().filter(c=>c.activo!==false&&normTxt(c.jefe)===normTxt(a.nombre)).length):"Revisión contable"}</span></button>`).join("")}</div>
     <div class="btns"><button class="btn" data-a="rdAprNuevo">+ Agregar aprobador</button></div>
+    ${rdAutoContHTML()}
     ${H.length?`<h2>Últimos cambios</h2><ul class="rdcolh">${H.map(h=>`<li><b>${esc(h.quien)}</b>: ${esc(h.que)}<span>${esc(fmtD(String(h.f||"").slice(0,10)))} · ${esc(h.por||"")}</span></li>`).join("")}</ul>`:""}
     <p class="note">Versión ${APP_VER}</p>
   </main>`}
+/* v211: interruptor «Contabilidad revisa sus propias rendiciones» (solo lo cambia el administrador) */
+function rdAutoContHTML(){const on=rdAutoCont(),x=(MAE&&MAE.autoCont)||{},adm=esAdmin();
+  return `<div class="fdcfg rdauto"><span><b>Contabilidad revisa sus propias rendiciones</b><small>Para cuando falta alguien en Contabilidad. Quien es de Contabilidad revisa, aprueba y contabiliza también su propia rendición, y queda anotado. La jefatura no cambia. ${on?`Activo desde el ${esc(fmtD(String(x.hora||"").slice(0,10)))}${x.por?" ("+esc(quien(x.por))+")":""}: apágalo cuando vuelva.`:"Apagado: cada rendición la revisa otra persona."}${adm?"":" Lo cambia la administración."}</small></span><button class="fdsw" role="switch" aria-checked="${on}" data-a="rdAutoCont" aria-label="Contabilidad revisa sus propias rendiciones" ${adm?"":"disabled"}><i></i></button></div>`}
 function rdColPintar(){const L=$("#rdcoll");if(L)L.innerHTML=rdColListaHTML()}
 const rdColBuscar=k=>colabs().find(c=>(normRut(c.rut)||"n:"+c.nombre)===k)||null;
 /* formulario: se repite con los datos escritos si algo no está bien */
@@ -2488,6 +2495,10 @@ function askVal(title,msg,ok,html){return new Promise(res=>{
   const f=m.querySelector("[data-v]")||m.querySelector('[data-m="yes"]');if(f)f.focus()})}
 async function rdClick(A,b){
   if(/^rd(Col|Apr(Nuevo|Ed)$)/.test(A)&&await rdColClick(A,b))return true; /* v117: colaboradores y aprobadores */
+  if(A==="rdAutoCont"){if(!esAdmin())return true;const on=!rdAutoCont();
+    if(on&&!await ask("¿Activar la revisión de las propias rendiciones?","Quien es de Contabilidad podrá revisar, aprobar y contabilizar también su propia rendición. Queda anotado en cada una. Apágalo cuando vuelva la persona que falta.","Activar"))return true;
+    try{await rdMaeGuardar(n=>{n.autoCont={on,por:yo(),hora:new Date().toISOString()}});toast(on?"Contabilidad ya puede revisar sus propias rendiciones.":"Listo: cada rendición la vuelve a revisar otra persona.")}
+    catch(e){toast("No se pudo guardar: "+errMsg(e))}render();return true}
   if(A==="rdRecVer"){rdRecVer();return true}
   if(A==="rdRecProbar"){rdRecProbar();return true}
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
@@ -2611,7 +2622,7 @@ async function rdClick(A,b){
     const As=rdAsiento(rdv);if(As.bloq){toast("Hay cosas por corregir en el asiento.");render();return true}
     const nr=As.al.filter(a=>a.n==="r").length;
     if(!(await ask("¿Aprobar la imputación?",`Asiento de ${fmtP(As.debe)} con ${As.lineas.length} líneas${nr?` y ${nr} ${nr===1?"alerta revisada":"alertas revisadas"}`:""}. ${As.pend?`Falta crear en Finnegans: ${As.al.filter(a=>a.n==="p").map(a=>`${a.nombre} (${a.rut})`).join(", ")}; se podrá contabilizar cuando exista.`:"Queda lista para contabilizar en FinnegansGO."} ${rdv.persona&&rdv.persona.nombre?primerNombre(rdv.persona.nombre)+" recibirá un aviso por correo.":""}`,"Aprobar")))return true;
-    D.forEach(d=>{d.estadoRev="ok"});rdv.aprobCont={por:yo(),fecha:today()};rdv.asiento={lineas:As.lineas.map(l=>({lado:l.lado,cuenta:l.cuenta,prod:l.prod,part:l.part,centro:l.centro,ter:l.ter,bu:l.bu,monto:l.monto,glosa:l.glosa})),fecha:As.fecha,desc:As.desc,debe:As.debe};rdv.estado="aprobada";rdHist(rdv,"aprobada por Contabilidad");rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"aprobada","Imputación aprobada.").catch(e=>console.warn("correo",e));if(DB&&navigator.onLine!==false)setTimeout(()=>rdArchivos(rr),2500);return true}
+    D.forEach(d=>{d.estadoRev="ok"});rdv.aprobCont={por:yo(),fecha:today()};if(esPropia(rdv))rdv.aprobCont.propia=true;rdv.asiento={lineas:As.lineas.map(l=>({lado:l.lado,cuenta:l.cuenta,prod:l.prod,part:l.part,centro:l.centro,ter:l.ter,bu:l.bu,monto:l.monto,glosa:l.glosa})),fecha:As.fecha,desc:As.desc,debe:As.debe};rdv.estado="aprobada";rdHist(rdv,rdv.aprobCont.propia?"aprobada por Contabilidad (su propia rendición)":"aprobada por Contabilidad");rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"aprobada","Imputación aprobada.").catch(e=>console.warn("correo",e));if(DB&&navigator.onLine!==false)setTimeout(()=>rdArchivos(rr),2500);return true}
   if(A==="rdReabrir"){if(!puedeContabilizar(rdv))return true;const ex=rdv.exportada;
     if(!(await ask("¿Volver a revisión contable?",`Podrás corregir la imputación y aprobarla de nuevo.${ex?` Ya se exportó a Excel el ${fmtD(ex.fecha)}: si ya está cargada en FinnegansGO, corrígela también allá, porque al aprobarla de nuevo vuelve a salir en el Excel.`:""}`,"Volver a revisión")))return true;
     rdv.estado="revcont";delete rdv.aprobCont;delete rdv.exportada; /* v133 (A-07) */rdHist(rdv,"vuelve a revisión contable",ex?"estaba exportada: "+(ex.archivo||""):"");rdv.actualizado=new Date().toISOString();await saveRend(rdv);render();return true}
@@ -2893,4 +2904,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="210"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="211"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
