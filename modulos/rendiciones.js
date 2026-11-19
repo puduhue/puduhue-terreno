@@ -25,7 +25,8 @@ const fdHora=h=>{if(!h)return"";const d=new Date(h);if(isNaN(d))return"";const f
   return (f===today()?"hoy":f===sumarDias(today(),-1)?"ayer":fdF(f))+" "+hh};
 function fdCacheMio(){try{const x=JSON.parse(localStorage.getItem(FD_K)||"null");return x&&x.correo===meCorreo()?x:null}catch(e){return null}}
 /* fuente de datos: el servidor de Puduhue consulta el Libro Mayor de la 110106 en Finnegans (solo lo de quien pide; todo, para Contabilidad) */
-async function fdFuente(todos,forzar){if(todos)await fdPadron(false);return await workerFetch("/fondo"+(todos?"?todos=1"+(forzar?"&forzar=1":""):""))} /* v171: forzar = sin la copia de 5 minutos del servidor (solo Contabilidad) */
+let FD_ESPERA=90000; /* v204: tiempo máximo de espera de la consulta (el servidor corta antes, a los 60 s por reporte) */
+async function fdFuente(todos,forzar){if(todos)await fdPadron(false);return await workerFetch("/fondo"+(todos?"?todos=1"+(forzar?"&forzar=1":""):""),FD_ESPERA)} /* v171: forzar = sin la copia de 5 minutos del servidor (solo Contabilidad) */
 /* lista de colaboradores para el servidor (correo → RUT → organización en Finnegans): así cada persona recibe solo lo suyo.
    La publica Contabilidad (o el administrador) al abrir «Fondos por rendir» o al activar el saldo para todos. */
 let FD_PADRON_OK=0;
@@ -346,12 +347,13 @@ function fdLista(){
 function renderFDL(){
   const head=band("Fondos por rendir","fdVolver","Rendiciones");
   if(!esContab())return head+`<main class="wrap"><h1>Fondos por rendir</h1><div class="empty">Solo Contabilidad ve esta pantalla.</div></main>`;
-  if(!FD.t&&!FD.cargando&&!FD.errT&&DB&&navigator.onLine!==false)setTimeout(()=>fdTraer(true,true),0);
+  const fdAuto1=!FD.t&&!FD.cargando&&!FD.errT&&DB&&navigator.onLine!==false; /* v204: la consulta automática ya muestra el esqueleto (antes «Consultar Finnegans» hasta el próximo dibujo) */
+  if(fdAuto1)setTimeout(()=>fdTraer(true,true),0);
   const L=fdLista(),D=FD.t;
   const cfg=`<div class="fdcfg"><span><b>Mostrar a cada persona su saldo</b><small>Aparece en «Mis rendiciones». Actívalo cuando en Finnegans la 110106 y la 110105 tengan a la persona en todas sus líneas.</small></span><button class="fdsw" role="switch" aria-checked="${fdVisible()}" data-a="fdMostrar" aria-label="Mostrar a cada persona su saldo"><i></i></button></div>
     ${fdConf().por?`<p class="note">${fdVisible()?"Activado":"Desactivado"} por ${esc(quien(fdConf().por))} el ${fmtD(String(fdConf().hora||"").slice(0,10))}.</p>`:""}`;
   if(!L)return head+`<main class="wrap"><h1>Fondos por rendir</h1><p class="lead">Saldo de las cuentas 110106 (fondo por rendir) y 110105 (fondo fijo) por persona.</p>
-    <div class="empty">${FD.cargando?`<span class="esqc" role="status" aria-label="Consultando Finnegans">${'<span class="esqf"><span class="esqx"><span class="esq" style="width:70%"></span><span class="esq" style="width:45%"></span></span></span>'.repeat(3)}</span>`:FD.errT?`${esc(FD.errT)}<div class="btns" style="justify-content:center"><button class="btn" data-a="fdActualizar">Reintentar</button></div>`:navigator.onLine===false?"Se necesita señal para consultar Finnegans.":`<button class="btn" data-a="fdActualizar">Consultar Finnegans</button>`}</div>${cfg}</main>`;
+    <div class="empty">${FD.cargando||fdAuto1?`<span class="esqc" role="status" aria-label="Consultando Finnegans">${'<span class="esqf"><span class="esqx"><span class="esq" style="width:70%"></span><span class="esq" style="width:45%"></span></span></span>'.repeat(3)}</span><p class="fdesp">Consultando Finnegans…</p>`:FD.errT?`${esc(FD.errT)}<div class="btns" style="justify-content:center"><button class="btn" data-a="fdActualizar">Reintentar</button></div>`:navigator.onLine===false?"Se necesita señal para consultar Finnegans.":`<button class="btn" data-a="fdActualizar">Consultar Finnegans</button>`}</div>${cfg}</main>`;
   const con=L.filter(x=>x.porRendir>0.5),alDia=L.filter(x=>Math.abs(x.porRendir)<=0.5),favor=L.filter(x=>x.porRendir<-0.5);
   const tot=con.reduce((s,x)=>s+x.porRendir,0),nA=con.filter(x=>x.dias>=FD_DIAS_A).length,tram=L.reduce((s,x)=>s+x.enTram,0);
   const ord={saldo:(a,b)=>b.porRendir-a.porRendir,dias:(a,b)=>b.dias-a.dias||b.porRendir-a.porRendir,nom:(a,b)=>cmpEs(a.nom,b.nom)}[fdOrd]||((a,b)=>b.porRendir-a.porRendir);
@@ -1808,7 +1810,7 @@ function renderRD(){
     const cel=([k,n,t])=>`<button class="rdcr${n?"":" cero"}" data-a="rdContF" data-f="${k}" aria-pressed="${F===k}"><b>${n}</b><span>${t}</span></button>`;
     const resHTML=`<section class="rdcres" aria-label="Rendiciones enviadas, por paso"><div class="rdcg"><p class="rdcgh">Esperan a otros</p><div class="rdcgl">${RES.slice(0,2).map(cel).join("")}</div></div><div class="rdcg acc"><p class="rdcgh">Contabilidad</p><div class="rdcgl">${RES.slice(2).map(cel).join("")}</div></div></section>${F?`<p class="rdcfil">Solo «${esc((RES.find(x=>x[0]===F)||[])[2]||"").toLowerCase()}» · <button class="lnk" data-a="rdContF" data-f="">Ver todas</button></p>`:""}`;
     body=`${resHTML}${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
-    <div class="btns rdctools"><button class="btn" data-a="rdMae">Maestros contables</button><button class="btn" data-a="rdXlsxMes" data-p="${periodoActual()}">Excel de documentos del mes</button><button class="btn" data-a="rdXlsxRango">Excel de rendiciones</button><button class="btn" data-a="fdl">Fondos por rendir</button></div>
+    <nav class="rdherrs" aria-label="Herramientas de Contabilidad">${RDCT.map(([a,ico,t])=>`<button class="rdherr" data-a="${a}"${a==="rdXlsxMes"?` data-p="${periodoActual()}"`:""}><span class="rdherri">${ico}</span><span>${t}</span></button>`).join("")}</nav>
     ${PC.length&&(ve("rev")||F==="apr")?`<h2>Por crear en Finnegans<span class="cnt">${PC.length}</span></h2><div class="info" style="border-left:5px solid var(--act)">Créalos en Finnegans con este RUT; la app los detecta sola. Mientras tanto se pueden aprobar, pero su Excel espera.<ul>${PC.map(x=>`<li><b>${esc(x.nombre)}</b> · RUT ${esc(x.rut)} · ${esc(x.tipo)} · rendición de ${esc([...x.quien].filter(Boolean).join(", "))}</li>`).join("")}</ul></div><div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Ya los creé: revisar en Finnegans"}</button></div>`:""}
     ${ve("rev")?`<h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>`:""}
     ${sinJ.length&&ve("rev")?`<h2>Sin jefatura asignada<span class="cnt">${sinJ.length}</span></h2><p class="note">Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button>: la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura».</p><div class="list">${sinJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
@@ -2098,6 +2100,12 @@ function sugeridosPick(f){
 /* v203: palabras que no cuentan al buscar y sugerencia de la app para el tipo de gasto */
 const PK_STOP=new Set(["de","del","la","las","el","los","para","por","con","en","un","una","unos","unas","y","a","al","que","se","mi","mis","su","sus","lo","le"]);
 let IA_PK=null;const PK_IA_MIN=8; /* letras mínimas para pedir sugerencias */
+/* v204: herramientas de Contabilidad (cuadrícula con ícono; antes una fila que se desplazaba hacia el lado) */
+const RDCT_SVG=p=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const RDCT_XLS=RDCT_SVG('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/>');
+const RDCT=[["rdMae",RDCT_SVG('<path d="M5 4.5h11a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M5 16.5a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/>'),"Maestros contables"],
+  ["fdl",RDCT_SVG('<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M16 14.5h2"/><path d="M6 6l9-3 1.5 3"/>'),"Fondos por rendir"],
+  ["rdXlsxMes",RDCT_XLS,"Excel del mes"],["rdXlsxRango",RDCT_XLS,"Excel de rendiciones"]];
 function rdPick(f){IA_PK=null;
   const ops=opcionesPick(f),sug=sugeridosPick(f).filter(x=>ops.some(o=>o.v===x.v)),actual=f==="centro"?centroDoc(rdv,rdd):(gastoDe(rdd)||{}).id,tit=f==="centro"?"Centro de costo":"Tipo de gasto";
   const m=document.createElement("div");m.className="modal";
@@ -2841,4 +2849,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="204"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="205"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

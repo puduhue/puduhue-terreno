@@ -568,7 +568,7 @@ function renderCL(){
   </main>`;
 }
 
-/* ---------- v204: ranking de cumplimiento (pedido de Benja, 19-11-2026) ----------
+/* ---------- v205: ranking de cumplimiento (pedido de Benja, 19-11-2026) ----------
    «Una sección donde se pueda ver el ranking desde que empezaron los check list: todas las visitas con sus porcentajes y un
    ponderado a la fecha, un puntaje al total a la fecha… que se pueda extraer un informe».
    Puntaje a la fecha de cada predio (o bodega o camioneta): todos los puntos revisados en sus visitas cerradas del período,
@@ -1434,4 +1434,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="204"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="205"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

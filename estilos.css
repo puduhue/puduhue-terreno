@@ -2340,8 +2340,18 @@ details>*{box-sizing:border-box}
 .pkiac{margin:4px 2px 8px;font-size:13.5px;color:var(--muted)}
 .pkiac b{color:var(--ink)}
 .pkit.pktop{border-color:var(--act);box-shadow:inset 0 0 0 1px var(--act);background:var(--soft)}
+/* v204: herramientas de Contabilidad en cuadrícula (antes una fila que se desplazaba hacia el lado y escondía botones) */
+.rdherrs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
+@media (min-width:760px){.rdherrs{grid-template-columns:repeat(4,1fr)}}
+.rdherr{display:flex;align-items:center;gap:10px;min-height:58px;padding:10px 12px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;font:inherit;font-size:14px;font-weight:600;line-height:1.25;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rdherr:active{transform:scale(.98)}
+.rdherr:focus-visible{outline:2px solid var(--act);outline-offset:2px}
+.rdherr .rdherri{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--soft);color:var(--act)}
+.rdherr .rdherri svg{width:20px;height:20px}
+@media (hover:hover){.rdherr:hover{border-color:var(--act)}}
+.fdesp{margin:10px 0 0;color:var(--muted);font-size:14px;text-align:center}
 
-/* v204: ranking de cumplimiento del check list (pantalla «clrk») */
+/* v205: ranking de cumplimiento del check list (pantalla «clrk») */
 :root{--rk-o:#F6DE8D;--rk-o-ink:#574100;--rk-p:#DFE6ED;--rk-p-ink:#2B3D4F;--rk-b:#F1CFAE;--rk-b-ink:#653610}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rk-o:#D9B23C;--rk-o-ink:#1F1700;--rk-p:#AEB9C4;--rk-p-ink:#17222D;--rk-b:#D39A68;--rk-b-ink:#261204}}
 :root[data-theme="dark"]{--rk-o:#D9B23C;--rk-o-ink:#1F1700;--rk-p:#AEB9C4;--rk-p-ink:#17222D;--rk-b:#D39A68;--rk-b-ink:#261204}

@@ -121,7 +121,10 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v203";
+const VERSION_SERVIDOR = "v204";
+/* v204: tiempo máximo de espera con Finnegans (antes no había: si Finnegans no respondía, la app quedaba esperando para siempre) */
+const finnEspera = (env, ms) => AbortSignal.timeout(+env.FINN_ESPERA_MS > 0 ? +env.FINN_ESPERA_MS : ms);
+const finnTarde = e => e && (e.name === "TimeoutError" || e.name === "AbortError") ? { status: 504, error: "Finnegans está tardando en responder. Intenta de nuevo en unos minutos." } : e;
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -138,8 +141,7 @@ async function tokenFinnegans(env) {
   const id = env.FINN_CLIENT_ID || env.FINN_API_KEY, sec = env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY;
   if (!id || !sec) throw { status: 500, error: "Faltan las credenciales de Finnegans en el servidor." };
   const u = `${FINN}/oauth/token?grant_type=client_credentials&client_id=${encodeURIComponent(id)}&client_secret=${encodeURIComponent(sec)}`;
-  const r = await fetch(u);
-  const t = (await r.text()).trim();
+  let r, t; try { r = await fetch(u, { signal: AbortSignal.timeout(20000) }); t = (await r.text()).trim(); } catch (e) { throw finnTarde(e); } /* v204 */
   if (!r.ok) throw { status: 502, error: "Finnegans rechazó las credenciales.", detalle: t.slice(0, 300) };
   let tok = t; try { const j = JSON.parse(t); tok = typeof j === "string" ? j : (j.access_token || j.token || ""); } catch (e) {}
   tok = String(tok).replace(/"/g, "").trim();
@@ -180,8 +182,7 @@ async function reporte(env, nombre, params) {
   const u = new URL(`${FINN}/reports/${encodeURIComponent(nombre)}`);
   u.searchParams.set("ACCESS_TOKEN", tok);
   for (const [k, v] of params) if (k.startsWith("PARAMWEBREPORT_")) u.searchParams.set(k, v);
-  const r = await fetch(u.toString(), { headers: { Accept: "application/json" } });
-  const t = await r.text();
+  let r, t; try { r = await fetch(u.toString(), { headers: { Accept: "application/json" }, signal: finnEspera(env, 60000) }); t = await r.text(); } catch (e) { throw finnTarde(e); } /* v204 */
   if (!r.ok) throw { status: 502, error: `Finnegans rechazó el reporte ${nombre}.`, estado: r.status, detalle: t.slice(0, 500) };
   try { return JSON.parse(t) } catch (e) { throw { status: 502, error: "El reporte no vino en formato JSON.", detalle: t.slice(0, 500) } }
 }
