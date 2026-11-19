@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-GOtntAA4D/aXtfcx9gBlwTxJP78nCYXD96K5s0vIA+s=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-SdBy8/7EstBlpl0TmiwVbCb4+0JUZGFqpjIVMTx3iRk=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=213">
+<link rel="stylesheet" href="estilos.css?v=214">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="213";
+const APP_VER="214";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -418,7 +418,7 @@ async function subirPorSesion(s,blob){
   return res}
 /* v137 (A-10): parte del nombre de una foto que sale de la foto misma: un reintento reemplaza el archivo en vez de duplicarlo */
 const sufRef=(ref,n)=>{let h=5381;const s=String(ref||uid());for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36).padStart(n,"0").slice(-n)};
-async function actaSubir(a,sub,name,blob,type){const folder=await actaCarpeta(carpetaActa(a).concat(sub?[sub]:[]));if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+async function actaSubir(a,sub,name,blob,type){if(rolesSrv().odMods)return odSubirMod("ax",carpetaActa(a).concat(sub?[sub]:[]),name,blob); /* v214 */const folder=await actaCarpeta(carpetaActa(a).concat(sub?[sub]:[]));if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
 const nombreFoto=(a,k,ref)=>{if(a.tipo==="capacitacion"){const fs=((a.items||{})[k]||{}).fotos||[];return `Capacitacion_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}if(a.tipo==="vehiculo"||a.tipo==="activo"){const fs=((a.items||{})[k]||{}).fotos||[];const lb=a.tipo==="vehiculo"?(k==="v_km"?"Kilometraje":"Estado_general"):"Activo_"+(((a.activos||[]).find(x=>"a_"+x.id===k)||{}).tipo||"").replace(/\s+/g,"_");return limpiaNombre(lb).replace(/[(),.]/g,"")+`_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}const it=ITEMS.find(i=>i.k===k);const fs=((a.items||{})[k]||{}).fotos||[];const idx=Math.max(0,fs.indexOf(ref))+1;return limpiaNombre(`${it?SECC[it.s].t:"Item"}_${it?it.n:k}`).replace(/\s+/g,"_").replace(/[(),.]/g,"")+`_${idx}_${uid().slice(-4)}.jpg`};
 /* --- Base de actas: un archivo JSON por acta en OneDrive/actas --- */
 const REMOTE={actas:{},visitas:{},conteos:{},rendiciones:{}},SNAP={};let pullT=null,pulling=false;
@@ -614,7 +614,9 @@ const nombreRegistro=(col,o)=>{const q=QUE_COL[col]||"El acta",d=deRegistro(col,
 const odRendCol=col=>col==="rendiciones"&&!!rolesSrv().odRend;
 const odRendPedir=cuerpo=>odPedir("/od/rend",cuerpo);
 /* v212: Control de bodega (y después los demás módulos) guarda por el servidor (/od/reg); las lecturas siguen directas */
-const odModCol=col=>(col==="conteos"||col==="visitas")&&!!rolesSrv().odMods; /* v213: también Check list */
+const odModCol=col=>(col==="conteos"||col==="visitas"||col==="actas")&&!!rolesSrv().odMods; /* v213: también Check list; v214: Actas */
+/* v214: sube un archivo de un módulo con la carga que abre el servidor */
+async function odSubirMod(mod,ruta,nombre,blob,tipo){const s=await odPedir("/od/mod/subida",Object.assign({mod,ruta,nombre},tipo?{tipo}:{}));return subirPorSesion(s,blob)}
 const odSrvCol=col=>odRendCol(col)||odModCol(col);
 const odRegPedir=(col,cuerpo)=>col==="rendiciones"?odRendPedir(cuerpo):odPedir("/od/reg",Object.assign({col},cuerpo));
 /* v212: borrar una foto o un archivo que OneDrive no deja borrar con la cuenta de la persona */
@@ -1254,7 +1256,7 @@ async function permSubir(){
   if(!esAdmin())return false;
   if(!DB||navigator.onLine===false){PERM_PEND=true;PERM_ERR="";permLocal();return false}
   const body=JSON.stringify({v:1,personas:PERM.personas,nombres:PERM.nombres,actualizado:PERM.actualizado,por:PERM.por},null,1);
-  const put=async()=>{const d=await permCarpeta(true);const r=await gfetch(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body});return r.json()};
+  const put=async()=>{if(rolesSrv().odMods)return odPedir("/od/permisos",{datos:JSON.parse(body)}); /* v214: por el servidor */const d=await permCarpeta(true);const r=await gfetch(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body});return r.json()};
   try{let it;try{it=await put()}catch(e){if(e.code!=="not_found")throw e;try{localStorage.removeItem(PERM_DIR_K)}catch(x){}it=await put()}
     PERM_ETAG=(it&&it.eTag)||"";PERM_PEND=false;PERM_ERR="";permLocal();return true}
   catch(e){console.error(e);PERM_PEND=true;PERM_ERR=errMsg(e);permLocal();return false}}
@@ -3145,7 +3147,7 @@ async function urlsAlDia(docs,marca,guardar){
 }
 const marcaActa=a=>"/Actas/"+encodeURIComponent(carpetaActa(a)[0])+"/";
 async function actasXlsxUpload(){await urlsAlDia(Object.values(ACTAS).filter(a=>a._col!=="visitas"&&!esAx(a)),marcaActa,saveActa);
-  const buf=actasXlsxBuild();const dir=await actaCarpeta(["Viviendas"]);const r=await gfetch(`/drives/${M365.drive}/items/${dir}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
+  const buf=actasXlsxBuild();if(rolesSrv().odMods){await odSubirMod("ax",["Viviendas"],"Actas_de_vivienda.xlsx",new Blob([buf]));return} /* v214 */const dir=await actaCarpeta(["Viviendas"]);const r=await gfetch(`/drives/${M365.drive}/items/${dir}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
 function actasXlsx(manual){return subirExcel("actas",manual,actasXlsxUpload)}
 /* Al cerrar un acta: guardar Acta.pdf e Informe general.pdf en su carpeta de OneDrive */
 async function subirPDFsActa(a){
@@ -3898,10 +3900,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=213"></script>
-<script src="modulos/bodega.js?v=213"></script>
-<script src="modulos/rendiciones.js?v=213"></script>
-<script src="modulos/actas-entrega.js?v=213"></script>
+<script src="modulos/checklist.js?v=214"></script>
+<script src="modulos/bodega.js?v=214"></script>
+<script src="modulos/rendiciones.js?v=214"></script>
+<script src="modulos/actas-entrega.js?v=214"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
