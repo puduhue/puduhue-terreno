@@ -64,7 +64,8 @@ async function stockGuardar(mezclar,conBase){
     if(conBase){try{meta=await gjson(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e}
       if(meta)base=STOCK&&meta.eTag===STOCK_ETAG?STOCK:await(await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json()}
     const snap=mezclar(base),h={"Content-Type":"application/json"};if(meta&&!IFM_NO)h["If-Match"]=meta.eTag;
-    try{const up=await gfetch(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}:/content`,{method:"PUT",headers:h,body:JSON.stringify(snap)});const it=await up.json();
+    try{const it=rolesSrv().odMods?await odPedir("/od/mod/json",{mod:"stock",datos:snap,ifMatch:h["If-Match"]||null}) /* v212: por el servidor */
+        :await (await gfetch(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}:/content`,{method:"PUT",headers:h,body:JSON.stringify(snap)})).json();
       snap.etag=it.eTag;STOCK=snap;STOCK_ETAG=it.eTag;try{if(IDB.db)await IDB.put("remote","stock/actual",snap)}catch(e){}return snap}
     catch(e){if(e&&e.status===412&&i<3)continue;throw e}
   }
@@ -104,7 +105,7 @@ async function stockExcel(){
   r2.push([]);r2.push(["Todas las bodegas al",fmtFecha(horaTodo())]);r2.push(["Última actualización",fmtFecha(STOCK.hora)]);r2.push(["Actualizado por",STOCK.por?STOCK.por.nombre:""]);
   const w2=XLSX.utils.aoa_to_sheet(r2);w2["!cols"]=[{wch:28},{wch:12},{wch:12},{wch:16},{wch:14},{wch:16},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Por depósito");
   const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-  await subirExcel("stock",false,async()=>{const r=await gfetch(`/drives/${M365.drive}/items/${STK.root}:/Stock_Finnegans.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()});
+  await subirExcel("stock",false,async()=>{if(rolesSrv().odMods){const s=await odPedir("/od/mod/subida",{mod:"stock",ruta:[],nombre:"Stock_Finnegans.xlsx"});await subirPorSesion(s,new Blob([buf]));return} /* v212 */const r=await gfetch(`/drives/${M365.drive}/items/${STK.root}:/Stock_Finnegans.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()});
 }
 function fmtFecha(iso){try{const d=new Date(iso);return fmtD(iso)+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}catch(e){return iso}}
 function hace_(iso){const m=Math.round((Date.now()-new Date(iso))/60000);if(m<1)return"hace un momento";if(m<60)return`hace ${m} min`;const h=Math.round(m/60);if(h<48)return`hace ${h} h`;return`hace ${Math.round(h/24)} días`} /* v174: «hace un momento» */
@@ -458,7 +459,9 @@ async function cbCarpeta(segs){let parent=CB.root,path="";
     if(!id){const r=await crearCarpeta(parent,seg);id=r.id}
     CBPATH[path]=id;parent=id}return parent}
 const carpetaConteo=c=>[limpiaNombre(c.bodega),`${c.fecha} Conteo ${esc(c.n)}`];
-async function cbSubir(segs,name,blob,type){const f=await cbCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10) */
+async function cbSubir(segs,name,blob,type){
+  if(rolesSrv().odMods){const s=await odPedir("/od/mod/subida",{mod:"cb",ruta:segs,nombre:name});return subirPorSesion(s,blob)} /* v212: el servidor abre la carga */
+  const f=await cbCarpeta(segs);return subirBlob(f,name,blob,type)} /* v137 (A-10) */
 function cbXlsx(c){
   const wb=XLSX.utils.book_new();const L=lineasDe(c);const R=resumenConteo(c);
   const rows=[["Código","Producto","Familia","Partida","Unidad","Sistema","Observado","Diferencia","Precio unitario","Valor diferencia","Estado","Comentario","Fotos"]];
@@ -515,4 +518,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="211"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="212"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
