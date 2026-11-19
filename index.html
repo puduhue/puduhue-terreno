@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-wyNbSz5DbKDmISwxCxfpUIkclPCWmZ4N7Gx3AxV4TNA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-fqbQ/v4faaU1WfcMV0VmW1SGDOgqXjlEzCK/l/jBn0w=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=207">
+<link rel="stylesheet" href="estilos.css?v=208">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="207";
+const APP_VER="208";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -3438,6 +3438,15 @@ function instAChromeAuto(){
     if(/[#&?](code|state|error)=/.test(location.href))return;localStorage.setItem(A_CHROME_K,String(Date.now()))}catch(e){return}
   setTimeout(()=>{try{irAChrome(chromeURL())}catch(e){}},700)}
 const esIOSApp=()=>esIOS()&&!/Safari\//.test(navigator.userAgent); /* abierto dentro de otra app (correo, WhatsApp…) */
+/* v208 (Benja: «¿Podemos hacer que se abra altiro en Safari?»): en el iPhone, dentro de otra app, intenta abrir Safari sola una
+   vez por teléfono, como la v201 con Chrome. x-safari-https:// funciona desde iOS 17; si no se abre, queda el botón. */
+const A_SAFARI_K="actas-a-safari";
+const safariURL=()=>`x-safari-https://${location.host}${location.pathname.replace(/index\.html$/,"")}`;
+let irASafari=u=>{location.href=u};
+function instASafariAuto(){
+  try{if(localStorage.getItem(A_SAFARI_K))return;if(Object.keys(LOCAL||{}).length||Object.keys(QF||{}).length)return;
+    if(/[#&?](code|state|error)=/.test(location.href))return;localStorage.setItem(A_SAFARI_K,String(Date.now()))}catch(e){return}
+  setTimeout(()=>{try{irASafari(safariURL())}catch(e){}},700)}
 const navIOS=()=>{const u=navigator.userAgent;return /CriOS/.test(u)?"Chrome":/EdgiOS/.test(u)?"Edge":/FxiOS/.test(u)?"Firefox":"Safari"};
 function instMarcar(){try{localStorage.setItem(INST_OK_K,"1");localStorage.removeItem(INST_NO_K)}catch(e){}}
 function instPosible(){
@@ -3453,6 +3462,7 @@ function instCardHTML(login){
   try{if(localStorage.getItem(MUDANZA_K))return""}catch(e){} /* la bienvenida de la mudanza ya trae este paso */
   const ios=esIOS();
   if(esAndroidOtro()){instAChromeAuto();return `<div class="info pushc lx-inst lx-instch"><div class="lx-insth"><img src="icon-192.png" alt="" class="lx-insti"><div><b>Instala la app desde Chrome</b><br><span>Desde ${esc(navAndroidTxt())}, Android bloquea la instalación. Ábrela en Chrome y ahí toca «Instalar app». ${CUENTA?"En Chrome inicias sesión de nuevo; si tienes algo sin subir, sincroniza antes.":""}</span></div></div><div class="btns"><a class="btn pri" href="${esc(chromeURL())}" data-chrome="1">Abrir en Chrome</a><button class="btn" data-a="instNo">Ahora no</button></div></div>`} /* v201 */
+  if(ios&&esIOSApp()){instASafariAuto();return `<div class="info pushc lx-inst lx-instch"><div class="lx-insth"><img src="icon-192.png" alt="" class="lx-insti"><div><b>Ábrela en Safari para instalarla</b><br><span>Esta página está abierta dentro de otra app (WhatsApp, el correo…) y desde aquí no se puede instalar. Si no se abre, mantén apretado el enlace y elige «Abrir en Safari».</span></div></div><div class="btns"><a class="btn pri" href="${esc(safariURL())}" data-safari="1">Abrir en Safari</a><button class="btn" data-a="instGuia">Cómo instalarla</button><button class="btn" data-a="instNo">Ahora no</button></div></div>`} /* v208 */
   const txt=ios&&login?"Hazlo antes de iniciar sesión: así inicias sesión una sola vez, dentro de la app."
     :"Queda con su ícono en la pantalla de inicio, funciona sin señal y te puede avisar con notificaciones. Se hace una sola vez.";
   const boton=INST_EVT?`<button class="btn pri" data-a="instalar">Instalar app</button>`:`<button class="btn pri" data-a="instGuia">Cómo instalarla</button>`;
@@ -3486,9 +3496,9 @@ function instGuia(motivo){
     const p1=nav==="Safari"
       ?`<li><span class="ig-t">Toca <b>Compartir</b>.</span><span class="ig-n">Está en la barra de Safari, abajo. Si no lo ves, toca primero <b>⋯</b> (abajo a la derecha).</span>${IG.barraSafari}</li>`
       :`<li><span class="ig-t">Toca <b>Compartir</b>.</span><span class="ig-n">En ${nav} está arriba, en la barra de direcciones (o dentro del menú <b>⋯</b>).</span>${IG.barraArriba}</li>`;
-    cuerpo=(enApp?`<div class="info" style="margin:6px 0 12px"><b>Primero ábrela en Safari.</b> Esta página está abierta dentro de otra app (por ejemplo, el correo), y desde ahí no se puede instalar. Copia el enlace y pégalo en Safari, o toca <b>Abrir en Safari</b> si aparece.<div class="btns"><button class="btn" data-m="copiar">Copiar enlace</button></div></div>`:"")
+    cuerpo=(enApp?`<div class="info" style="margin:6px 0 12px"><b>Primero ábrela en Safari.</b> Esta página está abierta dentro de otra app (por ejemplo, el correo), y desde ahí no se puede instalar. Toca <b>Abrir en Safari</b>; si no se abre, copia el enlace y pégalo en Safari.<div class="btns"><a class="btn pri" href="${esc(safariURL())}" data-safari="1">Abrir en Safari</a><button class="btn" data-m="copiar">Copiar enlace</button></div></div>`:"")
       +`<ol class="ig-pasos">${p1}
-        <li><span class="ig-t">Toca <b>Agregar a inicio</b>.</span><span class="ig-n">Si no aparece, desliza la lista hacia arriba. Puede decir «Agregar a pantalla de inicio».</span>${IG.agregar}</li>
+        <li><span class="ig-t">Toca <b>Agregar a inicio</b>.</span><span class="ig-n">Si no aparece, toca <b>Ver más</b> o desliza la lista hacia arriba. Puede decir «Agregar a pantalla de inicio».</span>${IG.agregar}</li>
         <li><span class="ig-t">Toca <b>Agregar</b>, arriba a la derecha.</span><span class="ig-n">Si aparece la opción «Abrir como app web», déjala activada.</span>${IG.confirmar}</li>
         <li><span class="ig-t">Abre <b>Puduhue Terreno</b> desde el ícono nuevo.</span><span class="ig-n">${CUENTA?"La primera vez inicias sesión de nuevo (el iPhone guarda la app aparte de Safari). ":""}${motivo==="notif"?"Ahí toca <b>Activar notificaciones</b>.":"Desde ahí funciona sin señal y puede avisarte con notificaciones."}</span>${IG.icono}</li></ol>`;
   }else if(and){
@@ -3882,10 +3892,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=207"></script>
-<script src="modulos/bodega.js?v=207"></script>
-<script src="modulos/rendiciones.js?v=207"></script>
-<script src="modulos/actas-entrega.js?v=207"></script>
+<script src="modulos/checklist.js?v=208"></script>
+<script src="modulos/bodega.js?v=208"></script>
+<script src="modulos/rendiciones.js?v=208"></script>
+<script src="modulos/actas-entrega.js?v=208"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
