@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-AXUxQdXm199pZFd9lD3a3XA+xkM1thq9qFXagJqYpok=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-oQYgg9igwMH2UvKlaqBtB3fOuBJNJgffUg2QHUM7aHU=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=203">
+<link rel="stylesheet" href="estilos.css?v=204">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="203";
+const APP_VER="204";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -657,7 +657,7 @@ function quitarRegistro(col,id){const ek=rkey(col,id);
 /* deja en el registro abierto (mismo objeto) la versión combinada */
 function reemplazarEnSitio(a,datos){const d=JSON.parse(JSON.stringify(datos));for(const k of Object.keys(a))if(!(k in d)&&!["id","_col","_etag"].includes(k))delete a[k];Object.assign(a,d);
   if(rdv===a&&rdd){rdd=a.docs&&a.docs[rdd.k]||null;if(view==="rdd"&&!rdd)view="rdv"}}
-const VISTAS_COL={visitas:["cl","clp","clv","launch"],rendiciones:["rd","rdv","rdd","rdm","launch"],conteos:["cb","cbb","cbv","launch"],actas:["home","edit","axl","axe","launch"]};
+const VISTAS_COL={visitas:["cl","clp","clv","clrk","clhub","launch"],rendiciones:["rd","rdv","rdd","rdm","launch"],conteos:["cb","cbb","cbv","launch"],actas:["home","edit","axl","axe","launch"]};
 async function aplicarSubida(col,id,a,stamp,res){const ek=rkey(col,id);
   if(res.eliminado){quitarRegistro(col,id);delete LOCAL[id];await localDel(id);toast(`${nombreRegistro(col,a)} se eliminó en otro teléfono. Tus cambios se guardaron en OneDrive, en la carpeta «_conflictos».`);
     if(VISTAS_COL[col].includes(view))render();return}
@@ -1006,7 +1006,7 @@ const TB_RAIZ={launch:1,rd:1,clhub:1,cl:1,axhub:1,cb:1,stock:1};
 function tbModDe(v){
   if(v==="launch")return"inicio";
   if(["rd","rdv","rdd","rdm","rdcol","fdl"].includes(v))return"rd";
-  if(["clhub","cl","clp","clv","clcat"].includes(v))return"cl";
+  if(["clhub","cl","clp","clv","clcat","clrk"].includes(v))return"cl";
   if(["axhub","axl","axe","home","edit"].includes(v))return"ax";
   if(["cb","cbb","cbv"].includes(v))return"cb";
   if(v==="stock")return"stock";
@@ -1683,6 +1683,7 @@ function renderPantalla(){
   else if(view==="clhub")app.innerHTML=renderCLHub();
   else if(view==="cl")app.innerHTML=renderCL();
   else if(view==="clp")app.innerHTML=renderCLPredio();
+  else if(view==="clrk")app.innerHTML=renderCLRank(); /* v204: ranking */
   else if(view==="clcat")app.innerHTML=renderCLCat();
   else if(view==="finn")app.innerHTML=renderFinn();
   else if(view==="adm")app.innerHTML=renderADM();
@@ -3779,7 +3780,7 @@ async function init(){
       for(const id of Object.keys(LOCAL)){const l=LOCAL[id];if(l._col!=="visitas")continue;n[id]=l}
       DELQ.forEach(id=>{if(id.startsWith("visitas/"))delete n[id.slice(8)]});
       let vAbierto=false;if(clv){const r=n[clv.id];if(!r||!sinPendiente(clv)||r===clv||r._etag===clv._etag)n[clv.id]=clv;else{clv=r;if(!clv.items)clv.items={};vAbierto=true}}VIS=n;if(vAbierto)abiertoAlDia(["clv"]);
-      if(loaded){if(view==="cl"||view==="clp"||view==="launch")renderFondo();else status()}
+      if(loaded){if(view==="cl"||view==="clp"||view==="clrk"||view==="clhub"||view==="launch")renderFondo();else status()}
     },e=>{});
     await new Promise(res=>{let first=true;const done=()=>{if(first){first=false;res()}};
       DB.collection("actas").onSnapshot(sn=>{
@@ -3855,7 +3856,7 @@ let SWREG=null,UPD_READY=false,UPD_CHECKING=false,UPD_APLICANDO=false,FOTO_T=0;
 function aplicarUpdate(){if(UPD_APLICANDO)return;UPD_APLICANDO=true;flush().then(()=>{try{sessionStorage.setItem("actas-actualizado","1")}catch(e){}location.reload()})}
 /* v104: la app se recarga sola solo en una pantalla de lista, sin diálogos abiertos, sin una foto por elegir (cámara o galería)
    y sin texto a medio escribir. Si no, avisa con la barra y se actualiza al volver a una lista (ver render()). */
-const UPD_VISTAS=["launch","home","clhub","cl","clp","rd","cb","cbb","stock","axl","axhub","fdl"];
+const UPD_VISTAS=["launch","home","clhub","cl","clp","clrk","rd","cb","cbb","stock","axl","axhub","fdl"];
 document.addEventListener("click",e=>{const t=e.target;if(t&&t.matches&&t.matches('input[type="file"]'))FOTO_T=Date.now()},true);
 document.addEventListener("change",e=>{const t=e.target;if(t&&t.type==="file")FOTO_T=0},true);
 function updSegura(){
@@ -3880,10 +3881,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=203"></script>
-<script src="modulos/bodega.js?v=203"></script>
-<script src="modulos/rendiciones.js?v=203"></script>
-<script src="modulos/actas-entrega.js?v=203"></script>
+<script src="modulos/checklist.js?v=204"></script>
+<script src="modulos/bodega.js?v=204"></script>
+<script src="modulos/rendiciones.js?v=204"></script>
+<script src="modulos/actas-entrega.js?v=204"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
