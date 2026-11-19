@@ -1787,6 +1787,41 @@ function rdCard(r,ctx){const D=docsDe(r),n=D.length,inc=D.filter(d=>!docCompleto
   let extra=ctx==="cont"&&D.some(d=>d.moneda&&+d.montoMoneda>0)?" · en dólares":""; /* v203 */if(ctx==="cont"&&(r.estado==="revcont"||r.estado==="aprobada")){const A=rdAsiento(r);extra=A.bloq?` · <span style="color:var(--m-ink)">${A.bloq} por corregir</span>`:A.pend?` · ${A.pend} por crear en Finnegans`:A.al.length?` · ${A.al.length} por revisar`:" · asiento cuadrado";extra=(ctx==="cont"&&D.some(d=>d.moneda&&+d.montoMoneda>0)?" · en dólares":"")+extra}
   const X=r.anulada,F=ctx==="cont"&&!X?rdFalta(r):null,pn=r.persona&&r.persona.nombre||"",pp=ctx==="cont"&&pn; /* v199: en Contabilidad, la persona primero */
   return `<button class="bod rdc${X?" anu":""}${F?" rdcc":""}" data-a="rdAbrir" data-id="${esc(r.id)}">${X?RDC_ANU:disRdIco(r)}<span class="rdc-x"><span class="bodn">${pp?esc(pn):`${esc(rdTitulo(r))}${nom?` · ${esc(pn)}`:""}`}</span><span class="bodm">${pp?`${esc(rdTitulo(r))} · `:""}${n} ${n===1?"documento":"documentos"}${X?rdAnuPor(r):`${inc&&(r.estado==="borrador"||r.estado==="observada")?` · ${inc} por completar`:""}${extra}${r.exportada&&r.estado==="aprobada"?" · exportada":""}`}</span><span class="bodc rdc-e">${X?`<span class="xp rdanux">${X.eliminada?"Eliminada":"Anulada"} el ${esc(fmtD(X.fecha))}</span>`:F?rdFaltaHTML(F):rdMiniHTML(r)+rdEstadoChip(r)}${(x=>x.includes("xp ok")?"":x)(chipSync(r))}</span></span><b class="rdc-v">${fmtP(totalRend(r))}</b>${ICO.arrow}</button>`}
+/* v209: Contabilidad: contabilizadas sin pago registrado (fdPago «pend»: en Finnegans no hay una orden de pago que cubra el
+   asiento) y las que no tienen dato en Finnegans; Excel para las nóminas */
+const rdDiasDesde=f=>{f=String(f||"").slice(0,10);return /^\d{4}-\d\d-\d\d$/.test(f)?Math.max(0,Math.round((new Date(today()+"T12:00:00Z")-new Date(f+"T12:00:00Z"))/864e5)):null};
+function rdSinPago(todas){const L=[],sd=[],C=todas.filter(r=>r.estado==="contabilizada"&&!r.anulada);
+  C.forEach(r=>{const g=fdPago(r);if(g&&g.e==="pend")L.push({r,g,d:rdDiasDesde(r.contab&&r.contab.fecha)});else if(!g&&FD.t)sd.push(r)});
+  const ord=(a,b)=>((b.d||0)-(a.d||0))||cmpEs(a.r.persona&&a.r.persona.nombre||"",b.r.persona&&b.r.persona.nombre||"");
+  L.sort(ord);sd.sort((a,b)=>String(a.contab&&a.contab.fecha||"").localeCompare(String(b.contab&&b.contab.fecha||"")));
+  const listo=!!FD.t||!C.length; /* sin contabilizadas no hay nada que revisar */
+  return{L,sd,total:L.reduce((t,x)=>t+(x.g.falta||0),0),listo,err:listo||FD.cargando?null:FD.errT||(navigator.onLine===false?"Sin señal: no se pueden revisar los pagos en Finnegans.":null)}}
+function rdSinPagoBarra(SP,F){
+  const est=SP.listo?`<b>${SP.L.length}</b><span>${SP.L.length===1?"contabilizada sin pago registrado":"contabilizadas sin pago registrado"}${SP.L.length?` · ${fmtP(SP.total)} por pagar`:""}</span>`
+    :SP.err?`<b>–</b><span>${esc(SP.err)}</span>`:`<b>…</b><span>Revisando pagos en Finnegans…</span>`;
+  return `<div class="rdcpago${SP.listo&&SP.L.length?" hay":""}"><button class="rdcpb" data-a="rdContF" data-f="pago" aria-pressed="${F==="pago"}" ${SP.listo?"":"disabled"}>${est}</button>${SP.err?`<button class="btn" data-a="rdPagosReint">Reintentar</button>`:""}</div>`}
+function rdSinPagoHTML(SP){
+  if(!SP.listo)return `<h2>Contabilizadas sin pago registrado</h2><div class="empty">${SP.err?esc(SP.err):"Revisando pagos en Finnegans…"}</div>`;
+  return `<h2>Contabilizadas sin pago registrado<span class="cnt">${SP.L.length}</span></h2>
+    <p class="note">En Finnegans todavía no hay una orden de pago que cubra el asiento. El monto es lo que falta pagar. No entran las que se descontaron del fondo por rendir.</p>
+    <div class="btns"><button class="btn pri" data-a="rdPagosXlsx" style="flex:1" ${SP.L.length||SP.sd.length?"":"disabled"}>Excel de pagos pendientes</button></div>
+    <div class="list">${SP.L.map(x=>rdCard(x.r,"cont")).join("")||`<div class="empty">Todas las rendiciones contabilizadas tienen su pago registrado.</div>`}</div>
+    ${SP.sd.length?`<details class="rdanu"><summary><b>Sin dato en Finnegans</b> (${SP.sd.length})</summary><p class="note">No se encontró su asiento en los movimientos de la persona en Finnegans (por ejemplo, contabilizadas sin número de asiento). Revísalas a mano.</p><div class="list">${SP.sd.map(r=>rdCard(r,"cont")).join("")}</div></details>`:""}`}
+function rdPagosXlsxBuild(SP){
+  const wb=XLSX.utils.book_new(),H=["Fecha de contabilización","RUT","Nombre","N° de asiento","Monto por pagar","Período","Total de la rendición","Días sin pago"];
+  const fila=(r,falta,d)=>[r.contab&&r.contab.fecha?fmtD(String(r.contab.fecha).slice(0,10)):"",r.persona&&r.persona.rut?rutFmt(r.persona.rut):"",r.persona&&r.persona.nombre||"",r.contab&&r.contab.asiento||"",falta,periodoTxt(r.periodo),totalRend(r),d==null?"":d];
+  const hoja=(rows,nombre)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[14,14,30,14,15,18,17,12].map(w=>({wch:w}));
+    for(let i=1;i<rows.length;i++)[4,6].forEach(c=>{const x=ws[XLSX.utils.encode_cell({r:i,c})];if(x&&typeof x.v==="number")x.z="#,##0"});XLSX.utils.book_append_sheet(wb,ws,nombre)};
+  const r1=[H].concat(SP.L.map(x=>fila(x.r,x.g.falta,x.d)));if(SP.L.length)r1.push(["Total","","","",SP.total,"",SP.L.reduce((t,x)=>t+totalRend(x.r),0),""]);hoja(r1,"Sin pago registrado");
+  hoja([H].concat(SP.sd.map(r=>fila(r,"",rdDiasDesde(r.contab&&r.contab.fecha)))),"Sin dato en Finnegans");
+  const n=XLSX.utils.aoa_to_sheet([["Consulta a Finnegans",FD.t&&FD.t.hora?fmtFecha(FD.t.hora):""],["Emitido",fmtD(today())],
+    ["Sin pago registrado","Rendición contabilizada cuyo asiento no está cubierto por una orden de pago a la persona en Finnegans (la app ve la orden de pago, no la transferencia del banco). Si hubo un pago parcial, «Monto por pagar» es lo que falta."],
+    ["Sin dato en Finnegans","No se encontró el asiento en los movimientos de la persona (por ejemplo, contabilizada sin número de asiento): revisar a mano."],
+    ["No entran","Las rendiciones que se descontaron del fondo por rendir (no necesitan pago) y las que ya tienen el pago registrado."]]);
+  n["!cols"]=[{wch:24},{wch:100}];XLSX.utils.book_append_sheet(wb,n,"Notas");
+  return XLSX.write(wb,{bookType:"xlsx",type:"array"})}
+async function rdPagosXlsx(){if(!esContab())return;const SP=rdSinPago(Object.values(REND).filter(r=>!r.anulada));if(!SP.listo){toast("Todavía se están revisando los pagos en Finnegans.");return}
+  await compartirBlob(new Blob([rdPagosXlsxBuild(SP)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Rendiciones_sin_pago_${fmtD(today())}.xlsx`,"Excel de pagos pendientes listo.")}
 function renderRD(){
   const head=band("Rendiciones");
   const todas=Object.values(REND).filter(r=>!r.anulada);
@@ -1813,9 +1848,11 @@ function renderRD(){
     const RES=[["jef",enJ.length,"En jefatura"],["dev",obs.length,obs.length===1?"Devuelta":"Devueltas"],["rev",rev.length+sinJ.length,"Por revisar"],["apr",apr.length,"Por contabilizar"]];
     const cel=([k,n,t])=>`<button class="rdcr${n?"":" cero"}" data-a="rdContF" data-f="${k}" aria-pressed="${F===k}"><b>${n}</b><span>${t}</span></button>`;
     const resHTML=`<section class="rdcres" aria-label="Rendiciones enviadas, por paso"><div class="rdcg"><p class="rdcgh">Esperan a otros</p><div class="rdcgl">${RES.slice(0,2).map(cel).join("")}</div></div><div class="rdcg acc"><p class="rdcgh">Contabilidad</p><div class="rdcgl">${RES.slice(2).map(cel).join("")}</div></div></section>${F?`<p class="rdcfil">Solo «${esc((RES.find(x=>x[0]===F)||[])[2]||"").toLowerCase()}» · <button class="lnk" data-a="rdContF" data-f="">Ver todas</button></p>`:""}`;
-    body=`${resHTML}${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
+    const SP=rdSinPago(todas); /* v209 */
+    body=`${resHTML}${rdSinPagoBarra(SP,F)}${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
     <nav class="rdherrs" aria-label="Herramientas de Contabilidad">${RDCT.map(([a,ico,t])=>`<button class="rdherr" data-a="${a}"${a==="rdXlsxMes"?` data-p="${periodoActual()}"`:""}><span class="rdherri">${ico}</span><span>${t}</span></button>`).join("")}</nav>
     ${PC.length&&(ve("rev")||F==="apr")?`<h2>Por crear en Finnegans<span class="cnt">${PC.length}</span></h2><div class="info" style="border-left:5px solid var(--act)">Créalos en Finnegans con este RUT; la app los detecta sola. Mientras tanto se pueden aprobar, pero su Excel espera.<ul>${PC.map(x=>`<li><b>${esc(x.nombre)}</b> · RUT ${esc(x.rut)} · ${esc(x.tipo)} · rendición de ${esc([...x.quien].filter(Boolean).join(", "))}</li>`).join("")}</ul></div><div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Ya los creé: revisar en Finnegans"}</button></div>`:""}
+    ${F==="pago"?rdSinPagoHTML(SP):""}
     ${ve("rev")?`<h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>`:""}
     ${sinJ.length&&ve("rev")?`<h2>Sin jefatura asignada<span class="cnt">${sinJ.length}</span></h2><p class="note">Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button>: la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura».</p><div class="list">${sinJ.map(r=>rdCard(r,"cont")).join("")}</div>`:""}
     ${ve("apr")?`<h2>Aprobadas, por contabilizar<span class="cnt">${apr.length}</span></h2>
@@ -2455,6 +2492,8 @@ async function rdClick(A,b){
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
   if(A==="rd"){await flush();rdv=null;rdd=null;await rdPurgarVacias();if(Object.values(REND).some(r=>!r.anulada&&puedeJefatura(r)))rdTab="jef";go("rd");return true} /* v207: lo que espera su aprobación, primero */
   if(A==="rdTab"){rdTab=b.dataset.t;rdContF="";render();return true}
+  if(A==="rdPagosXlsx"){await rdPagosXlsx();return true} /* v209 */
+  if(A==="rdPagosReint"){FD.errT=null;FD.intentoT=1;fdTraer(true,false,true);return true}
   if(A==="rdContF"){const f=b.dataset.f||"";rdContF=rdContF===f?"":f;render();return true} /* v199 */
   if(A==="rdMae"){go("rdm");return true}
   if(A==="rdPick"){if(rdv&&rdd&&!rdRO(rdv))rdPick(b.dataset.f);return true}
@@ -2853,4 +2892,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="208"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="209"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
