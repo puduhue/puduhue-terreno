@@ -1796,10 +1796,11 @@ function rdSinPago(todas){const L=[],sd=[],C=todas.filter(r=>r.estado==="contabi
   L.sort(ord);sd.sort((a,b)=>String(a.contab&&a.contab.fecha||"").localeCompare(String(b.contab&&b.contab.fecha||"")));
   const listo=!!FD.t||!C.length; /* sin contabilizadas no hay nada que revisar */
   return{L,sd,total:L.reduce((t,x)=>t+(x.g.falta||0),0),listo,err:listo||FD.cargando?null:FD.errT||(navigator.onLine===false?"Sin señal: no se pueden revisar los pagos en Finnegans.":null)}}
-function rdSinPagoBarra(SP,F){
-  const est=SP.listo?`<b>${SP.L.length}</b><span>${SP.L.length===1?"contabilizada sin pago registrado":"contabilizadas sin pago registrado"}${SP.L.length?` · ${fmtP(SP.total)} por pagar`:""}</span>`
-    :SP.err?`<b>–</b><span>${esc(SP.err)}</span>`:`<b>…</b><span>Revisando pagos en Finnegans…</span>`;
-  return `<div class="rdcpago${SP.listo&&SP.L.length?" hay":""}"><button class="rdcpb" data-a="rdContF" data-f="pago" aria-pressed="${F==="pago"}" ${SP.listo?"":"disabled"}>${est}</button>${SP.err?`<button class="btn" data-a="rdPagosReint">Reintentar</button>`:""}</div>`}
+/* v210: «Pagos pendientes», primera herramienta de Contabilidad, a lo ancho (reemplaza al recuadro de la v209) */
+const RDP_ICO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>';
+function rdSinPagoCard(SP,F){const n=SP.L.length;
+  const sub=SP.listo?(n?`${n} sin pago · ${fmtP(SP.total)} por pagar`:"Todas tienen su pago registrado"):SP.err?`${SP.err} Toca para reintentar.`:"Revisando pagos en Finnegans…";
+  return `<button class="rdherr rdpagos${SP.err?" err":""}" data-a="${SP.err?"rdPagosReint":"rdContF"}" data-f="pago" aria-pressed="${F==="pago"}"><span class="rdherri">${RDP_ICO}</span><span class="rdpt"><span>Pagos pendientes</span><span class="rdps">${esc(sub)}</span></span>${SP.listo&&n?`<span class="rdpn" aria-label="${n} sin pago">${n}</span>`:""}<svg class="rdpv" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>`}
 function rdSinPagoHTML(SP){
   if(!SP.listo)return `<h2>Contabilizadas sin pago registrado</h2><div class="empty">${SP.err?esc(SP.err):"Revisando pagos en Finnegans…"}</div>`;
   return `<h2>Contabilizadas sin pago registrado<span class="cnt">${SP.L.length}</span></h2>
@@ -1849,8 +1850,8 @@ function renderRD(){
     const cel=([k,n,t])=>`<button class="rdcr${n?"":" cero"}" data-a="rdContF" data-f="${k}" aria-pressed="${F===k}"><b>${n}</b><span>${t}</span></button>`;
     const resHTML=`<section class="rdcres" aria-label="Rendiciones enviadas, por paso"><div class="rdcg"><p class="rdcgh">Esperan a otros</p><div class="rdcgl">${RES.slice(0,2).map(cel).join("")}</div></div><div class="rdcg acc"><p class="rdcgh">Contabilidad</p><div class="rdcgl">${RES.slice(2).map(cel).join("")}</div></div></section>${F?`<p class="rdcfil">Solo «${esc((RES.find(x=>x[0]===F)||[])[2]||"").toLowerCase()}» · <button class="lnk" data-a="rdContF" data-f="">Ver todas</button></p>`:""}`;
     const SP=rdSinPago(todas); /* v209 */
-    body=`${resHTML}${rdSinPagoBarra(SP,F)}${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
-    <nav class="rdherrs" aria-label="Herramientas de Contabilidad">${RDCT.map(([a,ico,t])=>`<button class="rdherr" data-a="${a}"${a==="rdXlsxMes"?` data-p="${periodoActual()}"`:""}><span class="rdherri">${ico}</span><span>${t}</span></button>`).join("")}</nav>
+    body=`${resHTML}${!MAE?`<div class="info netbox"><b>Faltan los maestros contables.</b> Cárgalos en «Maestros contables» para validar cuentas, productos y proveedores, y para que cada persona tenga su jefatura.</div>`:""}
+    <nav class="rdherrs" aria-label="Herramientas de Contabilidad">${rdSinPagoCard(SP,F)}${RDCT.map(([a,ico,t])=>`<button class="rdherr" data-a="${a}"${a==="rdXlsxMes"?` data-p="${periodoActual()}"`:""}><span class="rdherri">${ico}</span><span>${t}</span></button>`).join("")}</nav>
     ${PC.length&&(ve("rev")||F==="apr")?`<h2>Por crear en Finnegans<span class="cnt">${PC.length}</span></h2><div class="info" style="border-left:5px solid var(--act)">Créalos en Finnegans con este RUT; la app los detecta sola. Mientras tanto se pueden aprobar, pero su Excel espera.<ul>${PC.map(x=>`<li><b>${esc(x.nombre)}</b> · RUT ${esc(x.rut)} · ${esc(x.tipo)} · rendición de ${esc([...x.quien].filter(Boolean).join(", "))}</li>`).join("")}</ul></div><div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Ya los creé: revisar en Finnegans"}</button></div>`:""}
     ${F==="pago"?rdSinPagoHTML(SP):""}
     ${ve("rev")?`<h2>Revisión contable<span class="cnt">${rev.length}</span></h2><div class="list">${rev.map(r=>rdCard(r,"cont")).join("")||`<div class="empty">No hay rendiciones esperando revisión contable.</div>`}</div>`:""}
@@ -2892,4 +2893,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="209"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="210"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
