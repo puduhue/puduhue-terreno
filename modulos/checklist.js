@@ -1299,7 +1299,9 @@ async function clCarpeta(segs,tipo){
   return parent;
 }
 const carpetaVisita=v=>[v.predio,`${v.fecha} Visita ${esc(v.n)}`];
-async function clSubir(segs,name,blob,type,tipo){const folder=await clCarpeta(segs,tipo);if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+async function clSubir(segs,name,blob,type,tipo){
+  if(rolesSrv().odMods){const s=await odPedir("/od/mod/subida",{mod:"cl",tipo:tipo||"visitas",ruta:segs,nombre:name});return subirPorSesion(s,blob)} /* v213: el servidor abre la carga */
+  const folder=await clCarpeta(segs,tipo);if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
 function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   const vs=validas(p,tipo).filter(v=>v.estado==="cerrada");const wb=XLSX.utils.book_new();const anul=visitasDe(p,tipo).filter(v=>v.anulada);
   const H=hallazgos(p,tipo);
@@ -1476,4 +1478,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="212"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="213"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

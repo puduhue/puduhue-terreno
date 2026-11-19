@@ -1,18 +1,21 @@
 /*
   v212: los demás módulos también guardan por el servidor (plan «que solo el servidor escriba», etapa 3; Benja la sumó el
   19-11-2026, junto con la etapa 4, para que al final la app no necesite el permiso Files.ReadWrite.All). Primero Stock y
-  Control de bodega; Check list y Actas se suman después en MODS, con las mismas rutas.
+  Control de bodega; desde la v213, Check list (visitas, bodegas, camionetas y casas de huéspedes, y su catálogo); Actas se
+  suma después en MODS, con las mismas rutas.
   ----------------------------------------------------------------------------------------------------------------------------
   Igual que Rendiciones (rendod.js): la app combina en el teléfono (eTag, If-Match) y el servidor revisa quién pide y escribe con
   su credencial. Las reglas siguen OD_MODO («aviso»: anota y deja pasar; «bloquear»: 403); lo que está fuera del módulo (rutas,
   nombres o tipos de archivo) se rechaza siempre (400).
     POST /od/reg        { col, op: put|delete|conflicto, id, datos, ifMatch, nombre... } → { ok, eTag }   (un registro de _datos)
-    POST /od/mod/subida { mod, ruta: [carpetas desde la raíz del módulo], nombre }     → { ok, uploadUrl } (sesión de carga)
+    POST /od/mod/subida { mod, tipo, ruta: [carpetas desde la raíz], nombre }          → { ok, uploadUrl } (sesión de carga)
+                        (tipo: en Check list, la carpeta de cada check list: visitas, bodega, camionetas o huespedes)
     POST /od/mod/json   { mod, datos, ifMatch }                                         → { ok, eTag }   (stock.json)
     POST /od/mod/borrar { id }                                                          → { ok }         (una foto o archivo de un módulo)
   Quién puede: el administrador, todo. Los demás, según «Permisos por persona» (Apps de terreno/_config/Permisos_app.json, que
   el servidor lee con su credencial, como la app: por correo y, si no está, por los otros correos de su ficha de colaborador):
-  «agregar» guarda; «ver» o «no», no. En Stock (solo se ve) basta con no tener «no». Interruptor: OD_MODS = "no" → /yo dice
+  «agregar» guarda; «ver» o «no», no. En Stock (solo se ve) basta con no tener «no». El catálogo del check list
+  (Check list de visitas/_config/Catalogo_check_list.xlsx), solo el administrador. Interruptor: OD_MODS = "no" → /yo dice
   odMods: false y la app vuelve a escribir directo.
 */
 import { odConfig, graphApp } from "./onedrive.js";
@@ -21,6 +24,11 @@ import { idHijo, odRendActivo, odModo, anotarAviso, maestrosSrv, correosDe } fro
 export const MODS = {
   cb: { nombre: "Control de bodega", col: "conteos", root: "01RAJ2KQFXDFLPDNY2IJCIZ3BGSVPF74IH", ext: /\.(jpe?g|png|webp|heic|pdf|xlsx)$/i, prof: 3 },
   stock: { nombre: "Stock", root: "01RAJ2KQF2KBOXTJBS5VAJHLQZVCLBOCZ6", datos: "01RAJ2KQEA4AYAJGRSLVBI4JELXKHFCDUH", archivo: "stock.json", soloVer: true, ext: /^Stock_Finnegans\.xlsx$/, prof: 0 },
+  /* v213: los registros de los cuatro check list están en «Check list de visitas»/_datos; los archivos, en la carpeta de cada uno
+     (camionetas y casas de huéspedes se buscan por nombre junto a la de visitas, como clRaiz en la app) */
+  cl: { nombre: "Check list de cumplimiento", col: "visitas", root: "01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS", ext: /\.(jpe?g|png|webp|heic|pdf|xlsx)$/i, prof: 3,
+    tipos: { visitas: { root: "01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS" }, bodega: { root: "01RAJ2KQCDFWQKAL4FGVGIAV7CDLCSWXQW" }, camionetas: { carpeta: "Camionetas" }, huespedes: { carpeta: "Casas de huéspedes" } },
+    especiales: [{ tipo: "visitas", ruta: ["_config"], nombre: "Catalogo_check_list.xlsx", soloAdmin: "el catálogo del check list lo cambia solo el administrador" }] },
 };
 const MOD_DE_COL = Object.fromEntries(Object.entries(MODS).filter(([, m]) => m.col).map(([k, m]) => [m.col, k]));
 export const odModsActivo = env => odRendActivo(env) && String(env.OD_MODS || "").toLowerCase() !== "no";
@@ -61,9 +69,12 @@ export function revisarMod(P, mod, correos, quien) {
   if (m.soloVer) return p === "no" ? [`no tiene acceso a ${m.nombre}`] : [];
   return p === "agregar" ? [] : [p === "ver" ? `en ${m.nombre} solo puede ver` : `no tiene acceso a ${m.nombre}`];
 }
-/* qué archivo es: { error } (400) o null */
-export function revisarArchivo(mod, ruta, nombre) {
+/* qué archivo es: { error } (400), { especial } (un archivo fijo del módulo, con su regla) o null */
+export function revisarArchivo(mod, ruta, nombre, tipo) {
   const m = MODS[mod]; if (!m) return { error: "Módulo no válido." };
+  if (m.tipos && !m.tipos[tipo || "visitas"]) return { error: "Tipo de check list no válido." };
+  const esp = (m.especiales || []).find(e => e.tipo === (tipo || "visitas") && e.nombre === nombre && JSON.stringify(e.ruta) === JSON.stringify(ruta));
+  if (esp) return { especial: esp };
   if (!Array.isArray(ruta) || ruta.length > m.prof || !ruta.every(RUTA_OK)) return { error: "Carpeta no válida." };
   if (!RUTA_OK(nombre) || nombre.length > 150 || nombre.toLowerCase().endsWith(".json")) return { error: "Nombre de archivo no válido." };
   if (!m.ext.test(nombre)) return { error: "Tipo de archivo no permitido en este módulo." };
@@ -73,8 +84,18 @@ export function revisarArchivo(mod, ruta, nombre) {
 
 /* ---------- carpetas ---------- */
 const CARP = {}; let DATOS = {};
-async function carpetaMod(env, mod, segs) {
-  let p = MODS[mod].root, k = mod;
+/* v213: la raíz de los archivos de un módulo (en Check list, la de cada tipo) */
+async function raizMod(env, mod, tipo, crear = true) {
+  const m = MODS[mod]; if (!m.tipos) return m.root;
+  const t = m.tipos[tipo || "visitas"]; if (t.root) return t.root;
+  const k = "raiz:" + mod + ":" + tipo; if (CARP[k]) return CARP[k];
+  const c = odConfig(env), q = await graphApp(env, `/drives/${encodeURIComponent(c.drive)}/items/${m.tipos.visitas.root}?$select=id,parentReference`);
+  if (!q.ok) throw { status: 502, error: `No se encontró la carpeta de los check list (${q.status}).` };
+  const padre = ((await q.json()).parentReference || {}).id; if (!padre) throw { status: 502, error: "No se encontró la carpeta de los check list." };
+  return CARP[k] = await idHijo(env, padre, t.carpeta, crear);
+}
+async function carpetaMod(env, mod, segs, tipo) {
+  let p = await raizMod(env, mod, tipo), k = mod + ":" + (tipo || "");
   for (const s of segs) { k += "/" + s; p = CARP[k] || (CARP[k] = await idHijo(env, p, s, true)); }
   return p;
 }
@@ -128,10 +149,11 @@ export async function rutasModulos(req, env, ctx, url, { correo, json, autorizad
       const it = await r.json(); return json({ ok: true, eTag: it.eTag, id: it.id });
     }
     if (url.pathname === "/od/mod/subida") {
-      const mod = String(b.mod || ""), ruta = b.ruta || [], arch = String(b.nombre || "");
-      const v = revisarArchivo(mod, ruta, arch); if (v) return json({ error: v.error }, 400);
-      const no = await anotarOBloquear(env, ctx, avisos, json, { op: `${mod}:subida`, id: ruta.concat([arch]).join("/"), correo, reglas: revisarMod(P, mod, correos, quien) }); if (no) return no;
-      const carpeta = await carpetaMod(env, mod, ruta);
+      const mod = String(b.mod || ""), ruta = b.ruta || [], arch = String(b.nombre || ""), tipo = MODS[mod] && MODS[mod].tipos ? String(b.tipo || "visitas") : "";
+      const v = revisarArchivo(mod, ruta, arch, tipo); if (v && v.error) return json({ error: v.error }, 400);
+      const reglas = v && v.especial && v.especial.soloAdmin ? (quien.admin ? [] : [v.especial.soloAdmin]) : revisarMod(P, mod, correos, quien);
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: `${mod}:subida`, id: (tipo ? [tipo] : []).concat(ruta, [arch]).join("/"), correo, reglas }); if (no) return no;
+      const carpeta = await carpetaMod(env, mod, ruta, tipo);
       const r = await graphApp(env, `/drives/${d}/items/${carpeta}:/${encodeURIComponent(arch)}:/createUploadSession`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ item: { "@microsoft.graph.conflictBehavior": "replace" } }) });
       if (!r.ok) { if (r.status === 404) odOlvidarPermisos(); return json({ error: `OneDrive no abrió la carga (${r.status}).`, status: r.status }, 502); }
       const s = await r.json(); return json({ ok: true, uploadUrl: s.uploadUrl, vence: s.expirationDateTime });
@@ -153,15 +175,19 @@ export async function rutasModulos(req, env, ctx, url, { correo, json, autorizad
       if (r.status === 404) return json({ ok: true, yaNoEstaba: true });
       if (!r.ok) return json({ error: `No se pudo leer el archivo (${r.status}).`, status: r.status }, 502);
       const it = await r.json();
-      /* sube por las carpetas, por id, hasta la raíz de un módulo (como máximo 4 niveles) */
-      const raices = Object.fromEntries(Object.entries(MODS).map(([k, m]) => [m.root, k]));
-      let mod = null, pid = (it.parentReference || {}).id, segs = [];
+      /* sube por las carpetas, por id, hasta la raíz de un módulo (como máximo 4 niveles); en Check list, la de cada tipo */
+      const raices = {};
+      for (const [k, m] of Object.entries(MODS)) {
+        if (!m.tipos) { raices[m.root] = [k, ""]; continue; }
+        for (const t of Object.keys(m.tipos)) { try { raices[await raizMod(env, k, t, false)] = [k, t]; } catch (e) {} }
+      }
+      let mod = null, tipo = "", pid = (it.parentReference || {}).id, segs = [];
       for (let i = 0; i < 5 && pid && !mod; i++) {
-        if (raices[pid]) { mod = raices[pid]; break; }
+        if (raices[pid]) { [mod, tipo] = raices[pid]; break; }
         const q = await graphApp(env, `/drives/${d}/items/${pid}?$select=id,name,parentReference`); if (!q.ok) break;
         const p = await q.json(); segs.unshift(p.name); pid = (p.parentReference || {}).id;
       }
-      if (it.folder || !mod || segs.some(s => String(s).startsWith("_")) || revisarArchivo(mod, segs, it.name)) return json({ error: "Solo se eliminan fotos o archivos de un módulo." }, 400);
+      if (it.folder || !mod || segs.some(s => String(s).startsWith("_")) || revisarArchivo(mod, segs, it.name, tipo)) return json({ error: "Solo se eliminan fotos o archivos de un módulo." }, 400);
       const no = await anotarOBloquear(env, ctx, avisos, json, { op: `${mod}:borrar`, id: segs.concat([it.name]).join("/"), correo, reglas: revisarMod(P, mod, correos, quien) }); if (no) return no;
       r = await graphApp(env, `/drives/${d}/items/${id}`, { method: "DELETE" });
       if (!r.ok && r.status !== 404) return json({ error: `OneDrive no eliminó el archivo (${r.status}).`, status: r.status }, 502);
