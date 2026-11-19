@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-oQYgg9igwMH2UvKlaqBtB3fOuBJNJgffUg2QHUM7aHU=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-5uT2d6Z8NyWICbkc7tAI6Iqr/4BkZRfAGKh9yz2jFJ4=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -2092,7 +2092,7 @@ document.addEventListener("input",ev=>{
   if(t.dataset.sn){cur.firmas[t.dataset.sn]=Object.assign(cur.firmas[t.dataset.sn]||{},{nombre:t.value});firmaNombreCambio(cur.firmas[t.dataset.sn]);touch();updateClose();return}
 });
 document.addEventListener("change",ev=>{
-  const t=ev.target;if(view==="axe"){axChange(ev);return}if(view==="rdv"||view==="rdd"||view==="rdm"){rdChange(ev);return}if(view==="cbv"){cbChange(ev);return}if(view==="stock"&&t.dataset.sk){stkInput(ev);return}if(view==="clcat"){catInput(ev);return}if(view==="clv"){clChange(ev);return}if(!cur||ro())return;
+  const t=ev.target;if(view==="axe"){axChange(ev);return}if(view==="rdv"||view==="rdd"||view==="rdm"){rdChange(ev);return}if(view==="cbv"){cbChange(ev);return}if(view==="stock"&&t.dataset.sk){stkInput(ev);return}if(view==="clcat"){catInput(ev);return}if(view==="clv"){clChange(ev);return}if(view==="clrk"){rkChange(ev);return}if(!cur||ro())return;
   if(t.dataset.nf){const f=Object.assign(cur.firmas.trabajador||{},{noFirmo:t.checked});if(!t.checked)delete f.motivo;if(!f.nombre)f.nombre=cur.trabajador||"";cur.firmas.trabajador=f;touch();const keep=window.scrollY;render();window.scrollTo(0,keep);return}
   if(t.dataset.foto){const files=[...t.files];t.value="";addFotos(cur,t.dataset.foto,files);return}
   if(t.dataset.f==="rut"){cur.rut=rutFmt(t.value);t.value=cur.rut;const e=$("#rutErr");if(e)e.textContent=cur.rut&&!rutOk(cur.rut)?"El RUT no es válido. Revisa el dígito verificador.":"";touch()}

@@ -576,27 +576,42 @@ function renderCL(){
    ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más que una con pocos.
    Pantalla «clrk» (desde el inicio del Check list y desde cada lista), informe PDF y Excel. Las visitas anuladas y las que
    siguen en curso no cuentan. */
-let rkTipo="visitas",rkPer="todo",rkVolver="clHub",clPVolver=null;
-const RK_PER=[["todo","Desde el inicio"],["anio","Este año"],["90","Últimos 90 días"]];
-const rkDesde=per=>per==="anio"?today().slice(0,4)+"-01-01":per==="90"?sumarDias(today(),-90):"";
-const rkPerTxt=(per,R)=>per==="anio"?`Año ${today().slice(0,4)}`:per==="90"?"Últimos 90 días":`Desde el inicio${R&&R.desde?` (${fmtD(R.desde)})`:""}`;
+let rkTipo="visitas",rkPer="todo",rkVolver="clHub",clPVolver=null,rkMD="",rkMH="";
+/* período: [clave, texto largo, texto del botón]; «Meses» (pedido de Benja): de un mes a otro, elegidos en dos listas */
+const RK_PER=[["todo","Desde el inicio","Todo"],["anio","Este año","Este año"],["90","Últimos 90 días","90 días"],["meses","Elegir meses","Meses"]];
+const RK_MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const rkMesTxt=k=>RK_MES[+k.slice(5,7)-1]+" "+k.slice(0,4);
+/* meses que se pueden elegir: desde el de la primera visita cerrada de ese check list hasta el mes actual */
+function rkMesesDisp(tipo){
+  const f=Object.values(VIS).filter(v=>v&&!v.anulada&&v.estado==="cerrada"&&tipoDe(v)===tipo&&/^\d{4}-\d\d/.test(String(v.fecha||""))).map(v=>String(v.fecha).slice(0,7)).sort();
+  const b=today().slice(0,7);let a=f[0]&&f[0]<b?f[0]:b;const L=[];
+  while(a<=b&&L.length<240){L.push(a);let y=+a.slice(0,4),m=+a.slice(5,7)+1;if(m>12){m=1;y++}a=`${y}-${String(m).padStart(2,"0")}`}
+  return L}
+/* rango de fechas del período (desde y hasta inclusive, AAAA-MM-DD; vacío = sin límite) */
+function rkRango(per,tipo){
+  if(per==="anio")return{desde:today().slice(0,4)+"-01-01",hasta:""};
+  if(per==="90")return{desde:sumarDias(today(),-90),hasta:""};
+  if(per==="meses"){const L=rkMesesDisp(tipo);let d=L.includes(rkMD)?rkMD:L[Math.max(0,L.length-3)],h=L.includes(rkMH)?rkMH:L[L.length-1];if(d>h){const t=d;d=h;h=t}
+    return{desde:d+"-01",hasta:h+"-31",md:d,mh:h,L}}
+  return{desde:"",hasta:""}}
+const rkPerTxt=(per,R)=>{const g=R&&R.rg||{};return per==="anio"?`Año ${today().slice(0,4)}`:per==="90"?"Últimos 90 días":per==="meses"&&g.md?(g.md===g.mh?rkMesTxt(g.md):`De ${rkMesTxt(g.md)} a ${rkMesTxt(g.mh)}`):`Desde el inicio${R&&R.desde?` (${fmtD(R.desde)})`:""}`};
 const rkNum=x=>x===null||x===undefined?"–":(Math.round(x*10)/10).toLocaleString("es-CL",{minimumFractionDigits:1,maximumFractionDigits:1});
 const rkTipos=()=>clHubVer().map(x=>x[0]);
 const RK_CORTO={visitas:"Predios",bodega:"Bodegas",camionetas:"Camionetas",huespedes:"Casas"};
 const rkFc=f=>{const t=fmtD(f);return t.length===10?t.slice(0,6)+t.slice(8):t}; /* 19-11-26 */
-const RK_MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const rkFcH=f=>`<span class="rknw">${esc(rkFc(f))}</span>`; /* en pantalla, sin cortar la fecha en el guion */
 const RK_ICO=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5.5a4 4 0 0 1-8 0V4z"/><path d="M8 6.5H5.2v1.2A3.3 3.3 0 0 0 8.4 11M16 6.5h2.8v1.2a3.3 3.3 0 0 1-3.2 3.3M12 13.5V17M9 20h6M10 17h4v3h-4z"/></svg>`;
-function rkUnidad(u,tipo,desde){
-  const vs=validas(u,tipo).filter(v=>v.estado==="cerrada"&&(!desde||String(v.fecha||"")>=desde));
+function rkUnidad(u,tipo,rg){
+  const vs=validas(u,tipo).filter(v=>{const f=String(v.fecha||"");return v.estado==="cerrada"&&(!rg.desde||f>=rg.desde)&&(!rg.hasta||f<=rg.hasta)});
   let s=0,n=0;const L=vs.map(v=>{const p=puntaje(v);s+=p.s;n+=p.n;return{id:v.id,n:v.n,fecha:v.fecha,revisor:v.revisor||"",pct:p.pct,s:p.s,nn:p.n}});
   const C=L.filter(x=>x.pct!==null),ult=C[C.length-1]||null,ant=C[C.length-2]||null,pri=C[0]||null;
   return{u,vis:L,s,n,acc:n?s/n*100:null,ult,ant,pri,dif:ult&&ant?ult.pct-ant.pct:null,mejora:ult&&pri&&C.length>1?ult.pct-pri.pct:null,
     mejor:C.length?Math.max(...C.map(x=>x.pct)):null,peor:C.length?Math.min(...C.map(x=>x.pct)):null,ha:abiertos(u,tipo).length};
 }
 function rkDatos(tipo,per){
-  const desde=rkDesde(per),U=new Set(unidadesCL(tipo));
+  const rg=rkRango(per,tipo),U=new Set(unidadesCL(tipo));
   Object.values(VIS).forEach(v=>{if(v&&!v.anulada&&v.estado==="cerrada"&&tipoDe(v)===tipo&&v.predio)U.add(v.predio)});
-  const all=[...U].map(u=>rkUnidad(u,tipo,desde));
+  const all=[...U].map(u=>rkUnidad(u,tipo,rg));
   const con=all.filter(x=>x.acc!==null).sort((a,b)=>(b.acc-a.acc)||((b.ult?b.ult.pct:0)-(a.ult?a.ult.pct:0))||a.u.localeCompare(b.u,"es"));
   let pos=0,prev=null;con.forEach((x,i)=>{const r=Math.round(x.acc*10);if(r!==prev){pos=i+1;prev=r}x.pos=pos});
   const sin=all.filter(x=>x.acc===null).map(x=>x.u).sort((a,b)=>a.localeCompare(b,"es"));
@@ -605,7 +620,7 @@ function rkDatos(tipo,per){
   const meses=Object.values(M).sort((a,b)=>a.k.localeCompare(b.k)).map(m=>Object.assign(m,{pct:m.n?m.s/m.n*100:null}));
   const fechas=V.map(v=>v.fecha).filter(Boolean).sort();
   const mej=con.filter(x=>x.mejora!==null&&x.mejora>0).sort((a,b)=>b.mejora-a.mejora)[0]||null;
-  return{tipo,per,con,sin,gen:N?S/N*100:null,nv:V.length,V,meses,desde:fechas[0]||"",hasta:fechas[fechas.length-1]||"",mej,
+  return{tipo,per,rg,con,sin,gen:N?S/N*100:null,nv:V.length,V,meses,desde:fechas[0]||"",hasta:fechas[fechas.length-1]||"",mej,
     bajo:con.filter(x=>Math.round(x.acc)<80).length,sobre:con.filter(x=>Math.round(x.acc)>=90).length};
 }
 /* tarjeta de acceso (inicio del Check list y cada lista) */
@@ -622,7 +637,7 @@ function rkFila(x){
   const c=semColor(Math.round(x.acc)),nv=x.vis.length,d=x.dif;
   const tr=d===null?"":`<span class="rktr ${d>0?"sube":d<0?"baja":"igual"}" title="Última visita comparada con la anterior">${d>0?"↑":d<0?"↓":"="} ${d===0?"igual":Math.abs(d)+(Math.abs(d)===1?" pt":" pts")}</span>`;
   return `<button class="rkrow" data-a="clRkPredio" data-p="${esc(x.u)}"><span class="rkpos${x.pos<=3?" p"+x.pos:""}">${x.pos}</span>
-    <span class="rkt"><b>${esc(x.u)}</b><span class="rks">${nv===1?`1 visita · ${rkFc(x.ult.fecha)}`:`${nv} visitas · última ${x.ult.pct} % el ${rkFc(x.ult.fecha)}`}</span>
+    <span class="rkt"><b>${esc(x.u)}</b><span class="rks">${nv===1?`1 visita · ${rkFcH(x.ult.fecha)}`:`${nv} visitas · última ${x.ult.pct} % el ${rkFcH(x.ult.fecha)}`}</span>
       <span class="rkbar" aria-hidden="true"><i class="${c}" style="width:${Math.max(2,Math.min(100,x.acc)).toFixed(1)}%"></i></span>${rkVisChips(x)}</span>
     <span class="rkp"><b class="${c}">${rkNum(x.acc)}<small> %</small></b>${tr}</span></button>`;
 }
@@ -639,11 +654,13 @@ function rkMesesHTML(meses){
 }
 function renderCLRank(){
   const T=rkTipos().includes(rkTipo)?rkTipo:"visitas",K=CLK[T],R=rkDatos(T,rkPer),tipos=rkTipos();
-  const per=`<div class="smord rkper" role="group" aria-label="Período">${RK_PER.map(([k,t])=>`<button data-a="clRkPer" data-o="${k}" aria-pressed="${k===rkPer}">${t}</button>`).join("")}</div>`;
+  const g=R.rg,op=(L,v)=>L.map(k=>`<option value="${esc(k)}"${k===v?" selected":""}>${esc(rkMesTxt(k))}</option>`).join("");
+  const per=`<div class="smord rkper" role="group" aria-label="Período">${RK_PER.map(([k,t,c])=>`<button data-a="clRkPer" data-o="${k}" aria-pressed="${k===rkPer}" title="${esc(t)}">${c}</button>`).join("")}</div>${rkPer==="meses"&&g.L?`<div class="rkmeses">
+      <div class="f"><label for="rkMD">Desde</label><select id="rkMD" data-rk="md">${op(g.L,g.md)}</select></div><div class="f"><label for="rkMH">Hasta</label><select id="rkMH" data-rk="mh">${op(g.L,g.mh)}</select></div></div>`:""}`;
   const sel=tipos.length>1?`<div class="smord rktipo" role="group" aria-label="Check list" style="grid-template-columns:repeat(${tipos.length},minmax(0,1fr))">${tipos.map(t=>`<button data-a="clRkTipo" data-t="${t}" aria-pressed="${t===T}">${esc(RK_CORTO[t]||clNom(t))}</button>`).join("")}</div>`:"";
   const gc=semColor(R.gen===null?null:Math.round(R.gen));
   const hero=R.con.length?`<div class="rkhero"><div class="rkg"><span class="rkgl">Puntaje general</span><b class="${gc}">${rkNum(R.gen)}<small> %</small></b>
-      <span class="rkgs">${R.nv} ${R.nv===1?"visita cerrada":"visitas cerradas"} en ${R.con.length} ${R.con.length===1?K.uni:K.unis}${R.desde?` · ${R.desde===R.hasta?rkFc(R.desde):`${rkFc(R.desde)} al ${rkFc(R.hasta)}`}`:""}</span></div>
+      <span class="rkgs">${R.nv} ${R.nv===1?"visita cerrada":"visitas cerradas"} en ${R.con.length} ${R.con.length===1?K.uni:K.unis}${R.desde?` · ${R.desde===R.hasta?rkFcH(R.desde):`${rkFcH(R.desde)} al ${rkFcH(R.hasta)}`}`:""}</span></div>
       <div class="smres rkres"><div><b class="v">${R.sobre}</b><span>con 90 % o más</span></div><div${R.bajo?' class="rr"':""}><b>${R.bajo}</b><span>bajo 80 %</span></div><div><b>${R.mej?`+${R.mej.mejora}`:"–"}</b><span>${R.mej?`mayor mejora: ${esc(R.mej.u)}`:"mayor mejora"}</span></div></div></div>`:"";
   const lista=R.con.length?`${rkPodio(R.con)}<h2 class="rkh">Ranking</h2>
       <div class="smley"><span><i class="v"></i>90 % o más</span><span><i class="a"></i>80 a 89 %</span><span><i class="r"></i>menos de 80 %</span></div>
@@ -663,6 +680,9 @@ function renderCLRank(){
     <div class="btns rkbtns"><button class="btn pri" data-a="clRkPdf" ${R.con.length?"":"disabled"}>Informe PDF</button><button class="btn" data-a="clRkXlsx" ${R.con.length?"":"disabled"}>Excel</button></div>
   </main>`;
 }
+/* «Meses»: al elegir un mes en «Desde» o «Hasta» (si quedan al revés, el otro se mueve al mismo mes) */
+function rkChange(ev){const t=ev.target;if(!t||!t.dataset||!t.dataset.rk)return;const g=rkRango("meses",rkTipo);let d=g.md,h=g.mh;
+  if(t.dataset.rk==="md"){d=t.value;if(h<d)h=d}else{h=t.value;if(d>h)d=h}rkMD=d;rkMH=h;render()}
 /* Excel: ranking, todas las visitas y el puntaje por mes */
 function rkXlsxBuild(R){
   const K=CLK[R.tipo],U=K.Unis.replace(/s$/,""),wb=XLSX.utils.book_new(),pct=x=>x===null||x===undefined?"":Math.round(x*10)/1000;
@@ -685,7 +705,7 @@ function rkXlsxBuild(R){
   XLSX.utils.book_append_sheet(wb,w3,"Por mes");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
-const rkArchivo=(R,ext)=>`Ranking_check_list_${(RK_CORTO[R.tipo]||R.tipo).toLowerCase()}_${R.per==="todo"?"desde_el_inicio":R.per==="anio"?today().slice(0,4):"90_dias"}_${fmtD(today())}.${ext}`.replace(/[\/\\]/g,"-");
+const rkArchivo=(R,ext)=>`Ranking_check_list_${(RK_CORTO[R.tipo]||R.tipo).toLowerCase()}_${R.per==="todo"?"desde_el_inicio":R.per==="anio"?today().slice(0,4):R.per==="meses"&&R.rg.md?(R.rg.md===R.rg.mh?R.rg.md:R.rg.md+"_a_"+R.rg.mh):"90_dias"}_${fmtD(today())}.${ext}`.replace(/[\/\\]/g,"-");
 async function rkXlsx(){
   const R=rkDatos(rkTipo,rkPer);if(!R.con.length)return;
   const buf=rkXlsxBuild(R);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),rkArchivo(R,"xlsx"),"Excel del ranking listo.");
