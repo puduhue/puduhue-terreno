@@ -11,7 +11,8 @@
   502/503 (OneDrive o la credencial). El cuerpo de error trae { error, status }.
 
   Reglas (comparando la versión que está en OneDrive con la nueva; las aplica revisarRendicion):
-    - El administrador y Contabilidad pueden todo, salvo aprobar o contabilizar su propia rendición (solo el administrador).
+    - El administrador y Contabilidad pueden todo, salvo aprobar o contabilizar su propia rendición (solo el administrador; v211:
+      también Contabilidad si maestros.json trae autoCont.on, «Contabilidad revisa sus propias rendiciones»).
     - Quien rinde (su cuenta, el correo de la persona o los correos de su ficha por RUT) cambia lo que quiera mientras está en
       borrador o devuelta, y la envía: a la jefatura que dice la lista de colaboradores (no a otra) o, si no tiene jefatura, a
       Contabilidad. No puede ponerse aprobaciones ni contabilizarla. Después de enviarla solo puede completar su RUT y el enlace
@@ -123,8 +124,11 @@ export function revisarRendicion(M, antes, despues, quien) {
   if (antes && !histCrece(antes, despues) && !quien.contab) v.push("el historial no puede borrarse ni cambiarse");
   if (dueno) {
     const ks = cambiadas(antes, despues);
-    if (["aprobJef", "aprobCont", "contab"].some(k => ks.includes(k) && despues[k])) v.push("quien rinde no puede ponerse aprobaciones ni contabilizar su propia rendición");
-    if (["aprobada", "contabilizada"].includes(est1) && est1 !== est0) v.push(`quien rinde no puede pasar su rendición a «${est1}»`);
+    /* v211: con «Contabilidad revisa sus propias rendiciones» (maestros.json autoCont.on), Contabilidad aprueba y contabiliza la suya */
+    const propiaOk = !!(quien.contab && M && M.autoCont && M.autoCont.on);
+    const prohibidas = propiaOk ? ["aprobJef"] : ["aprobJef", "aprobCont", "contab"];
+    if (prohibidas.some(k => ks.includes(k) && despues[k])) v.push("quien rinde no puede ponerse aprobaciones ni contabilizar su propia rendición");
+    if (!propiaOk && ["aprobada", "contabilizada"].includes(est1) && est1 !== est0) v.push(`quien rinde no puede pasar su rendición a «${est1}»`);
     if (!antes || ["borrador", "observada"].includes(est0)) {
       if (despues.anulada && !(antes && antes.anulada)) { if (!quien.contab) v.push("quien rinde no puede anular su rendición"); }
       if (!["borrador", "observada", "enviada", "revcont"].includes(est1)) v.push(`estado no permitido al enviar: «${est1}»`);
