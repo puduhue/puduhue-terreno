@@ -2421,3 +2421,23 @@ details>*{box-sizing:border-box}
 .rkmeses select{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-height:42px}
 @media (min-width:1100px){body.conlat .rkmeses{max-width:520px}}
 .rknw{white-space:nowrap}
+
+/* v206: «Qué se revisa» en el ranking */
+.rksub{font-size:14px;color:var(--muted);margin:4px 2px 10px;line-height:1.4}
+.rkareas{display:flex;flex-direction:column;gap:8px}
+.rkar{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.rkar>summary{display:flex;align-items:center;gap:12px;padding:12px;cursor:pointer;list-style:none}
+.rkar>summary::-webkit-details-marker{display:none}
+.rkar>summary::after{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--act);border-bottom:2px solid var(--act);transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .2s}
+.rkar[open]>summary::after{transform:rotate(-135deg);margin:4px 4px 0 0}
+.rkat{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.rkat b{font-size:16px;color:var(--ink)}
+.rkat>span:not(.rkbar){font-size:13px;color:var(--muted);line-height:1.35}
+.rkap{flex:none;font-size:18px;font-weight:800;min-width:52px;text-align:right}
+.rkap.v{color:var(--sm-v)}.rkap.a{color:var(--sm-a-ink)}.rkap.r{color:var(--sm-r)}.rkap.n{color:var(--muted)}
+.rkai{border-top:1px solid var(--line);padding:4px 12px 10px}
+.rkag{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.rkai ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.rkai li{font-size:14px;line-height:1.4;color:var(--ink);display:flex;gap:8px}
+.rkcod{flex:none;font-size:12px;font-weight:700;color:var(--act);min-width:42px;padding-top:1px}
+@media (prefers-reduced-motion:reduce){.rkar>summary::after{transition:none}}

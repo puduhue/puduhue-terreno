@@ -652,6 +652,28 @@ function rkMesesHTML(meses){
     <div class="evb">${L.map(m=>{const p=m.pct===null?null:Math.round(m.pct),k=semColor(p),mm=RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):"");
       return `<div class="evc" role="img" aria-label="${mm}: ${p===null?"sin puntaje":p+" %"}, ${m.c} ${m.c===1?"visita":"visitas"}"><span class="evp ${k}">${p===null?"–":p}</span><span class="evr"><i class="${esc(k)}" style="height:${alto(p)}%"></i></span><span class="evn">${mm}</span></div>`}).join("")}</div></div>`;
 }
+/* v206: «Qué se revisa» en el ranking (pedido de Benja, 19-11-2026: que quien vea el ranking entienda qué se está revisando, con un
+   mini resumen de cada área: Oficina, Sala de ordeña…). Áreas del catálogo activo de ese check list, con sus puntos y sus grupos, y
+   el cumplimiento de todas las visitas del período en cada área (Cumple 1, Parcial 0,5, No cumple 0; N/A no cuenta). En San
+   Francisco los puntos están en la sección «Predio» pero cuentan en su área de origen (areaOrig). */
+const rkMin=(t,i)=>i&&!/^[A-ZÁÉÍÓÚÑ]{2}/.test(t)?t.charAt(0).toLowerCase()+t.slice(1):t; /* «Seguridad y EPP» → «seguridad y EPP» */
+function rkAreas(R){
+  const M={},orden=AREAS.map(a=>a.id);
+  catalogoActivo().filter(i=>enTipo(R.tipo,i.area)).forEach(i=>{const a=M[i.area]||(M[i.area]={id:i.area,nom:AREA_NAME[i.area]||i.areaName||i.area,n:0,grupos:[],items:[],s:0,e:0});
+    a.n++;a.items.push(i);if(i.group&&!a.grupos.includes(i.group))a.grupos.push(i.group)});
+  R.V.forEach(x=>{const v=VIS[x.id];if(!v)return;itemsDe(v).forEach(it=>{const a=M[it.areaOrig||it.area],r=v.items&&v.items[it.key];if(!a||!r||!r.e||r.e==="NA")return;a.s+=SCORE[r.e];a.e++})});
+  return Object.values(M).filter(a=>a.n).sort((a,b)=>orden.indexOf(a.id)-orden.indexOf(b.id)).map(a=>Object.assign(a,{pct:a.e?a.s/a.e*100:null,
+    resumen:a.grupos.map((g,i)=>rkMin(g,i)).join(", ")}));
+}
+function rkAreasHTML(R){
+  const A=rkAreas(R);if(!A.length)return"";const T=A.reduce((t,a)=>t+a.n,0);
+  return `<h2 class="rkh">Qué se revisa</h2>
+    <p class="rksub">El check list tiene ${T} puntos en ${A.length} ${A.length===1?"área":"áreas"} (los que no aplican se marcan N/A y no cuentan). El porcentaje es el cumplimiento de todas las visitas del período en esa área. Toca un área para ver sus puntos.</p>
+    <div class="rkareas">${A.map(a=>{const p=a.pct===null?null:Math.round(a.pct),c=semColor(p);let g0="";
+      return `<details class="rkar"><summary><span class="rkat"><b>${esc(a.nom)}</b><span>${a.n} ${a.n===1?"punto":"puntos"} · ${esc(a.resumen)}</span>
+        <span class="rkbar" aria-hidden="true">${p===null?"":`<i class="${c}" style="width:${Math.max(2,p)}%"></i>`}</span></span><span class="rkap ${c}">${p===null?"–":p+" %"}</span></summary>
+        <div class="rkai">${a.items.map(it=>{const h=it.group!==g0?`${g0?"</ul>":""}<p class="rkag">${esc(it.group||"")}</p><ul>`:"";g0=it.group;return `${h}<li><span class="rkcod">${esc(codigo(it))}</span>${esc(it.txt)}</li>`}).join("")}</ul></div></details>`}).join("")}</div>`;
+}
 function renderCLRank(){
   const T=rkTipos().includes(rkTipo)?rkTipo:"visitas",K=CLK[T],R=rkDatos(T,rkPer),tipos=rkTipos();
   const g=R.rg,op=(L,v)=>L.map(k=>`<option value="${esc(k)}"${k===v?" selected":""}>${esc(rkMesTxt(k))}</option>`).join("");
@@ -671,7 +693,7 @@ function renderCLRank(){
   <main class="wrap rkwrap"><div class="pendslot">${slotHTML()}</div>
     <h1>Ranking de cumplimiento</h1>
     <p class="lead">${esc(clNom(T))} · ${esc(rkPerTxt(rkPer,R))}</p>
-    ${sel}${per}${hero}${lista}${rkMesesHTML(R.meses)}${sin}
+    ${sel}${per}${hero}${lista}${rkAreasHTML(R)}${rkMesesHTML(R.meses)}${sin}
     <details class="info rkcomo"><summary><b>¿Cómo se calcula?</b></summary>
       <p>Cada punto revisado vale: <b>Cumple</b> 1, <b>Parcial</b> 0,5 y <b>No cumple</b> 0. Los <b>N/A</b> no cuentan.</p>
       <p>El <b>puntaje a la fecha</b> junta todos los puntos de todas las visitas cerradas del ${esc(K.uni)} en el período: puntos obtenidos dividido por puntos revisados. Es un promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más.</p>
@@ -703,6 +725,14 @@ function rkXlsxBuild(R){
   const w3=XLSX.utils.aoa_to_sheet(r3);w3["!cols"]=[{wch:12},{wch:14},{wch:14}];
   for(let r=1;r<r3.length;r++){const cell=w3[XLSX.utils.encode_cell({r,c:2})];if(cell&&typeof cell.v==="number")cell.z="0.0%"}
   XLSX.utils.book_append_sheet(wb,w3,"Por mes");
+  /* v206: qué se revisa (resumen por área) y todos los puntos */
+  {const A=rkAreas(R);const r4=[["Área","Puntos","Qué incluye","Cumplimiento del período","Puntos evaluados en el período"]];
+    A.forEach(a=>r4.push([a.nom,a.n,a.resumen,a.pct===null?"":Math.round(a.pct*10)/1000,a.e]));
+    const w4=XLSX.utils.aoa_to_sheet(r4);w4["!cols"]=[{wch:24},{wch:8},{wch:70},{wch:14},{wch:14}];
+    for(let r=1;r<r4.length;r++){const cell=w4[XLSX.utils.encode_cell({r,c:3})];if(cell&&typeof cell.v==="number")cell.z="0.0%"}
+    XLSX.utils.book_append_sheet(wb,w4,"Qué se revisa");
+    const r5=[["Área","Grupo","Código","Punto","Cómo verificar"]];A.forEach(a=>a.items.forEach(it=>r5.push([a.nom,it.group||"",codigo(it),it.txt,it.evid||""])));
+    const w5=XLSX.utils.aoa_to_sheet(r5);w5["!cols"]=[{wch:20},{wch:24},{wch:8},{wch:80},{wch:30}];XLSX.utils.book_append_sheet(wb,w5,"Puntos del check list")}
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
 const rkArchivo=(R,ext)=>`Ranking_check_list_${(RK_CORTO[R.tipo]||R.tipo).toLowerCase()}_${R.per==="todo"?"desde_el_inicio":R.per==="anio"?today().slice(0,4):R.per==="meses"&&R.rg.md?(R.rg.md===R.rg.mh?R.rg.md:R.rg.md+"_a_"+R.rg.mh):"90_dias"}_${fmtD(today())}.${ext}`.replace(/[\/\\]/g,"-");
@@ -750,11 +780,23 @@ function rkPdfBuild(R){
     d.setFillColor(236,239,243);d.roundedRect(cx+1.5,yc-3,30,3.6,1,1,"F");d.setFillColor(...COL[c]);d.roundedRect(cx+1.5,yc-3,Math.max(1,30*Math.min(100,x.acc)/100),3.6,1,1,"F");
     d.setFont("helvetica","bold");d.setTextColor(...COL[c]);d.text(rkNum(x.acc)+" %",cx+cR[3].w-1.5,yc,{align:"right"});d.setTextColor(0);d.setFont("helvetica","normal");cx+=cR[3].w;
     d.text(x.ult?`${x.ult.pct} % · ${fmtD(x.ult.fecha).slice(0,5)}`:"-",cx+cR[4].w/2,yc,{align:"center"});cx+=cR[4].w;
-    if(x.dif!==null){d.setTextColor(...(x.dif>0?COL.v:x.dif<0?COL.r:[90,90,90]));d.text(x.dif===0?"igual":(x.dif>0?"+":"-")+Math.abs(x.dif)+" pts",cx+cR[5].w/2,yc,{align:"center"});d.setTextColor(0)}else d.text("-",cx+cR[5].w/2,yc,{align:"center"});cx+=cR[5].w;
+    if(x.dif!==null){d.setTextColor(...(x.dif>0?COL.v:x.dif<0?COL.r:[90,90,90]));d.text(x.dif===0?"igual":(x.dif>0?"+":"-")+Math.abs(x.dif)+(Math.abs(x.dif)===1?" pt":" pts"),cx+cR[5].w/2,yc,{align:"center"});d.setTextColor(0)}else d.text("-",cx+cR[5].w/2,yc,{align:"center"});cx+=cR[5].w;
     d.text(x.mejor===null?"-":`${x.mejor} % / ${x.peor} %`,cx+cR[6].w/2,yc,{align:"center"});
     d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
   if(R.sin.length){y+=3;d.setFont("helvetica","italic");d.setFontSize(8.3);d.setTextColor(90);const l=d.splitTextToSize(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`,W);chk(l.length*3.8+2);d.text(l,L,y+1);y+=l.length*3.8+1;d.setTextColor(0);d.setFont("helvetica","normal")}
   y+=6;
+  /* v206: qué se revisa (área, puntos, qué incluye y cumplimiento del período) */
+  {const A=rkAreas(R);if(A.length){titulo(`Qué se revisa (${A.reduce((t,a)=>t+a.n,0)} puntos en el check list)`);
+    const cw=[38,16,104,22];
+    const th=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.3);d.text("Área",L+1.5,y);d.text("Puntos",L+cw[0]+cw[1]/2,y,{align:"center"});d.text("Qué incluye",L+cw[0]+cw[1]+1.5,y);d.text("Cumplimiento",L+W-cw[3]/2,y,{align:"center"});d.setFont("helvetica","normal");y+=4};
+    th();
+    A.forEach(a=>{d.setFontSize(8.3);const tl=d.splitTextToSize(a.resumen.charAt(0).toUpperCase()+a.resumen.slice(1)+".",cw[2]-3);const h=Math.max(7.5,tl.length*3.7+3.5);if(chk(h))th();const yc=y+4.6;
+      d.setFont("helvetica","bold");d.setFontSize(9);d.text(d.splitTextToSize(a.nom,cw[0]-2)[0],L+1.5,yc);d.setFont("helvetica","normal");d.setFontSize(8.5);d.text(String(a.n),L+cw[0]+cw[1]/2,yc,{align:"center"});
+      d.setFontSize(8.3);d.setTextColor(60);d.text(tl,L+cw[0]+cw[1]+1.5,yc,{lineHeightFactor:1.25});d.setTextColor(0);
+      const p=a.pct===null?null:Math.round(a.pct),k=semColor(p);d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(...COL[k]);d.text(p===null?"-":p+" %",L+W-cw[3]/2,yc,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
+      d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
+    d.setFont("helvetica","italic");d.setFontSize(7.8);d.setTextColor(90);const nl=d.splitTextToSize("Cumplimiento: todas las visitas cerradas del período en esa área. Cada punto, con su código y cómo verificarlo, está en el Excel (hoja «Puntos del check list»).",W);
+    chk(nl.length*3.5+2);d.text(nl,L,y+3.5);y+=nl.length*3.5+3;d.setTextColor(0);d.setFont("helvetica","normal");y+=6}}
   /* 2. todas las visitas (una fila por unidad, una columna por visita; de a 10 columnas) */
   const maxV=Math.max(1,...R.con.map(x=>x.vis.length)),POR=10;
   for(let b=0;b<maxV;b+=POR){const nC=Math.min(POR,maxV-b),wU=40,wA=20,wc=(W-wU-wA)/POR;
@@ -1434,4 +1476,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="205"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="206"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
