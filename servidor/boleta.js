@@ -33,11 +33,12 @@ export async function sugerirGasto(env, { texto, tipos, centros }) {
 Elige del catálogo los tipos de gasto que mejor calcen, máximo 3, el más probable primero. Catálogo (id: nombre — grupo):
 ${T.map(t => `${t.id}: ${t.n}${t.g ? " — " + t.g : ""}`).join("\n")}
 ${C.length ? `Centros de costo (código: nombre):\n${C.map(c => `${c.c}: ${c.n}`).join("\n")}\nSi el texto nombra claramente un predio o lugar que corresponde a uno de estos centros, pon su código en "centro"; si no, deja "centro" vacío.` : ""}
-Devuelve SOLO un objeto JSON, sin texto adicional: {"opciones":[{"tipo":"id del catálogo","razon":"por qué, máximo 8 palabras"}],"centro":""}`;
+Pon "segura": true solo si la primera opción calza claramente con lo descrito; si hay dudas, false.
+Devuelve SOLO un objeto JSON, sin texto adicional: {"opciones":[{"tipo":"id del catálogo","razon":"por qué, máximo 8 palabras"}],"segura":false,"centro":""}`;
   const r = await llamar(env, env.MODELO_LECTURA || MODELO_LECTURA, [{ type: "text", text: p }], false);
   const okT = new Set(T.map(t => t.id)), okC = new Set(C.map(c => c.c)), d = r.datos || {};
   const op = (Array.isArray(d.opciones) ? d.opciones : []).filter(o => o && okT.has(o.tipo)).slice(0, 3).map(o => ({ tipo: o.tipo, razon: String(o.razon || "").slice(0, 80) }));
-  return { opciones: op, centro: okC.has(d.centro) ? d.centro : "", modelo: r.modelo };
+  return { opciones: op, segura: d.segura === true && op.length > 0, centro: okC.has(d.centro) ? d.centro : "", modelo: r.modelo };
 }
 export async function convertirMoneda(datos, fetchFn) {
   const m = String(datos && datos.moneda || "CLP").toUpperCase().replace("US$", "USD");

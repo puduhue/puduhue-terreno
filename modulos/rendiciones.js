@@ -2097,7 +2097,7 @@ function sugeridosPick(f){
 }
 /* v203: palabras que no cuentan al buscar y sugerencia de la app para el tipo de gasto */
 const PK_STOP=new Set(["de","del","la","las","el","los","para","por","con","en","un","una","unos","unas","y","a","al","que","se","mi","mis","su","sus","lo","le"]);
-let IA_PK=null;
+let IA_PK=null;const PK_IA_MIN=8; /* letras mínimas para pedir sugerencias */
 function rdPick(f){IA_PK=null;
   const ops=opcionesPick(f),sug=sugeridosPick(f).filter(x=>ops.some(o=>o.v===x.v)),actual=f==="centro"?centroDoc(rdv,rdd):(gastoDe(rdd)||{}).id,tit=f==="centro"?"Centro de costo":"Tipo de gasto";
   const m=document.createElement("div");m.className="modal";
@@ -2114,23 +2114,29 @@ function rdPick(f){IA_PK=null;
       const L0=ops.map(o=>[o,sc(o)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]),top=L0.length?L0[0][1]:0;
       const L=L0.filter(x=>x[1]>=Math.max(1,top/2)).slice(0,6); /* solo los más parecidos */
       const ia=f!=="gasto"?"":IA_PK&&IA_PK.texto===inp.value.trim()?(IA_PK.cargando?`<div class="pkia"><span class="spin" aria-hidden="true"></span> Buscando sugerencias…</div>`:IA_PK.error?`<div class="pkia">${esc(IA_PK.error)}</div>`
-          :IA_PK.opciones.length?`<div class="pkg">Sugerencias de la app</div>${IA_PK.opciones.map(x=>{const o=ops.find(y=>y.v===x.tipo);return o?item(o,x.razon).replace('class="pkit','data-ia="1" class="pkit'):""}).join("")}${IA_PK.centro?`<p class="pkiac">Centro de costo sugerido: <b>${esc(centroNombre(IA_PK.centro))}</b> (se pone al elegir)</p>`:""}`:`<div class="pkia">La app no encontró un tipo de gasto claro. Elige de la lista.</div>`)
-        :q.length>=3?`<button type="button" class="btn pkiab"${navigator.onLine===false?" disabled":""}>${navigator.onLine===false?"Sin señal: elige de la lista":"Sugerir con la app"}</button>`:"";
+          :IA_PK.opciones.length?(()=>{const its=IA_PK.opciones.map(x=>{const o=ops.find(y=>y.v===x.tipo);return o?item(o,x.razon).replace('class="pkit','data-ia="1" class="pkit'):""}).filter(Boolean);
+            const cen=IA_PK.centro?`<p class="pkiac">Centro de costo: <b>${esc(centroNombre(IA_PK.centro))}</b> (se pone al elegir)</p>`:"";
+            return IA_PK.segura?`<div class="pkg">Lo más probable</div>${its[0].replace('class="pkit','class="pkit pktop')}${cen}${its.length>1?`<div class="pkg">Otras opciones</div>${its.slice(1).join("")}`:""}`:`<div class="pkg">Sugerencias de la app</div>${its.join("")}${cen}`})()
+          :`<div class="pkia">La app no encontró un tipo de gasto claro. Elige de la lista.</div>`)
+        :q.length>=PK_IA_MIN&&navigator.onLine===false?`<div class="pkia">Sin señal: elige de la lista.</div>`:"";
       h=ia+(L.length?(ia?`<div class="pkg">Parecidos</div>`:"")+L.map(([o])=>item(o)).join(""):`<div class="empty">Sin resultados. Prueba con otra palabra${f==="gasto"?" o elige «Otro»":""}.</div>`)}
     lista.innerHTML=h};
   pintar();inp.addEventListener("input",pintar);
   const cerrar=()=>{m.remove();document.body.style.overflow=""};
-  m.addEventListener("click",async e=>{e.stopPropagation();
-    if(e.target.closest(".pkiab")){const texto=inp.value.trim();IA_PK={texto,cargando:true};pintar(); /* v203 */
+  /* v203: al dejar de escribir un segundo, con señal, la app sugiere sola (sin botón) */
+  let tIA=null;const pedirIA=async()=>{const texto=inp.value.trim();if(f!=="gasto"||texto.length<PK_IA_MIN||navigator.onLine===false||!document.body.contains(m)||(IA_PK&&IA_PK.texto===texto))return;
+      IA_PK={texto,cargando:true};pintar();
       try{const r=await srvFetch("/gasto",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({texto,tipos:ops.map(o=>({id:o.v,n:o.t,g:o.g})),centros:centrosSel().map(x=>({c:x.c,n:x.n}))})});
-        const j=await r.json().catch(()=>({}));if(IA_PK.texto!==texto)return;IA_PK=r.ok?{texto,opciones:Array.isArray(j.opciones)?j.opciones:[],centro:j.centro||""}:{texto,error:j.error||"No se pudo sugerir. Elige de la lista."}}
+        const j=await r.json().catch(()=>({}));if(IA_PK.texto!==texto)return;IA_PK=r.ok?{texto,opciones:Array.isArray(j.opciones)?j.opciones:[],segura:j.segura===true,centro:j.centro||""}:{texto,error:j.error||"No se pudo sugerir. Elige de la lista."}}
       catch(x){IA_PK={texto,error:"No se pudo sugerir (¿sin señal?). Elige de la lista."}}
-      if(document.body.contains(m))pintar();return}
+      if(document.body.contains(m))pintar()};
+  if(f==="gasto")inp.addEventListener("input",()=>{clearTimeout(tIA);tIA=setTimeout(pedirIA,1000)});
+  m.addEventListener("click",async e=>{e.stopPropagation();
     const b=e.target.closest(".pkit");if(b){const ia=b.dataset.ia&&IA_PK,txt=inp.value.trim();cerrar();
       if(f==="gasto"&&txt&&rdd&&!String(rdd.glosa||"").trim())rdd.glosa=txt.slice(0,120); /* v203: lo escrito queda como detalle */
       if(ia&&IA_PK.centro&&rdd&&!rdRO(rdv)&&centroDoc(rdv,rdd)!==IA_PK.centro){rdd.centro=IA_PK.centro;delete rdd.predio;delete rdd.centroSug}
       IA_PK=null;rdSetCampo(f,b.dataset.v);return}
-    if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m){IA_PK=null;cerrar()}});
+    if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m){IA_PK=null;clearTimeout(tIA);cerrar()}});
   if(!matchMedia("(pointer:coarse)").matches)setTimeout(()=>inp.focus(),30);
 }
 function rdSetCampo(f,v){

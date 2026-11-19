@@ -284,7 +284,7 @@ export default {
         if (env.AVISOS) { const tope = +env.LIMITE_SUGERENCIAS || 100, u = await objetoAvisos(env).usar("gasto", correo, tope, santiago().fecha);
           if (!u.ok) return json({ error: `Llegaste al límite de ${tope} sugerencias de hoy. Elige el tipo de gasto de la lista.` }, 429); }
         const r = await sugerirGasto(env, body);
-        return json({ ok: true, opciones: r.opciones, centro: r.centro, modelo: r.modelo });
+        return json({ ok: true, opciones: r.opciones, segura: r.segura, centro: r.centro, modelo: r.modelo });
       }
       // /stock → reporte de stock por depósito configurado en el servidor
       if (url.pathname === "/stock") {
