@@ -94,7 +94,10 @@ export function metaDe(r, eTag) {
 }
 
 /* ---------- reglas ---------- */
-const TECNICOS = ["id", "_col", "_etag", "actualizado"];
+/* v207.1: «modificadoPor» (quién guardó por última vez) lo pone la app en cada guardado, también cuando la jefatura aprueba o
+   devuelve y cuando quien rinde completa el enlace de una foto: es dato técnico, no un cambio de la rendición (antes avisaba
+   «la jefatura no puede cambiar «modificadoPor»» en cada aprobación). */
+const TECNICOS = ["id", "_col", "_etag", "actualizado", "modificadoPor"];
 const cambiadas = (a, b) => { const ks = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]); return [...ks].filter(k => !TECNICOS.includes(k) && !igual((a || {})[k], (b || {})[k])); };
 const histCrece = (a, b) => { const h0 = (a && a.hist) || [], h1 = (b && b.hist) || []; return Array.isArray(h1) && h1.length >= h0.length && igual(h1.slice(0, h0.length), h0); };
 /* solo cambió el enlace de fotos o PDF (q: → a:) y su fotoUrl, o se completó el RUT */
