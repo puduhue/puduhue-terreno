@@ -2326,3 +2326,17 @@ details>*{box-sizing:border-box}
 /* v200: catálogo del check list en el teléfono: Referencia, Cómo verificar, Grupo y Área uno debajo del otro (lado a lado se
    cortaba el texto; Benja: «Si dale»). Solo en el catálogo (.it.cat); en el computador siguen lado a lado. */
 @media (max-width:759px){.it.cat .plan2{grid-template-columns:1fr}}
+/* v202: el resumen de la barra de abajo puede usar dos líneas (se cortaba «11 documentos · faltan d…») */
+.accbar .accres span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}
+/* v202: documento con solo avisos (no boleta, revisar N°): se puede enviar; va en ámbar, no en rojo */
+.rdd.aviso{box-shadow:inset 4px 0 0 var(--r-ink)}
+.rdcl.aviso{color:var(--r-ink)}
+.rdcorr-i:has(.rdcorr-q) .rdcorr-q{white-space:normal}
+/* v203: resumen de la ficha con solo avisos (se puede enviar): ámbar, no rojo */
+.rdcorr.aviso{background:var(--r-bg);color:var(--r-ink)}
+/* v203: sugerencia de tipo de gasto en la hoja */
+.pkiab{width:100%;margin:2px 0 6px}
+.pkia{display:flex;gap:8px;align-items:center;padding:10px 12px;margin:4px 0;border-radius:10px;background:var(--soft);color:var(--ink);font-size:14px}
+.pkiac{margin:4px 2px 8px;font-size:13.5px;color:var(--muted)}
+.pkiac b{color:var(--ink)}
+.pkit.pktop{border-color:var(--act);box-shadow:inset 0 0 0 1px var(--act);background:var(--soft)}

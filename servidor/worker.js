@@ -62,7 +62,7 @@
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
 import { rutasFondo, esContabSrv, contabDef, avisosDePago } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
-import { leerBoleta, MODELO_LECTURA, MODELO_REVISION, revisarClaveClaude } from "./boleta.js";
+import { leerBoleta, convertirMoneda, sugerirGasto, MODELO_LECTURA, MODELO_REVISION, REGLAS_LECTURA, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
 import { rutasOneDrive, odListo } from "./onedrive.js";
@@ -121,7 +121,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v197";
+const VERSION_SERVIDOR = "v203";
 /* v142: revisión diaria de la clave de Claude: en el primer cron desde las 8:00 de Chile (o enseguida si nunca se ha revisado) */
 export async function revisionClaude(env, cuando) {
   const s = santiago(new Date(cuando || Date.now())), o = objetoAvisos(env), prev = await o.leerClaude();
@@ -274,7 +274,17 @@ export default {
         if (env.AVISOS) { const tope = +env.LIMITE_BOLETAS || 150, u = await objetoAvisos(env).usar("boleta", correo, tope, santiago().fecha);
           if (!u.ok) return json({ error: `Llegaste al límite de ${tope} lecturas automáticas de hoy. Escribe los datos a mano; mañana la app vuelve a leer sola.` }, 429); }
         const r = await leerBoleta(env, { imagen, mime: body.mime || "image/jpeg", tipos: body.tipos, timbre: body.timbre, escaneo: body.escaneo === true });
-        return json({ ok: true, leidoPor: correo, hora: new Date().toISOString(), datos: r.datos, uso: r.uso, modelo: r.modelo, revision: r.revision });
+        await convertirMoneda(r.datos); /* v203: dólares o euros a pesos con el valor del Banco Central de la fecha */
+        return json({ ok: true, leidoPor: correo, hora: new Date().toISOString(), datos: r.datos, uso: r.uso, modelo: r.modelo, revision: r.revision, reglas: REGLAS_LECTURA });
+      }
+      // /gasto → v203: sugerencia de tipo de gasto según lo que la persona escribe (límite propio: LIMITE_SUGERENCIAS, 100 al día)
+      if (url.pathname === "/gasto" && req.method === "POST") {
+        let body; try { body = await req.json() } catch (e) { return json({ error: "Cuerpo inválido." }, 400); }
+        if (!String(body.texto || "").trim()) return json({ error: "Falta el texto." }, 400);
+        if (env.AVISOS) { const tope = +env.LIMITE_SUGERENCIAS || 100, u = await objetoAvisos(env).usar("gasto", correo, tope, santiago().fecha);
+          if (!u.ok) return json({ error: `Llegaste al límite de ${tope} sugerencias de hoy. Elige el tipo de gasto de la lista.` }, 429); }
+        const r = await sugerirGasto(env, body);
+        return json({ ok: true, opciones: r.opciones, segura: r.segura, centro: r.centro, modelo: r.modelo });
       }
       // /stock → reporte de stock por depósito configurado en el servidor
       if (url.pathname === "/stock") {

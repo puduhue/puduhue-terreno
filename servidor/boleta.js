@@ -8,10 +8,53 @@
    Variables (opcionales) en Cloudflare: MODELO_LECTURA y MODELO_REVISION. ANTHROPIC_MODEL ya no se usa. */
 export const MODELO_LECTURA = "claude-haiku-5-5";
 export const MODELO_REVISION = "claude-sonnet-5-5";
+/* v202: versión de las reglas de lectura (la app vuelve a leer sola los N° dudosos solo con estas reglas o más nuevas) */
+export const REGLAS_LECTURA = 203;
+/* v203: documentos en dólares o euros: pesos con el valor del Banco Central (dólar observado o euro) de la fecha del documento,
+   desde mindicador.cl; si ese día no hay valor (fin de semana o feriado), el último anterior del año */
+const INDICADOR = { USD: "dolar", EUR: "euro" };
+const ddmmaaaa = f => `${f.slice(8, 10)}-${f.slice(5, 7)}-${f.slice(0, 4)}`;
+export async function valorMoneda(moneda, fecha, fetchFn) {
+  const ind = INDICADOR[moneda]; if (!ind || !/^\d{4}-\d{2}-\d{2}$/.test(fecha || "")) return null;
+  const f = fetchFn || fetch, leer = async u => { try { const r = await f(u, { headers: { accept: "application/json" } }); if (!r.ok) return []; const j = await r.json(); return Array.isArray(j.serie) ? j.serie : [] } catch (e) { return [] } };
+  let s = await leer(`https://mindicador.cl/api/${ind}/${ddmmaaaa(fecha)}`);
+  if (!s.length) s = (await leer(`https://mindicador.cl/api/${ind}/${fecha.slice(0, 4)}`)).filter(x => String(x.fecha).slice(0, 10) <= fecha);
+  const x = s.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
+  return x && +x.valor > 0 ? { valor: +x.valor, fecha: String(x.fecha).slice(0, 10) } : null;
+}
+/* v203: sugerencia de tipo de gasto (y del centro, si el texto lo nombra) a partir de lo que la persona escribe */
+export async function sugerirGasto(env, { texto, tipos, centros }) {
+  if (!env.ANTHROPIC_API_KEY) throw { status: 500, error: "Las sugerencias no están configuradas en el servidor." };
+  const T = (Array.isArray(tipos) ? tipos : []).slice(0, 90).map(t => ({ id: String(t.id || "").slice(0, 30), n: String(t.n || "").slice(0, 80), g: String(t.g || "").slice(0, 40) })).filter(t => t.id);
+  const C = (Array.isArray(centros) ? centros : []).slice(0, 80).map(c => ({ c: String(c.c || "").slice(0, 30), n: String(c.n || "").slice(0, 80) })).filter(c => c.c);
+  const tx = String(texto || "").replace(/[<>]/g, "").trim().slice(0, 200);
+  if (!tx || !T.length) return { opciones: [], centro: "" };
+  const p = `Eres asistente contable de una empresa lechera del sur de Chile. Un trabajador del campo describe con sus palabras un gasto que quiere rendir: «${tx}».
+Elige del catálogo los tipos de gasto que mejor calcen, máximo 3, el más probable primero. Catálogo (id: nombre — grupo):
+${T.map(t => `${t.id}: ${t.n}${t.g ? " — " + t.g : ""}`).join("\n")}
+${C.length ? `Centros de costo (código: nombre):\n${C.map(c => `${c.c}: ${c.n}`).join("\n")}\nSi el texto nombra claramente un predio o lugar que corresponde a uno de estos centros, pon su código en "centro"; si no, deja "centro" vacío.` : ""}
+Pon "segura": true solo si la primera opción calza claramente con lo descrito; si hay dudas, false.
+Devuelve SOLO un objeto JSON, sin texto adicional: {"opciones":[{"tipo":"id del catálogo","razon":"por qué, máximo 8 palabras"}],"segura":false,"centro":""}`;
+  const r = await llamar(env, env.MODELO_LECTURA || MODELO_LECTURA, [{ type: "text", text: p }], false);
+  const okT = new Set(T.map(t => t.id)), okC = new Set(C.map(c => c.c)), d = r.datos || {};
+  const op = (Array.isArray(d.opciones) ? d.opciones : []).filter(o => o && okT.has(o.tipo)).slice(0, 3).map(o => ({ tipo: o.tipo, razon: String(o.razon || "").slice(0, 80) }));
+  return { opciones: op, segura: d.segura === true && op.length > 0, centro: okC.has(d.centro) ? d.centro : "", modelo: r.modelo };
+}
+export async function convertirMoneda(datos, fetchFn) {
+  const m = String(datos && datos.moneda || "CLP").toUpperCase().replace("US$", "USD");
+  if (!datos || m === "CLP" || !INDICADOR[m]) return datos;
+  const monto = typeof datos.total_moneda === "number" ? datos.total_moneda : parseFloat(String(datos.total_moneda || "").replace(",", "."));
+  if (!(monto > 0)) return datos;
+  const v = await valorMoneda(m, datos.fecha, fetchFn);
+  datos.neto = 0; datos.iva = 0;
+  if (!v) { datos.total = 0; (datos.problemas = datos.problemas || []).push(`no se pudo obtener el valor del ${m === "USD" ? "dólar" : "euro"} de la fecha: escribe el total en pesos`); datos.cambio = { moneda: m, monto }; return datos }
+  datos.total = Math.round(monto * v.valor); datos.cambio = { moneda: m, monto, valor: v.valor, fecha: v.fecha };
+  return datos;
+}
 
 export const PROMPT_BOLETA = `Eres un asistente contable chileno. Lee la foto de este documento tributario (boleta, factura, boleta de honorarios, vale o comprobante) y devuelve SOLO un objeto JSON, sin texto adicional ni marcas de código, con esta forma exacta:
 {"legible":true,"tipo":"boleta|factura|boleta_honorarios|vale|otro","emisor":"razón social o nombre del comercio","rut_emisor":"12.345.678-9 o cadena vacía","folio":"número de boleta o factura, cadena vacía si no se ve","fecha":"AAAA-MM-DD o cadena vacía","neto":0,"iva":0,"total":0,"propina":0,"moneda":"CLP","glosa":"descripción breve de lo comprado, máximo 12 palabras","rut_receptor":"RUT del cliente al que se emitió (solo facturas), o cadena vacía","receptor":"razón social del cliente (solo facturas), o cadena vacía","problemas":["lista de problemas: foto borrosa, documento cortado, no se lee el total, no se lee el folio, no se lee la fecha, no es un documento tributario, etc."],"confianza":0.0}
-Reglas: los montos son números enteros en pesos chilenos, sin puntos ni símbolos; si el documento no desglosa IVA (boletas), deja neto e iva en 0 y pon solo el total; si el total no se lee con claridad, pon 0 y agrégalo a problemas; la fecha en formato AAAA-MM-DD, interpretando día/mes/año como en Chile; el RUT con puntos y guion si aparece; verifica el dígito verificador del RUT (módulo 11) y, si no calza, vuelve a mirar cada número (es común confundir 0, 6, 8 y 9, o 1 y 7); si aun así no calza, déjalo tal como se ve y agrega "RUT con dígito verificador que no calza" a problemas; en facturas, revisa que neto + IVA = total y que el IVA sea el 19 % del neto (salvo facturas exentas); confianza entre 0 y 1 según cuán seguro estés del total, la fecha y el folio. Si la imagen no es un documento tributario, legible=false y explica en problemas. "propina": la propina o el servicio voluntario si el comprobante lo muestra aparte (0 si no); el total es lo que se pagó, con la propina incluida si está en el mismo comprobante. En "problemas" anota solo lo que pueda dejar mal leído un dato (total, fecha, folio, RUT, neto o IVA); si los datos se leen bien, deja la lista vacía (no anotes manchas, arrugas, propinas ni redondeos que no cambian los datos).`;
+Reglas: los montos son números enteros en pesos chilenos, sin puntos ni símbolos; si el documento no desglosa IVA (boletas), deja neto e iva en 0 y pon solo el total; si el total no se lee con claridad, pon 0 y agrégalo a problemas; la fecha en formato AAAA-MM-DD, interpretando día/mes/año como en Chile; el RUT con puntos y guion si aparece; verifica el dígito verificador del RUT (módulo 11) y, si no calza, vuelve a mirar cada número (es común confundir 0, 6, 8 y 9, o 1 y 7); si aun así no calza, déjalo tal como se ve y agrega "RUT con dígito verificador que no calza" a problemas; en facturas, revisa que neto + IVA = total y que el IVA sea el 19 % del neto (salvo facturas exentas); confianza entre 0 y 1 según cuán seguro estés del total, la fecha y el folio. Comprobantes de pago con tarjeta: si dice «VÁLIDO COMO BOLETA» (Mercado Pago, Getnet, SumUp, Transbank u otro), tipo "boleta" y en "folio" el número de operación o transacción impreso (por ejemplo «Operación #188215521371» → "188215521371"); si no dice «válido como boleta» (solo «comprobante de venta», «copia cliente», «acepto pagar según contrato»), tipo "vale". En "folio" va solo el número del documento: nunca uses números de la dirección del comercio (calle, número o local), del terminal, de la caja, de la tienda, de la tarjeta ni del código de autorización. Moneda: si el documento está en otra moneda (por ejemplo dólares, «USD», «US$»), pon en "moneda" su código ("USD" o "EUR") y en "total_moneda" el total con decimales tal como aparece, como número con punto decimal (por ejemplo 23.8); en ese caso deja "total", "neto" e "iva" en 0 (el servidor calcula los pesos). Si la imagen no es un documento tributario, legible=false y explica en problemas. "propina": la propina o el servicio voluntario si el comprobante lo muestra aparte (0 si no); el total es lo que se pagó, con la propina incluida si está en el mismo comprobante. En "problemas" anota solo lo que pueda dejar mal leído un dato (total, fecha, folio, RUT, neto o IVA); si los datos se leen bien, deja la lista vacía (no anotes manchas, arrugas, propinas ni redondeos que no cambian los datos).`;
 
 const TD_NOMBRE = { 33: "factura electrónica", 34: "factura exenta electrónica", 39: "boleta electrónica", 41: "boleta exenta electrónica", 46: "factura de compra electrónica", 48: "comprobante de pago electrónico", 52: "guía de despacho electrónica", 56: "nota de débito electrónica", 61: "nota de crédito electrónica" };
 const TD_TIPO = { 33: "factura", 34: "factura", 46: "factura", 39: "boleta", 41: "boleta", 48: "boleta" };

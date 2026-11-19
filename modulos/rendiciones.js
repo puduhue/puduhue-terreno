@@ -502,13 +502,14 @@ const rdcCorregido=(r,d)=>d.estadoRev==="obs"&&!!d.obsCampo&&d.obsValor!=null&&r
 function rdcItems(r,d,P,o){o=o||{};const L=[];
   if(!o.sinFalta)P.b.forEach(m=>{const c=campoDeMsg(m);L.push({c:RDC_DATO[c]?c:"",m,t:"falta"})});
   if(o.cont)(imputar(r,d).al||[]).filter(a=>a.n==="b"&&!P.b.includes(a.m)).forEach(a=>{const c=/tipo de gasto/i.test(a.m)?"rdGa":campoDeMsg(a.m);L.push({c:RDC_DATO[c]?c:"",m:a.m,t:"cont"})});
+  P.a.filter(m=>esNoBolMsg(m)||esNumMsg(m)||esMonMsg(m)).forEach(m=>L.push({c:esNoBolMsg(m)?"rdTd":esNumMsg(m)?"rdFol":"rdTot",m,t:"aviso"})); /* v202; v203: dólares */
   if(d.estadoRev==="obs"&&!o.sinPedido)L.push({c:RDC_DE_CAMPO[d.obsCampo]||"",m:d.obsRev||"Revisa este documento. Mira el comentario de la rendición.",t:"pedido",ok:rdcCorregido(r,d)});
   return L}
-function rdcResumenHTML(L,edita,quienRinde){if(!L.length)return"";const n=L.filter(x=>!x.ok).length;
-  const tit=n?`Hay que corregir ${n===1?"1 dato":n+" datos"}`:"Corregiste lo pedido";
+function rdcResumenHTML(L,edita,quienRinde){if(!L.length)return"";const n=L.filter(x=>!x.ok).length,nA=L.filter(x=>!x.ok&&x.t==="aviso").length,nC=n-nA; /* v203 */
+  const tit=nC?`Hay que corregir ${nC===1?"1 dato":nC+" datos"}${nA?` y ${nA===1?"1 aviso":nA+" avisos"}`:""}`:nA?`${nA===1?"1 aviso":nA+" avisos"} · se puede enviar`:"Corregiste lo pedido";
   const sub=n?(edita?"Toca cada uno para ir al dato.":""):(quienRinde?"Cuando termines con los demás documentos, toca «Reenviar» en la rendición.":"");
-  return `<section class="rdcorr${n?"":" listo"}" aria-label="Datos por corregir"><p class="rdcorr-t">${n?ICO_ALERTA:RDFIC_OK}<b>${tit}</b></p>${sub?`<p class="rdcorr-s">${sub}</p>`:""}<ul>${L.map(x=>{
-    const et=x.c?RDC_DATO[x.c][1]:"Otro",q=x.t==="pedido"?`<span class="rdcorr-q">${x.ok?"Corregido":"Lo pidió quien revisó"}</span>`:x.t==="cont"?`<span class="rdcorr-q">Regla contable</span>`:"";
+  return `<section class="rdcorr${nC?"":nA?" aviso":" listo"}" aria-label="Datos por corregir"><p class="rdcorr-t">${n?ICO_ALERTA:RDFIC_OK}<b>${tit}</b></p>${sub?`<p class="rdcorr-s">${sub}</p>`:""}<ul>${L.map(x=>{
+    const et=x.c?RDC_DATO[x.c][1]:"Otro",q=x.t==="pedido"?`<span class="rdcorr-q">${x.ok?"Corregido":"Lo pidió quien revisó"}</span>`:x.t==="cont"?`<span class="rdcorr-q">Regla contable</span>`:x.t==="aviso"?`<span class="rdcorr-q">Aviso</span>`:""; /* v203: el título ya dice que se puede enviar */
     const cu=`<span class="rdcorr-et">${esc(et)}${q}</span><span class="rdcorr-m">${x.t==="pedido"?`«${esc(x.m)}»`:esc(x.m)}</span>`;
     return `<li>${x.c?`<button type="button" class="rdcorr-i${x.ok?" ok":""}" data-a="rdIrDato" data-c="${esc(x.c)}">${cu}${ICO_CHEV}</button>`:`<div class="rdcorr-i fija">${cu}</div>`}</li>`}).join("")}</ul></section>`}
 /* marca de una fila: la primera cosa pendiente de ese dato (o «Corregido») */
@@ -680,6 +681,7 @@ function timbreDiferencias(d){
 }
 function lecTipoAviso(d){
   if(d.timbre&&!TD_TIPO98[d.timbre.td])return `El timbre del SII dice «${esc(TD_NOMBRE98[d.timbre.td]||"otro documento")}», que no sirve para rendir.`;
+  if(d.tipo==="vale"||d.tipo==="otro")return `«${esc(TIPO_DOC[d.tipo])}»: no es boleta ni factura. Si tienes la boleta, cambia la foto; si es un peaje, elige «Peaje».`; /* v202; v203: corto */
   return `La lectura dice «${esc(TIPO_DOC[d.tipo]||"sin tipo")}», que no sirve para rendir: elige uno${d.tipo==="vale"||d.tipo==="otro"?" (si es el ticket de un peaje, «Peaje»)":""} o elimina el documento.`;
 }
 /* factura sin neto ni IVA (p. ej. si se escaneó solo el código: el timbre trae el total, no el desglose). La exenta no lleva IVA. */
@@ -693,7 +695,8 @@ const rdRefotoHTML=t=>`${t}: `+(ESCRITORIO()?`<label class="lnk">Subir foto<inpu
 function lecTarjetaHTML(d,P){
   const le=d.lectura||{};let h="";
   const PB=P?P.b.filter(m=>/^rd(Ce|Ga)$/.test(campoDeMsg(m)||"")):[];
-  if(PB.length)h+=`<p class="rdok-av">${ICO_ALERTA}<span>Para enviar falta elegir ${PB.map(m=>campoDeMsg(m)==="rdCe"?"el centro de costo":"el tipo de gasto").filter((x,i,a)=>a.indexOf(x)===i).join(" y ")}.</span></p>`;
+  /* v203: «Para enviar falta elegir…» ya lo dice el resumen de arriba de la foto */
+  if(PB.length&&false)h+=`<p class="rdok-av">${ICO_ALERTA}<span>Para enviar falta elegir ${PB.map(m=>campoDeMsg(m)==="rdCe"?"el centro de costo":"el tipo de gasto").filter((x,i,a)=>a.indexOf(x)===i).join(" y ")}.</span></p>`;
   if(d.timbre){const df=timbreDiferencias(d);
     h+=df.length?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(df.join(" "))}</span></p>`:`<p class="rdok-tim">${ICO_OK96}<span>RUT, N°, fecha y total del timbre del SII</span></p>`}
   if(le.estado==="leyendo")h+=`<p class="rdok-ia"><span class="spin" aria-hidden="true"></span><span>Completando el comercio y el detalle…</span></p>`;
@@ -1291,6 +1294,25 @@ async function rdPreguntarDup(r,d,x){
     if(view==="rdd"&&rdv===r)go("rdv");else render();
     deshacer("Documento eliminado.",async()=>{if(r.docs[d.k])return;r.docs[d.k]=d;r.actualizado=new Date().toISOString();await saveRend(r,true);render()},()=>{if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d)});return}
   if(otro)d.noDup=true;r.actualizado=new Date().toISOString();await saveRend(r,true);render()}
+/* v202 (Benja: «que deje enviarlo igualmente… si no, igual estamos siendo demasiado restrictivos»): «Ticket / vale» y «Otro» no
+   bloquean; avisan y Contabilidad decide. «Revisa el N°»: mismo RUT y N° con otro total y otra fecha (la lectura pudo tomar otro
+   número, como la dirección del local). */
+const noBolMsg=d=>d.tipo==="otro"?"No es boleta ni factura chilena. Puedes enviarlo, pero Contabilidad puede rechazarlo."
+  :"No es boleta ni factura: parece el comprobante de la tarjeta. Lo correcto es la boleta (suele venir arriba en el mismo papel). Puedes enviarlo, pero Contabilidad puede rechazarlo.";
+/* v203: documento en otra moneda: el servidor manda cambio {moneda, monto, valor, fecha} y el total ya en pesos */
+function rdAplicarCambio(d,x){const c=x&&x.cambio;if(!c||!c.moneda||!(+c.monto>0)){if(x&&(!x.moneda||String(x.moneda).toUpperCase()==="CLP")){delete d.moneda;delete d.montoMoneda;delete d.tc;delete d.tcFecha}return}
+  d.moneda=c.moneda;d.montoMoneda=+c.monto;if(+c.valor>0){d.tc=+c.valor;d.tcFecha=c.fecha||"";d.total=Math.round(d.montoMoneda*d.tc)}else{delete d.tc;delete d.tcFecha}d.neto=0;d.iva=0}
+const fmtMon=(m,v)=>`${m==="USD"?"US$":m==="EUR"?"€":m+" "}${Number(v).toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const monMsg=d=>d.tc?`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)} × ${fmtMon("$",d.tc).replace("$ ","$")} (${d.moneda==="EUR"?"euro":"dólar observado"} del ${fmtD(d.tcFecha)}) = ${fmtP(Math.round(d.montoMoneda*d.tc))}. Si el banco te cobró otro monto en pesos, corrige el total.`
+  :`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)}. Escribe el total en pesos que te cobró el banco.`;
+const esMonMsg=m=>/^En (dólares|euros):/.test(m);
+/* v203: texto corto de un problema, para la lista (el detalle queda en la ficha) */
+function msgCorto(m){m=String(m||"");
+  const T=[[/^Falta el tipo de gasto/,"Falta el tipo de gasto"],[/^Falta el centro de costo/,"Falta el centro de costo"],[/^Falta la foto/,"Falta la foto"],[/^Falta el total/,"Falta el total"],
+    [/^Falta el RUT/,"Falta el RUT del emisor"],[/^Revisa el N°/,"N° repetido con otra boleta"],[/^No es boleta ni factura/,"No es boleta ni factura"],[/^Documento duplicado/,"Documento repetido"],
+    [/^Posible duplicado/,"Posible duplicado"],[/^En (dólares|euros)/,"En dólares: revisa el total en pesos"],[/^La fecha es futura/,"Fecha futura"],[/^Tipo de documento no válido/,"Tipo de documento no válido"],[/^El RUT .* no calza|^El RUT .* incompleto/,"RUT con error"]];
+  const x=T.find(([r])=>r.test(m));if(x)return x[1];const s=m.split(/(?<=\.)\s/)[0].replace(/\.$/,"");return s.length>60?s.slice(0,57)+"…":s}
+const esNoBolMsg=m=>/^No es boleta ni factura/.test(m),esNumMsg=m=>/^Revisa el N°/.test(m);
 const docAntes=(x,y)=>{const a=String(x.creado||""),b=String(y.creado||"");return a<b||(a===b&&String(x.k||"")<String(y.k||""))};
 /* Problemas de un documento: b impide enviar · a advertencia (se envía igual y quien revisa la ve) */
 function problemasDoc2(r,d){
@@ -1299,6 +1321,7 @@ function problemasDoc2(r,d){
   if(!(num(d.total)>0))b.push("Falta el total.");
   /* v133 (M-16): con timbre de nota de crédito, guía o nota de débito no sirve aunque se cambie el tipo a mano */
   if(d.timbre&&d.timbre.td&&!TD_TIPO98[d.timbre.td]&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`El timbre del SII dice «${TD_NOMBRE98[d.timbre.td]||"otro documento"}», que no sirve para rendir aunque se cambie el tipo. Elimina el documento o cambia la foto.`);
+  else if((d.tipo==="vale"||d.tipo==="otro")&&r.estado!=="aprobada"&&r.estado!=="contabilizada")a.push(noBolMsg(d)); /* v202: se envía igual; Contabilidad decide */
   else if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
   if(d.tipo==="peaje"&&gastoDe(d)&&!esGastoPeaje(d))b.push("Un comprobante de peaje solo se rinde con el tipo de gasto «Peajes / barcaza». Cambia el tipo de gasto o el tipo de documento.");
   /* en facturas y boletas de honorarios el RUT viene impreso y Finnegans lo exige; en boletas es opcional */
@@ -1311,16 +1334,19 @@ function problemasDoc2(r,d){
   if(!centroDoc(r,d))b.push("Falta el centro de costo.");
   if(!gastoDe(d))b.push("Falta el tipo de gasto.");
   /* v133 (M-17): el N° se compara sin ceros a la izquierda; solo la copia más nueva queda bloqueada (la original sigue su curso) */
-  if(d.rut&&d.folio){const fd=folioNorm(d.folio),igual=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&folioNorm(y.folio)===fd&&docAntes(y,d);const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
+  if(d.rut&&d.folio){const fd=folioNorm(d.folio),mismoN=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&folioNorm(y.folio)===fd,
+    igual=y=>mismoN(y)&&(num(y.total)===num(d.total)||String(y.fecha||"")===String(d.fecha||""))&&docAntes(y,d); /* v202: con otro total y otra fecha no es copia */const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
     if(otra){const quien_=otra.persona&&otra.persona.nombre||quien(otra.creadoPor)||"otra persona",mia=esMiaR(otra);
       b.push(`Documento duplicado: esta boleta o factura (mismo RUT y número) ya está en ${mia?"tu rendición":"la rendición de "+quien_} de ${periodoTxt(otra.periodo).toLowerCase()} (${(RD_ESTADO[otra.estado]||otra.estado||"").toLowerCase()}). Debe quedar en una sola rendición: elimínala de una de las dos.`)}
-    else if(Object.values(r.docs||{}).some(igual))b.push("Documento duplicado: esta boleta o factura (mismo RUT y número) está dos veces en esta misma rendición. Elimina una.")}
+    else if(Object.values(r.docs||{}).some(igual))b.push("Documento duplicado: esta boleta o factura (mismo RUT y número) está dos veces en esta misma rendición. Elimina una.");
+    else if(Object.values(REND).some(x=>!x.anulada&&Object.values(x.docs||{}).some(y=>mismoN(y)&&num(y.total)!==num(d.total)&&String(y.fecha||"")!==String(d.fecha||""))))a.push(`Revisa el N° ${d.folio}: otra boleta de ${d.emisor||"este comercio"} tiene el mismo N° con otro total. Puede que se haya leído otro número del papel.`)}
   /* v189: posible duplicado (mismo total y fecha, o mismo total y N°, en cualquier tipo); aviso en el más nuevo */
   {const x=rdDupDe(r,d);if(x)a.push(rdDupTxt(r,d,x))}
   /* v133 (M-16): la lectura con IA dice que la foto no se lee o no es una boleta o factura */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
   if(d.lectura&&d.lectura.estado==="error")a.push("La lectura automática falló; los datos quedan como los escribas.");
+  if(d.moneda&&+d.montoMoneda>0)a.push(monMsg(d)); /* v203 */
   if(!d.emisor)a.push("Sin nombre del emisor.");
   if(d.tipo!=="vale"&&d.tipo!=="otro"&&d.tipo!=="peaje"){if(!d.rut&&!rutObl)a.push("Sin RUT del emisor.");if(!d.folio)a.push("Sin número de boleta o factura.")}
   if(!d.fecha)a.push("Sin fecha.");else{const per=r.periodo;const f=String(d.fecha).slice(0,7);const [y,m]=per.split("-").map(Number);const ant=new Date(y,m-2,1);const antP=`${ant.getFullYear()}-${String(ant.getMonth()+1).padStart(2,"0")}`;if(f!==per&&f!==antP)a.push(`La fecha ${fmtD(d.fecha)} no corresponde al período (${periodoTxt(per)} o el mes anterior).`)}
@@ -1610,6 +1636,7 @@ async function leerDoc(r,d){
     if(!d.revisadoManual){if(x.tipo&&TIPO_DOC[x.tipo])d.tipo=x.tipo;if(x.emisor)d.emisor=String(x.emisor).slice(0,80);if(x.rut_emisor)d.rut=rutLimpio(x.rut_emisor);if(x.folio)d.folio=String(x.folio).trim();if(x.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(x.fecha))d.fecha=x.fecha;if(num(x.total)>0)d.total=Math.round(num(x.total));if(num(x.neto)>0)d.neto=Math.round(num(x.neto));if(num(x.iva)>0)d.iva=Math.round(num(x.iva));if(x.glosa&&(!d.glosa||d.glosaTimbre)){d.glosa=String(x.glosa).slice(0,120);delete d.glosaTimbre}}
     if(x.rut_receptor)d.rutReceptor=rutLimpio(x.rut_receptor);if(x.receptor)d.receptor=String(x.receptor).slice(0,80);
     if(num(x.propina)>0)d.propina=Math.round(num(x.propina));else delete d.propina; /* v135: propina aparte (el total la incluye) */
+    if(!d.revisadoManual)rdAplicarCambio(d,x); /* v203: dólares o euros */
     if(d.timbre){const ti=num(x.total_impreso);if(ti>0&&Math.abs(ti-num(d.timbre.mnt))>1)d.lectura.totalImpreso=ti}
     if(d.timbre&&!d.revisadoManual)timbreAplicar(d,d.timbre);
     if(d.rut&&!d.gasto){const gh=gastoHistorial(d.rut,d.k);if(gh){d.gasto=gh;d.gastoHist=true}}
@@ -1622,10 +1649,36 @@ async function leerDoc(r,d){
   /* v189: si se parece a otro documento, preguntar una vez (solo quien rinde, mientras la puede editar) */
   if(!d.dupPreg&&!d.noDup&&r.docs&&r.docs[d.k]===d&&editaPersona(r)){const x=rdDupDe(r,d);if(x)await rdPreguntarDup(r,d,x)}
 }
+/* v202 (Benja: «hace tú eso de que tienen que volver a leer»): los documentos de quien rinde con «Revisa el N°» o un duplicado,
+   en rendiciones en borrador o devueltas, se vuelven a leer una vez con las reglas nuevas del servidor (reglas ≥ 202) y se
+   corrige solo el N° (lo demás queda como está). */
+let RELEYENDO_N=false;
+async function rdReleerNumeros(){if(RELEYENDO_N||navigator.onLine===false||typeof srvFetch!=="function")return;RELEYENDO_N=true;
+  try{const C=[]; /* primero la lista completa: al corregir uno, los otros del grupo dejan de verse repetidos */
+    for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r)||!(r.estado==="borrador"||r.estado==="observada"))continue;
+      for(const d of Object.values(r.docs||{})){if(!d.foto||d.relec202||LEYENDO[d.k]||QF[d.foto]||!(d.lectura&&d.lectura.estado==="ok"))continue;
+        const P=problemasDoc2(r,d);if(P.a.some(esNumMsg)||P.b.some(m=>/^Documento duplicado/.test(m)))C.push([r,d,"n"]);
+        else if(!d.moneda&&!d.relec203&&/USD|US\$|dólar/i.test(((d.lectura||{}).problemas||[]).join(" ")))C.push([r,d,"m"])}}
+    for(const [r,d,q] of C){if(navigator.onLine===false)break;if(r.docs&&r.docs[d.k]===d&&!(q==="n"?d.relec202:d.relec203))await rdReleerNumero(r,d,q)}}
+  finally{RELEYENDO_N=false}}
+async function rdReleerNumero(r,d,q){
+  LEYENDO[d.k]=true;const turno=LEER_COLA;let listo;LEER_COLA=new Promise(o=>listo=o);
+  try{await turno;let dataURL=FOTO[d.foto];
+    if(!dataURL||!dataURL.startsWith("data:")){let blob=null;if(IDB.db){const rec=await IDB.get("fotos",d.foto).catch(()=>null)||await IDB.get("cache",d.foto).catch(()=>null);blob=await recBlob(rec)}
+      if(!blob&&dataURL){const rr=await fetch(dataURL);blob=await rr.blob()}if(!blob)return;dataURL=await blobToDataURL(blob)}
+    await getToken();const res=await srvFetch("/boleta",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({imagen:dataURL,mime:"image/jpeg",tipos:[],timbre:d.timbre||undefined})});
+    const j=await res.json().catch(()=>({}));if(!res.ok||!(+j.reglas>=(q==="m"?203:202)))return; /* servidor anterior: se intenta otro día */
+    if(q==="m"){d.relec203=new Date().toISOString();const t0=d.total;rdAplicarCambio(d,j.datos||{});if(d.moneda)rdHist(r,"monto en pesos al volver a leer",`${d.emisor||"documento"}: ${fmtP(num(t0))} → ${fmtP(num(d.total))} (${fmtMon(d.moneda,d.montoMoneda)})`);r.actualizado=new Date().toISOString();await saveRend(r);return} /* v203 */
+    d.relec202=new Date().toISOString();const f=String((j.datos||{}).folio||"").trim();
+    if(f&&folioNorm(f)!==folioNorm(d.folio)){d.folioAntes=d.folio;d.folio=f;rdHist(r,"N° corregido al volver a leer",`${d.emisor||"documento"}: ${d.folioAntes} → ${f}`)}
+    r.actualizado=new Date().toISOString();await saveRend(r)}
+  catch(e){console.warn("volver a leer el N°",e)}
+  finally{listo();delete LEYENDO[d.k];if(view==="rdv"&&rdv===r||view==="rdd"&&rdd===d)render()}}
 async function leerPendientes(){
   /* v133 (B-12): una lectura que quedó en «Leyendo…» porque la app se cerró a mitad vuelve a «pendiente» y se lee de nuevo */
   for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{}))if(d.lectura&&d.lectura.estado==="leyendo"&&!LEYENDO[d.k])d.lectura={estado:"pendiente"}}
-  if(navigator.onLine===false)return;for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{})){if(d.foto&&d.lectura&&(d.lectura.estado==="pendiente")&&!QF[d.foto]&&!LEYENDO[d.k])await leerDoc(r,d)}}}
+  if(navigator.onLine===false)return;for(const r of Object.values(REND)){if(r.anulada||!esMiaR(r))continue;for(const d of Object.values(r.docs||{})){if(d.foto&&d.lectura&&(d.lectura.estado==="pendiente")&&!QF[d.foto]&&!LEYENDO[d.k])await leerDoc(r,d)}}
+  await rdReleerNumeros()} /* v202 */
 
 /* ---------- Pantallas ---------- */
 /* ---------- v92: seguimiento por pasos y revisión de documentos uno por uno ----------
@@ -1725,7 +1778,7 @@ function rdFalta(r){const e=r.estado,sj=sinJefatura(r),hE=haceDias(r.enviada),en
   return null}
 const rdFaltaHTML=f=>`<span class="rdcf k-${f.k}"><i aria-hidden="true"></i><span class="rdct"><b>${esc(f.t)}</b>${f.w?`<small class="rdcw${f.tarde?" tarde":""}">${esc(f.w.charAt(0).toUpperCase()+f.w.slice(1))}</small>`:""}</span></span>`;
 function rdCard(r,ctx){const D=docsDe(r),n=D.length,inc=D.filter(d=>!docCompleto(r,d)).length;const nom=ctx||!esPropia(r)||colabsDeCuenta().length>1;
-  let extra="";if(ctx==="cont"&&(r.estado==="revcont"||r.estado==="aprobada")){const A=rdAsiento(r);extra=A.bloq?` · <span style="color:var(--m-ink)">${A.bloq} por corregir</span>`:A.pend?` · ${A.pend} por crear en Finnegans`:A.al.length?` · ${A.al.length} por revisar`:" · asiento cuadrado"}
+  let extra=ctx==="cont"&&D.some(d=>d.moneda&&+d.montoMoneda>0)?" · en dólares":""; /* v203 */if(ctx==="cont"&&(r.estado==="revcont"||r.estado==="aprobada")){const A=rdAsiento(r);extra=A.bloq?` · <span style="color:var(--m-ink)">${A.bloq} por corregir</span>`:A.pend?` · ${A.pend} por crear en Finnegans`:A.al.length?` · ${A.al.length} por revisar`:" · asiento cuadrado";extra=(ctx==="cont"&&D.some(d=>d.moneda&&+d.montoMoneda>0)?" · en dólares":"")+extra}
   const X=r.anulada,F=ctx==="cont"&&!X?rdFalta(r):null,pn=r.persona&&r.persona.nombre||"",pp=ctx==="cont"&&pn; /* v199: en Contabilidad, la persona primero */
   return `<button class="bod rdc${X?" anu":""}${F?" rdcc":""}" data-a="rdAbrir" data-id="${esc(r.id)}">${X?RDC_ANU:disRdIco(r)}<span class="rdc-x"><span class="bodn">${pp?esc(pn):`${esc(rdTitulo(r))}${nom?` · ${esc(pn)}`:""}`}</span><span class="bodm">${pp?`${esc(rdTitulo(r))} · `:""}${n} ${n===1?"documento":"documentos"}${X?rdAnuPor(r):`${inc&&(r.estado==="borrador"||r.estado==="observada")?` · ${inc} por completar`:""}${extra}${r.exportada&&r.estado==="aprobada"?" · exportada":""}`}</span><span class="bodc rdc-e">${X?`<span class="xp rdanux">${X.eliminada?"Eliminada":"Anulada"} el ${esc(fmtD(X.fecha))}</span>`:F?rdFaltaHTML(F):rdMiniHTML(r)+rdEstadoChip(r)}${(x=>x.includes("xp ok")?"":x)(chipSync(r))}</span></span><b class="rdc-v">${fmtP(totalRend(r))}</b>${ICO.arrow}</button>`}
 function renderRD(){
@@ -1826,15 +1879,16 @@ function rdDocCard(r,d){
   const L=editable?rdcItems(r,d,P,{sinFalta:rdLeyendo(d,P)}):[],pend=L.filter(x=>!x.ok); /* v191: mientras lee, sin lo que falta */
   if(L.length){/* v183: el dato y el motivo van en su línea */}
   else if(d.estadoRev==="obs")ch.push(`<span class="xp nueva">Por corregir</span>`);else if(d.estadoRev==="ok")ch.push(`<span class="xp ok">Revisada</span>`);
-  {const nD=P.a.filter(esDupMsg).length,nB=P.a.length-nD; /* v189 */
+  {const nD=P.a.filter(esDupMsg).length,nB=P.a.filter(m=>!esDupMsg(m)&&!esNoBolMsg(m)&&!esNumMsg(m)&&!esMonMsg(m)).length; /* v189; v202: sin «No es boleta» ni «Revisa el N°», que salen en su línea */
     if(nD&&editable&&!d.noDup)ch.push(`<span class="xp nueva">Posible duplicado</span>`);
     if(nB&&editable)ch.push(`<span class="xp camb">${nB} ${nB===1?"dato en blanco":"datos en blanco"}</span>`)}
   if(d.aj&&Object.keys(d.aj).length)ch.push(`<span class="xp camb">Ajuste contable</span>`);
   {const gs=d.gastoIA||d.gastoHist;if(editable&&(d.centroSug||gs))ch.push(`<span class="xp sug">${d.centroSug&&gs?"Centro y tipo sugeridos":gs?"Tipo sugerido":"Centro sugerido"}</span>`)}
   if(!ch.length&&editable&&!L.length)ch.push(`<span class="xp ok">Completa</span>`);
   const pdfCh=d.pdf||d.pdfPags?`<span class="xp" style="background:var(--soft);color:var(--muted)">PDF</span>`:"";
-  const lin=pend.length?`<span class="rdcl">${ICO_ALERTA}<span><b>${esc(pend[0].c?RDC_DATO[pend[0].c][1]:"Por corregir")}:</b> ${esc(pend[0].m)}${pend.length>1?` <span class="rdcl-mas">y ${pend.length-1} más</span>`:""}</span></span>`:L.length?`<span class="rdcl bien">${RDFIC_OK}<span>Corregido</span></span>`:"";
-  return `<div class="rdd${pend.length?" mal":L.length?" bien":""}" role="button" tabindex="0" data-a="rdDoc" data-k="${esc(d.k)}">
+  const soloAv=pend.length&&pend.every(x=>x.t==="aviso"); /* v202 */
+  const lin=pend.length?`<span class="rdcl${soloAv?" aviso":""}">${ICO_ALERTA}<span>${esc(pend[0].t==="pedido"?"Pedido: "+pend[0].m:msgCorto(pend[0].m))}${pend.length>1?` <span class="rdcl-mas">· y ${pend.length-1} más</span>`:""}</span></span>`:L.length?`<span class="rdcl bien">${RDFIC_OK}<span>Corregido</span></span>`:"";
+  return `<div class="rdd${soloAv?" aviso":pend.length?" mal":L.length?" bien":""}" role="button" tabindex="0" data-a="rdDoc" data-k="${esc(d.k)}">
     <span class="rdth"><span class="th${src?"":" miss"}">${src?`<img src="${esc(src)}" alt="">`:d.foto?(navigator.onLine===false?"Sin señal":"Cargando…"):"Sin foto"}</span></span>
     <span class="rdx"><span class="rdt">${esc(d.emisor||"Documento sin emisor")}</span><span class="rdm">${d.fecha?fmtD(d.fecha):"Sin fecha"}${d.folio?` · N° ${esc(d.folio)}`:""}${d.tipo?` · ${esc(TIPO_DOC[d.tipo]||d.tipo)}`:""}</span><span class="rdm">${[centro?centroNombre(centro):"",cat?cat.n:""].filter(Boolean).map(esc).join(" · ")||"Sin centro ni tipo de gasto"}${d.dist?` · reparto ${esc(d.dist)}`:""}</span>${lin}<span class="bodc">${pdfCh}${ch.slice(0,2).join("")}</span></span>
     <span class="rdv"><b>${num(d.total)?fmtP(num(d.total)):"—"}</b></span></div>`;
@@ -1926,7 +1980,7 @@ function renderRDV(){
   let acciones="";
   if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>
       ${disTip("rdsolo",`Solo sirven <b>facturas y boletas</b>, en foto o en PDF.${ESCRITORIO()?" También puedes arrastrar las fotos o los PDF a esta página.":""}`,"rdsolo")}
-      ${D.length?`${inc?`<p class="note">Faltan datos obligatorios en ${inc} ${inc===1?"documento":"documentos"} (foto, total, tipo de documento, centro de costo, tipo de gasto o RUT de la factura). <button class="lnk" data-a="rdDoc" data-k="${esc(D.find(d=>!docCompleto(r,d)).k)}">Ir ${inc===1?"al documento":"al primero"}</button></p>`:adv?`<p class="note">${adv} ${adv===1?"dato queda en blanco":"datos quedan en blanco"}; se puede enviar igual y quien revisa los completa.</p>`:""}`:""}`;
+      ${D.length?`${inc?`<p class="note"><b>${inc} ${inc===1?"documento por completar":"documentos por completar"}</b> · <button class="lnk" data-a="rdDoc" data-k="${esc(D.find(d=>!docCompleto(r,d)).k)}">Ir ${inc===1?"al documento":"al primero"}</button></p>`:adv?`<p class="note">${adv} ${adv===1?"dato queda en blanco":"datos quedan en blanco"}; se puede enviar igual y quien revisa los completa.</p>`:""}`:""}`;
   else if(esContab()&&r.estado==="enviada"&&sinJefatura(r)&&!esPropia(r))acciones=`<div class="info netbox"><b>Falta asignar la jefatura.</b> Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button> y la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura»: pasa a revisión contable.</div>`; /* v199 */
   else if(jef)acciones=`<p class="note">${sinJefatura(r)?"Quien rinde no tiene jefatura asignada: apruebas este paso como Contabilidad. ":""}Revisa cada documento: «Está bien» o «Pedir corrección».</p>`;
   else if(esContab()&&r.estado==="revcont"&&aprobeJef(r)&&!esPropia(r))acciones=`<p class="note">La aprobaste como jefatura: la revisión contable la hace otra persona de Contabilidad.</p>`;
@@ -1991,8 +2045,8 @@ function renderRDD(){
       ${rdPdfInfo(d)}${editP?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}</div>
     ${conf?disConfHTML(r,d,P,conf):fic?disFichaHTML(r,d,P,editC):""}<div class="rdform"${conf||fic?" hidden":""}>
     ${le.estado==="leyendo"?`<div class="info">Leyendo el documento…</div>`:le.estado==="pendiente"?`<div class="info netbox">Sin señal: el documento se leerá automáticamente cuando vuelva la conexión. Mientras tanto puedes escribir los datos a mano.</div>`:le.estado==="error"?`<div class="info netbox"><b>La lectura automática no funcionó.</b> ${esc(le.msg||"")} Completa los datos a mano.</div>`:le.estado==="ok"&&editP?`<div class="info" style="border-left:5px solid ${le.confianza>=0.6?"var(--b-ink)":"var(--r-ink)"}"><b>Leída automáticamente</b>${le.confianza!=null?` · confianza ${Math.round(le.confianza*100)}%`:""}. ${le.problemas&&le.problemas.length?`La IA advierte: ${esc(le.problemas.join("; "))}. `:""}Revisa que los datos coincidan con el documento.</div>`:""}
-    ${probs.length&&!ro?`<div class="info netbox"><b>Para enviar falta:</b> <span class="hint">(toca cada aviso para ir al dato)</span><ul>${probs.map(liCampo).join("")}</ul></div>`:""}
-    ${P.a.length&&!ro?`<div class="info" style="border-left:5px solid var(--r-ink)"><b>Datos en blanco o por revisar</b> (no impiden enviar; quien revisa puede completarlos):<ul>${P.a.map(liCampo).join("")}</ul></div>`:!probs.length&&editP?`<div class="info" style="border-left:5px solid var(--b-ink)">Documento completo.${(d.centroSug||d.gastoIA)?" El centro de costo y el tipo de gasto marcados como «Sugerido» los propuso la app: revisa que correspondan.":""}</div>`:""}
+    ${probs.length&&!ro&&!(editP&&(conf||fic)&&conf!=="leyendo"&&rdcItems(r,d,P).length)?`<div class="info netbox"><b>Para enviar falta:</b> <span class="hint">(toca cada aviso para ir al dato)</span><ul>${probs.map(liCampo).join("")}</ul></div>`:""}
+    ${(PA=>PA.length&&!ro?`<div class="info" style="border-left:5px solid var(--r-ink)"><b>Para revisar</b> (no impide enviar):<ul>${PA.map(liCampo).join("")}</ul></div>`:"")(P.a.filter(m=>!esNoBolMsg(m)&&!esNumMsg(m)&&!esMonMsg(m)&&!esDupMsg(m)))}${P.a.length&&!ro?"":!probs.length&&editP?`<div class="info" style="border-left:5px solid var(--b-ink)">Documento completo.${(d.centroSug||d.gastoIA)?" El centro de costo y el tipo de gasto marcados como «Sugerido» los propuso la app: revisa que correspondan.":""}</div>`:""}
     <div class="enc">
       ${disTipoHTML(d,dis)}
       <div class="f"><label for="rdEm">Emisor (comercio o proveedor)</label><input id="rdEm" data-rdf="emisor" value="${esc(d.emisor||"")}" ${dis}></div>
@@ -2041,21 +2095,48 @@ function sugeridosPick(f){
   Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,4).forEach(([v,n])=>add(v,`Usado antes (${n} ${n===1?"vez":"veces"})`));
   return out;
 }
-function rdPick(f){
+/* v203: palabras que no cuentan al buscar y sugerencia de la app para el tipo de gasto */
+const PK_STOP=new Set(["de","del","la","las","el","los","para","por","con","en","un","una","unos","unas","y","a","al","que","se","mi","mis","su","sus","lo","le"]);
+let IA_PK=null;const PK_IA_MIN=8; /* letras mínimas para pedir sugerencias */
+function rdPick(f){IA_PK=null;
   const ops=opcionesPick(f),sug=sugeridosPick(f).filter(x=>ops.some(o=>o.v===x.v)),actual=f==="centro"?centroDoc(rdv,rdd):(gastoDe(rdd)||{}).id,tit=f==="centro"?"Centro de costo":"Tipo de gasto";
   const m=document.createElement("div");m.className="modal";
-  m.innerHTML=`<div class="sheet pksheet" role="dialog" aria-modal="true" aria-label="${esc(tit)}"><h3>${tit}</h3><input class="pksearch" type="search" placeholder="${f==="centro"?"Buscar predio o código":"Buscar: bencina, almuerzo, repuesto…"}" autocomplete="off" aria-label="Buscar"><div class="pklist"></div><div class="btns"><button class="btn" data-m="no">Cerrar</button></div></div>`;
+  m.innerHTML=`<div class="sheet pksheet" role="dialog" aria-modal="true" aria-label="${esc(tit)}"><h3>${tit}</h3><input class="pksearch" type="search" placeholder="${f==="centro"?"Buscar predio o código":"¿Qué compraste? Ej.: herramientas para la sala de ordeña"}" autocomplete="off" aria-label="${f==="centro"?"Buscar":"Qué compraste"}"><div class="pklist"></div><div class="btns"><button class="btn" data-m="no">Cerrar</button></div></div>`;
   document.body.appendChild(m);document.body.style.overflow="hidden";
   const lista=m.querySelector(".pklist"),inp=m.querySelector(".pksearch");
   const item=(o,why)=>`<button class="pkit${o.v===actual?" on":""}" data-v="${esc(o.v)}"><span class="pkt">${esc(o.t)}${o.v===actual?" ✓":""}</span><span class="pks">${esc(why||o.s)}</span></button>`;
   const pintar=()=>{const q=normTxt(inp.value);let h="";
     if(!q){if(sug.length)h+=`<div class="pkg">Sugeridos</div>`+sug.map(x=>item(ops.find(o=>o.v===x.v),x.why)).join("");
       [...new Set(ops.map(o=>o.g))].forEach(g=>{h+=`<div class="pkg">${esc(g)}</div>`+ops.filter(o=>o.g===g).map(o=>item(o)).join("")})}
-    else{const ws=q.split(" ").filter(Boolean);h=ops.filter(o=>ws.every(w=>o.q.includes(w))).map(o=>item(o)).join("")||`<div class="empty">Sin resultados. Prueba con otra palabra${f==="gasto"?" o elige «Otro»":""}.</div>`}
+    else{const ws=q.split(" ").filter(w=>w&&!PK_STOP.has(w.toLowerCase())); /* normTxt deja todo en mayúsculas */ /* v203: cuenta las palabras que calzan (o su raíz), no exige todas */
+      const raiz=w=>w.length>4?w.replace(/(es|s)$/i,""):w; /* herramientas → herramienta */
+      const sc=o=>ws.reduce((n,w)=>n+(o.q.includes(w)||o.q.includes(raiz(w))?2:w.length>=5&&o.q.includes(w.slice(0,Math.max(4,w.length-3)))?1:0),0);
+      const L0=ops.map(o=>[o,sc(o)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]),top=L0.length?L0[0][1]:0;
+      const L=L0.filter(x=>x[1]>=Math.max(1,top/2)).slice(0,6); /* solo los más parecidos */
+      const ia=f!=="gasto"?"":IA_PK&&IA_PK.texto===inp.value.trim()?(IA_PK.cargando?`<div class="pkia"><span class="spin" aria-hidden="true"></span> Buscando sugerencias…</div>`:IA_PK.error?`<div class="pkia">${esc(IA_PK.error)}</div>`
+          :IA_PK.opciones.length?(()=>{const its=IA_PK.opciones.map(x=>{const o=ops.find(y=>y.v===x.tipo);return o?item(o,x.razon).replace('class="pkit','data-ia="1" class="pkit'):""}).filter(Boolean);
+            const cen=IA_PK.centro?`<p class="pkiac">Centro de costo: <b>${esc(centroNombre(IA_PK.centro))}</b> (se pone al elegir)</p>`:"";
+            return IA_PK.segura?`<div class="pkg">Lo más probable</div>${its[0].replace('class="pkit','class="pkit pktop')}${cen}${its.length>1?`<div class="pkg">Otras opciones</div>${its.slice(1).join("")}`:""}`:`<div class="pkg">Sugerencias de la app</div>${its.join("")}${cen}`})()
+          :`<div class="pkia">La app no encontró un tipo de gasto claro. Elige de la lista.</div>`)
+        :q.length>=PK_IA_MIN&&navigator.onLine===false?`<div class="pkia">Sin señal: elige de la lista.</div>`:"";
+      h=ia+(L.length?(ia?`<div class="pkg">Parecidos</div>`:"")+L.map(([o])=>item(o)).join(""):`<div class="empty">Sin resultados. Prueba con otra palabra${f==="gasto"?" o elige «Otro»":""}.</div>`)}
     lista.innerHTML=h};
   pintar();inp.addEventListener("input",pintar);
   const cerrar=()=>{m.remove();document.body.style.overflow=""};
-  m.addEventListener("click",e=>{e.stopPropagation();const b=e.target.closest(".pkit");if(b){cerrar();rdSetCampo(f,b.dataset.v);return}if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m)cerrar()});
+  /* v203: al dejar de escribir un segundo, con señal, la app sugiere sola (sin botón) */
+  let tIA=null;const pedirIA=async()=>{const texto=inp.value.trim();if(f!=="gasto"||texto.length<PK_IA_MIN||navigator.onLine===false||!document.body.contains(m)||(IA_PK&&IA_PK.texto===texto))return;
+      IA_PK={texto,cargando:true};pintar();
+      try{const r=await srvFetch("/gasto",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({texto,tipos:ops.map(o=>({id:o.v,n:o.t,g:o.g})),centros:centrosSel().map(x=>({c:x.c,n:x.n}))})});
+        const j=await r.json().catch(()=>({}));if(IA_PK.texto!==texto)return;IA_PK=r.ok?{texto,opciones:Array.isArray(j.opciones)?j.opciones:[],segura:j.segura===true,centro:j.centro||""}:{texto,error:j.error||"No se pudo sugerir. Elige de la lista."}}
+      catch(x){IA_PK={texto,error:"No se pudo sugerir (¿sin señal?). Elige de la lista."}}
+      if(document.body.contains(m))pintar()};
+  if(f==="gasto")inp.addEventListener("input",()=>{clearTimeout(tIA);tIA=setTimeout(pedirIA,1000)});
+  m.addEventListener("click",async e=>{e.stopPropagation();
+    const b=e.target.closest(".pkit");if(b){const ia=b.dataset.ia&&IA_PK,txt=inp.value.trim();cerrar();
+      if(f==="gasto"&&txt&&rdd&&!String(rdd.glosa||"").trim())rdd.glosa=txt.slice(0,120); /* v203: lo escrito queda como detalle */
+      if(ia&&IA_PK.centro&&rdd&&!rdRO(rdv)&&centroDoc(rdv,rdd)!==IA_PK.centro){rdd.centro=IA_PK.centro;delete rdd.predio;delete rdd.centroSug}
+      IA_PK=null;rdSetCampo(f,b.dataset.v);return}
+    if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m){IA_PK=null;clearTimeout(tIA);cerrar()}});
   if(!matchMedia("(pointer:coarse)").matches)setTimeout(()=>inp.focus(),30);
 }
 function rdSetCampo(f,v){
@@ -2391,9 +2472,10 @@ async function rdClick(A,b){
     const c=colabDe(rdv);let j=c?jefaturaDe(c):null;if(j&&j.correo&&(j.correo===meCorreo()||correosDe(c).includes(j.correo)))j=null;
     const devCont=rdv.estado==="observada"&&rdv.devueltaEn==="revcont"&&!!rdv.aprobJef,cambio=devCont&&rdCambioDesdeDev(rdv); /* v133 (M-14) */
     const vuelveCont=devCont&&!cambio,eraObs=rdv.estado==="observada";
-    const adv=D.reduce((n,d)=>n+docAdvertencias(rdv,d).filter(m=>!esDupMsg(m)).length,0),nDup=D.filter(d=>!d.noDup&&docAdvertencias(rdv,d).some(esDupMsg)).length; /* v189 */
+    const adv=D.reduce((n,d)=>n+docAdvertencias(rdv,d).filter(m=>!esDupMsg(m)&&!esNoBolMsg(m)&&!esNumMsg(m)&&!esMonMsg(m)).length,0),nDup=D.filter(d=>!d.noDup&&docAdvertencias(rdv,d).some(esDupMsg)).length; /* v189 */
+    const nNB=D.filter(d=>docAdvertencias(rdv,d).some(esNoBolMsg)).length,nNum=D.filter(d=>docAdvertencias(rdv,d).some(esNumMsg)).length; /* v202 */
     const quienRev=vuelveCont?"Vuelve a revisión de Contabilidad, que recibirá un aviso por correo.":cambio&&j&&j.correo?`Como agregaste, quitaste o cambiaste el monto de documentos, vuelve a aprobación de ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:j&&j.correo?`La aprueba ${j.nombre} (le llegará un aviso por correo) y después la revisa Contabilidad.`:sinJefDecidida(c)?"No tienes jefatura: la revisa Contabilidad, que recibirá un aviso por correo.":"No tienes jefatura en la lista de colaboradores: Contabilidad recibirá un aviso para asignarla y después la aprueba tu jefatura.";
-    if(!(await ask(vuelveCont?"¿Reenviar la rendición?":"¿Enviar a aprobación?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))}. ${quienRev}${nDup?` Hay ${nDup===1?"un posible duplicado":`${nDup} posibles duplicados`}: revisa que no sea el mismo gasto dos veces.`:""}${adv?` Hay ${adv} ${adv===1?"dato en blanco":"datos en blanco"} que quien revisa podrá completar.`:""} Después de enviar no se puede modificar hasta que la revisen.`,"Enviar")))return true;
+    if(!(await ask(vuelveCont?"¿Reenviar la rendición?":"¿Enviar a aprobación?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))}. ${quienRev}${nDup?` Hay ${nDup===1?"un posible duplicado":`${nDup} posibles duplicados`}: revisa que no sea el mismo gasto dos veces.`:""}${nNB?` ${nNB===1?"Un documento no es":`${nNB} documentos no son`} boleta ni factura: Contabilidad decide si ${nNB===1?"lo acepta":"los acepta"}.`:""}${nNum?` Revisa el N° de ${nNum===1?"un documento":`${nNum} documentos`} (se repite con otro total).`:""}${adv?` Hay ${adv} ${adv===1?"dato en blanco":"datos en blanco"} que quien revisa podrá completar.`:""} Después de enviar no se puede modificar hasta que la revisen.`,"Enviar")))return true;
     if(!vuelveCont){rdv.jefatura=j;delete rdv.aprobJef}
     /* v199: sin jefatura con correo, la rendición espera en Contabilidad a que se le asigne una (antes, v74, pasaba directo a
        revisión contable). Solo con «Sin jefatura» elegida en la lista sigue pasando directo. */
@@ -2759,4 +2841,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="201"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="203"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
