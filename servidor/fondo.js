@@ -141,13 +141,13 @@ async function mayorFondo(env, ctx, reporte, forzar) {
   const clave = new Request(`https://cache.puduhue-terreno/fondo-mayor?c=${encodeURIComponent(cuentas.join(","))}&d=${desde}&h=${hoy}`);
   const cache = typeof caches !== "undefined" ? caches.default : null;
   if (cache && !forzar) { const r = await cache.match(clave); if (r) return await r.json(); }
-  const rs = [];
-  for (const c of cuentas) {
+  /* v204: las cuentas se consultan a la vez (antes una después de otra: el doble de espera) */
+  const rs = await Promise.all(cuentas.map(async c => {
     const p = new URLSearchParams(env.FINN_PARAMS_FONDO || "");
     p.set("PARAMWEBREPORT_FechaDesde", desde); p.set("PARAMWEBREPORT_FechaHasta", hoy); p.set("PARAMWEBREPORT_cuenta", c);
     const r = movimientos(await reporte(env, "libroMayor", p), c);
-    r.movs.forEach(m => { m.c = c; }); rs.push(r);
-  }
+    r.movs.forEach(m => { m.c = c; }); return r;
+  }));
   const x = { hora: new Date().toISOString(), desde, cuenta, cuentas, movs: rs.flatMap(r => r.movs), columnas: rs[0].columnas, filas: rs.reduce((s, r) => s + r.filas, 0), claves: rs[0].claves };
   if (cache) ctx.waitUntil(cache.put(clave, new Response(JSON.stringify(x), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" } })));
   return forzar ? { ...x, crudo: rs.flatMap(r => r.crudo.slice(0, 3)) } : x;
