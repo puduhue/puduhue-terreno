@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-NuV+u4CBhTaPrntxZAoOfpJ5Q+Ssmsj7haqk4Y3DRY0=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-lOhfFEEzTmorfF7wMlIjJl5WVa1bBbRCGJThLAvON94=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=219">
+<link rel="stylesheet" href="estilos.css?v=220">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="219";
+const APP_VER="220";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -758,7 +758,9 @@ function pedirFoto(ref){
     finally{delete PIDIENDO[ref];refrescarRef(ref)}
   })();
 }
-function refrescarRef(ref){document.querySelectorAll(`[data-a="foto"][data-ref="${CSS.escape(ref)}"]`).forEach(b=>{const k=b.dataset.k,own=b.dataset.own==="1",old=b.classList.contains("old");b.outerHTML=thumb(ref,k,own,old)})}
+function refrescarRef(ref){document.querySelectorAll(`[data-a="foto"][data-ref="${CSS.escape(ref)}"]`).forEach(b=>{const k=b.dataset.k,own=b.dataset.own==="1",old=b.classList.contains("old");b.outerHTML=thumb(ref,k,own,old)});
+  /* v220: también la miniatura de la lista de la rendición (no es un botón de foto) */
+  document.querySelectorAll(`[data-thref="${CSS.escape(ref)}"]`).forEach(el=>{if(FOTO[ref]){el.classList.remove("miss");el.removeAttribute("data-thref");el.innerHTML=`<img src="${esc(FOTO[ref])}" alt="">`}else if(LOST[ref]){el.removeAttribute("data-thref");el.textContent="Sin foto"}})}
 function objetoDeFoto(meta){return meta&&meta.col==="visitas"?VIS[meta.actaId]:meta&&meta.col==="conteos"?CONT[meta.actaId]:meta&&meta.col==="rendiciones"?REND[meta.actaId]:ACTAS[meta.actaId]}
 function refrescarFotoItem(meta){if(!meta)return;if(meta.col==="visitas"){const v=VIS[meta.actaId];if(v)clRefreshItem(v,meta.k)}else if(meta.col==="conteos"){if(cbv&&cbv.id===meta.actaId)cbRefresh(meta.k)}else if(meta.col==="rendiciones"){if(rdv&&rdv.id===meta.actaId){rdRefreshDoc(meta.k);if(view==="rdd")render()}}else{const a=ACTAS[meta.actaId];if(a)refreshItem(a,meta.k)}}
 
@@ -2834,7 +2836,7 @@ async function checkRed(){
   else{
     /* Se prueban varios servidores a la vez; basta con que uno responda */
     const t=Date.now(),ping=u=>fetch(u,{mode:"no-cors",cache:"no-store"});
-    const pruebas=[ping(location.origin+location.pathname.replace(/[^/]*$/,"")+"manifest.json?__ping="+t),ping("https://claude.ai/favicon.ico?t="+t),ping("https://www.gstatic.com/generate_204?t="+t),ping("https://www.apple.com/library/test/success.html?t="+t)];
+    const pruebas=[ping(location.origin+location.pathname.replace(/[^/]*$/,"")+"manifest.json?__ping="+t),ping(WORKER+"/salud?__ping="+t)]; /* v220: sin claude.ai, gstatic ni apple (la política de contenido las bloquea) */
     try{await Promise.race([Promise.any(pruebas),new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),8000))]);ok=true}
     catch(e){REDMSG=e&&e.message==="timeout"?"Ningún servidor respondió en 8 segundos: la señal es muy débil.":"No se pudo conectar con ningún servidor."}
   }
@@ -3972,10 +3974,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=219"></script>
-<script src="modulos/bodega.js?v=219"></script>
-<script src="modulos/rendiciones.js?v=219"></script>
-<script src="modulos/actas-entrega.js?v=219"></script>
+<script src="modulos/checklist.js?v=220"></script>
+<script src="modulos/bodega.js?v=220"></script>
+<script src="modulos/rendiciones.js?v=220"></script>
+<script src="modulos/actas-entrega.js?v=220"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
