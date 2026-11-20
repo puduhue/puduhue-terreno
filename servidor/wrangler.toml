@@ -10,6 +10,11 @@ keep_vars = true
 [observability]
 enabled = true
 
+# v215.1 (19-11-2026, con el OK de Benja): las reglas de quién puede cambiar qué (Rendiciones, Actas, Check list, Stock y
+# Control de bodega) BLOQUEAN lo que no cumple (403, no se guarda); antes solo avisaban. Para volver a «aviso», cambiar aquí.
+[vars]
+OD_MODO = "bloquear"
+
 # Notificaciones en el teléfono (v83): almacenamiento propio del servidor para los equipos registrados
 [[durable_objects.bindings]]
 name = "AVISOS"
