@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-jADidWiIlbk6S5L+D/rbwtIgrW8lWZL8vp0TjSx0UvA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Apn0O8M41+Ec6aoTNBeKLRV90E9VlEVNE2la+S/+LSY=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -3240,7 +3240,7 @@ async function tokenServidor(){
   return{tok:await getToken(),api:false};
 }
 async function srvFetch(path,op){
-  op=op||{};const u=WORKER+path+(path.includes("?")?"&":"?")+"av="+APP_VER; /* v217: la versión de la app, para saber cuándo nadie usa una anterior */
+  op=op||{};const u=WORKER+path+(String(path).includes("?")?"&":"?")+"av="+APP_VER; /* v217: la versión de la app, para saber cuándo nadie usa una anterior */
   const pedir=t=>fetch(u,Object.assign({},op,{headers:Object.assign({},op.headers||{},{Authorization:"Bearer "+t})}));
   const t=await tokenServidor();let r=await pedir(t.tok);
   if(r.status===401&&t.api){API_NO=Date.now();r=await pedir(await getToken())}
