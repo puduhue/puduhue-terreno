@@ -58,7 +58,8 @@
   Sincronización por cursor (v197): /od/rend/cambios (registro de cambios numerado en el Durable Object), /sync/medida (los
     teléfonos mandan cuánto tardó) y /od/medidas (resumen, administrador).
   Los demás módulos guardan por el servidor (v212, primero Stock y Control de bodega; v213, Check list; v214, Actas y
-    «Permisos por persona», /od/permisos): ver odmod.js. /od/reg, /od/mod/subida,
+    «Permisos por persona», /od/permisos; v215, también leen: /od/mod/bajar, /od/mod/leer, /od/mod/jsonleer, /od/mod/info y
+    /od/mod/archivo; OD_MODS_LEE = "no" apaga la lectura): ver odmod.js. /od/reg, /od/mod/subida,
     /od/mod/json y /od/mod/borrar, con «Permisos por persona» y OD_MODO; OD_MODS = "no" lo apaga.
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
@@ -70,7 +71,7 @@ import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: 
 import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
 import { rutasOneDrive, odListo } from "./onedrive.js";
 import { rutaRend, rutasArchivos, odRendActivo, odModo } from "./rendod.js";
-import { rutasModulos, odModsActivo } from "./odmod.js"; /* v212: Stock y Control de bodega guardan por el servidor */
+import { rutasModulos, odModsActivo, odModsLeeActivo } from "./odmod.js"; /* v212: Stock y Control de bodega guardan por el servidor */
 import { rutasLectura, odLeeActivo } from "./rendlee.js"; /* v196: Rendiciones lee por el servidor */ /* v194: Rendiciones guarda por el servidor, con reglas */ /* v193.1: OneDrive con la credencial propia del servidor (certificado) */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
@@ -125,7 +126,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v214";
+const VERSION_SERVIDOR = "v215";
 /* v204: tiempo máximo de espera con Finnegans (antes no había: si Finnegans no respondía, la app quedaba esperando para siempre) */
 const finnEspera = (env, ms) => AbortSignal.timeout(+env.FINN_ESPERA_MS > 0 ? +env.FINN_ESPERA_MS : ms);
 const finnTarde = e => e && (e.name === "TimeoutError" || e.name === "AbortError") ? { status: 504, error: "Finnegans está tardando en responder. Intenta de nuevo en unos minutos." } : e;
@@ -253,11 +254,11 @@ export default {
 
     try {
       // /yo → roles de quien pide (v138, B-15): administrador, Contabilidad y la lista de Contabilidad
-      if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env), odRend: odRendActivo(env), odLee: odLeeActivo(env), odCambios: odLeeActivo(env), odMods: odModsActivo(env) }); /* v212: odMods = los demás módulos guardan por el servidor */ /* v197: odCambios = sincronización por cursor */ /* v194: odRend = Rendiciones guarda por el servidor */
+      if (url.pathname === "/yo") return json({ ok: true, correo, admin: autorizado, contab: await esContab(), contabCorreos: contabDef(env), odRend: odRendActivo(env), odLee: odLeeActivo(env), odCambios: odLeeActivo(env), odMods: odModsActivo(env), odModsLee: odModsLeeActivo(env) }); /* v215: odModsLee = los demás módulos leen por el servidor */ /* v212: odMods = los demás módulos guardan por el servidor */ /* v197: odCambios = sincronización por cursor */ /* v194: odRend = Rendiciones guarda por el servidor */
       // /od/... → OneDrive con la credencial del servidor (v193.1; por ahora solo /od/prueba, del administrador)
       const av = env.AVISOS ? objetoAvisos(env) : null;
       const rle = await rutasLectura(req, env, ctx, url, { correo, json, crudo, autorizado, esContab, avisos: av }); if (rle) return rle; /* v196 */
-      const rmo = await rutasModulos(req, env, ctx, url, { correo, json, autorizado, avisos: av }); if (rmo) return rmo; /* v212: /od/reg y /od/mod/... */
+      const rmo = await rutasModulos(req, env, ctx, url, { correo, json, crudo, autorizado, avisos: av }); if (rmo) return rmo; /* v212: /od/reg y /od/mod/... */
       const rar = await rutasArchivos(req, env, ctx, url, { correo, nombre: yo.displayName || "", json, autorizado, esContab, avisos: av }); if (rar) return rar; /* v195: fotos, PDF, Excel y maestros de Rendiciones */
       const rod = await rutasOneDrive(req, env, url, { correo, json, autorizado }, { avisos: av, modo: odModo(env), rend: () => rutaRend(req, env, ctx, { correo, json, autorizado, esContab, avisos: av }) }); if (rod) return rod;
       // /push/... → notificaciones en el teléfono (cualquier cuenta de Puduhue)

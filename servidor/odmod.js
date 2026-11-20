@@ -2,7 +2,8 @@
   v212: los demás módulos también guardan por el servidor (plan «que solo el servidor escriba», etapa 3; Benja la sumó el
   19-11-2026, junto con la etapa 4, para que al final la app no necesite el permiso Files.ReadWrite.All). Primero Stock y
   Control de bodega; desde la v213, Check list (visitas, bodegas, camionetas y casas de huéspedes, y su catálogo); desde la
-  v214, Actas (viviendas, vehículos, activos fijos y capacitaciones) y «Permisos por persona».
+  v214, Actas (viviendas, vehículos, activos fijos y capacitaciones) y «Permisos por persona». Desde la v215, también LEE por
+  las personas (etapa 4): registros, stock.json, el catálogo y los archivos de los módulos.
   ----------------------------------------------------------------------------------------------------------------------------
   Igual que Rendiciones (rendod.js): la app combina en el teléfono (eTag, If-Match) y el servidor revisa quién pide y escribe con
   su credencial. Las reglas siguen OD_MODO («aviso»: anota y deja pasar; «bloquear»: 403); lo que está fuera del módulo (rutas,
@@ -13,6 +14,13 @@
     POST /od/mod/json   { mod, datos, ifMatch }                                         → { ok, eTag }   (stock.json)
     POST /od/mod/borrar { id }                                                          → { ok }         (una foto o archivo de un módulo)
     POST /od/permisos   { datos }                                                       → { ok, eTag }   (v214: Permisos_app.json, solo el administrador)
+  v215, lectura (quien no tenga «no» en el módulo; el administrador, todo; OD_MODS_LEE = "no" la apaga):
+    POST /od/mod/bajar  { col, conocidos: { id: eTag } }   → { ok, lista: [[id, eTag]], datos: { id: registro }, mas }
+                        (todos los registros de _datos con su eTag; el contenido solo de los nuevos o cambiados, de a MAX_DATOS)
+    POST /od/mod/leer   { col, id }                        → { ok, eTag, datos }   (un registro; 404 si no está)
+    POST /od/mod/jsonleer { mod, soloMeta }                → { ok, eTag, datos }   (stock.json; 404 si no está)
+    POST /od/mod/info   { mod, tipo, ruta, nombre }        → { ok, id, eTag, webUrl } (un archivo por su ruta dentro del módulo)
+    POST /od/mod/archivo { id }                            → el archivo (dentro de la carpeta de un módulo)
   Quién puede: el administrador, todo. Los demás, según «Permisos por persona» (Apps de terreno/_config/Permisos_app.json, que
   el servidor lee con su credencial, como la app: por correo y, si no está, por los otros correos de su ficha de colaborador):
   «agregar» guarda; «ver» o «no», no. En Stock (solo se ve) basta con no tener «no». El catálogo del check list
@@ -36,6 +44,8 @@ export const MODS = {
 };
 const MOD_DE_COL = Object.fromEntries(Object.entries(MODS).filter(([, m]) => m.col).map(([k, m]) => [m.col, k]));
 export const odModsActivo = env => odRendActivo(env) && String(env.OD_MODS || "").toLowerCase() !== "no";
+export const odModsLeeActivo = env => odModsActivo(env) && String(env.OD_MODS_LEE || "").toLowerCase() !== "no"; /* v215 */
+export const MAX_DATOS = 30; /* registros por pedido (los subpedidos de un Worker tienen límite) */
 const ID_OK = /^[A-Za-z0-9_-]{4,80}$/;
 const RUTA_OK = s => typeof s === "string" && s.length > 0 && s.length <= 100 && !/[\\/:*?"<>|#%]/.test(s) && s.trim() === s && s !== "." && s !== "..";
 
@@ -72,6 +82,12 @@ export function revisarMod(P, mod, correos, quien) {
   const p = permDe(P, mod, correos), m = MODS[mod];
   if (m.soloVer) return p === "no" ? [`no tiene acceso a ${m.nombre}`] : [];
   return p === "agregar" ? [] : [p === "ver" ? `en ${m.nombre} solo puede ver` : `no tiene acceso a ${m.nombre}`];
+}
+/* v215: para leer basta con no tener «no» (en un módulo que solo se ve, igual) */
+export function revisarLectura(P, mod, correos, quien) {
+  if (quien.admin) return [];
+  if (mod === "stock" && permDe(P, "cb", correos) !== "no") return []; /* quien hace conteos necesita el stock (puedeContar en la app) */
+  return permDe(P, mod, correos) === "no" ? [`no tiene acceso a ${MODS[mod].nombre}`] : [];
 }
 /* qué archivo es: { error } (400), { especial } (un archivo fijo del módulo, con su regla) o null */
 export function revisarArchivo(mod, ruta, nombre, tipo) {
@@ -113,15 +129,97 @@ async function anotarOBloquear(env, ctx, avisos, json, e) {
   return odModo(env) === "bloquear" ? json({ error: "No tienes permiso para este cambio: " + e.reglas[0] + ".", reglas: e.reglas, status: 403 }, 403) : null;
 }
 
-export async function rutasModulos(req, env, ctx, url, { correo, json, autorizado, avisos }) {
-  const rutas = ["/od/reg", "/od/mod/subida", "/od/mod/json", "/od/mod/borrar", "/od/permisos"];
+const LEE = ["/od/mod/bajar", "/od/mod/leer", "/od/mod/jsonleer", "/od/mod/info", "/od/mod/archivo"];
+/* v215: sube por las carpetas de un archivo, por id, hasta la raíz de un módulo (como máximo 7 niveles): { mod, tipo, segs, it } */
+async function ubicar(env, id) {
+  const c = odConfig(env), d = encodeURIComponent(c.drive);
+  const r = await graphApp(env, `/drives/${d}/items/${id}?$select=id,name,parentReference,folder,eTag,webUrl`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw { status: 502, error: `No se pudo leer el archivo (${r.status}).` };
+  const it = await r.json(), raices = {};
+  for (const [k, m] of Object.entries(MODS)) {
+    if (!m.tipos) { raices[m.root] = [k, ""]; if (m.datos) raices[m.datos] = [k, ""]; continue; }
+    for (const t of Object.keys(m.tipos)) { try { raices[await raizMod(env, k, t, false)] = [k, t]; } catch (e) {} }
+  }
+  let mod = null, tipo = "", pid = (it.parentReference || {}).id, segs = [];
+  for (let i = 0; i < 8 && pid && !mod; i++) {
+    if (raices[pid]) { [mod, tipo] = raices[pid]; break; }
+    const q = await graphApp(env, `/drives/${d}/items/${pid}?$select=id,name,parentReference`); if (!q.ok) break;
+    const p = await q.json(); segs.unshift(p.name); pid = (p.parentReference || {}).id;
+  }
+  return { mod, tipo, segs, it };
+}
+export async function rutasModulos(req, env, ctx, url, { correo, json, crudo, autorizado, avisos }) {
+  const rutas = ["/od/reg", "/od/mod/subida", "/od/mod/json", "/od/mod/borrar", "/od/permisos"].concat(LEE);
   if (!rutas.includes(url.pathname)) return null;
   if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
+  if (LEE.includes(url.pathname) && !odModsLeeActivo(env)) return json({ error: "El servidor no está leyendo los módulos.", status: 503 }, 503);
   if (!odModsActivo(env)) return json({ error: "El servidor no está guardando en OneDrive (falta la clave o está apagado).", status: 503 }, 503);
   let b; try { b = await req.json(); } catch (e) { return json({ error: "Pedido sin JSON." }, 400); }
   const c = odConfig(env), d = encodeURIComponent(c.drive), quien = { correo, admin: autorizado };
   try {
     const P = await permisosSrv(env), correos = await correosDeQuien(env, correo);
+    /* ---------- v215: lectura ---------- */
+    const negar = async (mod, id) => { const v = revisarLectura(P, mod, correos, quien); if (!v.length) return null;
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: `${mod}:leer`, id, correo, reglas: v }); return no; };
+    if (url.pathname === "/od/mod/bajar" || url.pathname === "/od/mod/leer") {
+      const mod = MOD_DE_COL[String(b.col || "")]; if (!mod) return json({ error: "Colección no válida." }, 400);
+      const no = await negar(mod, b.col); if (no) return no;
+      const datos = await carpetaDatosMod(env, mod);
+      if (url.pathname === "/od/mod/leer") {
+        const id = String(b.id || ""); if (!ID_OK.test(id)) return json({ error: "Id de registro no válido." }, 400);
+        const r0 = await graphApp(env, `/drives/${d}/items/${datos}:/${encodeURIComponent(id + ".json")}?$select=id,eTag`);
+        if (r0.status === 404) return json({ error: "No está.", status: 404 }, 404);
+        if (!r0.ok) return json({ error: `No se pudo leer el registro (${r0.status}).`, status: r0.status }, 502);
+        const m = await r0.json(), rc = await graphApp(env, `/drives/${d}/items/${m.id}/content`);
+        if (!rc.ok) return json({ error: `No se pudo leer el registro (${rc.status}).`, status: rc.status }, 502);
+        return json({ ok: true, eTag: m.eTag, datos: await rc.json() });
+      }
+      const con = (b && typeof b.conocidos === "object" && b.conocidos) || {}, lista = [], cambiados = [];
+      let u = `/drives/${d}/items/${datos}/children?$select=id,name,eTag,file&$top=200`;
+      for (let i = 0; u && i < 20; i++) {
+        const r = await graphApp(env, u.replace("https://graph.microsoft.com/v1.0", ""));
+        if (!r.ok) return json({ error: `No se pudo leer la lista (${r.status}).`, status: r.status }, 502);
+        const pg = await r.json();
+        for (const it of pg.value || []) { if (!it.file || !/\.json$/i.test(it.name)) continue; const id = it.name.replace(/\.json$/i, ""); if (!ID_OK.test(id)) continue;
+          lista.push([id, it.eTag]); if (con[id] !== it.eTag) cambiados.push(it); }
+        u = pg["@odata.nextLink"] || null;
+      }
+      const out = {}, toca = cambiados.slice(0, MAX_DATOS);
+      await Promise.all(toca.map(async it => { const rc = await graphApp(env, `/drives/${d}/items/${it.id}/content`); if (rc.ok) { try { out[it.name.replace(/\.json$/i, "")] = await rc.json(); } catch (e) {} } }));
+      return json({ ok: true, lista, datos: out, mas: cambiados.length > toca.length });
+    }
+    if (url.pathname === "/od/mod/jsonleer") {
+      const mod = String(b.mod || ""), m = MODS[mod]; if (!m || !m.archivo) return json({ error: "Módulo no válido." }, 400);
+      const no = await negar(mod, m.archivo); if (no) return no;
+      const r0 = await graphApp(env, `/drives/${d}/items/${m.datos}:/${encodeURIComponent(m.archivo)}?$select=id,eTag`);
+      if (r0.status === 404) return json({ error: "No está.", status: 404 }, 404);
+      if (!r0.ok) return json({ error: `No se pudo leer ${m.archivo} (${r0.status}).`, status: r0.status }, 502);
+      const x = await r0.json(); if (b.soloMeta) return json({ ok: true, eTag: x.eTag });
+      const rc = await graphApp(env, `/drives/${d}/items/${x.id}/content`); if (!rc.ok) return json({ error: `No se pudo leer ${m.archivo} (${rc.status}).`, status: rc.status }, 502);
+      return json({ ok: true, eTag: x.eTag, datos: await rc.json() });
+    }
+    if (url.pathname === "/od/mod/info") {
+      const mod = String(b.mod || ""), m = MODS[mod], ruta = b.ruta || [], arch = String(b.nombre || ""), tipo = m && m.tipos ? String(b.tipo || "visitas") : "";
+      if (!m || (m.tipos && !m.tipos[tipo]) || !Array.isArray(ruta) || ruta.length > (m.prof || 0) + 1 || !ruta.every(RUTA_OK) || !RUTA_OK(arch)) return json({ error: "Archivo no válido." }, 400);
+      const no = await negar(mod, ruta.concat([arch]).join("/")); if (no) return no;
+      let p = await raizMod(env, mod, tipo);
+      for (const sg of ruta) { const q = await graphApp(env, `/drives/${d}/items/${p}:/${encodeURIComponent(sg)}?$select=id`); if (q.status === 404) return json({ error: "No está.", status: 404 }, 404); if (!q.ok) return json({ error: `No se pudo leer (${q.status}).` }, 502); p = (await q.json()).id; }
+      const q = await graphApp(env, `/drives/${d}/items/${p}:/${encodeURIComponent(arch)}?$select=id,eTag,webUrl`);
+      if (q.status === 404) return json({ error: "No está.", status: 404 }, 404);
+      if (!q.ok) return json({ error: `No se pudo leer (${q.status}).` }, 502);
+      const x = await q.json(); return json({ ok: true, id: x.id, eTag: x.eTag, webUrl: x.webUrl });
+    }
+    if (url.pathname === "/od/mod/archivo") {
+      const id = String(b.id || ""); if (!/^01[A-Z0-9]{20,}$/i.test(id)) return json({ error: "Id no válido." }, 400);
+      const u = await ubicar(env, id); if (!u) return json({ error: "No está.", status: 404 }, 404);
+      if (!u.mod || u.it.folder) return json({ error: "No es un archivo de un módulo.", status: 403 }, 403);
+      const no = await negar(u.mod, u.segs.concat([u.it.name]).join("/")); if (no) return no;
+      const r = await graphApp(env, `/drives/${d}/items/${id}/content`);
+      if (r.status === 404) return json({ error: "No está.", status: 404 }, 404);
+      if (!r.ok) return json({ error: `No se pudo leer el archivo (${r.status}).`, status: r.status }, 502);
+      return crudo(r.body, { "Content-Type": r.headers.get("Content-Type") || "application/octet-stream", "Cache-Control": "private, max-age=0", "X-WebUrl": encodeURI(u.it.webUrl || ""), "X-ETag": u.it.eTag || "" });
+    }
     if (url.pathname === "/od/reg") {
       const mod = MOD_DE_COL[String(b.col || "")], op = b.op, id = String(b.id || "");
       if (!mod) return json({ error: "Colección no válida." }, 400);
