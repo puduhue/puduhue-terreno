@@ -1936,7 +1936,7 @@ function rdDocCard(r,d){
   const soloAv=pend.length&&pend.every(x=>x.t==="aviso"); /* v202 */
   const lin=pend.length?`<span class="rdcl${soloAv?" aviso":""}">${ICO_ALERTA}<span>${esc(pend[0].t==="pedido"?"Pedido: "+pend[0].m:msgCorto(pend[0].m))}${pend.length>1?` <span class="rdcl-mas">· y ${pend.length-1} más</span>`:""}</span></span>`:L.length?`<span class="rdcl bien">${RDFIC_OK}<span>Corregido</span></span>`:"";
   return `<div class="rdd${soloAv?" aviso":pend.length?" mal":L.length?" bien":""}" role="button" tabindex="0" data-a="rdDoc" data-k="${esc(d.k)}">
-    <span class="rdth"><span class="th${src?"":" miss"}">${src?`<img src="${esc(src)}" alt="">`:d.foto?(navigator.onLine===false?"Sin señal":"Cargando…"):"Sin foto"}</span></span>
+    <span class="rdth"><span class="th${src?"":" miss"}"${!src&&d.foto?` data-thref="${esc(d.foto)}"`:""}>${src?`<img src="${esc(src)}" alt="">`:d.foto?(navigator.onLine===false?"Sin señal":"Cargando…"):"Sin foto"}</span></span>
     <span class="rdx"><span class="rdt">${esc(d.emisor||"Documento sin emisor")}</span><span class="rdm">${d.fecha?fmtD(d.fecha):"Sin fecha"}${d.folio?` · N° ${esc(d.folio)}`:""}${d.tipo?` · ${esc(TIPO_DOC[d.tipo]||d.tipo)}`:""}</span><span class="rdm">${[centro?centroNombre(centro):"",cat?cat.n:""].filter(Boolean).map(esc).join(" · ")||"Sin centro ni tipo de gasto"}${d.dist?` · reparto ${esc(d.dist)}`:""}</span>${lin}<span class="bodc">${pdfCh}${ch.slice(0,2).join("")}</span></span>
     <span class="rdv"><b>${num(d.total)?fmtP(num(d.total)):"—"}</b></span></div>`;
 }
@@ -2904,4 +2904,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="219"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="220"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
