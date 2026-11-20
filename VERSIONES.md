@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 218 | 2026-11-19 | [00ed1a6](https://github.com/puduhue/puduhue-terreno/tree/00ed1a6) | Seguridad: Administración › «Cambios rechazados por el servidor»: quién intentó qué, la regla que no cumplió, si se rechazó o solo se anotó, y cuándo. |
 | 217 | 2026-11-19 | [1da4ee9](https://github.com/puduhue/puduhue-terreno/tree/1da4ee9) | Seguridad: la app ya no pide el permiso amplio de OneDrive (Files.ReadWrite.All), solo «quién eres»; todo lo de OneDrive pasa por el servidor. En Administración: «Reglas del servidor» y «Versiones en uso (7 días)», para saber cuándo quitar el permiso en Entra. Servidor v217. |
 | 216 | 2026-11-19 | [9989ba2](https://github.com/puduhue/puduhue-terreno/tree/9989ba2) | Seguridad: las fotos y PDF de todos los módulos, los enlaces de las fotos en los Excel, el Excel de colaboradores de Contabilidad y «Ordenar fotos antiguas» van por el servidor. Las fechas con hora se muestran con el día de Chile (antes, de 21:00 a 24:00 salía el día siguiente). Servidor v216. |
 | 215.1 (solo servidor) | 2026-11-19 | [3ac1286](https://github.com/puduhue/puduhue-terreno/tree/3ac1286) | Seguridad: las reglas de quién puede cambiar qué (Rendiciones, Actas, Check list, Stock y Control de bodega) ahora bloquean lo que no cumple, en vez de solo avisar (OD_MODO = "bloquear" en servidor/wrangler.toml). La app no cambia (sigue la v215). |
