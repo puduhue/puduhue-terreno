@@ -158,11 +158,14 @@ export class Avisos extends DurableObject {
   async odDatos(ids) { const out = {}; for (const id of ids || []) { const x = await this.ctx.storage.get("rl:d:" + id); if (x) out[id] = x; } return out; }
   async leerAntiguo() { const x = await this.ctx.storage.get("antiguo"); return x ? { total: x.total, desde: x.desde, ultimo: x.ultimo } : { total: 0 }; }
   /* v141.1 (M-26): cómo llega la sesión (api: permiso propio; graph: token de Graph), por día, con huellas de correo (no correos) */
-  async contarSesion(modo, correo, fecha) {
+  async contarSesion(modo, correo, fecha, ver = "") {
     if (modo !== "api" && modo !== "graph") return;
     const h = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(correo || "").toLowerCase())))).slice(0, 6).map(b => b.toString(16).padStart(2, "0")).join("");
     const x = (await this.ctx.storage.get("sesiones")) || { desde: fecha, api: {}, graph: {} };
     const d = x[modo][fecha] || (x[modo][fecha] = { n: 0, p: [] }); d.n++; if (!d.p.includes(h)) d.p.push(h);
+    /* v217: la última versión de la app de cada persona (por huella); sin versión = anterior a la v217 */
+    const vs = x.ver || (x.ver = {}); vs[h] = { v: ver || "anterior", f: fecha };
+    for (const k of Object.keys(vs)) if (vs[k].f < new Date(Date.parse(fecha + "T12:00:00Z") - 30 * 864e5).toISOString().slice(0, 10)) delete vs[k];
     for (const m of ["api", "graph"]) { const ks = Object.keys(x[m]).sort(); while (ks.length > 30) delete x[m][ks.shift()]; }
     await this.ctx.storage.put("sesiones", x);
   }
@@ -172,6 +175,7 @@ export class Avisos extends DurableObject {
     for (const m of ["api", "graph"]) { const ds = Object.keys(x[m]).filter(f => f >= desde7), p = new Set(); let n = 0;
       ds.forEach(f => { n += x[m][f].n; x[m][f].p.forEach(h => p.add(h)); });
       r[m] = { pedidos7: n, personas7: p.size, ultimo: Object.keys(x[m]).sort().pop() || null }; }
+    const v7 = {}; Object.values(x.ver || {}).filter(y => y.f >= desde7).forEach(y => { v7[y.v] = (v7[y.v] || 0) + 1; }); r.versiones7 = v7; /* v217 */
     return r;
   }
   /* v142: resultado de la revisión diaria de la clave de Claude; aviso al administrador si falla (una vez al día) y al volver */
