@@ -21,6 +21,10 @@
     POST /od/mod/jsonleer { mod, soloMeta }                → { ok, eTag, datos }   (stock.json; 404 si no está)
     POST /od/mod/info   { mod, tipo, ruta, nombre }        → { ok, id, eTag, webUrl } (un archivo por su ruta dentro del módulo)
     POST /od/mod/archivo { id }                            → el archivo (dentro de la carpeta de un módulo)
+  v216:
+    POST /od/mod/meta   { id }                             → { ok, webUrl, eTag }  (el enlace de una foto para los Excel)
+    POST /od/mod/mover  { id, ruta, nombre }               → { ok, id, webUrl }    (solo el administrador: «Ordenar fotos antiguas»,
+                        de Actas/fotos —la carpeta de las primeras versiones— a la carpeta de su acta)
   Quién puede: el administrador, todo. Los demás, según «Permisos por persona» (Apps de terreno/_config/Permisos_app.json, que
   el servidor lee con su credencial, como la app: por correo y, si no está, por los otros correos de su ficha de colaborador):
   «agregar» guarda; «ver» o «no», no. En Stock (solo se ve) basta con no tener «no». El catálogo del check list
@@ -40,7 +44,8 @@ export const MODS = {
     especiales: [{ tipo: "visitas", ruta: ["_config"], nombre: "Catalogo_check_list.xlsx", soloAdmin: "el catálogo del check list lo cambia solo el administrador" }] },
   /* v214: Actas/{Viviendas|Vehículos|Activos fijos}/{predio}/{Entregas|Devoluciones}/{fecha …}/Fotos y Actas/Capacitaciones/{fecha tema}/Fotos
      (carpetaActa en index.html); los Excel consolidados en la carpeta de cada tipo */
-  ax: { nombre: "Actas", col: "actas", root: "01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC", ext: /\.(jpe?g|png|webp|heic|pdf|xlsx)$/i, prof: 5, primeras: ["Viviendas", "Vehículos", "Activos fijos", "Capacitaciones"] },
+  ax: { nombre: "Actas", col: "actas", root: "01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC", ext: /\.(jpe?g|png|webp|heic|pdf|xlsx)$/i, prof: 5, primeras: ["Viviendas", "Vehículos", "Activos fijos", "Capacitaciones"],
+    legado: "fotos" /* v216: Actas/fotos, de las primeras versiones (fotos guardadas por nombre); solo .jpg, para leer, borrar y ordenar */ },
 };
 const MOD_DE_COL = Object.fromEntries(Object.entries(MODS).filter(([, m]) => m.col).map(([k, m]) => [m.col, k]));
 export const odModsActivo = env => odRendActivo(env) && String(env.OD_MODS || "").toLowerCase() !== "no";
@@ -90,7 +95,7 @@ export function revisarLectura(P, mod, correos, quien) {
   return permDe(P, mod, correos) === "no" ? [`no tiene acceso a ${MODS[mod].nombre}`] : [];
 }
 /* qué archivo es: { error } (400), { especial } (un archivo fijo del módulo, con su regla) o null */
-export function revisarArchivo(mod, ruta, nombre, tipo) {
+export function revisarArchivo(mod, ruta, nombre, tipo, op = {}) {
   const m = MODS[mod]; if (!m) return { error: "Módulo no válido." };
   if (m.tipos && !m.tipos[tipo || "visitas"]) return { error: "Tipo de check list no válido." };
   const esp = (m.especiales || []).find(e => e.tipo === (tipo || "visitas") && e.nombre === nombre && JSON.stringify(e.ruta) === JSON.stringify(ruta));
@@ -99,6 +104,7 @@ export function revisarArchivo(mod, ruta, nombre, tipo) {
   if (!RUTA_OK(nombre) || nombre.length > 150 || nombre.toLowerCase().endsWith(".json")) return { error: "Nombre de archivo no válido." };
   if (!m.ext.test(nombre)) return { error: "Tipo de archivo no permitido en este módulo." };
   if (ruta[0] && ruta[0].startsWith("_")) return { error: "Carpeta no válida." };
+  if (m.legado && ruta.length === 1 && ruta[0] === m.legado) return !op.legado ? { error: "En la carpeta antigua no se suben archivos." } : /\.jpe?g$/i.test(nombre) ? null : { error: "En la carpeta antigua solo hay fotos." }; /* v216: solo leer, borrar y ordenar */
   if (m.primeras && !m.primeras.includes(String(ruta[0] || "").normalize("NFC"))) return { error: "Carpeta no válida." };
   return null;
 }
@@ -129,7 +135,7 @@ async function anotarOBloquear(env, ctx, avisos, json, e) {
   return odModo(env) === "bloquear" ? json({ error: "No tienes permiso para este cambio: " + e.reglas[0] + ".", reglas: e.reglas, status: 403 }, 403) : null;
 }
 
-const LEE = ["/od/mod/bajar", "/od/mod/leer", "/od/mod/jsonleer", "/od/mod/info", "/od/mod/archivo"];
+const LEE = ["/od/mod/bajar", "/od/mod/leer", "/od/mod/jsonleer", "/od/mod/info", "/od/mod/archivo", "/od/mod/meta"];
 /* v215: sube por las carpetas de un archivo, por id, hasta la raíz de un módulo (como máximo 7 niveles): { mod, tipo, segs, it } */
 async function ubicar(env, id) {
   const c = odConfig(env), d = encodeURIComponent(c.drive);
@@ -150,7 +156,7 @@ async function ubicar(env, id) {
   return { mod, tipo, segs, it };
 }
 export async function rutasModulos(req, env, ctx, url, { correo, json, crudo, autorizado, avisos }) {
-  const rutas = ["/od/reg", "/od/mod/subida", "/od/mod/json", "/od/mod/borrar", "/od/permisos"].concat(LEE);
+  const rutas = ["/od/reg", "/od/mod/subida", "/od/mod/json", "/od/mod/borrar", "/od/permisos", "/od/mod/mover"].concat(LEE);
   if (!rutas.includes(url.pathname)) return null;
   if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
   if (LEE.includes(url.pathname) && !odModsLeeActivo(env)) return json({ error: "El servidor no está leyendo los módulos.", status: 503 }, 503);
@@ -219,6 +225,25 @@ export async function rutasModulos(req, env, ctx, url, { correo, json, crudo, au
       if (r.status === 404) return json({ error: "No está.", status: 404 }, 404);
       if (!r.ok) return json({ error: `No se pudo leer el archivo (${r.status}).`, status: r.status }, 502);
       return crudo(r.body, { "Content-Type": r.headers.get("Content-Type") || "application/octet-stream", "Cache-Control": "private, max-age=0", "X-WebUrl": encodeURI(u.it.webUrl || ""), "X-ETag": u.it.eTag || "" });
+    }
+    if (url.pathname === "/od/mod/meta") { /* v216 */
+      const id = String(b.id || ""); if (!/^01[A-Z0-9]{20,}$/i.test(id)) return json({ error: "Id no válido." }, 400);
+      const u = await ubicar(env, id); if (!u) return json({ error: "No está.", status: 404 }, 404);
+      if (!u.mod || u.it.folder) return json({ error: "No es un archivo de un módulo.", status: 403 }, 403);
+      const no = await negar(u.mod, u.segs.concat([u.it.name]).join("/")); if (no) return no;
+      return json({ ok: true, webUrl: u.it.webUrl || "", eTag: u.it.eTag || "" });
+    }
+    if (url.pathname === "/od/mod/mover") { /* v216: «Ordenar fotos antiguas» (administrador) */
+      if (!quien.admin) return json({ error: "Solo el administrador ordena las fotos antiguas.", status: 403 }, 403);
+      const id = String(b.id || ""), ruta = b.ruta || [], arch = String(b.nombre || "");
+      if (!/^01[A-Z0-9]{20,}$/i.test(id)) return json({ error: "Id no válido." }, 400);
+      const v = revisarArchivo("ax", ruta, arch); if (v || ruta[0] === MODS.ax.legado) return json({ error: (v && v.error) || "Carpeta no válida." }, 400);
+      const u = await ubicar(env, id); if (!u) return json({ error: "No está.", status: 404 }, 404);
+      if (u.mod !== "ax" || u.segs.length !== 1 || u.segs[0] !== MODS.ax.legado || u.it.folder) return json({ error: "Solo se ordenan fotos de la carpeta antigua de Actas." }, 400);
+      const destino = await carpetaMod(env, "ax", ruta, "");
+      const r = await graphApp(env, `/drives/${d}/items/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parentReference: { id: destino }, name: arch }) });
+      if (!r.ok) return json({ error: `OneDrive no movió la foto (${r.status}).`, status: r.status }, r.status === 409 ? 409 : 502);
+      const x = await r.json(); return json({ ok: true, id: x.id, webUrl: x.webUrl || "" });
     }
     if (url.pathname === "/od/reg") {
       const mod = MOD_DE_COL[String(b.col || "")], op = b.op, id = String(b.id || "");
@@ -298,7 +323,7 @@ export async function rutasModulos(req, env, ctx, url, { correo, json, crudo, au
         const q = await graphApp(env, `/drives/${d}/items/${pid}?$select=id,name,parentReference`); if (!q.ok) break;
         const p = await q.json(); segs.unshift(p.name); pid = (p.parentReference || {}).id;
       }
-      if (it.folder || !mod || segs.some(s => String(s).startsWith("_")) || revisarArchivo(mod, segs, it.name, tipo)) return json({ error: "Solo se eliminan fotos o archivos de un módulo." }, 400);
+      if (it.folder || !mod || segs.some(s => String(s).startsWith("_")) || revisarArchivo(mod, segs, it.name, tipo, { legado: true })) return json({ error: "Solo se eliminan fotos o archivos de un módulo." }, 400);
       const no = await anotarOBloquear(env, ctx, avisos, json, { op: `${mod}:borrar`, id: segs.concat([it.name]).join("/"), correo, reglas: revisarMod(P, mod, correos, quien) }); if (no) return no;
       r = await graphApp(env, `/drives/${d}/items/${id}`, { method: "DELETE" });
       if (!r.ok && r.status !== 404) return json({ error: `OneDrive no eliminó el archivo (${r.status}).`, status: r.status }, 502);

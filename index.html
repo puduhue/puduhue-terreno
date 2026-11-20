@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-YIQQjv16N0MT6wX0jCIrEeLf/fBIe12PYrElbVXvf1A=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-07sqFNCCVtRAVtgOylvdThlYc44Br4QlCYsZR4x4sGA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=215">
+<link rel="stylesheet" href="estilos.css?v=216">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="215";
+const APP_VER="216";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -205,7 +205,11 @@ function sinPerderFoco(fn){const run=()=>{if(PTR_ABAJO&&Date.now()-PTR_ABAJO<150
   fn();if(!s)return;const n=document.querySelector(s);if(!n||n===a||n.disabled)return;n.focus({preventScroll:true});try{if(i0!=null)n.setSelectionRange(i0,i1)}catch(e){}};
   setTimeout(run,0)}
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-const fmtD=s=>{if(!s)return"";const p=String(s).slice(0,10).split("-");return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:s};
+/* v216: una fecha con hora en UTC («…T23:30:00Z») se muestra con el día de Chile (antes, de 21:00 a 24:00 salía el día siguiente);
+   a medianoche UTC es una fecha sin hora (así vienen algunas de Finnegans) y queda igual */
+const fmtD=s=>{if(!s)return"";let t=String(s);const m=/^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})[^]*?(Z|[+-]\d{2}:?\d{2})$/.exec(t);
+  if(m&&!(m[1]==="00"&&m[2]==="00")){const d=new Date(t);if(!isNaN(d))t=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+  const p=t.slice(0,10).split("-");return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:s};
 function rutClean(s){return String(s||"").replace(/[^0-9kK]/g,"").toUpperCase()}
 function rutFmt(s){const c=rutClean(s);if(c.length<2)return c;const b=c.slice(0,-1),dv=c.slice(-1);return b.replace(/\B(?=(\d{3})+(?!\d))/g,".")+"-"+dv}
 function rutOk(s){const c=rutClean(s);if(c.length<2)return false;const b=c.slice(0,-1),dv=c.slice(-1);if(!/^\d+$/.test(b))return false;let sum=0,m=2;for(let i=b.length-1;i>=0;i--){sum+=(+b[i])*m;m=m===7?2:m+1}const r=11-(sum%11);return (r===11?"0":r===10?"K":String(r))===dv}
@@ -479,7 +483,12 @@ async function metaRegistro(col,id,ruta){if(odLeeCol(col)){const j=col==="rendic
 /* v196: un archivo por id; si OneDrive no deja (403/404) y Rendiciones lee por el servidor, se le pide al servidor */
 async function odArchivo(id){let r;try{r=await srvFetch("/od/archivo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})}catch(e){if(e&&e.code)throw e;throw{code:"network"}}
   if(r.ok)return r;if(r.status===404)throw{code:"not_found"};if(r.status===403)throw{code:"forbidden"};throw{code:"graph",status:r.status}}
-async function leerArchivo(fid){try{return await gfetch(`/drives/${M365.drive}/items/${fid}/content`)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")){const R=rolesSrv(); /* v215: primero los módulos, después Rendiciones */
+/* v216: ¿es una foto o un PDF de una rendición? (para pedirlo a la ruta que corresponde) */
+const esRefRend=ref=>Object.values(REND).some(r=>r&&Object.values(r.docs||{}).some(d=>d&&(d.foto===ref||d.pdf===ref)));
+async function leerArchivo(fid){const R=rolesSrv();
+  if(R.odModsLee){const rend=esRefRend("a:"+fid),L=(rend?[R.odLee&&odArchivo,odArchivoMod]:[odArchivoMod,R.odLee&&odArchivo]).filter(Boolean); /* v216: primero por el servidor */
+    for(let i=0;i<L.length;i++){try{return await L[i](fid)}catch(e){if(i===L.length-1||!(e&&e.code==="forbidden"))throw e}}}
+  try{return await gfetch(`/drives/${M365.drive}/items/${fid}/content`)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")){const R=rolesSrv(); /* v215: primero los módulos, después Rendiciones */
   if(R.odModsLee){try{return await odArchivoMod(fid)}catch(x){if(!R.odLee||!(x&&(x.code==="forbidden"||x.code==="not_found")))throw x}}if(R.odLee)return odArchivo(fid)}throw e}}
 /* v215: Actas, Check list y Control de bodega se bajan por el servidor: todos los registros con su eTag y el contenido solo de
    los nuevos o cambiados, de a 30 (se repite mientras el servidor diga «mas») */
@@ -733,7 +742,7 @@ const GAS={
       const r=await actaSubir(a,"Fotos",nombreFoto(a,meta.k,meta.ref),blob,blob.type||"image/jpeg");id=r.id;url=r.webUrl}
     try{if(IDB.db)await IDB.put("cache","a:"+id,{data:await blob.arrayBuffer(),type:blob.type||"image/jpeg"})}catch(e){}
     return{id,url}},
-  async delete(id){try{if(esItemId(id))await gfetch(`/drives/${M365.drive}/items/${id}`,{method:"DELETE"}).catch(async e=>{if(e&&e.code==="forbidden"&&(rolesSrv().odRend||rolesSrv().odMods))await odBorrar(id);else throw e}); /* v195; v212: odBorrar */else{const f=await asegurarCarpetas();await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(id+".jpg")}`,{method:"DELETE"})}}catch(e){if(e.code!=="not_found")throw e}if(IDB.db)IDB.del("cache","a:"+id).catch(()=>{})}
+  async delete(id){try{if(esItemId(id))await gfetch(`/drives/${M365.drive}/items/${id}`,{method:"DELETE"}).catch(async e=>{if(e&&e.code==="forbidden"&&(rolesSrv().odRend||rolesSrv().odMods))await odBorrar(id);else throw e}); /* v195; v212: odBorrar */else if(rolesSrv().odMods&&rolesSrv().odModsLee){const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:id+".jpg"});await odPedir("/od/mod/borrar",{id:x.id})} /* v216 */else{const f=await asegurarCarpetas();await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(id+".jpg")}`,{method:"DELETE"})}}catch(e){if(e.code!=="not_found")throw e}if(IDB.db)IDB.del("cache","a:"+id).catch(()=>{})}
 };
 const PIDIENDO={};const esItemId=x=>/^01[A-Z0-9]{20,}$/i.test(x);
 function pedirFoto(ref){
@@ -742,7 +751,7 @@ function pedirFoto(ref){
     try{
       if(IDB.db){const c=await IDB.get("cache",ref);const b=await recBlob(c);if(b){FOTO[ref]=URL.createObjectURL(b);return}}
       if(!DB||navigator.onLine===false)return;
-      const fid=ref.slice(2);let r;if(esItemId(fid))r=await leerArchivo(fid); /* v196 */else{const f=await asegurarCarpetas();r=await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(fid+".jpg")}:/content`)}const b=await r.blob();
+      const fid=ref.slice(2);let r;if(esItemId(fid))r=await leerArchivo(fid); /* v196 */else if(rolesSrv().odModsLee){const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:fid+".jpg"});r=await odArchivoMod(x.id)} /* v216: foto antigua, por el servidor */else{const f=await asegurarCarpetas();r=await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(fid+".jpg")}:/content`)}const b=await r.blob();
       if(!b||!b.size)return;FOTO[ref]=URL.createObjectURL(b);
       try{if(IDB.db)await IDB.put("cache",ref,{data:await b.arrayBuffer(),type:b.type||"image/jpeg"})}catch(e){}
     }catch(e){if(e&&e.code==="not_found")LOST[ref]=true}
@@ -3158,7 +3167,7 @@ function actasXlsxBuild(){
 async function urlsAlDia(docs,marca,guardar){
   for(const a of docs){const U=a.fotoUrl;if(!U)continue;const m=marca(a);
     const malos=Object.keys(U).filter(r=>r.startsWith("a:")&&esItemId(r.slice(2))&&!String(U[r]).includes(m));if(!malos.length)continue;
-    let n=0;for(const r of malos){try{const it=await gjson(`/drives/${M365.drive}/items/${r.slice(2)}?$select=webUrl`);if(it&&it.webUrl&&it.webUrl!==U[r]){U[r]=it.webUrl;n++}}catch(e){console.warn("enlace foto",r,e)}}
+    let n=0;for(const r of malos){try{const it=rolesSrv().odModsLee?await odPedir("/od/mod/meta",{id:r.slice(2)}) /* v216 */:await gjson(`/drives/${M365.drive}/items/${r.slice(2)}?$select=webUrl`);if(it&&it.webUrl&&it.webUrl!==U[r]){U[r]=it.webUrl;n++}}catch(e){console.warn("enlace foto",r,e)}}
     if(n&&(a.estado==="cerrada"||a.anulada)&&!LOCAL[a.id]){a.actualizado=new Date().toISOString();await guardar(a)}}
 }
 const marcaActa=a=>"/Actas/"+encodeURIComponent(carpetaActa(a)[0])+"/";
@@ -3184,13 +3193,15 @@ async function ordenarFotosAntiguas(){
   const total=fotosAntiguas();if(!total){toast("No hay fotos antiguas por ordenar.");return}
   if(!(await ask(`¿Mover ${total} fotos a las carpetas de sus actas?`,"Se renombran con sección e ítem y quedan dentro de la carpeta de cada acta. Los enlaces del Excel se actualizan.","Mover")))return;
   let hechas=0,fallas=0;toast("Ordenando fotos…");
-  const f=await asegurarCarpetas();
+  const srv=rolesSrv().odMods&&rolesSrv().odModsLee,f=srv?null:await asegurarCarpetas(); /* v216: con el servidor, /od/mod/info y /od/mod/mover */
   for(const a of Object.values(ACTAS)){if(a._col==="visitas")continue;let cambio=false;
     for(const [k,r] of Object.entries(a.items||{})){const fs=r.fotos||[];
       for(let i=0;i<fs.length;i++){const ref=fs[i];if(!ref.startsWith("a:")||esItemId(ref.slice(2)))continue;
-        try{const it=await gjson(`/drives/${M365.drive}/items/${f.fotos}:/${encName(ref.slice(2)+".jpg")}`);
+        try{let nuevo;if(srv){const it=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:ref.slice(2)+".jpg"});
+            nuevo=await odPedir("/od/mod/mover",{id:it.id,ruta:carpetaActa(a).concat(["Fotos"]),nombre:nombreFoto(a,k,ref)})}
+          else{const it=await gjson(`/drives/${M365.drive}/items/${f.fotos}:/${encName(ref.slice(2)+".jpg")}`);
           const folder=await actaCarpeta(carpetaActa(a).concat(["Fotos"]));
-          const nuevo=await gjson(`/drives/${M365.drive}/items/${it.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({parentReference:{id:folder},name:nombreFoto(a,k,ref)})});
+          nuevo=await gjson(`/drives/${M365.drive}/items/${it.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({parentReference:{id:folder},name:nombreFoto(a,k,ref)})})}
           const nref="a:"+nuevo.id;fs[i]=nref;(a.fotoUrl=a.fotoUrl||{})[nref]=nuevo.webUrl;if(FOTO[ref])FOTO[nref]=FOTO[ref];
           try{if(IDB.db){const c=await IDB.get("cache",ref);if(c)await IDB.put("cache",nref,c)}}catch(e){}
           if(a.antes)Object.values(ACTAS).forEach(d=>{/* devoluciones que comparan con esta entrega miran por id de acta, no por ref */});
@@ -3916,10 +3927,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=215"></script>
-<script src="modulos/bodega.js?v=215"></script>
-<script src="modulos/rendiciones.js?v=215"></script>
-<script src="modulos/actas-entrega.js?v=215"></script>
+<script src="modulos/checklist.js?v=216"></script>
+<script src="modulos/bodega.js?v=216"></script>
+<script src="modulos/rendiciones.js?v=216"></script>
+<script src="modulos/actas-entrega.js?v=216"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
