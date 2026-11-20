@@ -2563,3 +2563,26 @@ details>*{box-sizing:border-box}
 @media (min-width:1100px){
   body.conlat[data-pant="rd"] main h1:has(+.filt){margin-bottom:0}
 }
+
+/* ---------- v225: tope de colación ---------- */
+.coltope{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--r-ink,#8A5A00);border-radius:14px;padding:12px 14px;margin:14px 0}
+.coltope .coltc{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;margin-bottom:4px}
+.coltope .coltc b{font-size:15px}.coltope .coltc span{font-size:13px;color:var(--muted)}
+.coltope .coltd{border-top:1px solid var(--line);padding:10px 0 4px}
+.coltope .coltd:nth-child(2){border-top:0}
+.coltope .coltt{display:flex;justify-content:space-between;gap:12px;font-size:15px}
+.coltope .coltt b{white-space:nowrap}
+.coltope .coltt span{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.coltope .coltq{font-size:13.5px;color:var(--muted);margin-top:2px}
+.coltope .colte{font-size:14px;margin-top:6px}
+.coltope .coltd.ok .colte{color:var(--b-ink)}
+.coltope .coltb{margin-top:10px}
+.coltope .coltb button[data-v="completo"][aria-pressed="true"]{background:var(--b-bg);color:var(--b-ink);border-color:var(--b-ink)}
+.coltope .coltb button[data-v="tope"][aria-pressed="true"]{background:var(--r-bg);color:var(--r-ink);border-color:var(--r-ink)}
+.coltope .coltlst{list-style:none;margin:6px 0 0;padding:0}
+.coltope .coltlst li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px dashed var(--line);font-size:14px}
+.coltope .coltlst li:first-child{border-top:0}
+.coltope .coltl{min-width:0}.coltope .coltl small{display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+.coltope .coltm{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rdv small.rdtope{font-size:12px;color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}
+.colhint{grid-column:1/-1;margin:0}
