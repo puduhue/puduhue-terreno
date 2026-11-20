@@ -28,6 +28,9 @@ function filasSt(){filas();return STOCK?SKS:[]}
 async function stockCargarLocal(){try{if(IDB.db){const d=await IDB.get("remote","stock/actual");if(d&&d.filas){STOCK=d;STOCK_ETAG=d.etag||""}}}catch(e){}}
 async function stockPull(){
   if(!DB||navigator.onLine===false||!(puedeVerStock()||puedeContar()))return false;
+  if(rolesSrv().odModsLee){let j;try{j=await odPedir("/od/mod/jsonleer",{mod:"stock",soloMeta:true})}catch(e){if(e.code!=="not_found")throw e;return false} /* v215: por el servidor */
+    if(j.eTag===STOCK_ETAG&&STOCK)return false;const x=await odPedir("/od/mod/jsonleer",{mod:"stock"});const d=x.datos;d.etag=x.eTag;STOCK=d;STOCK_ETAG=x.eTag;
+    try{if(IDB.db)await IDB.put("remote","stock/actual",d)}catch(e){}return true}
   let meta=null;try{meta=await gjson(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e;return false}
   if(meta.eTag===STOCK_ETAG&&STOCK)return false;
   const r=await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const d=await r.json();d.etag=meta.eTag;STOCK=d;STOCK_ETAG=meta.eTag;
@@ -61,7 +64,9 @@ function stockMezclar(base,R,dep,hora,por,reporte){
 async function stockGuardar(mezclar,conBase){
   for(let i=0;;i++){
     let meta=null,base=null;
-    if(conBase){try{meta=await gjson(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e}
+    if(conBase&&rolesSrv().odModsLee){try{const j=await odPedir("/od/mod/jsonleer",{mod:"stock",soloMeta:true});meta={eTag:j.eTag}; /* v215 */
+        base=STOCK&&j.eTag===STOCK_ETAG?STOCK:(x=>{meta.eTag=x.eTag;return x.datos})(await odPedir("/od/mod/jsonleer",{mod:"stock"}))}catch(e){if(e.code!=="not_found")throw e}}
+    else if(conBase){try{meta=await gjson(`/drives/${M365.drive}/items/${STK.datos}:/${STK.file}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e}
       if(meta)base=STOCK&&meta.eTag===STOCK_ETAG?STOCK:await(await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json()}
     const snap=mezclar(base),h={"Content-Type":"application/json"};if(meta&&!IFM_NO)h["If-Match"]=meta.eTag;
     try{const it=rolesSrv().odMods?await odPedir("/od/mod/json",{mod:"stock",datos:snap,ifMatch:h["If-Match"]||null}) /* v212: por el servidor */
@@ -518,4 +523,4 @@ async function cbPdf(c,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_BODEGA=true;
-window.MODV=window.MODV||{};window.MODV["bodega"]="214"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["bodega"]="215"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

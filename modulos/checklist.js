@@ -306,10 +306,11 @@ function catalogoDesdeExcel(buf){const wb=XLSX.read(buf,{type:"array"});const ws
 const CAT_PATH=["_config"],CAT_FILE="Catalogo_check_list.xlsx";
 async function cargarCatalogo(){
   if(!DB||navigator.onLine===false)return false;
-  let meta=null;try{const f=await clCarpeta(CAT_PATH);meta=await gjson(`/drives/${M365.drive}/items/${f}:/${encName(CAT_FILE)}?$select=id,eTag`)}catch(e){if(e.code!=="not_found")throw e}
+  if(rolesSrv().odModsLee&&!permVe("cl"))return false; /* v215: sin acceso a Check list, no se pide */
+  let meta=null;try{if(rolesSrv().odModsLee)meta=await odPedir("/od/mod/info",{mod:"cl",tipo:"visitas",ruta:CAT_PATH,nombre:CAT_FILE}); /* v215 */else{const f=await clCarpeta(CAT_PATH);meta=await gjson(`/drives/${M365.drive}/items/${f}:/${encName(CAT_FILE)}?$select=id,eTag`)}}catch(e){if(e.code!=="not_found")throw e}
   if(!meta){if(esAdmin()){await guardarCatalogo(false);return true}return false}
   if(meta.eTag===CAT_ETAG){if(CAT_AGREGADO&&esAdmin()){CAT_AGREGADO=false;await guardarCatalogo(false)}return false}
-  const r=await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const buf=await r.arrayBuffer();
+  const r=rolesSrv().odModsLee?await odArchivoMod(meta.id):await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const buf=await r.arrayBuffer(); /* v215 */
   const lista=catalogoDesdeExcel(buf);CAT_AGREGADO=false;catalogoSet(lista);CAT_ETAG=meta.eTag;CAT_ORIGEN="onedrive";
   if(CAT_AGREGADO&&esAdmin()){CAT_AGREGADO=false;await guardarCatalogo(false);return true}
   try{localStorage.setItem(CATK,JSON.stringify({etag:CAT_ETAG,items:CL_ITEMS.map(i=>({key:i.key,area:i.area,sheet:i.sheet,fam:i.fam,group:i.group,n:i.n,txt:i.txt,prot:i.prot,evid:i.evid,star:i.star,retirado:i.retirado,orden:i.orden}))}))}catch(e){}
@@ -1478,4 +1479,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="214"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="215"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
