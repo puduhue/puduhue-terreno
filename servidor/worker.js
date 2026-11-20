@@ -59,7 +59,8 @@
     teléfonos mandan cuánto tardó) y /od/medidas (resumen, administrador).
   Los demás módulos guardan por el servidor (v212, primero Stock y Control de bodega; v213, Check list; v214, Actas y
     «Permisos por persona», /od/permisos; v215, también leen: /od/mod/bajar, /od/mod/leer, /od/mod/jsonleer, /od/mod/info y
-    /od/mod/archivo; v216: /od/mod/meta y /od/mod/mover; OD_MODS_LEE = "no" apaga la lectura): ver odmod.js. /od/reg, /od/mod/subida,
+    /od/mod/archivo; v216: /od/mod/meta y /od/mod/mover; OD_MODS_LEE = "no" apaga la lectura): ver odmod.js.
+  v217: la app manda su versión (?av=) y /salud dice cuántas personas usan cada una en los últimos 7 días (versiones7). /od/reg, /od/mod/subida,
     /od/mod/json y /od/mod/borrar, con «Permisos por persona» y OD_MODO; OD_MODS = "no" lo apaga.
   (También acepta los nombres anteriores FINN_API_KEY y FINN_SECRET_KEY.)
 */
@@ -126,7 +127,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v216"; /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
+const VERSION_SERVIDOR = "v217"; /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
 /* v204: tiempo máximo de espera con Finnegans (antes no había: si Finnegans no respondía, la app quedaba esperando para siempre) */
 const finnEspera = (env, ms) => AbortSignal.timeout(+env.FINN_ESPERA_MS > 0 ? +env.FINN_ESPERA_MS : ms);
 const finnTarde = e => e && (e.name === "TimeoutError" || e.name === "AbortError") ? { status: 504, error: "Finnegans está tardando en responder. Intenta de nuevo en unos minutos." } : e;
@@ -245,7 +246,7 @@ export default {
     }
     const correo = String(yo.mail || yo.userPrincipalName || "").toLowerCase();
     if (!correo.endsWith("@" + (env.DOMINIO || "puduhue.cl").toLowerCase())) return json({ error: "Solo cuentas de Puduhue." }, 403);
-    if (env.AVISOS) ctx.waitUntil(objetoAvisos(env).contarSesion("api", correo, hoyChile()).catch(() => {})); /* v141.1 (M-26) */
+    if (env.AVISOS) ctx.waitUntil(objetoAvisos(env).contarSesion("api", correo, hoyChile(), String(url.searchParams.get("av") || "").replace(/[^0-9.]/g, "").slice(0, 8)).catch(() => {})); /* v141.1 (M-26); v217: con la versión de la app */
     const permitidos = (env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
     const autorizado = permitidos.includes(correo); // v132 (M-22): con CORREOS_ACTUALIZAR vacía no queda nadie autorizado (antes, todos)
     if (url.pathname === "/reporte" && !autorizado) return json({ error: "Tu cuenta no está autorizada para consultar reportes de Finnegans." }, 403);

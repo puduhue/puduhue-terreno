@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-07sqFNCCVtRAVtgOylvdThlYc44Br4QlCYsZR4x4sGA=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Apn0O8M41+Ec6aoTNBeKLRV90E9VlEVNE2la+S/+LSY=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=216">
+<link rel="stylesheet" href="estilos.css?v=217">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="216";
+const APP_VER="217";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -258,7 +258,7 @@ const M365={
   drive:"b!nCeXkUkQakyXzjNEG02DFgw2I-0bYBdJhlmDvTiBzBSTkCzagsNQTbjlr-nZSEjm",
   root:"01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC",   /* carpeta "Actas" (hasta el 19-10-2026 «Actas de vivienda»; se ubica por id) */
   cols:{actas:{root:"01RAJ2KQCIPH6SPKTJ5NA3JYZ3FTJGI5SC",sub:"_datos"},visitas:{root:"01RAJ2KQCX5EEP6HGCTBA2KO2DSGC4F7LS",sub:"_datos"},conteos:{root:"01RAJ2KQFXDFLPDNY2IJCIZ3BGSVPF74IH",sub:"_datos"},rendiciones:{root:"01RAJ2KQBLDIZGFMASZVCIDO2PGKXQW5VY",sub:"_datos"}},
-  scopes:["User.Read","Files.ReadWrite.All"],
+  scopes:["User.Read"], /* v217: ya no Files.ReadWrite.All: la app lee y guarda en OneDrive solo por el servidor de Puduhue */
   graph:"https://graph.microsoft.com/v1.0"
 };
 let MSAL=null,CUENTA=null,AUTH_ERR="",CARPETAS=null,SYNC_INFO={ultima:"",estado:"",error:""};
@@ -742,7 +742,7 @@ const GAS={
       const r=await actaSubir(a,"Fotos",nombreFoto(a,meta.k,meta.ref),blob,blob.type||"image/jpeg");id=r.id;url=r.webUrl}
     try{if(IDB.db)await IDB.put("cache","a:"+id,{data:await blob.arrayBuffer(),type:blob.type||"image/jpeg"})}catch(e){}
     return{id,url}},
-  async delete(id){try{if(esItemId(id))await gfetch(`/drives/${M365.drive}/items/${id}`,{method:"DELETE"}).catch(async e=>{if(e&&e.code==="forbidden"&&(rolesSrv().odRend||rolesSrv().odMods))await odBorrar(id);else throw e}); /* v195; v212: odBorrar */else if(rolesSrv().odMods&&rolesSrv().odModsLee){const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:id+".jpg"});await odPedir("/od/mod/borrar",{id:x.id})} /* v216 */else{const f=await asegurarCarpetas();await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(id+".jpg")}`,{method:"DELETE"})}}catch(e){if(e.code!=="not_found")throw e}if(IDB.db)IDB.del("cache","a:"+id).catch(()=>{})}
+  async delete(id){try{if(esItemId(id)){if(rolesSrv().odRend||rolesSrv().odMods)await odBorrar(id); /* v217: directo al servidor */else await gfetch(`/drives/${M365.drive}/items/${id}`,{method:"DELETE"})}else if(rolesSrv().odMods&&rolesSrv().odModsLee){const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:id+".jpg"});await odPedir("/od/mod/borrar",{id:x.id})} /* v216 */else{const f=await asegurarCarpetas();await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(id+".jpg")}`,{method:"DELETE"})}}catch(e){if(e.code!=="not_found")throw e}if(IDB.db)IDB.del("cache","a:"+id).catch(()=>{})}
 };
 const PIDIENDO={};const esItemId=x=>/^01[A-Z0-9]{20,}$/i.test(x);
 function pedirFoto(ref){
@@ -1174,7 +1174,11 @@ function admSaludHTML(){
   const s=ADM.salud;if(!s)return"";
   const fila=(t,ok,txt)=>`<div class="admst"><span class="admpt ${ok===true?"ok":ok===false?"no":""}" aria-hidden="true"></span><span>${t}</span><b>${esc(txt)}</b></div>`;
   const rec=s.recordatorios||{},ult=rec.ultimo;
-  return `<div class="admsts">${fila("Servidor",true,`activo · ${s.version||"?"}`)}${fila("Finnegans",!!s.credenciales,s.credenciales?"credenciales cargadas":"faltan credenciales")}${(()=>{const c=s.claveClaude;if(!s.lecturaBoletas)return fila("Lectura de boletas",false,"sin clave");if(!c)return fila("Lectura de boletas",true,"activa");
+  /* v217: versiones de la app en uso (última de cada persona, 7 días; «anterior» = antes de la v217) y modo de las reglas */
+  const vs=(s.sesiones&&s.sesiones.versiones7)||null,vk=vs?Object.keys(vs).sort((a,b)=>a==="anterior"?1:b==="anterior"?-1:parseFloat(b)-parseFloat(a)):[];
+  const verTxt=vk.length?vk.map(k=>`${k==="anterior"?"anteriores":k}: ${vs[k]} ${vs[k]===1?"persona":"personas"}`).join(" · "):"sin datos todavía";
+  const reglas=s.rendicionesPorServidor;
+  return `<div class="admsts">${fila("Servidor",true,`activo · ${s.version||"?"}`)}${fila("Reglas del servidor",reglas==="bloquear"?true:reglas?null:false,reglas==="bloquear"?"bloquean lo que no corresponde":reglas==="aviso"?"solo avisan":"apagadas")}${fila("Versiones en uso (7 días)",vk.length?!vs.anterior:null,verTxt)}${fila("Finnegans",!!s.credenciales,s.credenciales?"credenciales cargadas":"faltan credenciales")}${(()=>{const c=s.claveClaude;if(!s.lecturaBoletas)return fila("Lectura de boletas",false,"sin clave");if(!c)return fila("Lectura de boletas",true,"activa");
       /* v142: resultado de la revisión diaria de la clave de Claude */
       return c.alerta?fila("Lectura de boletas",false,c.detalle):fila("Lectura de boletas",c.estado==="ok"?true:null,c.estado==="ok"?`activa · clave revisada el ${fmtD(c.fecha)}`:`revisión del ${fmtD(c.fecha)}: ${c.detalle}`)})()}${fila("Notificaciones",!!s.notificaciones,s.notificaciones?"activas":"no configuradas")}${fila("Recordatorios",ult?true:null,ult&&ult.hora?`último envío ${fdHora(ult.hora)}`:rec.agenda?`agenda del ${fdHora(rec.agenda)}`:"sin envíos todavía")}</div>`;
 }
@@ -3236,7 +3240,8 @@ async function tokenServidor(){
   return{tok:await getToken(),api:false};
 }
 async function srvFetch(path,op){
-  op=op||{};const pedir=t=>fetch(WORKER+path,Object.assign({},op,{headers:Object.assign({},op.headers||{},{Authorization:"Bearer "+t})}));
+  op=op||{};const u=WORKER+path+(String(path).includes("?")?"&":"?")+"av="+APP_VER; /* v217: la versión de la app, para saber cuándo nadie usa una anterior */
+  const pedir=t=>fetch(u,Object.assign({},op,{headers:Object.assign({},op.headers||{},{Authorization:"Bearer "+t})}));
   const t=await tokenServidor();let r=await pedir(t.tok);
   if(r.status===401&&t.api){API_NO=Date.now();r=await pedir(await getToken())}
   return r;
@@ -3927,10 +3932,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=216"></script>
-<script src="modulos/bodega.js?v=216"></script>
-<script src="modulos/rendiciones.js?v=216"></script>
-<script src="modulos/actas-entrega.js?v=216"></script>
+<script src="modulos/checklist.js?v=217"></script>
+<script src="modulos/bodega.js?v=217"></script>
+<script src="modulos/rendiciones.js?v=217"></script>
+<script src="modulos/actas-entrega.js?v=217"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
