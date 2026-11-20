@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Apn0O8M41+Ec6aoTNBeKLRV90E9VlEVNE2la+S/+LSY=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-SLHxdaNuKWT5OhbO+3MMPI+dQCtC/jX7Cb2aoU/4X8A=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=217">
+<link rel="stylesheet" href="estilos.css?v=218">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -23,7 +23,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="217";
+const APP_VER="218";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -1182,10 +1182,33 @@ function admSaludHTML(){
       /* v142: resultado de la revisión diaria de la clave de Claude */
       return c.alerta?fila("Lectura de boletas",false,c.detalle):fila("Lectura de boletas",c.estado==="ok"?true:null,c.estado==="ok"?`activa · clave revisada el ${fmtD(c.fecha)}`:`revisión del ${fmtD(c.fecha)}: ${c.detalle}`)})()}${fila("Notificaciones",!!s.notificaciones,s.notificaciones?"activas":"no configuradas")}${fila("Recordatorios",ult?true:null,ult&&ult.hora?`último envío ${fdHora(ult.hora)}`:rec.agenda?`agenda del ${fdHora(rec.agenda)}`:"sin envíos todavía")}</div>`;
 }
+/* v218: cambios que el servidor rechazó (o solo anotó, en modo aviso): GET /od/avisos (solo el administrador) */
+const ADM_AV={L:null,err:"",carg:false,todos:false};
+async function admAvisos(){if(ADM_AV.carg)return;ADM_AV.carg=true;ADM_AV.err="";if(view==="adm")render();
+  try{const r=await srvFetch("/od/avisos");let j={};try{j=await r.json()}catch(e){}if(!r.ok||!j.ok)throw{error:j.error||"El servidor no entregó los avisos."};ADM_AV.L=Array.isArray(j.avisos)?j.avisos:[]}
+  catch(e){ADM_AV.err=(e&&e.error)||"No se pudo consultar al servidor."}finally{ADM_AV.carg=false;if(view==="adm")render()}}
+const AV_OP={put:"Guardar una rendición",delete:"Eliminar una rendición",subida:"Subir un archivo a Rendiciones",maestros:"Cambiar la lista de colaboradores",celdas:"Cambiar el Excel de colaboradores","celdas:leer":"Leer el Excel de colaboradores",borrar:"Eliminar un archivo de Rendiciones",permisos:"Cambiar los permisos por persona"};
+const AV_MOD={cb:"Control de bodega",stock:"Stock",cl:"Check list",ax:"Actas",conteos:"Control de bodega",visitas:"Check list",actas:"Actas"};
+function avQue(e){const op=String(e.op||"");if(AV_OP[op])return AV_OP[op];const i=op.indexOf(":"),m=i>0?op.slice(0,i):op,a=i>0?op.slice(i+1):"",mod=AV_MOD[m]||m;
+  return ({put:"Guardar en ",delete:"Eliminar en ",conflicto:"Guardar una copia en ",subida:"Subir un archivo a ",json:"Guardar el stock en ",borrar:"Eliminar un archivo de ",leer:"Leer "}[a]||"")+mod}
+const avNombre=c=>{c=String(c||"").toLowerCase();try{return typeof nombreDeCorreo==="function"?nombreDeCorreo(c):c}catch(e){return c}};
+const avEst=x=>(typeof RD_ESTADO!=="undefined"&&RD_ESTADO[x])||x;
+function admAvisosHTML(){
+  if(ADM_AV.carg&&!ADM_AV.L)return `<p class="note">Consultando el servidor<span class="dots"></span></p>`;
+  if(ADM_AV.err)return `<div class="info netbox">${esc(ADM_AV.err)}</div>`;
+  const L=ADM_AV.L||[];if(!L.length)return `<p class="note" style="margin-top:0">No hay cambios rechazados: todo lo que se guardó cumplió las reglas.</p>`;
+  const d7=Date.now()-7*864e5,n7=L.filter(e=>Date.parse(e.hora)>=d7).length,V=ADM_AV.todos?L:L.slice(0,10);
+  return `<p class="note" style="margin-top:0">${n7?`${n7} en los últimos 7 días.`:"Ninguno en los últimos 7 días."} Primero los más recientes.</p>
+    <ul class="admav">${V.map(e=>`<li><span class="admavt"><b>${esc(avNombre(e.correo))}</b><span class="tag ${e.modo==="bloquear"?"rech":"borrador"}">${e.modo==="bloquear"?"Rechazado":"Solo aviso"}</span></span>
+      <span class="admavq">${esc(avQue(e))}${e.estado&&e.nuevo&&e.estado!==e.nuevo?` (de «${esc(avEst(e.estado))}» a «${esc(avEst(e.nuevo))}»)`:""}</span>
+      <span class="admavr">${esc(String((e.reglas||[])[0]||"").replace(/^./,c=>c.toUpperCase()))}</span>
+      <span class="admavf">${esc(fdHora(e.hora))}</span></li>`).join("")}</ul>
+    ${L.length>10&&!ADM_AV.todos?`<button class="lnk" data-a="admAvTodos">Ver los ${L.length}</button>`:""}`}
 function renderADM(){
   const head=band("Administración");
   if(!esAdmin())return head+`<main class="wrap"><h1>Administración</h1><div class="empty">Solo el administrador de la app ve esta pantalla.</div></main>`;
   if(!ADM.salud&&!ADM.saludErr&&!ADM.saludCarg&&navigator.onLine!==false)setTimeout(admSalud,0);
+  if(!ADM_AV.L&&!ADM_AV.err&&!ADM_AV.carg&&navigator.onLine!==false)setTimeout(admAvisos,0); /* v218 */
   let lect=0;try{lect=+localStorage.getItem("rd-lecturas-"+periodoActual())||0}catch(e){}
   const cat=t=>{try{return catalogoActivo().filter(i=>enTipo(t,i.area)).length}catch(e){return null}};
   const sec=(t,body)=>`<section class="admsec"><h2>${t}</h2>${body}</section>`;
@@ -1194,6 +1217,7 @@ function renderADM(){
     <p class="lead">Herramientas que solo ve el administrador de la app.</p>
     ${sec("Permisos",`<div class="admit"><b>Permisos por persona</b><p>Qué módulos ve cada persona y si puede editarlos o solo verlos.${(()=>{const n=permPersonas().filter(p=>permCon(p.c)).length;return n?` Hoy ${n} ${n===1?"persona tiene":"personas tienen"} restricciones.`:" Hoy todos ven y editan en todo."})()}</p><div class="btns"><button class="btn" data-a="admPerm">Abrir permisos</button></div></div>`)}
     ${sec("Servidor y Finnegans",`${admSaludHTML()}<div class="btns"><button class="btn" data-a="admSalud" ${ADM.saludCarg?"disabled":""}>Revisar de nuevo</button><button class="btn" data-a="finn">Conexión con Finnegans</button></div>`)}
+    ${sec("Cambios rechazados por el servidor",`<p class="note" style="margin-top:0">El servidor revisa quién puede cambiar qué en Rendiciones, Actas, Check list, Stock y Control de bodega. Aquí queda lo que no cumplió una regla.</p>${admAvisosHTML()}<div class="btns"><button class="btn" data-a="admAvisos" ${ADM_AV.carg?"disabled":""}>Revisar de nuevo</button></div>`)}
     ${sec("Rendiciones",`<div class="admit"><b>Recordatorios automáticos</b><p>Salen solos los días hábiles a las 9:00 a quienes tienen las notificaciones activas: aprobaciones que esperan 3 días o más, devueltas sin corregir, cierre de mes y meses anteriores sin enviar.</p><div class="btns"><button class="btn" data-a="rdRecVer">Ver los del próximo día hábil</button><button class="btn" data-a="rdRecProbar">Recibirlos de prueba</button></div></div>
       <div class="admit"><b>Fondos por rendir</b><p>Saldo de la cuenta 110106 por persona y el interruptor para mostrarlo a cada uno.${fdVisible()?" Hoy cada persona ve su saldo.":" Hoy está apagado para las personas."}</p><div class="btns"><button class="btn" data-a="fdl">Abrir fondos por rendir</button></div></div>
       ${lecAdminHTML(lect)}`)}
@@ -1205,6 +1229,8 @@ function renderADM(){
 async function admClick(A,b){
   if(A==="adm"){go("adm");window.scrollTo(0,0);return true}
   if(A==="admSalud"){ADM.salud=null;await admSalud();return true}
+  if(A==="admAvisos"){ADM_AV.L=null;ADM_AV.todos=false;await admAvisos();return true} /* v218 */
+  if(A==="admAvTodos"){ADM_AV.todos=true;render();return true}
   if(A==="admPerm"){permQ="";permSolo=false;go("perm");return true}
   if(A==="admCat"){clTipo=["bodega","camionetas","huespedes"].includes(b.dataset.t)?b.dataset.t:"visitas";await clClick("clCat",b);return true}
   return false;
@@ -3932,10 +3958,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=217"></script>
-<script src="modulos/bodega.js?v=217"></script>
-<script src="modulos/rendiciones.js?v=217"></script>
-<script src="modulos/actas-entrega.js?v=217"></script>
+<script src="modulos/checklist.js?v=218"></script>
+<script src="modulos/bodega.js?v=218"></script>
+<script src="modulos/rendiciones.js?v=218"></script>
+<script src="modulos/actas-entrega.js?v=218"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
