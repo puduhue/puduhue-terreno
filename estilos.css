@@ -2558,3 +2558,8 @@ details>*{box-sizing:border-box}
   /* --- portadas de Actas y Check list: tarjetas a la altura de su contenido --- */
   body.conlat[data-pant="axhub"] .start>.big,body.conlat[data-pant="clhub"] .start>.big{min-height:0;padding:18px 20px}
 }
+
+/* ---------- v224: Rendiciones: las pestañas no saltan al cambiar entre «Mis rendiciones» y «Contabilidad» (solo con el menú) ---------- */
+@media (min-width:1100px){
+  body.conlat[data-pant="rd"] main h1:has(+.filt){margin-bottom:0}
+}
