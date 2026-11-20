@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 220 | 2026-11-20 | [758c809](https://github.com/puduhue/puduhue-terreno/tree/758c809) | Rendiciones: la miniatura de cada documento en la lista ya no se queda en «Cargando…» cuando la foto termina de bajar. La prueba de conexión usa la app y el servidor de Puduhue (ya no sitios externos que la política de contenido bloqueaba). |
 | 219 | 2026-11-19 | [6a237f6](https://github.com/puduhue/puduhue-terreno/tree/6a237f6) | Seguridad: la app ya no tiene «unsafe-eval» en su política de contenido (ningún texto que llegue a la app puede convertirse en código). La conversión de fotos HEIC corre en un marco aparte (lib/heic-aislado-1) y sigue funcionando sin señal. Sin cambios visibles. |
 | 218 | 2026-11-19 | [00ed1a6](https://github.com/puduhue/puduhue-terreno/tree/00ed1a6) | Seguridad: Administración › «Cambios rechazados por el servidor»: quién intentó qué, la regla que no cumplió, si se rechazó o solo se anotó, y cuándo. |
 | 217 | 2026-11-19 | [1da4ee9](https://github.com/puduhue/puduhue-terreno/tree/1da4ee9) | Seguridad: la app ya no pide el permiso amplio de OneDrive (Files.ReadWrite.All), solo «quién eres»; todo lo de OneDrive pasa por el servidor. En Administración: «Reglas del servidor» y «Versiones en uso (7 días)», para saber cuándo quitar el permiso en Entra. Servidor v217. |
