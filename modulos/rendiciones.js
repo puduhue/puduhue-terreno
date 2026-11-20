@@ -540,11 +540,11 @@ function disConfHTML(r,d,P,modo){
       ${rdcFilasCab(r,d,L,true)}
       ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,!centro?` <i class="xp nueva">Falta</i>`:sugC?` <i class="xp sug">Sugerido</i>`:"","rdCe")}
       ${fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Elegir",!cat,!cat?` <i class="xp nueva">Falta</i>`:sugG?` <i class="xp sug">Sugerido</i>`:"","rdGa")}
-      ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):"Agregar qué se compró",!d.glosa,d.glosaTimbre&&d.glosa?` <i class="xp sug">Sugerido</i>`:"","rdGl")}
+      ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):colSobre(r,d)?"Explica por qué se pasa del tope":"Agregar qué se compró",!d.glosa,d.glosaTimbre&&d.glosa?` <i class="xp sug">Sugerido</i>`:"","rdGl")}
     </div>${le.estado==="pendiente"?`<p class="rdok-av">${ICO_ALERTA}<span>Sin señal: la app leerá el documento cuando vuelva la conexión. Si quieres, escribe los datos con «Corregir datos».</span></p>`:le.estado==="error"?`<p class="rdok-av">${ICO_ALERTA}<span>La lectura automática no funcionó. Escribe los datos con «Corregir datos».</span></p>`:""}
     ${lecTarjetaHTML(d,P)}
     ${dudas?`<div class="rdok-av">${ICO_ALERTA}<span>La lectura tiene dudas: compara con la foto.${le.problemas&&le.problemas.length?`<details class="rdok-det"><summary>Ver detalle</summary>${esc(le.problemas.join("; "))}</details>`:""}</span></div>`:le.estado==="ok"&&!d.revisadoManual?`<p class="rdok-ia">Leída automáticamente. Compara con la foto.</p>`:""}
-    ${(PA=>PA.length?`<p class="rdok-av">${ICO_ALERTA}<span>Por revisar: ${esc(PA.slice(0,2).join(" "))}${PA.length>2?` Y ${PA.length-2} más.`:""} Puedes enviar igual. <button type="button" class="lnk" data-a="rdCorregir">Completar</button></span></p>`:"")(P.a.filter(m=>!/propina/.test(m)))}
+    ${(PA=>PA.length?`<p class="rdok-av">${ICO_ALERTA}<span>Por revisar: ${esc(PA.slice(0,2).join(" "))}${PA.length>2?` Y ${PA.length-2} más.`:""} Puedes enviar igual. <button type="button" class="lnk" data-a="rdCorregir">Completar</button></span></p>`:"")(P.a.filter(m=>!/propina/.test(m)&&!esColMsg(m)))}${(m=>m?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(m)}</span></p>`:"")(P.a.find(esColMsg))}
     <button type="button" class="btn rdok-ed" data-a="rdCorregir">Corregir datos</button><p class="rdok-mas"><button type="button" class="lnk rdok-todo" data-a="disEditar">Ver todos los campos</button><span aria-hidden="true"> · </span><button type="button" class="lnk rdok-foto" data-a="disEditar" data-c="rdFotoBox">Cambiar la foto</button></p>
   </section>`;
 }
@@ -1261,6 +1261,46 @@ function saveRend(r,deb){
 }
 function rdTouch(){if(!rdv)return;rdv.actualizado=new Date().toISOString();if(ME)rdv.modificadoPor=yo();saveRend(rdv,true)}
 const docsDe=r=>Object.values(r.docs||{}).sort((a,b)=>String(a.fecha||"9")<String(b.fecha||"9")?-1:String(a.fecha||"9")>String(b.fecha||"9")?1:String(a.creado).localeCompare(String(b.creado)));
+/* ---------- v225: tope de colación por persona al día ---------- */
+const COL_TOPE_DEF=13000,COL_DESDE_DEF="2026-11-01";
+const colTope=()=>{const m=Math.round(num(MAE&&MAE.topeCol&&MAE.topeCol.monto));return m>0?m:COL_TOPE_DEF};
+const colDesde=()=>String((MAE&&MAE.topeCol&&MAE.topeCol.desde)||COL_DESDE_DEF);
+const esColacion=d=>{const c=gastoDe(d);return !!c&&c.id==="colacion"};
+const colRige=d=>esColacion(d)&&/^\d{4}-\d{2}-\d{2}$/.test(String(d.fecha||""))&&d.fecha>=colDesde()&&num(d.total)>0;
+const colPers=r=>normRut((r.persona&&r.persona.rut)||"")||String((r.persona&&r.persona.correo)||r.cuenta||"").toLowerCase();
+let COLC=null;const colCache=()=>{if(!COLC){COLC=new Map();Promise.resolve().then(()=>{COLC=null})}return COLC};
+/* todas las colaciones de la persona en esa fecha, de la rendición más antigua a la más nueva; el exceso sale de las últimas */
+function colDia(r,f){
+  const p=colPers(r),ck=p+"|"+f+"|"+r.id+"|"+colTope()+"|"+colDesde(),C=colCache();if(C.has(ck))return C.get(ck);
+  if(!C.idx){C.idx=new Map();Object.values(REND).forEach(x=>{if(!x||x.anulada)return;const k=colPers(x);if(!k)return;if(!C.idx.has(k))C.idx.set(k,[]);C.idx.get(k).push(x)})}
+  const RS=(C.idx.get(p)||[]).filter(x=>x.id!==r.id).concat([r])
+    .sort((a,b)=>String(a.enviada||a.creado||"9").localeCompare(String(b.enviada||b.creado||"9"))||(a===r?1:b===r?-1:0));
+  const L=[];RS.forEach(x=>docsDe(x).forEach(d=>{if(colRige(d)&&d.fecha===f)L.push({r:x,d})}));
+  const suma=L.reduce((s,x)=>s+Math.round(num(x.d.total)),0),tope=colTope(),exc=Math.max(0,suma-tope);
+  const por=new Map();let rest=exc;for(let i=L.length-1;i>=0&&rest>0;i--){const q=Math.min(Math.round(num(L[i].d.total)),rest);por.set(L[i].d,q);rest-=q}
+  const o={f,L,suma,tope,exc,por};C.set(ck,o);return o}
+const colSobre=(r,d)=>colRige(d)&&colDia(r,d.fecha).exc>0; /* el documento es de un día que pasa el tope */
+const COL_PH="Por qué se pasa del tope (ej.: almuerzo con proveedor de semillas)";
+const colPh=(r,d,ph)=>colSobre(r,d)?COL_PH:ph;
+const esColMsg=m=>/^Colación sobre el tope/.test(String(m||""));
+function colDiasDe(r){
+  const fs=[...new Set(docsDe(r).filter(colRige).map(d=>d.fecha))].sort();
+  return fs.map(f=>colDia(r,f)).filter(x=>x.exc>0&&x.L.some(y=>y.r===r))}
+function colMsg(r,d){const x=colDia(r,d.fecha);
+  return `Colación sobre el tope: el ${fmtD(d.fecha)} suma ${fmtP(x.suma)} y el tope es ${fmtP(x.tope)} al día (${fmtP(x.exc)} más). Quien aprueba revisa el detalle y puede pedir que se corrija.`}
+function colBoxHTML(r,puede){const X=colDiasDe(r);if(!X.length)return "";
+  const filas=X.map(x=>{
+    const docs=x.L.map(y=>{const g=String(y.d.glosa||"").trim(),otra=y.r!==r;
+      return `<li><span class="coltl"><b>${esc(y.d.emisor||"Sin emisor")}</b>${g?` · «${esc(g)}»`:` · <i>sin detalle</i>`}${otra?`<small>Rendición de ${esc(periodoTxt(y.r.periodo).toLowerCase())}${(y.r.n||1)>1?` (N° ${y.r.n})`:""} · ${esc((RD_ESTADO[y.r.estado]||y.r.estado||"").toLowerCase())}</small>`:""}</span><span class="coltm">${fmtP(num(y.d.total))}</span></li>`}).join("");
+    return `<div class="coltd"><div class="coltt"><b>${esc(fmtD(x.f))}</b><span>${fmtP(x.suma)} · ${fmtP(x.exc)} sobre el tope</span></div><ul class="coltlst">${docs}</ul></div>`}).join("");
+  const pie=puede?`Si alguna no corresponde, ábrela y usa «Pedir corrección»; después devuelve la rendición.`
+    :editaPersona(r)?`En cada colación de ese día, explica en «Detalle» por qué se pasa del tope (sin eso no se puede enviar). Quien aprueba lo revisa y puede pedir que lo corrijas.`
+    :`Quien aprueba revisa el detalle y puede pedir que se corrija.`;
+  return `<div class="coltope" id="colTope"><div class="coltc"><b>Colación sobre el tope</b><span>Tope: ${fmtP(colTope())} al día por quien rinde</span></div>${filas}<p class="colte">${pie}</p></div>`}
+function colFormHTML(r,d){const x=colRige(d)?colDia(r,d.fecha):null;
+  return `<p class="hint colhint">Tope de colación: ${fmtP(colTope())} al día.${x?` El ${esc(fmtD(d.fecha))} suma ${fmtP(x.suma)}${x.exc?`: <b>${fmtP(x.exc)} sobre el tope</b>. Explica en «Detalle» por qué (por ejemplo, con quién fue).`:"."}`:""}</p>`}
+function colTopeCfgHTML(){const x=(MAE&&MAE.topeCol)||{},puede=esAdmin()||esContab();
+  return `<div class="fdcfg rdauto"><span><b>Tope de colación: ${fmtP(colTope())} al día por persona</b><small>Se suman las colaciones de cada persona por la fecha de la boleta. Si un día pasa el tope, quien rinde explica por qué en «Detalle» y quien aprueba lo revisa; si no corresponde, pide corregirlo. La app no descuenta nada sola. Rige para boletas desde el ${esc(fmtD(colDesde()))}.${x.hora?` Cambiado el ${esc(fmtD(String(x.hora)))}${x.por?" ("+esc(quien(x.por))+")":""}.`:""}</small></span>${puede?`<button class="btn" data-a="rdColTopeCfg">Cambiar</button>`:""}</div>`}
 const totalRend=r=>docsDe(r).reduce((s,d)=>s+(num(d.total)||0),0);
 const centroDoc=(r,d)=>d.centro||PREDIO_CENTRO[d.predio]||"";
 /* v133 (M-17): N° de boleta o factura sin ceros a la izquierda ni otros signos; orden de llegada de dos documentos */
@@ -1360,6 +1400,7 @@ function problemasDoc2(r,d){
   timbreDiferencias(d).forEach(x=>a.push(x));
   if(lecFacturaSinNeto(d)&&!(d.lectura&&/^(leyendo|pendiente)$/.test(d.lectura.estado)))a.push("Falta el neto y el IVA de la factura.");
   if(!String(d.glosa||"").trim())a.push("Sin detalle del gasto.");
+  if(colRige(d)&&colDia(r,d.fecha).exc){if(!String(d.glosa||"").trim()&&r.estado!=="aprobada"&&r.estado!=="contabilizada"){b.push("Esta colación es de un día que pasa el tope: en «Detalle» explica por qué (por ejemplo, con quién fue).");const i=a.indexOf("Sin detalle del gasto.");if(i>=0)a.splice(i,1)}a.push(colMsg(r,d))} /* v225 */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.confianza!=null&&d.lectura.confianza<0.6&&!d.revisadoManual)a.push("Lectura automática con baja confianza: conviene revisar los datos.");
   return{b,a};
 }
@@ -1921,9 +1962,10 @@ function rdDocCard(r,d){
   const L=editable?rdcItems(r,d,P,{sinFalta:rdLeyendo(d,P)}):[],pend=L.filter(x=>!x.ok); /* v191: mientras lee, sin lo que falta */
   if(L.length){/* v183: el dato y el motivo van en su línea */}
   else if(d.estadoRev==="obs")ch.push(`<span class="xp nueva">Por corregir</span>`);else if(d.estadoRev==="ok")ch.push(`<span class="xp ok">Revisada</span>`);
-  {const nD=P.a.filter(esDupMsg).length,nB=P.a.filter(m=>!esDupMsg(m)&&!esNoBolMsg(m)&&!esNumMsg(m)&&!esMonMsg(m)).length; /* v189; v202: sin «No es boleta» ni «Revisa el N°», que salen en su línea */
+  {const nD=P.a.filter(esDupMsg).length,nB=P.a.filter(m=>!esDupMsg(m)&&!esNoBolMsg(m)&&!esNumMsg(m)&&!esMonMsg(m)&&!esColMsg(m)).length; /* v189; v202: sin «No es boleta» ni «Revisa el N°», que salen en su línea */
     if(nD&&editable&&!d.noDup)ch.push(`<span class="xp nueva">Posible duplicado</span>`);
     if(nB&&editable)ch.push(`<span class="xp camb">${nB} ${nB===1?"dato en blanco":"datos en blanco"}</span>`)}
+  if(colSobre(r,d))ch.unshift(`<span class="xp camb">Sobre el tope</span>`); /* v225 */
   if(d.aj&&Object.keys(d.aj).length)ch.push(`<span class="xp camb">Ajuste contable</span>`);
   {const gs=d.gastoIA||d.gastoHist;if(editable&&(d.centroSug||gs))ch.push(`<span class="xp sug">${d.centroSug&&gs?"Centro y tipo sugeridos":gs?"Tipo sugerido":"Centro sugerido"}</span>`)}
   if(!ch.length&&editable&&!L.length)ch.push(`<span class="xp ok">Completa</span>`);
@@ -2016,7 +2058,7 @@ function rdTablaAsiento(lineas,edit){const bu=lineas.some(l=>l.bu);
     ${l.glosa?`<p class="ascg">${esc(l.glosa)}</p>`:""}${edit?`<button class="btn" data-a="rdAjLin" data-i="${esc(i)}" style="width:100%;margin-top:8px">✎ Cambiar esta línea</button>`:""}</div>`}).join("")}</div>`}
 function renderRDV(){
   const r=rdv,D=docsDe(r),edit=editaPersona(r),jef=puedeJefatura(r),con=puedeContab(r),ctz=puedeContabilizar(r);
-  const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).length,0);
+  const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).filter(m=>!esColMsg(m)).length,0);
   const c=colabDe(r),jefE=r.jefatura||(c?jefaturaDe(c):null);
   const verAsi=esContab()&&r.estado!=="borrador"&&contPropiaOk(r)||con||ctz;const AX=verAsi&&D.length?rdAsientoExcel(r):null,A=AX?AX.A:null; /* v133 (M-18) */
   let acciones="";
@@ -2047,6 +2089,7 @@ function renderRDV(){
     ${r.comentario?`<div class="info netbox"><b>Comentario de ${r.devueltaEn==="revcont"?"Contabilidad":"revisión"}:</b> ${esc(r.comentario)}</div>`:""}
     ${acciones}
     ${rdRevisa(r)&&D.length?(n=>`<div class="start rdrevini" style="grid-template-columns:1fr"><button class="big dev acc" data-a="rdRevIni"><strong>${n===D.length?"Ver los documentos":n?"Seguir revisando":D.length===1?"Revisar el documento":`Revisar los ${D.length} documentos`}</strong><span>${n?`${n} de ${D.length} revisados`:"Foto y datos de cada uno, uno tras otro"}</span></button></div>`)(D.filter(d=>d.estadoRev).length):""}
+    ${colBoxHTML(r,jef||con)}
     <h2>Documentos<span class="cnt">${D.length}</span></h2>
     <div class="list">${D.map(d=>rdDocCard(r,d)).join("")||`<div class="empty">Todavía no hay documentos. Toca <b>Agregar documento</b> y saca la foto de la factura o boleta.</div>`}</div>
     ${asi}
@@ -2108,7 +2151,8 @@ function renderRDD(){
       <div class="f"><label>Tipo de gasto${sugG?` <span class="xp sug">Sugerido</span>`:""}</label><button type="button" class="pkbtn" id="rdGa" data-a="rdPick" data-f="gasto" ${dis}>${cat?`<span>${esc(cat.n)}</span><small>${esc(cat.g||"")}</small>`:`<span class="ph">Elegir tipo de gasto…</span>`}</button>${sugG?`<span class="hint">${d.gastoHist?"Es el que se usó antes con este comercio. Cámbialo si esta vez es otro gasto.":"Lo sugirió la IA según lo que dice el documento. Revisa que corresponda."}</span>`:""}</div>
       ${pideBU?`<div class="f"><label for="rdBu">Bien de uso (máquina o instalación)</label><select id="rdBu" data-rdf="bu" ${dis}>${bienesOpts(centro,d.bu||"")}</select></div>`:""}
       ${pideDist?`<div class="f"><label for="rdDi">Gasto compartido entre predios</label><select id="rdDi" data-rdf="dist" ${dis}><option value="">No: va al centro elegido</option>${servs.concat(d.dist&&!servs.includes(d.dist)?[d.dist]:[]).map(s=>`<option value="${esc(s)}" ${d.dist===s?"selected":""}>Repartir según la tabla de ${esc(s)}</option>`).join("")}</select></div>`:""}
-      <div class="f"><label for="rdGl">Detalle del gasto${editP&&d.glosaTimbre&&d.glosa?` <span class="xp sug">Sugerido</span>`:""}</label><input id="rdGl" data-rdf="glosa" value="${esc(d.glosa||"")}" placeholder="${esc((cat&&cat.ph)||"Qué se compró y para qué")}" maxlength="120" ${dis}></div>
+      <div class="f"><label for="rdGl">Detalle del gasto${editP&&d.glosaTimbre&&d.glosa?` <span class="xp sug">Sugerido</span>`:""}</label><input id="rdGl" data-rdf="glosa" value="${esc(d.glosa||"")}" placeholder="${esc(colPh(r,d,(cat&&cat.ph)||"Qué se compró y para qué"))}" maxlength="120" ${dis}></div>
+      ${esColacion(d)?colFormHTML(r,d):""}
     </div></div>
     ${(jef||editC)&&fic?"":(jef||editC)?`<h2>Revisión</h2><div class="seg" style="grid-template-columns:1fr 1fr"><button data-a="rdRev" data-v="ok" aria-pressed="${d.estadoRev==="ok"}">Revisado</button><button data-a="rdRev" data-v="obs" aria-pressed="${d.estadoRev==="obs"}">Pedir corrección</button></div>${d.estadoRev==="obs"?`<input class="obs" data-rdf="obsRev" value="${esc(d.obsRev||"")}" placeholder="Qué debe corregir la persona">`:""}`:""}
     ${contHTML}
@@ -2378,6 +2422,7 @@ function renderRDCol(){
     <div class="list">${A.map(a=>`<button class="rdcc" data-a="rdAprEd" data-c="${esc(a.correo||"")}" data-n="${esc(a.nombre)}"><span class="rdcc-t"><b>${esc(a.nombre)}</b><span class="tag ${a.rol==="cont"?"cerrada":"borrador"}">${a.rol==="cont"?"Contabilidad":"Jefatura"}</span></span><span class="rdcc-l">${esc(a.correo||"Sin correo")}</span><span class="rdcc-l">${a.rol==="jef"?(n=>`${n} ${n===1?"persona":"personas"} a cargo`)(colabs().filter(c=>c.activo!==false&&normTxt(c.jefe)===normTxt(a.nombre)).length):"Revisión contable"}</span></button>`).join("")}</div>
     <div class="btns"><button class="btn" data-a="rdAprNuevo">+ Agregar aprobador</button></div>
     ${rdAutoContHTML()}
+    ${colTopeCfgHTML()}
     ${H.length?`<h2>Últimos cambios</h2><ul class="rdcolh">${H.map(h=>`<li><b>${esc(h.quien)}</b>: ${esc(h.que)}<span>${esc(fmtD(String(h.f||"")))} · ${esc(h.por||"")}</span></li>`).join("")}</ul>`:""}
     <p class="note">Versión ${APP_VER}</p>
   </main>`}
@@ -2490,6 +2535,11 @@ async function rdClick(A,b){
     if(on&&!await ask("¿Activar la revisión de las propias rendiciones?","Quien es de Contabilidad podrá revisar, aprobar y contabilizar también su propia rendición. Queda anotado en cada una. Apágalo cuando vuelva la persona que falta.","Activar"))return true;
     try{await rdMaeGuardar(n=>{n.autoCont={on,por:yo(),hora:new Date().toISOString()}});toast(on?"Contabilidad ya puede revisar sus propias rendiciones.":"Listo: cada rendición la vuelve a revisar otra persona.")}
     catch(e){toast("No se pudo guardar: "+errMsg(e))}render();return true}
+  if(A==="rdColTopeCfg"){if(!(esAdmin()||esContab()))return true; /* v225 */
+    const o=await askVal("Tope de colación","Monto por persona al día. Se aplica a las rendiciones que todavía no están aprobadas.","Guardar",`<div class="f"><label for="cTp">Monto por persona ($)</label><input id="cTp" data-v="monto" inputmode="numeric" value="${colTope()}"></div>`);
+    if(!o)return true;const m=+String(o.monto||"").replace(/[^\d]/g,"");if(!(m>0)){toast("Escribe un monto mayor que cero.");return true}
+    try{await rdMaeGuardar(n=>{n.topeCol=Object.assign({},n.topeCol,{monto:m,por:yo(),hora:new Date().toISOString()})});toast(`Tope de colación: ${fmtP(m)} por persona al día.`)}
+    catch(e){toast("No se pudo guardar: "+errMsg(e))}render();return true}
   if(A==="rdRecVer"){rdRecVer();return true}
   if(A==="rdRecProbar"){rdRecProbar();return true}
   if(A==="rdVerPdf"){if(rdd&&rdv)await rdAbrirPdf(rdv,rdd);return true}
@@ -2569,7 +2619,7 @@ async function rdClick(A,b){
     const o=await pr;if(!o)return true;let cambio=false;Object.entries(o).forEach(([f,v])=>{if(rdPoner(d,f,v))cambio=true});
     if(cambio)rdTouch();render();return true}
   if(A==="rdDetalle"){if(!rdd||rdRO(rdv))return true;const d=rdd,cat=gastoDe(d);
-    const o=await askVal("Detalle del gasto","Qué se compró y para qué.","Guardar",`<div class="f"><label for="cGl">Detalle</label><input id="cGl" data-v="glosa" value="${esc(d.glosa||"")}" maxlength="120" placeholder="${esc((cat&&cat.ph)||"Ej.: repuesto para el tractor")}" autocomplete="off"></div>`);
+    const o=await askVal("Detalle del gasto",colSobre(rdv,d)?"Esta colación es de un día que pasa el tope: explica por qué (por ejemplo, con quién fue).":"Qué se compró y para qué.","Guardar",`<div class="f"><label for="cGl">Detalle</label><input id="cGl" data-v="glosa" value="${esc(d.glosa||"")}" maxlength="120" placeholder="${esc(colPh(rdv,d,(cat&&cat.ph)||"Ej.: repuesto para el tractor"))}" autocomplete="off"></div>`);
     if(o&&rdPoner(d,"glosa",o.glosa))rdTouch();render();return true}
   if(A==="rdIrDato"){const c=b.dataset.c;if(!c)return true;const f=document.querySelector(`.rdok [data-dato="${CSS.escape(c)}"]`);
     if(!f){rdIrCampo(c);return true}  /* formulario completo */
@@ -2886,4 +2936,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="224"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="225"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
