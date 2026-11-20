@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 223 | 2026-11-20 | [2dd4e05](https://github.com/puduhue/puduhue-terreno/tree/2dd4e05) | Diseño más ordenado en el computador (el teléfono no cambia): barra de arriba clara con la ruta, pestañas subrayadas, contadores del menú en gris (rojo solo lo urgente), tarjetas y listas más sobrias, «Empezar la rendición…» a lo ancho y Administración en dos columnas. Se mantienen el azul de la marca, los íconos, el color de cada módulo y los botones redondeados. |
 | 222 | 2026-11-20 | [c898277](https://github.com/puduhue/puduhue-terreno/tree/c898277) | Seguridad y orden: la app ya no tiene el código que leía y guardaba directo en OneDrive con la cuenta de cada persona; todo pasa por el servidor, siempre (también la primera vez, antes de que responda el servidor). Sin cambios visibles. |
 | 221 | 2026-11-20 | [f7ab12a](https://github.com/puduhue/puduhue-terreno/tree/f7ab12a) | El logo de Puduhue aparece en la pestaña del navegador (en lugar del ícono genérico). |
 | 220 | 2026-11-20 | [758c809](https://github.com/puduhue/puduhue-terreno/tree/758c809) | Rendiciones: la miniatura de cada documento en la lista ya no se queda en «Cargando…» cuando la foto termina de bajar. La prueba de conexión usa la app y el servidor de Puduhue (ya no sitios externos que la política de contenido bloqueaba). |
