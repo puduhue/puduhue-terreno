@@ -2475,3 +2475,86 @@ details>*{box-sizing:border-box}
 .admavq{font-size:14px;color:var(--ink)}
 .admavr{font-size:13.5px;color:var(--muted)}
 .admavf{font-size:12.5px;color:var(--muted)}
+
+/* ---------- v223: diseño del computador más sobrio y ordenado (solo con el menú de la izquierda; el teléfono no cambia) ----------
+   Referencias: Microsoft 365 en la web (Outlook, Teams), Stripe, Linear y GitHub: menú oscuro y contenido claro, barra de arriba
+   liviana con la ruta, esquinas más rectas, pestañas subrayadas, listas con la fila resaltada al pasar el mouse y contadores grises. */
+@media (min-width:1100px){
+  html:has(body.conlat){scrollbar-gutter:auto}
+  body.conlat{--colw:1120px;--r-card:12px;--r-ctl:8px}
+  body.conlat[data-pant="edit"],body.conlat[data-pant="axe"]{--colw:920px}
+  body.conlat[data-pant="clv"],body.conlat[data-pant="clcat"],body.conlat[data-pant="cbv"],body.conlat[data-pant="pickDev"],body.conlat[data-pant="finn"]{--colw:880px}
+
+  /* --- menú: contadores grises (rojo solo lo urgente), título de grupo y elemento activo más claro --- */
+  .lat{padding:18px 12px 12px}
+  .lat-lista::before{content:"Módulos";display:block;padding:4px 12px 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(242,247,252,.5)}
+  .lat-it{min-height:40px;font-size:14.5px;border-radius:8px}
+  .lat-it.on{background:rgba(255,255,255,.12)}
+  .lat-it.on::before{left:-12px}
+  .lat-n{background:rgba(255,255,255,.16);color:#FFFFFF;font-size:11.5px;height:20px;line-height:20px;min-width:20px;padding:0 6px}
+  .lat-n.urg{background:#D93A3A}
+  .lat-nuevo{height:42px;border-radius:10px;font-size:14.5px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .lat-sep{margin:10px 12px}
+
+  /* --- barra de arriba: clara, con la ruta («‹ Rendiciones  Octubre de 2026») y el estado a la derecha --- */
+  body.conlat{--nb:var(--bg);--nb-ink:var(--ink);--nb-h:52px}
+  body.conlat .top{background:color-mix(in srgb,var(--bg) 90%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)!important}
+  body.conlat[data-mod] .top{border-bottom:2px solid var(--mod-c)!important}
+  body.conlat[data-pant="launch"]{--nb:var(--lx-hero);--nb-ink:#F2F7FC;--nb-h:56px}
+  body.conlat[data-pant="launch"] .top{background:var(--lx-hero);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:0!important}
+  body.conlat .top .bar .back{color:var(--muted);font-weight:600;font-size:14px}
+  body.conlat .top .bar .back:hover{color:var(--act)}
+  body.conlat .top .bar .ttl{font-size:14px;font-weight:600;color:var(--ink);text-align:left;flex:0 1 auto}
+  body.conlat .top .bar .back:not([data-a="launch"])+.ttl::before{content:"/";margin:0 10px 0 2px;color:var(--line);font-weight:400}
+  body.conlat .top.tt-rep .ttl{opacity:1}
+  body.conlat .top .bar .back[data-a="launch"]{display:none}
+  body.conlat .top .bar .est{margin-left:auto}
+  body.conlat .top .bar .back:focus-visible,body.conlat .top .bar .est:focus-visible{outline-color:var(--act)}
+  body.conlat .top .bar .saved:not(.est){color:var(--muted)}
+  body.conlat .est-ok{background:var(--b-bg);color:var(--b-ink)}
+  body.conlat .est-pend{background:var(--r-bg,#FFF4D6);color:var(--r-ink,#8A5A00)}
+  body.conlat .est-off{background:var(--soft);color:var(--muted)}
+
+  /* --- Inicio: se mantiene el encabezado azul de la marca, solo más ordenado --- */
+  body.conlat .lx-hero{padding-top:28px}
+  body.conlat .lx-hero>.lx-h1{letter-spacing:-.015em}
+  body.conlat .lx-hero>.lx-bus{border-radius:10px}
+
+  /* --- títulos de página y de sección --- */
+  body.conlat main h1{font-size:24px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+  body.conlat main h1 .ini-h1i{border-radius:8px}
+  body.conlat main .lead,body.conlat main>p.note:first-of-type{color:var(--muted)}
+  body.conlat main h2{letter-spacing:-.005em}
+  body.conlat .rdprh{font-size:11.5px;letter-spacing:.08em}
+
+  /* --- pestañas subrayadas (Mis rendiciones / Contabilidad, filtros de estado) --- */
+  body.conlat .filt{gap:22px;margin:14px 0 16px!important;border-bottom:1px solid var(--line);flex-wrap:nowrap}
+  body.conlat .filt .fb{border:0;border-radius:0;background:none;padding:10px 1px 11px;font-size:14px;font-weight:600;color:var(--muted);box-shadow:none;margin-bottom:-1px}
+  body.conlat .filt .fb:hover{color:var(--ink)}
+  body.conlat .filt .fb[aria-pressed="true"]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--act)}
+
+  /* --- tarjetas, listas y avisos: esquinas de 12 px, borde fino, sin sombra --- */
+  body.conlat .big,body.conlat .list,body.conlat .fdc,body.conlat .rdprl,body.conlat .card,body.conlat .admsec>.box,body.conlat .ifd,body.conlat .lx-hoy,body.conlat .rdst,body.conlat .smlist,body.conlat .rdcres{border-radius:var(--r-card)!important;box-shadow:none}
+  body.conlat .tip,body.conlat .info,body.conlat .note.box{border-radius:10px}
+  body.conlat .list>.bod,body.conlat .list>button,body.conlat .rdprl>button{transition:background-color .12s}
+  body.conlat .list>.bod:hover,body.conlat .list>button:hover,body.conlat .rdprl>button:hover,body.conlat .lx-hoy button:hover{background:color-mix(in srgb,var(--act) 5%,var(--card))}
+  body.conlat .big{transition:border-color .12s,box-shadow .12s}
+  body.conlat .big:hover{border-color:color-mix(in srgb,var(--act) 35%,var(--line));box-shadow:0 2px 10px rgba(16,24,40,.06)}
+  body.conlat .bodn{font-size:15px}
+  body.conlat .bodm{font-size:13.5px}
+  body.conlat .rdc-v{font-variant-numeric:tabular-nums;font-size:15px}
+  body.conlat .xp{border-radius:6px;font-size:11.5px;padding:2px 8px;font-weight:650}
+
+  /* --- Rendiciones: columna principal y panel de 340 px; «Empezar la rendición…» del ancho de la lista --- */
+  body.conlat[data-pant="rd"] .wrap:has(>.fdc),body.conlat[data-pant="rdv"] .wrap:has(>.rdst){grid-template-columns:minmax(0,1fr) 340px;column-gap:32px}
+  body.conlat[data-pant="rd"] .wrap>.start:has(>.acc){grid-template-columns:minmax(0,1fr)!important}
+  body.conlat[data-pant="rd"] .start>.acc{border-radius:var(--r-card)}
+
+  /* --- Administración: dos columnas que se acomodan solas --- */
+  body.conlat[data-pant="adm"] .wrap{display:block;columns:2;column-gap:28px}
+  body.conlat[data-pant="adm"] .wrap>*{column-span:all}
+  body.conlat[data-pant="adm"] .wrap>.admsec{column-span:none;break-inside:avoid;display:block;width:100%;margin:0 0 24px;padding-top:2px}
+
+  /* --- portadas de Actas y Check list: tarjetas a la altura de su contenido --- */
+  body.conlat[data-pant="axhub"] .start>.big,body.conlat[data-pant="clhub"] .start>.big{min-height:0;padding:18px 20px}
+}
