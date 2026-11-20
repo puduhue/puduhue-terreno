@@ -306,11 +306,11 @@ function catalogoDesdeExcel(buf){const wb=XLSX.read(buf,{type:"array"});const ws
 const CAT_PATH=["_config"],CAT_FILE="Catalogo_check_list.xlsx";
 async function cargarCatalogo(){
   if(!DB||navigator.onLine===false)return false;
-  if(rolesSrv().odModsLee&&!permVe("cl"))return false; /* v215: sin acceso a Check list, no se pide */
-  let meta=null;try{if(rolesSrv().odModsLee)meta=await odPedir("/od/mod/info",{mod:"cl",tipo:"visitas",ruta:CAT_PATH,nombre:CAT_FILE}); /* v215 */else{const f=await clCarpeta(CAT_PATH);meta=await gjson(`/drives/${M365.drive}/items/${f}:/${encName(CAT_FILE)}?$select=id,eTag`)}}catch(e){if(e.code!=="not_found")throw e}
+  if(!permVe("cl"))return false; /* v215: sin acceso a Check list, no se pide */
+  let meta=null;try{meta=await odPedir("/od/mod/info",{mod:"cl",tipo:"visitas",ruta:CAT_PATH,nombre:CAT_FILE})}catch(e){if(e.code!=="not_found")throw e} /* v215 */
   if(!meta){if(esAdmin()){await guardarCatalogo(false);return true}return false}
   if(meta.eTag===CAT_ETAG){if(CAT_AGREGADO&&esAdmin()){CAT_AGREGADO=false;await guardarCatalogo(false)}return false}
-  const r=rolesSrv().odModsLee?await odArchivoMod(meta.id):await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const buf=await r.arrayBuffer(); /* v215 */
+  const r=await odArchivoMod(meta.id);const buf=await r.arrayBuffer(); /* v215 */
   const lista=catalogoDesdeExcel(buf);CAT_AGREGADO=false;catalogoSet(lista);CAT_ETAG=meta.eTag;CAT_ORIGEN="onedrive";
   if(CAT_AGREGADO&&esAdmin()){CAT_AGREGADO=false;await guardarCatalogo(false);return true}
   try{localStorage.setItem(CATK,JSON.stringify({etag:CAT_ETAG,items:CL_ITEMS.map(i=>({key:i.key,area:i.area,sheet:i.sheet,fam:i.fam,group:i.group,n:i.n,txt:i.txt,prot:i.prot,evid:i.evid,star:i.star,retirado:i.retirado,orden:i.orden}))}))}catch(e){}
@@ -1281,28 +1281,8 @@ async function clMarcarFoto(v,k,ref){
 async function clTrasCierre(p,v){try{await new Promise(r=>setTimeout(r,2500));await clXlsx(p,false,tipoDe(v));if(v)await clPdf(v,true)}catch(e){console.warn(e)}}
 
 /* ---------- OneDrive: carpetas y Excel ---------- */
-const CLPATH={};
-/* v113: carpeta raíz de un check list sin id fijo (camionetas): se busca por nombre en la carpeta que contiene
-   la de visitas (desde la v118, «Check list de cumplimiento») y, si no está, se crea; el id queda guardado en el teléfono */
-async function clRaiz(tipo){const K=CLK[tipo],LK="actas-cl-raiz-"+tipo;if(K.root)return K.root;
-  try{const g=localStorage.getItem(LK);if(g){K.root=g;return g}}catch(e){}
-  const pv=await gjson(`/drives/${M365.drive}/items/${CLK.visitas.root}?$select=id,parentReference`);const padre=pv&&pv.parentReference&&pv.parentReference.id;if(!padre)throw new Error("No se encontró la carpeta de los check list.");
-  let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${padre}:/${encName(K.carpeta)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-  if(!id){const c=await crearCarpeta(padre,K.carpeta);id=c.id}
-  K.root=id;try{localStorage.setItem(LK,id)}catch(e){}return id}
-async function clCarpeta(segs,tipo){
-  /* asegura Check list de visitas (o de bodega)/{seg1}/{seg2}... y devuelve el id de la última */
-  tipo=tipo||"visitas";let parent=CLK[tipo].root||await clRaiz(tipo),path=tipo+":";
-  for(const seg of segs){path+="/"+seg;if(CLPATH[path]){parent=CLPATH[path];continue}
-    let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const c=await crearCarpeta(parent,seg);id=c.id}
-    CLPATH[path]=id;parent=id}
-  return parent;
-}
 const carpetaVisita=v=>[v.predio,`${v.fecha} Visita ${esc(v.n)}`];
-async function clSubir(segs,name,blob,type,tipo){
-  if(rolesSrv().odMods){const s=await odPedir("/od/mod/subida",{mod:"cl",tipo:tipo||"visitas",ruta:segs,nombre:name});return subirPorSesion(s,blob)} /* v213: el servidor abre la carga */
-  const folder=await clCarpeta(segs,tipo);if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+async function clSubir(segs,name,blob,type,tipo){const s=await odPedir("/od/mod/subida",{mod:"cl",tipo:tipo||"visitas",ruta:segs,nombre:name});return subirPorSesion(s,blob)} /* v213: el servidor abre la carga */
 function clXlsxBuild(p,tipo){tipo=tipo||"visitas";
   const vs=validas(p,tipo).filter(v=>v.estado==="cerrada");const wb=XLSX.utils.book_new();const anul=visitasDe(p,tipo).filter(v=>v.anulada);
   const H=hallazgos(p,tipo);
@@ -1479,4 +1459,4 @@ async function clPdf(v,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="221"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="222"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

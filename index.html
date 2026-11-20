@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-7qeQFmRLW7J15+agf/g2JLd/k1p8h0QSaKEfDAaHwY0=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-mNGGZbFBMsGTQwaSsY27IJVfw2/GpRJmsgmLVBzETEw=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=221">
+<link rel="stylesheet" href="estilos.css?v=222">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -24,7 +24,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="221";
+const APP_VER="222";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -262,8 +262,8 @@ const M365={
   scopes:["User.Read"], /* v217: ya no Files.ReadWrite.All: la app lee y guarda en OneDrive solo por el servidor de Puduhue */
   graph:"https://graph.microsoft.com/v1.0"
 };
-let MSAL=null,CUENTA=null,AUTH_ERR="",CARPETAS=null,SYNC_INFO={ultima:"",estado:"",error:""};
-const CK="actas-m365-carpetas",EK="actas-m365-etags",LK="actas-m365-ultima";
+let MSAL=null,CUENTA=null,AUTH_ERR="",SYNC_INFO={ultima:"",estado:"",error:""};
+const EK="actas-m365-etags",LK="actas-m365-ultima";
 let ETAGS={};try{ETAGS=JSON.parse(localStorage.getItem(EK)||"{}")}catch(e){}
 try{SYNC_INFO.ultima=localStorage.getItem(LK)||""}catch(e){}
 function guardarEtags(){try{localStorage.setItem(EK,JSON.stringify(ETAGS))}catch(e){}}
@@ -276,7 +276,6 @@ async function initM365(){
     const acc=(r&&r.account)||MSAL.getActiveAccount()||MSAL.getAllAccounts()[0]||null;
     if(acc){MSAL.setActiveAccount(acc);CUENTA=acc;ME={id:acc.localAccountId||acc.homeAccountId,nombre:acc.name||acc.username||"",correo:acc.username||""}}
   }catch(e){AUTH_ERR="Error al preparar el inicio de sesión: "+((e&&e.message)||"desconocido");console.error(e)}
-  try{CARPETAS=JSON.parse(localStorage.getItem(CK)||"null")}catch(e){}
 }
 /* Si un inicio de sesión anterior quedó a medias, MSAL responde interaction_in_progress: se borra ese intento trabado y se reintenta */
 function limpiarInteraccion(){for(const st of [sessionStorage,localStorage]){try{Object.keys(st).filter(k=>/msal\.interaction\.status|\.request\.(state|params|origin)/.test(k)).forEach(k=>st.removeItem(k))}catch(e){}}}
@@ -357,35 +356,7 @@ function vistaVolver(){
     go(s.view);return true;
   }catch(e){console.warn("volver a la pantalla",e);return false}
 }
-async function gfetch(path,opts,reintento){
-  const token=await getToken();
-  const url=path.startsWith("http")?path:M365.graph+path;
-  let res;try{res=await fetch(url,Object.assign({},opts,{headers:Object.assign({Authorization:"Bearer "+token},(opts&&opts.headers)||{})}))}catch(e){throw{code:"network"}}
-  if(res.status===401&&!reintento){try{await MSAL.acquireTokenSilent({scopes:M365.scopes,account:CUENTA,forceRefresh:true})}catch(e){}return gfetch(path,opts,true)}
-  if(res.status===429||res.status===503){const w=+(res.headers.get("Retry-After")||3);await new Promise(r=>setTimeout(r,Math.min(w,30)*1000));if(!reintento)return gfetch(path,opts,true)}
-  if(res.status===401)throw{code:"auth"};
-  if(res.status===403)throw{code:"forbidden"};
-  if(res.status===404)throw{code:"not_found"};
-  if(!res.ok){let d="";try{d=(await res.json()).error.message}catch(e){}throw{code:"graph",status:res.status,detail:d}}
-  return res;
-}
-const gjson=async(path,opts)=>{const r=await gfetch(path,opts);return r.status===204?null:r.json()};
-/* v120: crea una carpeta en OneDrive. Si dos subidas a la vez piden la misma, se crea una sola vez; si ya existía (409), se usa
-   la que está. Lo usan los 4 módulos (las fotos se suben de a 3). */
-const CARP_EN_CURSO={};
-function crearCarpeta(parent,name){const k=parent+"/"+name;if(CARP_EN_CURSO[k])return CARP_EN_CURSO[k];
-  const p=(async()=>{try{return await gjson(`/drives/${M365.drive}/items/${parent}/children`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,folder:{},"@microsoft.graph.conflictBehavior":"fail"})})}
-    catch(e){if(e&&e.code==="graph"&&e.status===409)return await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(name)}`);throw e}})();
-  CARP_EN_CURSO[k]=p;p.then(()=>{delete CARP_EN_CURSO[k]},()=>{delete CARP_EN_CURSO[k]});return p}
-const encName=n=>encodeURIComponent(n).replace(/'/g,"%27");
-async function asegurarCarpetas(){
-  /* carpeta "fotos" heredada de las primeras versiones: solo para leer fotos antiguas */
-  if(CARPETAS&&CARPETAS.fotos)return CARPETAS;
-  const ch=await gjson(`/drives/${M365.drive}/items/${M365.root}/children?$select=id,name,folder&$top=200`);
-  const out={};(ch.value||[]).forEach(x=>{if(x.folder&&x.name==="fotos")out.fotos=x.id});
-  if(!out.fotos)throw{code:"not_found"};
-  CARPETAS=out;try{localStorage.setItem(CK,JSON.stringify(out))}catch(e){}return out;
-}
+/* v222: sin gfetch ni gjson: la app ya no habla con OneDrive (Graph) con la cuenta de la persona; todo va por el servidor */
 /* Carpeta de un acta (v118, como en la app): Actas/{Viviendas|Vehículos|Activos fijos}/{Predio}/{Entregas|Devoluciones}/{fecha …};
    Actas/Capacitaciones/{fecha tema} */
 const limpiaNombre=t=>String(t||"").normalize("NFC").replace(/[\\/:*?"<>|#%&{}~]/g," ").replace(/\s+/g," ").trim().slice(0,80);
@@ -394,22 +365,8 @@ const carpetaActa=a=>a.tipo==="capacitacion"?["Capacitaciones",limpiaNombre(`${a
   :a.tipo==="vehiculo"?["Vehículos",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.mov==="devolucion"),limpiaNombre(`${a.fecha} ${(a.veh||{}).patente||"Sin patente"} ${a.conductor||"Sin nombre"}`)]
   :a.tipo==="activo"?["Activos fijos",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.mov==="devolucion"),limpiaNombre(`${a.fecha} ${a.recibe||"Sin nombre"} ${((a.activos||[])[0]||{}).tipo||"activos"}`)]
   :["Viviendas",limpiaNombre(predioDe(a))||"Sin predio",carpetaMov(a.tipo==="devolucion"),limpiaNombre(`${a.fecha} ${a.trabajador||"Sin nombre"}`)];
-const ACTPATH={};
-async function actaCarpeta(segs){
-  let parent=M365.root,path="";
-  for(const seg of segs){path+="/"+seg;if(ACTPATH[path]){parent=ACTPATH[path];continue}
-    let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${parent}:/${encName(seg)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const c=await crearCarpeta(parent,seg);id=c.id}
-    ACTPATH[path]=id;parent=id}
-  return parent;
-}
 /* v137 (A-10): más de 4 MB se sube por partes (sesión de carga de OneDrive); la dirección de la sesión no lleva la sesión de Microsoft */
 const PARTE=320*1024*12;
-async function subirBlob(folder,name,blob,type){
-  const ruta=`/drives/${M365.drive}/items/${folder}:/${encName(name)}:`;
-  if(!blob||!(blob.size>4*1048576)){const r=await gfetch(ruta+"/content",{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
-  const s=await gjson(ruta+"/createUploadSession",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item:{"@microsoft.graph.conflictBehavior":"replace"}})});
-  return subirPorSesion(s,blob)}
 /* v195: sube por partes a una sesión de carga (la que abre la app o la que entrega el servidor) */
 async function subirPorSesion(s,blob){
   if(!blob||!blob.size)blob=new Blob([""]);
@@ -423,23 +380,13 @@ async function subirPorSesion(s,blob){
   return res}
 /* v137 (A-10): parte del nombre de una foto que sale de la foto misma: un reintento reemplaza el archivo en vez de duplicarlo */
 const sufRef=(ref,n)=>{let h=5381;const s=String(ref||uid());for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36).padStart(n,"0").slice(-n)};
-async function actaSubir(a,sub,name,blob,type){if(rolesSrv().odMods)return odSubirMod("ax",carpetaActa(a).concat(sub?[sub]:[]),name,blob); /* v214 */const folder=await actaCarpeta(carpetaActa(a).concat(sub?[sub]:[]));if(blob&&blob.size>4*1048576)return subirBlob(folder,name,blob,type);const r=await gfetch(`/drives/${M365.drive}/items/${folder}:/${encName(name)}:/content`,{method:"PUT",headers:{"Content-Type":type},body:blob});return r.json()}
+async function actaSubir(a,sub,name,blob,type){return odSubirMod("ax",carpetaActa(a).concat(sub?[sub]:[]),name,blob)} /* v214; v222: siempre por el servidor */
 const nombreFoto=(a,k,ref)=>{if(a.tipo==="capacitacion"){const fs=((a.items||{})[k]||{}).fotos||[];return `Capacitacion_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}if(a.tipo==="vehiculo"||a.tipo==="activo"){const fs=((a.items||{})[k]||{}).fotos||[];const lb=a.tipo==="vehiculo"?(k==="v_km"?"Kilometraje":"Estado_general"):"Activo_"+(((a.activos||[]).find(x=>"a_"+x.id===k)||{}).tipo||"").replace(/\s+/g,"_");return limpiaNombre(lb).replace(/[(),.]/g,"")+`_${Math.max(0,fs.indexOf(ref))+1}_${uid().slice(-4)}.jpg`}const it=ITEMS.find(i=>i.k===k);const fs=((a.items||{})[k]||{}).fotos||[];const idx=Math.max(0,fs.indexOf(ref))+1;return limpiaNombre(`${it?SECC[it.s].t:"Item"}_${it?it.n:k}`).replace(/\s+/g,"_").replace(/[(),.]/g,"")+`_${idx}_${uid().slice(-4)}.jpg`};
 /* --- Base de actas: un archivo JSON por acta en OneDrive/actas --- */
 const REMOTE={actas:{},visitas:{},conteos:{},rendiciones:{}},SNAP={};let pullT=null,pulling=false;
 const rkey=(col,id)=>col==="actas"?id:col+"/"+id; /* las actas quedaron guardadas sin prefijo */
 async function remoteLoad(){if(!IDB.db)return;try{const ks=await IDB.keys("remote"),vs=await IDB.all("remote");ks.forEach((k,i)=>{if(String(k).startsWith("base:")){BASES[String(k).slice(5)]=vs[i];return}/* v131 */const m=String(k).match(/^(\w+)\/(.+)$/);const col=m?m[1]:"actas",id=m?m[2]:k;if(REMOTE[col])REMOTE[col][id]=vs[i]})}catch(e){}}
 function emitir(col){const cb=SNAP[col]&&SNAP[col].cb;if(cb)cb({docs:Object.values(REMOTE[col]).map(d=>({id:d.id,data:()=>Object.assign({},d,{_etag:ETAGS[rkey(col,d.id)]})}))})}
-let FOLDERS={};try{FOLDERS=JSON.parse(localStorage.getItem("actas-m365-folders")||"{}")}catch(e){}
-async function carpetaCol(col){
-  if(FOLDERS[col])return FOLDERS[col];const c=M365.cols[col];
-  {let id=null;try{const r=await gjson(`/drives/${M365.drive}/items/${c.root}:/${encName(c.sub)}`);id=r.id}catch(e){if(e.code!=="not_found")throw e}
-    if(!id){const r=await crearCarpeta(c.root,c.sub);id=r.id}
-    FOLDERS[col]=id}
-  try{localStorage.setItem("actas-m365-folders",JSON.stringify(FOLDERS))}catch(e){}return FOLDERS[col];
-}
-/* v137: corre fn sobre la lista, hasta n a la vez */
-async function enParalelo(L,n,fn){let i=0;const t=async()=>{while(i<L.length){const x=L[i++];await fn(x)}};await Promise.all(Array.from({length:Math.min(n,L.length)},t))}
 /* v137 (A-11): la copia en el teléfono de fotos y PDF ya subidos (almacén «cache») no pasa de 200 MB: una vez al día se borra lo
    más antiguo hasta 150 MB (se vuelve a bajar de OneDrive si hace falta). Lo pendiente de subir está en «fotos» y no se toca. */
 const CACHE_MAX=200*1048576,CACHE_K="actas-cache-recorte";
@@ -462,7 +409,7 @@ const RLC_K=()=>"actas-rl-cursor:"+meCorreo();
 async function pullColCambios(col){const R=REMOTE[col];let cursor="";try{cursor=localStorage.getItem(RLC_K())||""}catch(e){}
   if(!Object.keys(R).length)cursor=""; /* sin copia en el teléfono: todo desde cero */
   let cambios=0,vistos=null;const quitar=id=>{delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++};
-  for(let i=0;i<500;i++){const j=await odPedir("/od/rend/cambios",{cursor});
+  for(let i=0;i<500;i++){let j;try{j=await odPedir("/od/rend/cambios",{cursor})}catch(e){if(e&&e.code==="graph"&&e.status===403)throw{code:"forbidden"};throw e} /* v222 */
     if(j.completo&&!vistos)vistos=new Set();
     for(const [id,e,d] of (j.cambios||[])){if(vistos)vistos.add(id);const ek=rkey(col,id);if(ETAGS[ek]===e&&R[id])continue;
       d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=e;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}
@@ -472,25 +419,22 @@ async function pullColCambios(col){const R=REMOTE[col];let cursor="";try{cursor=
   try{localStorage.setItem(RLC_K(),cursor)}catch(e){}
   return cambios}
 /* v196: Rendiciones se baja por el servidor: solo las rendiciones que la persona puede ver, y solo las nuevas o cambiadas */
-const odLeeCol=col=>col==="rendiciones"?!!rolesSrv().odLee:(col==="conteos"||col==="visitas"||col==="actas")&&!!rolesSrv().odModsLee; /* v215: también los demás módulos */
 async function pullColSrv(col){const R=REMOTE[col],con={};if(rolesSrv().odCambios)return pullColCambios(col); /* v197 */Object.keys(R).forEach(id=>{const e=ETAGS[rkey(col,id)];if(e)con[id]=e});
-  const j=await odPedir("/od/rend/bajar",{conocidos:con});let cambios=0;const vistos=new Set();
+  let j;try{j=await odPedir("/od/rend/bajar",{conocidos:con})}catch(e){if(e&&e.code==="graph"&&e.status===403)throw{code:"forbidden"};throw e} /* v222: como sin acceso (v132) */
+  let cambios=0;const vistos=new Set();
   for(const [id,e] of (j.lista||[])){vistos.add(id);const ek=rkey(col,id);if(ETAGS[ek]===e&&R[id])continue;const d=(j.datos||{})[id];if(!d)continue;
     d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=e;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}
   for(const id of Object.keys(R)){if(!vistos.has(id)&&!LOCAL[id]){delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++}}
   return cambios}
 /* v196: la versión que está en OneDrive de un registro (para combinar antes de subir o eliminar) */
-async function metaRegistro(col,id,ruta){if(odLeeCol(col)){const j=col==="rendiciones"?await odPedir("/od/rend/leer",{id}):await odPedir("/od/mod/leer",{col,id}); /* v215 */return{id:null,eTag:j.eTag,_datos:j.datos}}return gjson(ruta+"?$select=id,eTag")}
+async function metaRegistro(col,id){const j=col==="rendiciones"?await odPedir("/od/rend/leer",{id}):await odPedir("/od/mod/leer",{col,id}); /* v215 */return{id:null,eTag:j.eTag,_datos:j.datos}}
 /* v196: un archivo por id; si OneDrive no deja (403/404) y Rendiciones lee por el servidor, se le pide al servidor */
 async function odArchivo(id){let r;try{r=await srvFetch("/od/archivo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})}catch(e){if(e&&e.code)throw e;throw{code:"network"}}
   if(r.ok)return r;if(r.status===404)throw{code:"not_found"};if(r.status===403)throw{code:"forbidden"};throw{code:"graph",status:r.status}}
 /* v216: ¿es una foto o un PDF de una rendición? (para pedirlo a la ruta que corresponde) */
 const esRefRend=ref=>Object.values(REND).some(r=>r&&Object.values(r.docs||{}).some(d=>d&&(d.foto===ref||d.pdf===ref)));
-async function leerArchivo(fid){const R=rolesSrv();
-  if(R.odModsLee){const rend=esRefRend("a:"+fid),L=(rend?[R.odLee&&odArchivo,odArchivoMod]:[odArchivoMod,R.odLee&&odArchivo]).filter(Boolean); /* v216: primero por el servidor */
-    for(let i=0;i<L.length;i++){try{return await L[i](fid)}catch(e){if(i===L.length-1||!(e&&e.code==="forbidden"))throw e}}}
-  try{return await gfetch(`/drives/${M365.drive}/items/${fid}/content`)}catch(e){if(e&&(e.code==="forbidden"||e.code==="not_found")){const R=rolesSrv(); /* v215: primero los módulos, después Rendiciones */
-  if(R.odModsLee){try{return await odArchivoMod(fid)}catch(x){if(!R.odLee||!(x&&(x.code==="forbidden"||x.code==="not_found")))throw x}}if(R.odLee)return odArchivo(fid)}throw e}}
+async function leerArchivo(fid){const L=esRefRend("a:"+fid)?[odArchivo,odArchivoMod]:[odArchivoMod,odArchivo]; /* v216: por el servidor; v222: solo así */
+  for(let i=0;i<L.length;i++){try{return await L[i](fid)}catch(e){if(i===L.length-1||!(e&&e.code==="forbidden"))throw e}}}
 /* v215: Actas, Check list y Control de bodega se bajan por el servidor: todos los registros con su eTag y el contenido solo de
    los nuevos o cambiados, de a 30 (se repite mientras el servidor diga «mas») */
 async function pullColMod(col){const R=REMOTE[col];let cambios=0,vistos=null;
@@ -506,19 +450,7 @@ async function pullColMod(col){const R=REMOTE[col];let cambios=0,vistos=null;
 /* v215: un archivo de un módulo (foto, PDF, Excel o el catálogo) por el servidor */
 async function odArchivoMod(id){let r;try{r=await srvFetch("/od/mod/archivo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})}catch(e){if(e&&e.code)throw e;throw{code:"network"}}
   if(r.ok)return r;if(r.status===404)throw{code:"not_found"};if(r.status===403)throw{code:"forbidden"};throw{code:"graph",status:r.status}}
-async function pullCol(col){
-  if(odLeeCol(col))return col==="rendiciones"?pullColSrv(col):pullColMod(col); /* v196; v215: los demás módulos */
-  const folder=await carpetaCol(col);const R=REMOTE[col];
-  let url=`/drives/${M365.drive}/items/${folder}/children?$select=id,name,eTag,lastModifiedDateTime,size&$top=200`;const vistos=new Set();let cambios=0;
-  while(url){const pg=await gjson(url);const baja=[];
-    for(const it of (pg.value||[])){if(!/\.json$/i.test(it.name))continue;const id=it.name.replace(/\.json$/i,"");vistos.add(id);const ek=rkey(col,id);
-      if(ETAGS[ek]===it.eTag&&R[id])continue;baja.push([it,id,ek])}
-    /* v137 (M-28): hasta 6 a la vez (antes, de a uno: la primera sincronización con cientos de registros tardaba minutos) */
-    await enParalelo(baja,6,async([it,id,ek])=>{try{const r=await gfetch(`/drives/${M365.drive}/items/${it.id}/content`);const d=await r.json();d.id=id;baseAntesDe(col,id);R[id]=d;ETAGS[ek]=it.eTag;if(IDB.db)IDB.put("remote",ek,d).catch(()=>{});cambios++}catch(e){console.warn(col,id,e)}});
-    url=pg["@odata.nextLink"]||null}
-  for(const id of Object.keys(R)){if(!vistos.has(id)&&!LOCAL[id]){delete R[id];delete ETAGS[rkey(col,id)];if(IDB.db)IDB.del("remote",rkey(col,id)).catch(()=>{});cambios++}}
-  return cambios;
-}
+async function pullCol(col){return col==="rendiciones"?pullColSrv(col):pullColMod(col)} /* v196; v215: los demás módulos; v222: solo por el servidor */
 async function pull(manual){
   if(pulling)return;if(navigator.onLine===false){if(manual)toast("Sin señal: se usa la copia guardada en el teléfono.");return}
   pulling=true;SYNC_INFO.estado="bajando";status();
@@ -556,10 +488,7 @@ const SIN_ACCESO={},SIN_AVISO={};
 const COL_MOD={actas:"Actas",visitas:"Check list de cumplimiento",conteos:"Control de bodega",rendiciones:"Rendiciones"};
 const MOD_COL={ax:"actas",cl:"visitas",cb:"conteos",rd:"rendiciones"};
 async function pullAcceso(col){
-  let c;try{c=await pullCol(col)}
-  catch(e){if(!(e&&e.code==="not_found"&&FOLDERS[col]))throw e;
-    delete FOLDERS[col];try{localStorage.setItem("actas-m365-folders",JSON.stringify(FOLDERS))}catch(x){} /* la carpeta guardada ya no existe: se busca de nuevo */
-    c=await pullCol(col)}
+  const c=await pullCol(col);
   if(SIN_ACCESO[col]==="escritura")schedSync(1000); /* vuelve a intentar subir lo de ese módulo */
   delete SIN_ACCESO[col];return c;
 }
@@ -635,18 +564,15 @@ function mezclarRegistro(base,loc,rem){
 const QUE_COL={visitas:"La visita",rendiciones:"La rendición",conteos:"El conteo"};
 const deRegistro=(col,o)=>!o?"":col==="rendiciones"?(o.persona&&o.persona.nombre)||"":col==="conteos"?o.bodega||"":col==="visitas"?o.predio||"":o.trabajador||o.conductor||o.recibe||o.tema||o.predio||"";
 const nombreRegistro=(col,o)=>{const q=QUE_COL[col]||"El acta",d=deRegistro(col,o);return q+(d?" de "+d:"")};
-/* v194: Rendiciones guarda sus registros por el servidor (revisa quién puede cambiar qué y escribe con su credencial).
-   Las lecturas siguen directas. Los errores se traducen a los de gfetch para que la cola y la combinación sigan igual. */
-const odRendCol=col=>col==="rendiciones"&&!!rolesSrv().odRend;
+/* v194: los registros se guardan por el servidor (revisa quién puede cambiar qué y escribe con su credencial); v212-v214: también
+   Control de bodega, Check list y Actas; v215-v216: también las lecturas; v222: solo así. Los errores de odPedir son los mismos
+   que daba OneDrive, para que la cola y la combinación sigan igual. */
 const odRendPedir=cuerpo=>odPedir("/od/rend",cuerpo);
-/* v212: Control de bodega (y después los demás módulos) guarda por el servidor (/od/reg); las lecturas siguen directas */
-const odModCol=col=>(col==="conteos"||col==="visitas"||col==="actas")&&!!rolesSrv().odMods; /* v213: también Check list; v214: Actas */
 /* v214: sube un archivo de un módulo con la carga que abre el servidor */
 async function odSubirMod(mod,ruta,nombre,blob,tipo){const s=await odPedir("/od/mod/subida",Object.assign({mod,ruta,nombre},tipo?{tipo}:{}));return subirPorSesion(s,blob)}
-const odSrvCol=col=>odRendCol(col)||odModCol(col);
 const odRegPedir=(col,cuerpo)=>col==="rendiciones"?odRendPedir(cuerpo):odPedir("/od/reg",Object.assign({col},cuerpo));
 /* v212: borrar una foto o un archivo que OneDrive no deja borrar con la cuenta de la persona */
-async function odBorrar(id){const R=rolesSrv();if(R.odMods){try{return await odPedir("/od/mod/borrar",{id})}catch(e){if(!R.odRend||!(e&&e.code==="graph"&&e.status===400))throw e}}return odPedir("/od/borrar",{id})}
+async function odBorrar(id){try{return await odPedir("/od/mod/borrar",{id})}catch(e){if(!(e&&e.code==="graph"&&e.status===400))throw e}return odPedir("/od/borrar",{id})}
 async function odPedir(ruta,cuerpo){ /* v195: también /od/subida, /od/maestros, /od/celdas y /od/borrar */
   let r;try{r=await srvFetch(ruta,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cuerpo)})}catch(e){if(e&&e.code)throw e;throw{code:"network"}}
   let j={};try{j=await r.json()}catch(e){}
@@ -659,27 +585,22 @@ async function odPedir(ruta,cuerpo){ /* v195: también /od/subida, /od/maestros,
   throw{code:"graph",status:503,detail:j.error||"el servidor no respondió"}} /* la cola espera y reintenta */
 /* copia completa de una versión que no quedó, en <colección>/_conflictos (nunca se descarta trabajo) */
 async function guardarConflicto(col,id,version,motivo,campos){
-  if(odSrvCol(col)){const f=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);await odRegPedir(col,{op:"conflicto",id,nombre:`${id} ${f} ${uid().slice(-4)}.json`,por:yo()||null,motivo,campos:campos||[],version});return}
-  const folder=await carpetaCol(col);let dir;try{dir=(await gjson(`/drives/${M365.drive}/items/${folder}:/_conflictos?$select=id`)).id}catch(e){if(e.code!=="not_found")throw e;dir=(await crearCarpeta(folder,"_conflictos")).id}
-  const f=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19),cuerpo=JSON.stringify({guardado:new Date().toISOString(),por:yo()||null,motivo,campos:campos||[],version});
-  await gfetch(`/drives/${M365.drive}/items/${dir}:/${encName(`${id} ${f} ${uid().slice(-4)}.json`)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body:cuerpo})}
-const rutaRegistro=async(col,id)=>`/drives/${M365.drive}/items/${await carpetaCol(col)}:/${encName(id+".json")}`;
+  const f=new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);await odRegPedir(col,{op:"conflicto",id,nombre:`${id} ${f} ${uid().slice(-4)}.json`,por:yo()||null,motivo,campos:campos||[],version})}
 /* sube un registro: con If-Match si OneDrive tiene la versión de partida; si tiene otra, combina; si ya no existe, avisa */
 async function subirRegistro(col,id,a){
-  const ruta=odLeeCol(col)?"":await rutaRegistro(col,id),local=clean(a); /* v196: con odLee no se ubica la carpeta */delete local.id;delete local._col;delete local._etag;
+  const local=clean(a);delete local.id;delete local._col;delete local._etag;
   const e0=a._etag||null,base0=e0?baseDe(col,id,e0):null;let copia=false,r412=null;
   for(let i=0;;i++){
-    let meta=null;try{meta=await metaRegistro(col,id,ruta)}catch(e){if(e.code!=="not_found")throw e}
+    let meta=null;try{meta=await metaRegistro(col,id)}catch(e){if(e.code!=="not_found")throw e}
     if(meta&&r412&&meta.eTag===r412)IFM_NO=true; /* OneDrive rechazó la versión sin que cambiara: se sube sin If-Match */
     if(!meta&&e0){await guardarConflicto(col,id,local,"Eliminado en otro teléfono");return{eliminado:true}}
     let datos=local,mez=null;
-    if(meta&&meta.eTag!==e0){const rem=(meta._datos?JSON.parse(JSON.stringify(meta._datos)):await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json());delete rem.id;
+    if(meta&&meta.eTag!==e0){const rem=JSON.parse(JSON.stringify(meta._datos));delete rem.id;
       mez=mezclarRegistro(base0,local,rem);datos=mez.r;mez.base=!!base0;mez.trajo=!igual(datos,local);
       if(mez.c.length&&!copia){await guardarConflicto(col,id,mez.lGana?rem:local,"Cambiado en dos teléfonos: quedó la versión más reciente",mez.c);copia=true}
       if(igual(datos,rem))return{datos:rem,etag:meta.eTag,mez,base0}}
     const h={"Content-Type":"application/json"};if(meta&&!IFM_NO)h["If-Match"]=meta.eTag;
-    try{if(odSrvCol(col)){const j=await odRegPedir(col,{op:"put",id,datos,ifMatch:h["If-Match"]||null});return{datos,etag:j.eTag,mez,base0}} /* v194; v212: también conteos */
-      const r=await gfetch(ruta+":/content",{method:"PUT",headers:h,body:JSON.stringify(datos)});const it=await r.json();return{datos,etag:it.eTag,mez,base0}}
+    try{const j=await odRegPedir(col,{op:"put",id,datos,ifMatch:h["If-Match"]||null});return{datos,etag:j.eTag,mez,base0}} /* v194; v212: también conteos; v222: siempre */
     catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta&&meta.eTag;continue}if(i<3&&e&&e.code==="not_found")continue;throw e}
   }
 }
@@ -706,17 +627,17 @@ async function aplicarSubida(col,id,a,stamp,res){const ek=rkey(col,id);
     if(res.mez.trajo&&VISTAS_COL[col].includes(view))(ab?sinPerderFoco(render):renderFondo())}}
 /* elimina un registro en OneDrive solo si sigue siendo la versión que se eliminó en este teléfono (o un borrador, en la cola antigua) */
 const esBorradorCol=(col,o)=>!o||(col==="conteos"?o.estado!=="cerrado":col==="rendiciones"?o.estado==="borrador":o.estado!=="cerrada");
-async function borrarRegistro(col,id,e0){const ruta=odLeeCol(col)?"":await rutaRegistro(col,id),ek=rkey(col,id);
+async function borrarRegistro(col,id,e0){const ek=rkey(col,id);
   const limpiar=()=>{delete REMOTE[col][id];delete ETAGS[ek];guardarEtags();if(IDB.db)IDB.del("remote",ek).catch(()=>{});baseBorrar(ek)};
   let r412=null;
   for(let i=0;;i++){
-    let meta=null;try{meta=await metaRegistro(col,id,ruta)}catch(e){if(e.code!=="not_found")throw e}
+    let meta=null;try{meta=await metaRegistro(col,id)}catch(e){if(e.code!=="not_found")throw e}
     if(!meta){limpiar();return{}}
     if(r412&&meta.eTag===r412)IFM_NO=true;
     let ok=!!e0&&meta.eTag===e0,rem=null;
-    if(!ok){rem=(meta._datos?JSON.parse(JSON.stringify(meta._datos)):await (await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`)).json());ok=!e0&&esBorradorCol(col,rem)}
+    if(!ok){rem=JSON.parse(JSON.stringify(meta._datos));ok=!e0&&esBorradorCol(col,rem)}
     if(!ok){rem.id=id;REMOTE[col][id]=rem;ETAGS[ek]=meta.eTag;guardarEtags();if(IDB.db)IDB.put("remote",ek,rem).catch(()=>{});return{restaurado:rem}}
-    try{if(odSrvCol(col))await odRegPedir(col,{op:"delete",id,ifMatch:IFM_NO?null:meta.eTag});else await gfetch(ruta,{method:"DELETE",headers:IFM_NO?{}:{"If-Match":meta.eTag}});limpiar();return{}}
+    try{await odRegPedir(col,{op:"delete",id,ifMatch:IFM_NO?null:meta.eTag});limpiar();return{}}
     catch(e){if(i<3&&e&&e.code==="graph"&&e.status===412){r412=meta.eTag;continue}if(e&&e.code==="not_found"){limpiar();return{}}throw e}
   }
 }
@@ -743,7 +664,7 @@ const GAS={
       const r=await actaSubir(a,"Fotos",nombreFoto(a,meta.k,meta.ref),blob,blob.type||"image/jpeg");id=r.id;url=r.webUrl}
     try{if(IDB.db)await IDB.put("cache","a:"+id,{data:await blob.arrayBuffer(),type:blob.type||"image/jpeg"})}catch(e){}
     return{id,url}},
-  async delete(id){try{if(esItemId(id)){if(rolesSrv().odRend||rolesSrv().odMods)await odBorrar(id); /* v217: directo al servidor */else await gfetch(`/drives/${M365.drive}/items/${id}`,{method:"DELETE"})}else if(rolesSrv().odMods&&rolesSrv().odModsLee){const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:id+".jpg"});await odPedir("/od/mod/borrar",{id:x.id})} /* v216 */else{const f=await asegurarCarpetas();await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(id+".jpg")}`,{method:"DELETE"})}}catch(e){if(e.code!=="not_found")throw e}if(IDB.db)IDB.del("cache","a:"+id).catch(()=>{})}
+  async delete(id){try{if(esItemId(id))await odBorrar(id); /* v217; v222: siempre por el servidor */else{const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:id+".jpg"});await odPedir("/od/mod/borrar",{id:x.id})} /* v216: foto antigua */}catch(e){if(e.code!=="not_found")throw e}if(IDB.db)IDB.del("cache","a:"+id).catch(()=>{})}
 };
 const PIDIENDO={};const esItemId=x=>/^01[A-Z0-9]{20,}$/i.test(x);
 function pedirFoto(ref){
@@ -752,7 +673,7 @@ function pedirFoto(ref){
     try{
       if(IDB.db){const c=await IDB.get("cache",ref);const b=await recBlob(c);if(b){FOTO[ref]=URL.createObjectURL(b);return}}
       if(!DB||navigator.onLine===false)return;
-      const fid=ref.slice(2);let r;if(esItemId(fid))r=await leerArchivo(fid); /* v196 */else if(rolesSrv().odModsLee){const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:fid+".jpg"});r=await odArchivoMod(x.id)} /* v216: foto antigua, por el servidor */else{const f=await asegurarCarpetas();r=await gfetch(`/drives/${M365.drive}/items/${f.fotos}:/${encName(fid+".jpg")}:/content`)}const b=await r.blob();
+      const fid=ref.slice(2);let r;if(esItemId(fid))r=await leerArchivo(fid); /* v196 */else{const x=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:fid+".jpg"});r=await odArchivoMod(x.id)} /* v216: foto antigua, por el servidor */const b=await r.blob();
       if(!b||!b.size)return;FOTO[ref]=URL.createObjectURL(b);
       try{if(IDB.db)await IDB.put("cache",ref,{data:await b.arrayBuffer(),type:b.type||"image/jpeg"})}catch(e){}
     }catch(e){if(e&&e.code==="not_found")LOST[ref]=true}
@@ -1255,7 +1176,7 @@ const PERM_MODS=[{k:"cl",t:"Check list de cumplimiento",c:"Check list"},{k:"ax",
 const PERM_MOD=Object.fromEntries(PERM_MODS.map(m=>[m.k,m]));
 /* acciones que crean, cierran o eliminan registros: con «Solo ve» no se muestran ni se ejecutan */
 const PERM_ACC={newEnt:"ax",newDev:"ax",axNew:"ax",axDev:"ax",close:"ax",axClose:"ax",del:"ax",delId:"ax",axDel:"ax",clNueva:"cl",clCerrar:"cl",clDel:"cl",cbNuevo:"cb",cbCerrar:"cb",cbDel:"cb"};
-const PERM_K="actas-permisos",PERM_DIR_K="actas-permisos-dir",PERM_FILE="Permisos_app.json";
+const PERM_K="actas-permisos",PERM_FILE="Permisos_app.json";
 const permVacio=()=>({personas:{},nombres:{},actualizado:"",por:""});
 let PERM=(()=>{try{const x=JSON.parse(localStorage.getItem(PERM_K)||"null");return x&&x.personas&&typeof x.personas==="object"?x:permVacio()}catch(e){return permVacio()}})();
 let PERM_ETAG=PERM._etag||"",PERM_PEND=!!PERM._pend,PERM_ERR="",PERM_T=null,permQ="",permSolo=false;
@@ -1283,39 +1204,20 @@ function permTrasRender(app){
   if(m&&PERM_MOD[m]&&permMio(m)==="ver"){const mn=app.querySelector("main");
     if(mn&&!mn.querySelector(".permro"))mn.insertAdjacentHTML("afterbegin",`<div class="info permro">Tienes acceso solo para ver ${esc(PERM_MOD[m].t)}: no puedes agregar ni modificar registros.</div>`)}
 }
-/* OneDrive: la carpeta _config va junto a Actas, en Apps de terreno */
-async function permCarpeta(crear){
-  let id=null;try{id=localStorage.getItem(PERM_DIR_K)}catch(e){}
-  if(id)return id;
-  const a=await gjson(`/drives/${M365.drive}/items/${M365.root}?$select=id,parentReference`);const padre=a&&a.parentReference&&a.parentReference.id;
-  if(!padre)throw new Error("No se encontró la carpeta Apps de terreno.");
-  try{const r=await gjson(`/drives/${M365.drive}/items/${padre}:/_config?$select=id`);id=r&&r.id}catch(e){if(e.code!=="not_found")throw e}
-  if(!id){if(!crear)return null;id=(await crearCarpeta(padre,"_config")).id}
-  try{localStorage.setItem(PERM_DIR_K,id)}catch(e){}
-  return id}
 async function permPull(){
   if(!DB||navigator.onLine===false||!ME)return false;
   if(PERM_PEND&&esAdmin())return await permSubir();
-  if(rolesSrv().odLee&&(!esAdmin()||rolesSrv().odModsLee)){const j=await odPedir("/od/permisos/leer",{}); /* v196; v215: también el administrador */
+  {const j=await odPedir("/od/permisos/leer",{}); /* v196; v215: también el administrador; v222: siempre por el servidor */
     if(j.vacio){if(!Object.keys(PERM.personas).length)return false;PERM=permVacio();PERM_ETAG="";permLocal();return true}
     if(j.eTag===PERM_ETAG)return false;const x=j.datos||{};
     PERM={personas:x.personas||{},nombres:x.nombres&&typeof x.nombres==="object"?x.nombres:{},actualizado:x.actualizado||"",por:x.por||""};PERM_ETAG=j.eTag||"";permLocal();return true}
-  const leer=async()=>{const d=await permCarpeta(false);if(!d)return null;
-    try{return await gjson(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}?$select=id,eTag`)}catch(e){if(e.code==="not_found")return null;throw e}};
-  let usaba=false;try{usaba=!!localStorage.getItem(PERM_DIR_K)}catch(e){}
-  let meta=await leer();
-  if(!meta&&usaba){try{localStorage.removeItem(PERM_DIR_K)}catch(e){}meta=await leer()}
-  if(!meta){if(!Object.keys(PERM.personas).length)return false;PERM=permVacio();PERM_ETAG="";permLocal();return true}
-  if(meta.eTag===PERM_ETAG)return false;
-  const r=await gfetch(`/drives/${M365.drive}/items/${meta.id}/content`);const x=await r.json();
-  if(!x||!x.personas||typeof x.personas!=="object")throw new Error("El archivo de permisos no se pudo leer.");
-  PERM={personas:x.personas,nombres:x.nombres&&typeof x.nombres==="object"?x.nombres:{},actualizado:x.actualizado||"",por:x.por||""};PERM_ETAG=meta.eTag||"";permLocal();return true}
+}
 async function permSubir(){
   if(!esAdmin())return false;
   if(!DB||navigator.onLine===false){PERM_PEND=true;PERM_ERR="";permLocal();return false}
   const body=JSON.stringify({v:1,personas:PERM.personas,nombres:PERM.nombres,actualizado:PERM.actualizado,por:PERM.por},null,1);
-  const put=async()=>{if(rolesSrv().odMods)return odPedir("/od/permisos",{datos:JSON.parse(body)}); /* v214: por el servidor */const d=await permCarpeta(true);const r=await gfetch(`/drives/${M365.drive}/items/${d}:/${encName(PERM_FILE)}:/content`,{method:"PUT",headers:{"Content-Type":"application/json"},body});return r.json()};
-  try{let it;try{it=await put()}catch(e){if(e.code!=="not_found")throw e;try{localStorage.removeItem(PERM_DIR_K)}catch(x){}it=await put()}
+  const put=async()=>odPedir("/od/permisos",{datos:JSON.parse(body)}); /* v214: por el servidor; v222: siempre */
+  try{const it=await put();
     PERM_ETAG=(it&&it.eTag)||"";PERM_PEND=false;PERM_ERR="";permLocal();return true}
   catch(e){console.error(e);PERM_PEND=true;PERM_ERR=errMsg(e);permLocal();return false}}
 function permCambio(){
@@ -3214,12 +3116,12 @@ function actasXlsxBuild(){
 async function urlsAlDia(docs,marca,guardar){
   for(const a of docs){const U=a.fotoUrl;if(!U)continue;const m=marca(a);
     const malos=Object.keys(U).filter(r=>r.startsWith("a:")&&esItemId(r.slice(2))&&!String(U[r]).includes(m));if(!malos.length)continue;
-    let n=0;for(const r of malos){try{const it=rolesSrv().odModsLee?await odPedir("/od/mod/meta",{id:r.slice(2)}) /* v216 */:await gjson(`/drives/${M365.drive}/items/${r.slice(2)}?$select=webUrl`);if(it&&it.webUrl&&it.webUrl!==U[r]){U[r]=it.webUrl;n++}}catch(e){console.warn("enlace foto",r,e)}}
+    let n=0;for(const r of malos){try{const it=await odPedir("/od/mod/meta",{id:r.slice(2)}); /* v216 */if(it&&it.webUrl&&it.webUrl!==U[r]){U[r]=it.webUrl;n++}}catch(e){console.warn("enlace foto",r,e)}}
     if(n&&(a.estado==="cerrada"||a.anulada)&&!LOCAL[a.id]){a.actualizado=new Date().toISOString();await guardar(a)}}
 }
 const marcaActa=a=>"/Actas/"+encodeURIComponent(carpetaActa(a)[0])+"/";
 async function actasXlsxUpload(){await urlsAlDia(Object.values(ACTAS).filter(a=>a._col!=="visitas"&&!esAx(a)),marcaActa,saveActa);
-  const buf=actasXlsxBuild();if(rolesSrv().odMods){await odSubirMod("ax",["Viviendas"],"Actas_de_vivienda.xlsx",new Blob([buf]));return} /* v214 */const dir=await actaCarpeta(["Viviendas"]);const r=await gfetch(`/drives/${M365.drive}/items/${dir}:/Actas_de_vivienda.xlsx:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
+  const buf=actasXlsxBuild();await odSubirMod("ax",["Viviendas"],"Actas_de_vivienda.xlsx",new Blob([buf]))} /* v214 */
 function actasXlsx(manual){return subirExcel("actas",manual,actasXlsxUpload)}
 /* Al cerrar un acta: guardar Acta.pdf e Informe general.pdf en su carpeta de OneDrive */
 async function subirPDFsActa(a){
@@ -3240,15 +3142,11 @@ async function ordenarFotosAntiguas(){
   const total=fotosAntiguas();if(!total){toast("No hay fotos antiguas por ordenar.");return}
   if(!(await ask(`¿Mover ${total} fotos a las carpetas de sus actas?`,"Se renombran con sección e ítem y quedan dentro de la carpeta de cada acta. Los enlaces del Excel se actualizan.","Mover")))return;
   let hechas=0,fallas=0;toast("Ordenando fotos…");
-  const srv=rolesSrv().odMods&&rolesSrv().odModsLee,f=srv?null:await asegurarCarpetas(); /* v216: con el servidor, /od/mod/info y /od/mod/mover */
   for(const a of Object.values(ACTAS)){if(a._col==="visitas")continue;let cambio=false;
     for(const [k,r] of Object.entries(a.items||{})){const fs=r.fotos||[];
       for(let i=0;i<fs.length;i++){const ref=fs[i];if(!ref.startsWith("a:")||esItemId(ref.slice(2)))continue;
-        try{let nuevo;if(srv){const it=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:ref.slice(2)+".jpg"});
-            nuevo=await odPedir("/od/mod/mover",{id:it.id,ruta:carpetaActa(a).concat(["Fotos"]),nombre:nombreFoto(a,k,ref)})}
-          else{const it=await gjson(`/drives/${M365.drive}/items/${f.fotos}:/${encName(ref.slice(2)+".jpg")}`);
-          const folder=await actaCarpeta(carpetaActa(a).concat(["Fotos"]));
-          nuevo=await gjson(`/drives/${M365.drive}/items/${it.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({parentReference:{id:folder},name:nombreFoto(a,k,ref)})})}
+        try{const it=await odPedir("/od/mod/info",{mod:"ax",ruta:["fotos"],nombre:ref.slice(2)+".jpg"}); /* v216: por el servidor */
+          const nuevo=await odPedir("/od/mod/mover",{id:it.id,ruta:carpetaActa(a).concat(["Fotos"]),nombre:nombreFoto(a,k,ref)});
           const nref="a:"+nuevo.id;fs[i]=nref;(a.fotoUrl=a.fotoUrl||{})[nref]=nuevo.webUrl;if(FOTO[ref])FOTO[nref]=FOTO[ref];
           try{if(IDB.db){const c=await IDB.get("cache",ref);if(c)await IDB.put("cache",nref,c)}}catch(e){}
           if(a.antes)Object.values(ACTAS).forEach(d=>{/* devoluciones que comparan con esta entrega miran por id de acta, no por ref */});
@@ -3262,7 +3160,9 @@ async function pdfsPendientes(){if(!DB||navigator.onLine===false||syncing)return
 /* v138 (B-15): quién es administrador y de Contabilidad lo dice el servidor (/yo); el código público ya no trae correos.
    Se guarda en el teléfono para usarlo sin señal; sin dato guardado, no se es administrador. */
 const ROLES_K="actas-roles";
-function rolesSrv(){try{const x=JSON.parse(localStorage.getItem(ROLES_K)||"null");return x&&ME&&x.correo===String(ME.correo||"").toLowerCase()?x:{}}catch(e){return{}}}
+/* v222: todo pasa por el servidor, siempre (ya no hay camino directo a OneDrive): odRend, odLee, odMods y odModsLee van fijos */
+const SRV_SIEMPRE={odRend:true,odLee:true,odMods:true,odModsLee:true};
+function rolesSrv(){let x=null;try{x=JSON.parse(localStorage.getItem(ROLES_K)||"null")}catch(e){}return Object.assign({},x&&ME&&x.correo===String(ME.correo||"").toLowerCase()?x:{},SRV_SIEMPRE)}
 let ROLES_PIDIENDO=false;
 async function rolesTraer(forzar){
   if(ROLES_PIDIENDO||!CUENTA||!ME||navigator.onLine===false)return false;const x=rolesSrv();if(!forzar&&x.hora&&Date.now()-x.hora<12*3600e3&&"odModsLee" in x)return false; /* v212: odMods; v215: odModsLee */
@@ -3975,10 +3875,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=221"></script>
-<script src="modulos/bodega.js?v=221"></script>
-<script src="modulos/rendiciones.js?v=221"></script>
-<script src="modulos/actas-entrega.js?v=221"></script>
+<script src="modulos/checklist.js?v=222"></script>
+<script src="modulos/bodega.js?v=222"></script>
+<script src="modulos/rendiciones.js?v=222"></script>
+<script src="modulos/actas-entrega.js?v=222"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
