@@ -351,7 +351,7 @@ function renderFDL(){
   if(fdAuto1)setTimeout(()=>fdTraer(true,true),0);
   const L=fdLista(),D=FD.t;
   const cfg=`<div class="fdcfg"><span><b>Mostrar a cada persona su saldo</b><small>Aparece en «Mis rendiciones». Actívalo cuando en Finnegans la 110106 y la 110105 tengan a la persona en todas sus líneas.</small></span><button class="fdsw" role="switch" aria-checked="${fdVisible()}" data-a="fdMostrar" aria-label="Mostrar a cada persona su saldo"><i></i></button></div>
-    ${fdConf().por?`<p class="note">${fdVisible()?"Activado":"Desactivado"} por ${esc(quien(fdConf().por))} el ${fmtD(String(fdConf().hora||"").slice(0,10))}.</p>`:""}`;
+    ${fdConf().por?`<p class="note">${fdVisible()?"Activado":"Desactivado"} por ${esc(quien(fdConf().por))} el ${fmtD(String(fdConf().hora||""))}.</p>`:""}`;
   if(!L)return head+`<main class="wrap"><h1>Fondos por rendir</h1><p class="lead">Saldo de las cuentas 110106 (fondo por rendir) y 110105 (fondo fijo) por persona.</p>
     <div class="empty">${FD.cargando||fdAuto1?`<span class="esqc" role="status" aria-label="Consultando Finnegans">${'<span class="esqf"><span class="esqx"><span class="esq" style="width:70%"></span><span class="esq" style="width:45%"></span></span></span>'.repeat(3)}</span><p class="fdesp">Consultando Finnegans…</p>`:FD.errT?`${esc(FD.errT)}<div class="btns" style="justify-content:center"><button class="btn" data-a="fdActualizar">Reintentar</button></div>`:navigator.onLine===false?"Se necesita señal para consultar Finnegans.":`<button class="btn" data-a="fdActualizar">Consultar Finnegans</button>`}</div>${cfg}</main>`;
   const con=L.filter(x=>x.porRendir>0.5),alDia=L.filter(x=>Math.abs(x.porRendir)<=0.5),favor=L.filter(x=>x.porRendir<-0.5);
@@ -2230,7 +2230,7 @@ function renderRDM(){
     <p class="note" style="margin-top:4px">Con estos archivos la app valida cuentas, centros y proveedores. Están en OneDrive: <b>Rendiciones / _maestros</b>.</p>
     ${esContab()?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""} style="flex:1">${ORGS_TRAYENDO?"Consultando Finnegans…":"Traer organizaciones desde Finnegans"}</button></div><p class="note">Proveedores y personas vienen de Finnegans y se actualizan solos cada 12 horas.</p>`:""}
     ${esContab()?`<div class="btns"><label class="btn pri" style="flex:1;text-align:center">Cargar archivos Excel<input class="vh" type="file" multiple accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-rdmae="1"></label></div><p class="note">Puedes elegir varios a la vez. Cada archivo reemplaza solo su propio maestro.</p>`:""}
-    ${MAE_TIPOS.map(([k,t,h])=>{const a=ar[k];return `<div class="rdmf${a?" ok":""}"><b>${esc(t)}</b><span>${a?`${fmtN(a.filas,0)} registros · ${esc(a.nombre)} · ${fmtD(String(a.hora||"").slice(0,10))}${a.por?` · ${esc(a.por)}`:""}`:k==="tipos"?"Se usa el catálogo de la app ("+CATALOGO_DEF.length+" tipos)":"No cargado"}</span><span class="hint">${esc(h)}</span></div>`}).join("")}
+    ${MAE_TIPOS.map(([k,t,h])=>{const a=ar[k];return `<div class="rdmf${a?" ok":""}"><b>${esc(t)}</b><span>${a?`${fmtN(a.filas,0)} registros · ${esc(a.nombre)} · ${fmtD(String(a.hora||""))}${a.por?` · ${esc(a.por)}`:""}`:k==="tipos"?"Se usa el catálogo de la app ("+CATALOGO_DEF.length+" tipos)":"No cargado"}</span><span class="hint">${esc(h)}</span></div>`}).join("")}
     ${esContab()?`<div class="btns"><button class="btn pri" data-a="rdCol" style="flex:1">Colaboradores y aprobadores: ver y editar</button></div><p class="note">Agrega personas, cambia su jefatura o centro y desactiva a quien ya no rinde. Se guarda también en el Excel.</p>`:""}
     <div class="btns"><button class="btn" data-a="rdMaeColab">Descargar colaboradores y aprobadores</button><button class="btn" data-a="rdMaeCat">Descargar catálogo de tipos de gasto</button></div>
     <h2>Revisión de los maestros<span class="cnt">${rev.length}</span></h2>
@@ -2384,12 +2384,12 @@ function renderRDCol(){
     <div class="list">${A.map(a=>`<button class="rdcc" data-a="rdAprEd" data-c="${esc(a.correo||"")}" data-n="${esc(a.nombre)}"><span class="rdcc-t"><b>${esc(a.nombre)}</b><span class="tag ${a.rol==="cont"?"cerrada":"borrador"}">${a.rol==="cont"?"Contabilidad":"Jefatura"}</span></span><span class="rdcc-l">${esc(a.correo||"Sin correo")}</span><span class="rdcc-l">${a.rol==="jef"?(n=>`${n} ${n===1?"persona":"personas"} a cargo`)(colabs().filter(c=>c.activo!==false&&normTxt(c.jefe)===normTxt(a.nombre)).length):"Revisión contable"}</span></button>`).join("")}</div>
     <div class="btns"><button class="btn" data-a="rdAprNuevo">+ Agregar aprobador</button></div>
     ${rdAutoContHTML()}
-    ${H.length?`<h2>Últimos cambios</h2><ul class="rdcolh">${H.map(h=>`<li><b>${esc(h.quien)}</b>: ${esc(h.que)}<span>${esc(fmtD(String(h.f||"").slice(0,10)))} · ${esc(h.por||"")}</span></li>`).join("")}</ul>`:""}
+    ${H.length?`<h2>Últimos cambios</h2><ul class="rdcolh">${H.map(h=>`<li><b>${esc(h.quien)}</b>: ${esc(h.que)}<span>${esc(fmtD(String(h.f||"")))} · ${esc(h.por||"")}</span></li>`).join("")}</ul>`:""}
     <p class="note">Versión ${APP_VER}</p>
   </main>`}
 /* v211: interruptor «Contabilidad revisa sus propias rendiciones» (solo lo cambia el administrador) */
 function rdAutoContHTML(){const on=rdAutoCont(),x=(MAE&&MAE.autoCont)||{},adm=esAdmin();
-  return `<div class="fdcfg rdauto"><span><b>Contabilidad revisa sus propias rendiciones</b><small>Para cuando falta alguien en Contabilidad. Quien es de Contabilidad revisa, aprueba y contabiliza también su propia rendición, y queda anotado. La jefatura no cambia. ${on?`Activo desde el ${esc(fmtD(String(x.hora||"").slice(0,10)))}${x.por?" ("+esc(quien(x.por))+")":""}: apágalo cuando vuelva.`:"Apagado: cada rendición la revisa otra persona."}${adm?"":" Lo cambia la administración."}</small></span><button class="fdsw" role="switch" aria-checked="${on}" data-a="rdAutoCont" aria-label="Contabilidad revisa sus propias rendiciones" ${adm?"":"disabled"}><i></i></button></div>`}
+  return `<div class="fdcfg rdauto"><span><b>Contabilidad revisa sus propias rendiciones</b><small>Para cuando falta alguien en Contabilidad. Quien es de Contabilidad revisa, aprueba y contabiliza también su propia rendición, y queda anotado. La jefatura no cambia. ${on?`Activo desde el ${esc(fmtD(String(x.hora||"")))}${x.por?" ("+esc(quien(x.por))+")":""}: apágalo cuando vuelva.`:"Apagado: cada rendición la revisa otra persona."}${adm?"":" Lo cambia la administración."}</small></span><button class="fdsw" role="switch" aria-checked="${on}" data-a="rdAutoCont" aria-label="Contabilidad revisa sus propias rendiciones" ${adm?"":"disabled"}><i></i></button></div>`}
 function rdColPintar(){const L=$("#rdcoll");if(L)L.innerHTML=rdColListaHTML()}
 const rdColBuscar=k=>colabs().find(c=>(normRut(c.rut)||"n:"+c.nombre)===k)||null;
 /* formulario: se repite con los datos escritos si algo no está bien */
@@ -2423,12 +2423,12 @@ function colLetra(n){let s="";n++;while(n>0){const m=(n-1)%26;s=String.fromCharC
 function colNum(L){let n=0;for(const ch of L)n=n*26+(ch.charCodeAt(0)-64);return n-1}
 async function rdColExcelAplicar(ops){
   const nom=(MAE&&MAE.archivos&&MAE.archivos.colab&&MAE.archivos.colab.nombre)||"Colaboradores_y_Aprobaciones_Rendiciones.xlsx";
-  const dir=await rdCarpeta([RD.maeDir]);const it=await gjson(`/drives/${M365.drive}/items/${dir}:/${encName(nom)}`);
-  const base=`/drives/${M365.drive}/items/${it.id}/workbook/worksheets/`;
+  const srv=!!rolesSrv().odRend,it=srv?null:await gjson(`/drives/${M365.drive}/items/${await rdCarpeta([RD.maeDir])}:/${encName(nom)}`); /* v216: con el servidor no se ubica el archivo */
+  const base=srv?"":`/drives/${M365.drive}/items/${it.id}/workbook/worksheets/`;
   const poner=(hoja,addr,val)=>rolesSrv().odRend?odPedir("/od/celdas",{archivo:nom,hoja,addr,valor:val}) /* v195 */
     :gfetch(`${base}${encodeURIComponent(hoja)}/range(address='${addr}')`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({values:[[val]]})});
   for(const op of ops){
-    const hoja=RDCOL_HOJA[op.tipo];const ur=await gjson(`${base}${encodeURIComponent(hoja)}/usedRange?$select=address,values`);
+    const hoja=RDCOL_HOJA[op.tipo];const ur=srv?await odPedir("/od/celdas/leer",{archivo:nom,hoja}) /* v216 */:await gjson(`${base}${encodeURIComponent(hoja)}/usedRange?$select=address,values`);
     const m=/!?\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(String(ur.address||"").split("!").pop()||"");if(!m)throw{error:"No se pudo leer la hoja "+hoja+"."};
     const c0=colNum(m[1]),r0=+m[2],V=ur.values||[];const h=(V[0]||[]).map(x=>String(x==null?"":x));let ancho=h.length;
     const col=op.tipo==="colab"?{rut:colIdx(h,"RUT"),nombre:colIdx(h,"Nombre"),centro:colIdx(h,"Centro por defecto (codigo)","Centro (codigo)","Centro"),centroN:colIdx(h,"Centro por defecto (nombre)","Centro (nombre)"),fondo:colIdx(h,"Tipo de fondo"),cuenta:colIdx(h,"Cuenta fondo"),jefe:colIdx(h,"Jefatura que aprueba","Jefatura"),obs:colIdx(h,"Observaciones"),correo:colIdx(h,"Correo Microsoft","Correo"),activo:colIdx(h,"Activo")}
@@ -2904,4 +2904,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="215"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="216"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

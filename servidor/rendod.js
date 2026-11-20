@@ -242,6 +242,7 @@ export async function rutaRend(req, env, ctx, { correo, json, autorizado, esCont
      POST /od/subida  { ruta: [carpetas desde Rendiciones], nombre }  → { ok, uploadUrl }
      POST /od/maestros { datos }                                      → { ok, eTag }   (maestros.json; Contabilidad y admin)
      POST /od/celdas  { archivo, hoja, addr, valor }                  → { ok }         (Excel de _maestros; Contabilidad y admin)
+     POST /od/celdas/leer { archivo, hoja }                           → { ok, address, values } (v216: lo usado de una hoja; Contabilidad y admin)
      POST /od/borrar  { id }                                          → { ok }         (una foto o PDF dentro de Rendiciones)
    Las reglas que dependen de quién pide siguen OD_MODO (aviso: anota y deja pasar; bloquear: 403); las rutas fuera de lo
    permitido se rechazan siempre (400).
@@ -279,7 +280,7 @@ async function anotarOBloquear(env, ctx, avisos, json, e) {
   return odModo(env) === "bloquear" ? json({ error: "No tienes permiso para este cambio: " + e.reglas[0] + ".", reglas: e.reglas, status: 403 }, 403) : null;
 }
 export async function rutasArchivos(req, env, ctx, url, { correo, nombre, json, autorizado, esContab, avisos }) {
-  const rutas = ["/od/subida", "/od/maestros", "/od/celdas", "/od/borrar"];
+  const rutas = ["/od/subida", "/od/maestros", "/od/celdas", "/od/celdas/leer", "/od/borrar"];
   if (!rutas.includes(url.pathname)) return null;
   if (req.method !== "POST") return json({ error: "Usa POST." }, 405);
   if (!odRendActivo(env)) return json({ error: "El servidor no está guardando rendiciones en OneDrive.", status: 503 }, 503);
@@ -301,6 +302,17 @@ export async function rutasArchivos(req, env, ctx, url, { correo, nombre, json, 
       const r = await graphApp(env, `/drives/${d}/items/${await carpetaRd(env, ["_maestros"])}:/maestros.json:/content`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b.datos) });
       if (!r.ok) return json({ error: `OneDrive no guardó los maestros (${r.status}).`, status: r.status }, 502);
       MAE = null; return json({ ok: true, eTag: (await r.json()).eTag });
+    }
+    if (url.pathname === "/od/celdas/leer") { /* v216: la app ya no lee el Excel de colaboradores con la cuenta de la persona */
+      const arch = String(b.archivo || ""), hoja = String(b.hoja || "");
+      if (!RUTA_OK(arch) || !/\.xlsx$/i.test(arch) || !hoja || hoja.length > 60) return json({ error: "Hoja no válida." }, 400);
+      const no = await anotarOBloquear(env, ctx, avisos, json, { op: "celdas:leer", id: `${arch}!${hoja}`, correo, reglas: quien.admin || quien.contab ? [] : ["solo Contabilidad lee la lista de colaboradores en Excel"] }); if (no) return no;
+      let r = await graphApp(env, `/drives/${d}/items/${await carpetaRd(env, ["_maestros"])}:/${encodeURIComponent(arch)}?$select=id`);
+      if (!r.ok) return json({ error: `No se encontró «${arch}» en los maestros (${r.status}).`, status: r.status }, r.status === 404 ? 404 : 502);
+      const id = (await r.json()).id;
+      r = await graphApp(env, `/drives/${d}/items/${id}/workbook/worksheets/${encodeURIComponent(hoja)}/usedRange?$select=address,values`);
+      if (!r.ok) return json({ error: `Excel no entregó la hoja ${hoja} (${r.status}).`, status: r.status }, r.status === 423 || r.status === 409 ? r.status : 502);
+      const x = await r.json(); return json({ ok: true, address: x.address || "", values: x.values || [] });
     }
     if (url.pathname === "/od/celdas") {
       const arch = String(b.archivo || ""), hoja = String(b.hoja || ""), addr = String(b.addr || "");
