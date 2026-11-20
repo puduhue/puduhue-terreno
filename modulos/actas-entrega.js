@@ -820,9 +820,9 @@ function axXlsxBuild(tipo){
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
 async function axXlsxUpload(tipo){await urlsAlDia(Object.values(ACTAS).filter(a=>a.tipo===tipo),marcaActa,saveActa); /* v118 */
-  const buf=axXlsxBuild(tipo);if(rolesSrv().odMods){await odSubirMod("ax",[AX[tipo].carpeta],AX[tipo].excel,new Blob([buf]));return} /* v214 */const dir=await actaCarpeta([AX[tipo].carpeta]);const r=await gfetch(`/drives/${M365.drive}/items/${dir}:/${encName(AX[tipo].excel)}:/content`,{method:"PUT",headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},body:new Blob([buf])});await r.json()}
+  const buf=axXlsxBuild(tipo);await odSubirMod("ax",[AX[tipo].carpeta],AX[tipo].excel,new Blob([buf]))} /* v214 */
 function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUpload(tipo))}
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="221"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="222"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
