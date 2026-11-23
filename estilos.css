@@ -2586,3 +2586,9 @@ details>*{box-sizing:border-box}
 .coltope .coltm{font-variant-numeric:tabular-nums;white-space:nowrap}
 .rdv small.rdtope{font-size:12px;color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}
 .colhint{grid-column:1/-1;margin:0}
+
+/* ---------- v228: con el menú de la izquierda, el espacio de la barra de desplazamiento se reserva siempre (salvo en el Inicio,
+   para que su encabezado azul llegue al borde): así el contenido no se corre al pasar entre pantallas o pestañas largas y cortas ---------- */
+@media (min-width:1100px){
+  html:has(body.conlat:not([data-pant="launch"])){scrollbar-gutter:stable}
+}
