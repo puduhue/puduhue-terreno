@@ -32,10 +32,11 @@ export async function anotarAviso(env, avisos, e) {
   if (!avisos) return;
   const x = await avisos.odAnotar(e);
   if (!x || !x.avisar) return;
+  if (/:leer$/.test(String(e.op || ""))) return; /* v226: una lectura negada no cambia nada: queda anotada, sin notificación */
   const admins = String(env.CORREOS_ACTUALIZAR || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
   if (!admins.length) return;
   const mas = x.n > 1 ? ` (${x.n} desde el último aviso)` : "";
-  await avisos.enviar(admins, { titulo: "Rendiciones: un cambio fuera de las reglas", texto: `${e.correo}: ${(e.reglas || [])[0] || "regla"}${mas}. ${e.modo === "bloquear" ? "No se guardó." : "Se guardó igual (modo aviso)."}`, url: "./", etiqueta: "od-aviso" }, sujetoDe(env));
+  await avisos.enviar(admins, { titulo: "Puduhue Terreno: un cambio fuera de las reglas", texto: `${e.correo}: ${(e.reglas || [])[0] || "regla"}${mas}. ${e.modo === "bloquear" ? "No se guardó." : "Se guardó igual (modo aviso)."}`, url: "./", etiqueta: "od-aviso" }, sujetoDe(env));
 }
 
 export const RD_ROOT = "01RAJ2KQBLDIZGFMASZVCIDO2PGKXQW5VY"; /* carpeta Rendiciones (la misma de modulos/rendiciones.js, RD.root) */
