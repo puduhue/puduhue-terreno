@@ -1904,7 +1904,7 @@ function renderRD(){
   }else{
     const p=periodoActual(),cs=colabsDeCuenta(),act=misRend().filter(r=>r.periodo===p),ant=misRend().filter(r=>r.periodo!==p);
     const falta=cs.length>1?cs.some(c=>!act.some(r=>normRut(r.persona&&r.persona.rut)===normRut(c.rut)&&rdEditable(r))):!act.some(rdEditable);
-    body=`${rdRecordatoriosHTML()}${fdTarjeta()}<h2>${esc(periodoTxt(p))}</h2>${act.length?`<div class="list">${act.map(r=>rdCard(r)).join("")}</div>`:""}
+    body=`${rdPlazoTipHTML()}${rdRecordatoriosHTML()}${fdTarjeta()}<h2>${esc(periodoTxt(p))}</h2>${act.length?`<div class="list">${act.map(r=>rdCard(r)).join("")}</div>`:""}
     ${falta?`<div class="start" style="grid-template-columns:1fr${act.length?";margin-top:10px":""}"><button class="big ent acc" data-a="rdNueva" data-p="${esc(p)}"><strong>${act.length?`Empezar otra rendición de ${esc(periodoTxt(p).toLowerCase())}`:`Empezar la rendición de ${esc(periodoTxt(p).toLowerCase())}`}</strong><span>${act.length&&cs.length<=1?"La que ya enviaste sigue su revisión; los documentos nuevos van en una rendición aparte (N°"+rdSiguienteN(p,cs[0]||null)+").":cs.length>1?"Esta cuenta la usan varias personas: la app te preguntará quién rinde.":"Foto de cada boleta o factura; la app lee los datos"}</span></button></div>`:""}
     ${ant.length?`<h2>Anteriores</h2><div class="list">${ant.map(r=>rdCard(r)).join("")}</div>`:""}
     ${colabs().length&&!cs.length?`<p class="note">Tu cuenta no está en la lista de colaboradores de Contabilidad. Puedes rendir igual: Contabilidad asignará tu RUT y revisará la rendición.</p>`:""}
@@ -1912,13 +1912,22 @@ function renderRD(){
   }
   return head+`<main class="wrap"><div class="pendslot">${slotHTML()}</div><h1>Rendiciones</h1>${tabs}${pushInvitaHTML()}${body}</main>`;
 }
-/* v77: recordatorio de cierre de mes — rendiciones con boletas sin enviar */
+/* v227: plazo para enviar la rendición del mes a aprobación (noviembre 2026: el 25; desde diciembre 2026: el 20; antes, fin de mes) */
+const RD_PLAZO_DEF=20,RD_PLAZO_ESP={"2026-11":25},RD_PLAZO_DESDE="2026-11";
+const rdPlazoDia=p=>{const [y,m]=String(p).split("-").map(Number);return p<RD_PLAZO_DESDE?new Date(y,m,0).getDate():(RD_PLAZO_ESP[p]||RD_PLAZO_DEF)};
+const rdPlazoFecha=p=>{const [y,m]=String(p).split("-").map(Number);return new Date(y,m-1,rdPlazoDia(p)).toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"}).replace(",","")};
+function rdPlazoTipHTML(){const p=periodoActual();if(p<RD_PLAZO_DESDE)return"";
+  const f=rdPlazoFecha(p);
+  return RD_PLAZO_ESP[p]?disTip("rdplazo-"+p,`<b>Plazo para enviar tu rendición a aprobación:</b> este mes, hasta el ${esc(f)}. Desde diciembre, hasta el día ${RD_PLAZO_DEF} de cada mes.`)
+    :disTip("rdplazo-"+RD_PLAZO_DEF,`<b>Plazo para enviar tu rendición a aprobación:</b> hasta el día ${RD_PLAZO_DEF} de cada mes. Este mes, hasta el ${esc(f)}.`)}
+/* v77: recordatorio de cierre de mes — rendiciones con boletas sin enviar (v227: hasta el plazo del mes) */
 function rdRecordatorios(){
-  if(!ME)return[];const p=periodoActual(),[y,m]=p.split("-").map(Number),hoy=new Date(),ult=new Date(y,m,0).getDate(),quedan=ult-hoy.getDate();
+  if(!ME)return[];const p=periodoActual(),[y,m]=p.split("-").map(Number),hoy=new Date(),ult=rdPlazoDia(p),quedan=ult-hoy.getDate(),mes=periodoTxt(p).toLowerCase(),fp=rdPlazoFecha(p); /* v227: hasta el plazo */
   const out=[];misRend().filter(r=>rdEditable(r)&&docsDe(r).length).forEach(r=>{const n=docsDe(r).length,tot=fmtP(totalRend(r)),nom=colabsDeCuenta().length>1&&r.persona?` de ${r.persona.nombre}`:"";
     const nd=`${n} ${n===1?"documento":"documentos"}`; /* v144: t y s, texto corto para «Por resolver» y «Para hoy» */
     if(r.periodo<p)out.push({n:"b",id:r.id,t:`${rdTitulo(r)}${nom} · sin enviar`,s:`${nd} · ${tot}`,m:`La rendición de ${rdTitulo(r).toLowerCase()}${nom} sigue sin enviar (${n} ${n===1?"documento":"documentos"}, ${tot}). Envíala para que Contabilidad pueda cerrar ese mes.`});
-    else if(r.periodo===p&&quedan<=4)out.push({n:"r",id:r.id,t:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}`,s:`Envía tu rendición${nom}: ${nd} · ${tot}`,m:quedan<=0?`Hoy cierra ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`:`Quedan ${quedan} ${quedan===1?"día":"días"} para cerrar ${periodoTxt(p).toLowerCase()}: envía tu rendición${nom} (${n} ${n===1?"documento":"documentos"}, ${tot}).`})});
+    else if(r.periodo===p&&quedan<0)out.push({n:"b",id:r.id,t:`Venció el plazo de ${mes}`,s:`Era el ${ult}. Envía tu rendición${nom}: ${nd} · ${tot}`,m:`Venció el plazo para enviar la rendición de ${mes}${nom} (era el ${ult}). Envíala cuanto antes (${nd}, ${tot}).`});
+    else if(r.periodo===p&&quedan<=4)out.push({n:"r",id:r.id,t:quedan===0?`Hoy vence el plazo de ${mes}`:`Quedan ${quedan} ${quedan===1?"día":"días"} para enviar ${mes}`,s:`Plazo: ${fp}. Envía tu rendición${nom}: ${nd} · ${tot}`,m:quedan===0?`Hoy vence el plazo para enviar la rendición de ${mes}${nom} (${nd}, ${tot}).`:`Quedan ${quedan} ${quedan===1?"día":"días"} para enviar la rendición de ${mes}${nom} (plazo: ${fp}; ${nd}, ${tot}).`})});
   return out;
 }
 /* v144: bloque «Por resolver» con filas cortas (antes, un párrafo subrayado por recordatorio); cada fila abre la rendición, como antes */
@@ -2936,4 +2945,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="226"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="227"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

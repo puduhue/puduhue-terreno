@@ -7,12 +7,16 @@
     - Jefatura: rendiciones que esperan su aprobación hace 3 días o más.
     - Contabilidad: rendiciones en revisión contable hace 3 días o más.
     - Cada persona: rendición devuelta sin corregir hace 3 días o más; rendición del mes sin enviar
-      en los últimos 3 días hábiles del mes; rendiciones de meses anteriores sin enviar en los
+      en los últimos 3 días hábiles hasta el plazo (v227: noviembre de 2026, el 25; desde diciembre, el 20) y, si venció,
+      el primer día hábil después del plazo y cada lunes; rendiciones de meses anteriores sin enviar en los
       primeros 3 días hábiles del mes y cada lunes.
   Una sola notificación por persona y tipo (si hay varias pendientes, van juntas).
 */
 export const HORA_RECORDATORIOS = 9;
 export const DIAS_ESPERA = 3;
+/* v227: plazo para enviar la rendición del mes (el mismo de la app, modulos/rendiciones.js rdPlazoDia) */
+export const PLAZO_DEF = 20, PLAZO_ESP = { "2026-11": 25 }, PLAZO_DESDE = "2026-11";
+export const plazoDia = p => { const [y, m] = String(p).split("-").map(Number); return p < PLAZO_DESDE ? new Date(Date.UTC(y, m, 0)).getUTCDate() : (PLAZO_ESP[p] || PLAZO_DEF); };
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 /* fecha y hora en Santiago (con horario de verano incluido) */
@@ -61,13 +65,15 @@ export function armarRecordatorios(agenda, ahora = new Date()) {
     }
   }
   /* 2) lo propio: devueltas sin corregir y rendiciones sin enviar */
-  const hab = habilesDelMes(s.y, s.m), pos = hab.indexOf(s.d), quedan = pos < 0 ? -1 : hab.length - pos; /* días hábiles que quedan, contando hoy */
-  const finDeMes = quedan >= 1 && quedan <= 3, inicioDeMes = pos >= 0 && pos < 3, lunes = s.dow === 1;
+  const plazo = plazoDia(s.periodo), habM = habilesDelMes(s.y, s.m), hab = habM.filter(d => d <= plazo), pos = hab.indexOf(s.d), quedan = pos < 0 ? -1 : hab.length - pos; /* días hábiles hasta el plazo, contando hoy (v227) */
+  const finDeMes = quedan >= 1 && quedan <= 3, inicioDeMes = habM.indexOf(s.d) >= 0 && habM.indexOf(s.d) < 3, lunes = s.dow === 1;
+  const vencido = s.d > plazo && habM.includes(s.d) && (habM.find(d => d > plazo) === s.d || lunes); /* v227: el primer día hábil después del plazo y cada lunes */
   const porPersona = {};
   for (const x of agenda.enviar || []) {
     let motivo = null;
     if (x.estado === "observada") { const n = dias(x.desde, t); if (n >= DIAS_ESPERA) motivo = { k: "dev", n }; }
     else if (x.docs > 0 && x.periodo === s.periodo && finDeMes) motivo = { k: "fin" };
+    else if (x.docs > 0 && x.periodo === s.periodo && vencido) motivo = { k: "ven" };
     else if (x.docs > 0 && x.periodo < s.periodo && (inicioDeMes || lunes)) motivo = { k: "ant" };
     if (!motivo) continue;
     for (const c of x.para) (porPersona[c] = porPersona[c] || []).push({ ...x, motivo });
@@ -76,7 +82,8 @@ export function armarRecordatorios(agenda, ahora = new Date()) {
     if (L.length === 1) {
       const x = L[0], mes = mesTxt(x.periodo);
       if (x.motivo.k === "dev") out.push({ para: c, tipo: "propia", titulo: "Tu rendición devuelta sigue pendiente", texto: `La rendición de ${mes} espera tu corrección ${haceTxt(x.motivo.n)}. Revisa las observaciones y vuelve a enviarla.`, url: `./?rd=${encodeURIComponent(x.rid)}`, etiqueta: "rec-propia" });
-      else if (x.motivo.k === "fin") out.push({ para: c, tipo: "propia", titulo: quedan === 1 ? `Hoy cierra ${mes}` : `Quedan ${quedan} días hábiles para cerrar ${mes}`, texto: `Tu rendición tiene ${docsTxt(x.docs, x.total)} sin enviar.${quedan === 1 ? " Envíala hoy." : " Envíala a tiempo."}`, url: `./?rd=${encodeURIComponent(x.rid)}`, etiqueta: "rec-propia" });
+      else if (x.motivo.k === "fin") out.push({ para: c, tipo: "propia", titulo: quedan === 1 ? (s.d === plazo ? `Hoy vence el plazo de ${mes}` : `Último día hábil para enviar ${mes}`) : `Quedan ${quedan} días hábiles para enviar ${mes}`, texto: `Tu rendición tiene ${docsTxt(x.docs, x.total)} sin enviar. El plazo es el ${plazo} de ${MESES[s.m - 1]}.${quedan === 1 ? " Envíala hoy." : " Envíala a tiempo."}`, url: `./?rd=${encodeURIComponent(x.rid)}`, etiqueta: "rec-propia" });
+      else if (x.motivo.k === "ven") out.push({ para: c, tipo: "propia", titulo: `Venció el plazo de ${mes}`, texto: `Tu rendición tiene ${docsTxt(x.docs, x.total)} sin enviar; el plazo era el ${plazo}. Envíala cuanto antes.`, url: `./?rd=${encodeURIComponent(x.rid)}`, etiqueta: "rec-propia" });
       else out.push({ para: c, tipo: "propia", titulo: `Rendición de ${mes} sin enviar`, texto: `Tiene ${docsTxt(x.docs, x.total)}. Envíala para que Contabilidad pueda cerrar ese mes.`, url: `./?rd=${encodeURIComponent(x.rid)}`, etiqueta: "rec-propia" });
     } else {
       const dev = L.filter(x => x.motivo.k === "dev").length;
