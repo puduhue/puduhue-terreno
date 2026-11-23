@@ -20,6 +20,20 @@
 */
 import { odConfig, graphApp } from "./onedrive.js";
 import { odRendActivo, maestrosSrv, correosDueno, carpetaDatos, idHijo, correosDe, RD_ROOT, metaDe } from "./rendod.js";
+/* v227.1: ¿el archivo (no carpeta) está dentro de la carpeta Rendiciones? Sube por las carpetas, por id, hasta 6 niveles.
+   true / false; null si el id no existe */
+export async function dentroDeRendiciones(env, d, id) {
+  const r = await graphApp(env, `/drives/${d}/items/${id}?$select=id,folder,parentReference`);
+  if (r.status === 404) return null; if (!r.ok) return false;
+  const it = await r.json(); if (it.folder) return false;
+  let pid = (it.parentReference || {}).id;
+  for (let i = 0; i < 6 && pid; i++) {
+    if (pid === RD_ROOT) return true;
+    const q = await graphApp(env, `/drives/${d}/items/${pid}?$select=id,parentReference`); if (!q.ok) return false;
+    pid = ((await q.json()).parentReference || {}).id;
+  }
+  return false;
+}
 export { metaDe };
 
 export const odLeeActivo = env => odRendActivo(env) && String(env.OD_LEE || "").toLowerCase() !== "no";
@@ -140,6 +154,14 @@ export async function rutasLectura(req, env, ctx, url, { correo, json, crudo, au
         const metas = await avisos.rlMetas(), M = await maestrosSrv(env);
         const ok = Object.values(metas).some(m => !m.borrado && (m.f || []).includes(id) && puedeVer(M, m, quien));
         if (!ok) return json({ error: "No es un archivo de una rendición tuya.", status: 403 }, 403);
+      } else {
+        /* v227.1: administrador y Contabilidad, solo archivos de una rendición o dentro de la carpeta Rendiciones (antes, cualquier id del drive) */
+        const metas = await avisos.rlMetas();
+        if (!Object.values(metas).some(m => !m.borrado && (m.f || []).includes(id))) {
+          const en = await dentroDeRendiciones(env, d, id);
+          if (en === null) return json({ error: "No está.", status: 404 }, 404);
+          if (!en) return json({ error: "No es un archivo de Rendiciones.", status: 403 }, 403);
+        }
       }
       const r = await graphApp(env, `/drives/${d}/items/${id}/content`);
       if (r.status === 404) return json({ error: "No está.", status: 404 }, 404);
