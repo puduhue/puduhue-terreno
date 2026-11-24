@@ -479,7 +479,7 @@ function disModoConf(r,d,editP,P){
   return null;
 }
 /* v179 (quien rinde): datos del documento en una línea (para el visor de la foto) */
-const rdDatosLinea=d=>[num(d.total)?fmtP(num(d.total)):"",d.fecha?fmtD(d.fecha):"",`${TIPO_DOC[d.tipo]||"Documento"}${d.folio?` N° ${d.folio}`:""}`,d.rut?`RUT ${d.rut}`:""].filter(Boolean).join(" · ");
+const rdDatosLinea=d=>[num(d.total)?fmtDoc(d):"",d.fecha?fmtD(d.fecha):"",`${TIPO_DOC[d.tipo]||"Documento"}${d.folio?` N° ${d.folio}`:""}`,d.rut?`RUT ${d.rut}`:""].filter(Boolean).join(" · ");
 /* pone un dato igual que el formulario (rdInput): montos como número, marca de corregido a mano y registro del cambio de Contabilidad */
 function rdPoner(d,f,v){const antes=d[f];let nv;
   if(["total","neto","iva"].includes(f)){const s=String(v==null?"":v).replace(/[^\d]/g,"");nv=s?+s:0}else nv=String(v==null?"":v).trim();
@@ -488,9 +488,10 @@ function rdPoner(d,f,v){const antes=d[f];let nv;
   d[f]=nv;if(f==="glosa")delete d.glosaTimbre;
   if(puedeContab(rdv)){d.orig=d.orig||{};if(!(f in d.orig))d.orig[f]=antes==null?"":antes}
   if(f==="tipo"&&d.tipo==="peaje"&&!d.gasto&&catalogo().some(c=>c.id===GASTO_PEAJE))d.gasto=GASTO_PEAJE;
+  if(f==="tipo"&&esNC(d)&&rdv)ncAuto(rdv,d); /* v230 */
   d.revisadoManual=true;return true}
 /* v183: cada dato con problema se marca en su fila y se resume arriba del documento */
-const RDC_DATO={rdFotoBox:["foto","Foto"],rdTd:["tipo","Tipo de documento"],rdEm:["emisor","Emisor"],rdRut:["rut","RUT del emisor"],rdFol:["folio","N° de boleta o factura"],rdFe:["fecha","Fecha"],rdTot:["total","Total"],rdNe:["neto","Neto e IVA"],rdCe:["centro","Centro de costo"],rdGa:["gasto","Tipo de gasto"],rdGl:["glosa","Detalle"]};
+const RDC_DATO={rdFotoBox:["foto","Foto"],rdTd:["tipo","Tipo de documento"],rdEm:["emisor","Emisor"],rdRut:["rut","RUT del emisor"],rdFol:["folio","N° de boleta o factura"],rdFe:["fecha","Fecha"],rdTot:["total","Total"],rdNe:["neto","Neto e IVA"],rdCe:["centro","Centro de costo"],rdGa:["gasto","Tipo de gasto"],rdGl:["glosa","Detalle"],rdNc:["ref","Rebaja a"]};
 const RDC_DE_CAMPO=Object.fromEntries(Object.entries(RDC_DATO).map(([id,v])=>[v[0],id]));
 const RDC_HOJA={rdTd:"cTd",rdEm:"cEm",rdRut:"cRut",rdFol:"cFol",rdFe:"cFe",rdTot:"cTot",rdNe:"cNe"};
 const OBS_EJ={foto:"Ej.: la foto está cortada",total:"Ej.: el total de la boleta es otro",fecha:"Ej.: la fecha de la boleta es otra",centro:"Ej.: fue para otro predio",gasto:"Ej.: es mantención, no combustible",glosa:"Ej.: indica para qué se usó"};
@@ -534,12 +535,12 @@ function disConfHTML(r,d,P,modo){
   return `<section class="rdok" aria-label="Datos del documento">
     <button type="button" class="rdok-cab" data-a="rdCorregir" aria-label="Corregir los datos del documento"><span class="rdok-lap" aria-hidden="true">Corregir</span><span class="rdok-em">${esc(d.emisor||"Sin emisor")}</span>
     <span class="rdok-meta">${meta}${d.rut?` <span class="rdok-rut">· RUT ${esc(d.rut)}</span>`:""}</span>
-    <span class="rdok-tot${tot?"":" falta"}">${tot?fmtP(tot):"Falta el total"}</span>
+    <span class="rdok-tot${tot?"":" falta"}${esNC(d)?" nc":""}">${tot?fmtDoc(d):"Falta el total"}</span>
     ${d.tipo==="factura"&&(num(d.neto)||num(d.iva))?`<span class="rdok-iva">Neto ${fmtP(num(d.neto))} · IVA ${fmtP(num(d.iva))}</span>`:""}${(m=>m?`<span class="rdok-iva">Incluye propina de ${esc((m.match(/[$][0-9.]+/)||[""])[0])} (no es parte de la boleta o factura)</span>`:"")(P.a.find(m=>/propina/.test(m)))}
     </button><div class="rdok-l">
       ${rdcFilasCab(r,d,L,true)}
-      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,!centro?` <i class="xp nueva">Falta</i>`:sugC?` <i class="xp sug">Sugerido</i>`:"","rdCe")}
-      ${fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Elegir",!cat,!cat?` <i class="xp nueva">Falta</i>`:sugG?` <i class="xp sug">Sugerido</i>`:"","rdGa")}
+      ${esNC(d)?(y=>fila(`data-a="rdNcRef"`,"Rebaja a",y?esc(ncRefTxt(y)):"Elegir la boleta o factura",!y,!y?` <i class="xp nueva">Falta</i>`:"","rdNc"))(ncRef(r,d)):""}${esNC(d)?"":fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,!centro?` <i class="xp nueva">Falta</i>`:sugC?` <i class="xp sug">Sugerido</i>`:"","rdCe")}
+      ${esNC(d)?"":fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Elegir",!cat,!cat?` <i class="xp nueva">Falta</i>`:sugG?` <i class="xp sug">Sugerido</i>`:"","rdGa")}
       ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):colSobre(r,d)?"Explica por qué se pasa del tope":"Agregar qué se compró",!d.glosa,d.glosaTimbre&&d.glosa?` <i class="xp sug">Sugerido</i>`:"","rdGl")}
     </div>${le.estado==="pendiente"?`<p class="rdok-av">${ICO_ALERTA}<span>Sin señal: la app leerá el documento cuando vuelva la conexión. Si quieres, escribe los datos con «Corregir datos».</span></p>`:le.estado==="error"?`<p class="rdok-av">${ICO_ALERTA}<span>La lectura automática no funcionó. Escribe los datos con «Corregir datos».</span></p>`:""}
     ${lecTarjetaHTML(d,P)}
@@ -561,7 +562,7 @@ function disFichaHTML(r,d,P,edita){
   const est=!rev?"":d.estadoRev==="ok"?`<p class="rdfic-e ok">${RDFIC_OK}Revisado</p>`
     :d.estadoRev==="obs"?`<div class="rdfic-e obs"><span>${ICO_ALERTA}<span><b>Por corregir${RDC_DE_CAMPO[d.obsCampo]?` (${RDC_DATO[RDC_DE_CAMPO[d.obsCampo]][1]})`:""}</b>${d.obsRev?`: ${esc(d.obsRev)}`:""}</span></span><button type="button" class="lnk" data-a="rdRevQuitar">Quitar</button></div>`:"";
   /* Contabilidad corrige con las mismas hojas cortas de quien rinde (el encabezado se toca) */
-  const cab=`<span class="rdok-em">${esc(d.emisor||"Sin emisor")}</span><span class="rdok-meta">${meta}</span><span class="rdok-meta">${d.rut?`RUT ${esc(d.rut)}`:"Sin RUT del emisor"}</span><span class="rdok-tot">${tot?fmtP(tot):"Sin total"}</span>${d.tipo==="factura"&&(num(d.neto)||num(d.iva))?`<span class="rdok-iva">Neto ${fmtP(num(d.neto))} · IVA ${fmtP(num(d.iva))}</span>`:""}${(m=>m?`<span class="rdok-iva">Incluye propina de ${esc((m.match(/[$][0-9.]+/)||[""])[0])} (no es parte de la boleta o factura)</span>`:"")(P.a.find(m=>/propina/.test(m)))}`;
+  const cab=`<span class="rdok-em">${esc(d.emisor||"Sin emisor")}</span><span class="rdok-meta">${meta}</span><span class="rdok-meta">${d.rut?`RUT ${esc(d.rut)}`:"Sin RUT del emisor"}</span><span class="rdok-tot${esNC(d)?" nc":""}">${tot?fmtDoc(d):"Sin total"}</span>${d.tipo==="factura"&&(num(d.neto)||num(d.iva))?`<span class="rdok-iva">Neto ${fmtP(num(d.neto))} · IVA ${fmtP(num(d.iva))}</span>`:""}${(m=>m?`<span class="rdok-iva">Incluye propina de ${esc((m.match(/[$][0-9.]+/)||[""])[0])} (no es parte de la boleta o factura)</span>`:"")(P.a.find(m=>/propina/.test(m)))}`;
   if(rev&&RD_ELIGE===d.k){ /* quien revisa tocó «Pedir corrección»: cada dato con su valor, para tocar el que está mal */
     const fe=(v,et,val)=>`<button type="button" class="rdok-r${d.estadoRev==="obs"&&(d.obsCampo||"")===v?" eleg":""}" data-a="rdElDato" data-v="${v}"><span class="rdok-et">${et}</span><span class="rdok-v${val?"":" vacio"}">${esc(val||"Sin dato")}</span>${ICO_CHEV}</button>`;
     const ids=["rdFotoBox","rdTd","rdEm","rdRut","rdFol","rdFe","rdTot"].concat(d.tipo==="factura"||num(d.neto)||num(d.iva)?["rdNe"]:[],["rdCe","rdGa","rdGl"]);
@@ -571,8 +572,9 @@ function disFichaHTML(r,d,P,edita){
     ${edita?`<button type="button" class="rdok-cab" data-a="rdCorregir" aria-label="Corregir los datos del documento"><span class="rdok-lap" aria-hidden="true">Corregir</span>${cab}</button>`:`<div class="rdok-cab fija">${cab}</div>`}
     <div class="rdok-l">
       ${rdcFilasCab(r,d,L,edita)}
-      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Sin centro",!centro,"rdCe")}
-      ${fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Sin tipo de gasto",!cat,"rdGa")}
+      ${esNC(d)?(y=>fila(`data-a="rdNcRef"`,"Rebaja a",y?esc(ncRefTxt(y)):"Sin documento",!y,"rdNc"))(ncRef(r,d)):""}
+      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Sin centro",!centro,"rdCe").replace(esNC(d)?/^<button/:/^$/,esNC(d)?'<button disabled':"")}
+      ${esNC(d)?"":fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Sin tipo de gasto",!cat,"rdGa")}
       ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):"Sin detalle",!d.glosa,"rdGl")}
       ${d.bu?`<div class="rdok-r fija"><span class="rdok-et">Bien de uso</span><span class="rdok-v">${esc((maeTiene("bienes")&&MAE.bienes[d.bu])||d.bu)}</span></div>`:""}${d.dist?`<div class="rdok-r fija"><span class="rdok-et">Reparto</span><span class="rdok-v">Según la tabla de ${esc(d.dist)}</span></div>`:""}
     </div>
@@ -582,7 +584,7 @@ function disFichaHTML(r,d,P,edita){
 }
 function disTipoHTML(d,dis){
   const ok=TIPOS_RENDIR.includes(d.tipo);
-  return `<div class="f"><label id="rdTdL">Tipo de documento</label><div class="seg segtd" id="rdTd" role="radiogroup" aria-labelledby="rdTdL">${TIPOS_RENDIR.map(k=>`<button type="button" role="radio" data-a="disTipo" data-v="${esc(k)}" aria-checked="${d.tipo===k}" aria-pressed="${d.tipo===k}" ${dis}>${k==="boleta_honorarios"?"Honorarios":k==="peaje"?"Peaje":esc(TIPO_DOC[k])}</button>`).join("")}</div>${ok?"":`<span class="hint" style="color:var(--m-ink)">${lecTipoAviso(d)}</span>`}</div>`;
+  return `<div class="f"><label id="rdTdL">Tipo de documento</label><div class="seg segtd" id="rdTd" role="radiogroup" aria-labelledby="rdTdL">${TIPOS_RENDIR.map(k=>`<button type="button" role="radio" data-a="disTipo" data-v="${esc(k)}" aria-checked="${d.tipo===k}" aria-pressed="${d.tipo===k}" ${dis}>${k==="boleta_honorarios"?"Honorarios":k==="peaje"?"Peaje":k==="nota_credito"?"Nota de crédito":esc(TIPO_DOC[k])}</button>`).join("")}</div>${ok?"":`<span class="hint" style="color:var(--m-ink)">${lecTipoAviso(d)}</span>`}</div>`;
 }
 
 /* ---- 4) rendiciones: ícono del estado a la izquierda y monto a la derecha ---- */
@@ -609,7 +611,7 @@ function disRdIco(r){const e=r.estado||"borrador",c=e==="aprobada"||e==="contabi
    5) Se guarda lo que leyó la app (lectura original) para medir qué datos corrige la gente: Administración › Lectura de
       boletas muestra el porcentaje de corrección por dato, cuántas boletas tenían timbre y cuántas se revisaron. */
 const TIMBRE_LIB="lib/zxing-wasm-3.1.4/";
-const TD_TIPO98={33:"factura",34:"factura",46:"factura",39:"boleta",41:"boleta",48:"boleta"};
+const TD_TIPO98={33:"factura",34:"factura",46:"factura",39:"boleta",41:"boleta",48:"boleta",61:"nota_credito"}; /* v230: 61 nota de crédito */
 const TD_NOMBRE98={33:"Factura electrónica",34:"Factura exenta electrónica",39:"Boleta electrónica",41:"Boleta exenta electrónica",46:"Factura de compra electrónica",48:"Comprobante de pago electrónico",52:"Guía de despacho electrónica",56:"Nota de débito electrónica",61:"Nota de crédito electrónica",110:"Factura de exportación electrónica",111:"Nota de débito de exportación",112:"Nota de crédito de exportación"};
 const ICO_TIMBRE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7V5h3M17 5h3v2M20 17v2h-3M7 19H4v-2"/><path d="M7 9v6M9.5 9v6M12 9v6M14 9v6M17 9v6"/></svg>`;
 let ZX=null,ZX_CARGANDO=null,ZX_PRECARGA=false;
@@ -682,6 +684,7 @@ function timbreDiferencias(d){
   return m;
 }
 function lecTipoAviso(d){
+  if(d.timbre&&TD_TIPO98[d.timbre.td]==="nota_credito"&&!esNC(d))return "El timbre del SII dice «Nota de crédito electrónica»: elige «Nota de crédito» e indica qué boleta o factura rebaja."; /* v230 */
   if(d.timbre&&!TD_TIPO98[d.timbre.td])return `El timbre del SII dice «${esc(TD_NOMBRE98[d.timbre.td]||"otro documento")}», que no sirve para rendir.`;
   if(d.tipo==="vale"||d.tipo==="otro")return `«${esc(TIPO_DOC[d.tipo])}»: no es boleta ni factura. Si tienes la boleta, cambia la foto; si es un peaje, elige «Peaje».`; /* v202; v203: corto */
   return `La lectura dice «${esc(TIPO_DOC[d.tipo]||"sin tipo")}», que no sirve para rendir: elige uno${d.tipo==="vale"||d.tipo==="otro"?" (si es el ticket de un peaje, «Peaje»)":""} o elimina el documento.`;
@@ -899,14 +902,14 @@ const CATALOGO_DEF=[
 ];
 /* tipos de gasto de las versiones anteriores a la v62 */
 const GASTO_ANT={"Combustible":"combustible","Peajes y estacionamiento":"peajes","Alimentación":"colacion","Alojamiento":"alojamiento","Repuestos y mantención":"mant_maquina","Insumos veterinarios":"otro","Insumos agrícolas":"otro","Ferretería y materiales":"ferreteria","Oficina":"oficina","Otros":"otro"};
-const TIPO_DOC={boleta:"Boleta",factura:"Factura",boleta_honorarios:"Boleta de honorarios",peaje:"Comprobante de peaje",vale:"Ticket / vale / comprobante",otro:"Otro"};
+const TIPO_DOC={boleta:"Boleta",factura:"Factura",boleta_honorarios:"Boleta de honorarios",peaje:"Comprobante de peaje",nota_credito:"Nota de crédito",vale:"Ticket / vale / comprobante",otro:"Otro"};
 /* v79: para rendir solo sirven facturas y boletas; «vale» y «otro» quedan solo para mostrar documentos antiguos */
-const TIPOS_RENDIR=["boleta","factura","boleta_honorarios","peaje"];
+const TIPOS_RENDIR=["boleta","factura","boleta_honorarios","peaje","nota_credito"]; /* v230: nota de crédito */
 /* v110: el comprobante de peaje solo vale con el tipo de gasto «Peajes / barcaza» */
 const GASTO_PEAJE="peajes";
 const esGastoPeaje=d=>{const c=gastoDe(d);return !!c&&c.id===GASTO_PEAJE};
 const pareceePeaje=t=>/peaje|autopista|autov[ií]a|concesionari|barcaza|transbordador|ruta\s*(5|68|78)|tag\b|p[oó]rtico/i.test(String(t||""));
-const DOCABR={boleta:["BOLETA","BOLETAS"],factura:["FACT","FACTS"],boleta_honorarios:["BH","BH"],vale:["TICKET","TICKETS"],otro:["DOCUMENTO","DOCUMENTOS"]};
+const DOCABR={nota_credito:["NC","NC"],boleta:["BOLETA","BOLETAS"],factura:["FACT","FACTS"],boleta_honorarios:["BH","BH"],vale:["TICKET","TICKETS"],otro:["DOCUMENTO","DOCUMENTOS"]};
 const RD_ESTADO={borrador:"Borrador",enviada:"En revisión de jefatura",revcont:"En revisión contable",aprobada:"Aprobada, por contabilizar",contabilizada:"Contabilizada",observada:"Con observaciones"};
 let REND={},rdv=null,rdd=null,rdTab="mias",MAE=null,MAE_ETAG="";
 const periodoActual=()=>today().slice(0,7);
@@ -1266,7 +1269,7 @@ const COL_TOPE_DEF=13000,COL_DESDE_DEF="2026-11-01";
 const colTope=()=>{const m=Math.round(num(MAE&&MAE.topeCol&&MAE.topeCol.monto));return m>0?m:COL_TOPE_DEF};
 const colDesde=()=>String((MAE&&MAE.topeCol&&MAE.topeCol.desde)||COL_DESDE_DEF);
 const esColacion=d=>{const c=gastoDe(d);return !!c&&c.id==="colacion"};
-const colRige=d=>esColacion(d)&&/^\d{4}-\d{2}-\d{2}$/.test(String(d.fecha||""))&&d.fecha>=colDesde()&&num(d.total)>0;
+const colRige=d=>!esNC(d)&&esColacion(d)&&/^\d{4}-\d{2}-\d{2}$/.test(String(d.fecha||""))&&d.fecha>=colDesde()&&num(d.total)>0;
 const colPers=r=>normRut((r.persona&&r.persona.rut)||"")||String((r.persona&&r.persona.correo)||r.cuenta||"").toLowerCase();
 let COLC=null;const colCache=()=>{if(!COLC){COLC=new Map();Promise.resolve().then(()=>{COLC=null})}return COLC};
 /* todas las colaciones de la persona en esa fecha, de la rendición más antigua a la más nueva; el exceso sale de las últimas */
@@ -1301,8 +1304,32 @@ function colFormHTML(r,d){const x=colRige(d)?colDia(r,d.fecha):null;
   return `<p class="hint colhint">Tope de colación: ${fmtP(colTope())} al día.${x?` El ${esc(fmtD(d.fecha))} suma ${fmtP(x.suma)}${x.exc?`: <b>${fmtP(x.exc)} sobre el tope</b>. Explica en «Detalle» por qué (por ejemplo, con quién fue).`:"."}`:""}</p>`}
 function colTopeCfgHTML(){const x=(MAE&&MAE.topeCol)||{},puede=esAdmin()||esContab();
   return `<div class="fdcfg rdauto"><span><b>Tope de colación: ${fmtP(colTope())} al día por persona</b><small>Se suman las colaciones de cada persona por la fecha de la boleta. Si un día pasa el tope, quien rinde explica por qué en «Detalle» y quien aprueba lo revisa; si no corresponde, pide corregirlo. La app no descuenta nada sola. Rige para boletas desde el ${esc(fmtD(colDesde()))}.${x.hora?` Cambiado el ${esc(fmtD(String(x.hora)))}${x.por?" ("+esc(quien(x.por))+")":""}.`:""}</small></span>${puede?`<button class="btn" data-a="rdColTopeCfg">Cambiar</button>`:""}</div>`}
-const totalRend=r=>docsDe(r).reduce((s,d)=>s+(num(d.total)||0),0);
-const centroDoc=(r,d)=>d.centro||PREDIO_CENTRO[d.predio]||"";
+/* ---------- v230: notas de crédito: rebajan una boleta o factura de la misma rendición ---------- */
+const esNC=d=>!!d&&d.tipo==="nota_credito";
+const valDoc=d=>esNC(d)?-(num(d.total)||0):(num(d.total)||0);
+const fmtDoc=d=>(esNC(d)&&num(d.total)?"-":"")+fmtP(num(d.total));
+const ncRef=(r,d)=>esNC(d)&&d.ref&&r&&r.docs?r.docs[d.ref]||null:null;
+const ncPuedeRef=y=>!!y&&(y.tipo==="factura"||y.tipo==="boleta");
+const ncMismoRut=(d,y)=>!!(d.rut&&y.rut&&rutValido(d.rut)&&rutValido(y.rut)&&normRut(d.rut)===normRut(y.rut));
+function ncCandidatos(r,d){return docsDe(r).filter(y=>y!==d&&ncPuedeRef(y)).sort((a,b)=>(ncMismoRut(d,a)?0:1)-(ncMismoRut(d,b)?0:1))}
+const ncRebaja=(r,y)=>docsDe(r).filter(x=>esNC(x)&&x.ref===y.k).reduce((s,x)=>s+(num(x.total)||0),0);
+const ncRefTxt=y=>y?[`${TIPO_DOC[y.tipo]||"Documento"}${y.folio?" N° "+y.folio:""}`,y.emisor||"",fmtP(num(y.total))].filter(Boolean).join(" · "):"";
+/* el centro y el tipo de gasto son los del documento que rebaja (el centro se toma siempre de él; el tipo de gasto se copia) */
+function ncCopiar(r,d,y){if(!y)return;d.gasto=y.gasto||"";if(!d.gasto)delete d.gasto;["dist","bu","gastoIA","gastoHist","centro","predio","centroSug"].forEach(f=>delete d[f])}
+function ncAuto(r,d){if(!r||!esNC(d)||(d.ref&&r.docs&&r.docs[d.ref]))return;const L=ncCandidatos(r,d).filter(y=>ncMismoRut(d,y));if(L.length===1){d.ref=L[0].k;ncCopiar(r,d,L[0])}}
+function ncPoner(r,d,y){if(!y||!r||!d)return;const antes=d.ref||"";d.ref=y.k;ncCopiar(r,d,y);
+  if(puedeContab(r)&&antes!==y.k){d.orig=d.orig||{};if(!("ref" in d.orig))d.orig.ref=antes}d.revisadoManual=true;rdTouch();render()}
+function ncElegir(){if(!rdv||!rdd||!esNC(rdd)||rdRO(rdv))return;const r=rdv,d=rdd,L=ncCandidatos(r,d);
+  const m=document.createElement("div");m.className="modal";
+  m.innerHTML=`<div class="sheet pksheet ncsheet" role="dialog" aria-modal="true" aria-label="Documento que rebaja"><h3>¿Qué boleta o factura rebaja?</h3>
+    <p class="ncs-p">La nota de crédito descuenta su total de ese documento. Tiene que estar en esta misma rendición.</p><div class="pklist">${L.length?L.map(y=>`<button class="pkit${d.ref===y.k?" on":""}" data-k="${esc(y.k)}"><span class="pkt">${esc(y.emisor||"Sin emisor")}${d.ref===y.k?" ✓":""}</span><span class="pks">${esc([`${TIPO_DOC[y.tipo]||""}${y.folio?" N° "+y.folio:""}`,y.fecha?fmtD(y.fecha):"",fmtP(num(y.total)),ncMismoRut(d,y)?"mismo RUT":""].filter(Boolean).join(" · "))}</span></button>`).join("")
+      :`<div class="empty">No hay boletas ni facturas en esta rendición. Agrega primero el documento que corrige la nota de crédito.</div>`}</div>
+    <div class="btns"><button class="btn" data-m="no">Cancelar</button></div></div>`;
+  document.body.appendChild(m);document.body.style.overflow="hidden";const cerrar=()=>{m.remove();document.body.style.overflow=""};
+  m.addEventListener("click",e=>{e.stopPropagation();const b=e.target.closest(".pkit");if(b){cerrar();ncPoner(r,d,r.docs[b.dataset.k]);return}
+    if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m)cerrar()})}
+const totalRend=r=>docsDe(r).reduce((s,d)=>s+valDoc(d),0); /* v230: la nota de crédito resta */
+const centroDoc=(r,d)=>{const y=ncRef(r,d);return y&&!esNC(y)?centroDoc(r,y):d.centro||PREDIO_CENTRO[d.predio]||""}; /* v230: la nota de crédito, el del documento que rebaja */
 /* v133 (M-17): N° de boleta o factura sin ceros a la izquierda ni otros signos; orden de llegada de dos documentos */
 const folioNorm=f=>{const s=String(f||"").trim(),n=s.replace(/\D/g,"").replace(/^0+/,"");return n||s.toUpperCase()};
 /* v189: posibles duplicados. Antes (v133) solo boletas sin RUT con el mismo total y fecha, y quien rinde lo veía como «dato
@@ -1312,6 +1339,7 @@ const rdDupRut=x=>x.rut&&rutValido(x.rut)?normRut(x.rut):"";
 function rdDupPar(d,y){
   if(!y||y===d)return false;const t=Math.round(num(d.total));if(!(t>0)||Math.round(num(y.total))!==t)return false;
   if(d.tipo==="peaje"||y.tipo==="peaje")return false;
+  if(esNC(d)!==esNC(y))return false; /* v230: la nota de crédito y lo que rebaja no son duplicados */
   const ra=rdDupRut(d),rb=rdDupRut(y);if(ra&&rb&&ra!==rb)return false;
   const fo=f=>{const s=folioNorm(f);return /^\d{4,}$/.test(s)?s:""},fa=fo(d.folio),fb=fo(y.folio);
   if(ra&&ra===rb&&d.folio&&y.folio&&folioNorm(d.folio)===folioNorm(y.folio))return false; /* ese caso bloquea (v133) */
@@ -1362,10 +1390,16 @@ function problemasDoc2(r,d){
   const b=[],a=[];
   if(!d.foto)b.push("Falta la foto del documento.");
   if(!(num(d.total)>0))b.push("Falta el total.");
+  if(esNC(d)){const y=ncRef(r,d); /* v230 */
+    if(!y)b.push("Indica qué boleta o factura rebaja esta nota de crédito (tiene que estar en esta rendición).");
+    else if(!ncPuedeRef(y))b.push("Una nota de crédito solo puede rebajar una boleta o una factura.");
+    else{const reb=ncRebaja(r,y);if(reb>num(y.total))b.push(`Las notas de crédito (${fmtP(reb)}) suman más que el documento que rebajan (${fmtP(num(y.total))}).`);
+      if(d.rut&&y.rut&&rutValido(d.rut)&&rutValido(y.rut)&&!ncMismoRut(d,y))a.push("El RUT de la nota de crédito no es el mismo del documento que rebaja.")}}
   /* v133 (M-16): con timbre de nota de crédito, guía o nota de débito no sirve aunque se cambie el tipo a mano */
   if(d.timbre&&d.timbre.td&&!TD_TIPO98[d.timbre.td]&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`El timbre del SII dice «${TD_NOMBRE98[d.timbre.td]||"otro documento"}», que no sirve para rendir aunque se cambie el tipo. Elimina el documento o cambia la foto.`);
   else if((d.tipo==="vale"||d.tipo==="otro")&&r.estado!=="aprobada"&&r.estado!=="contabilizada")a.push(noBolMsg(d,r)); /* v202: se envía igual; Contabilidad decide */
   else if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
+  if(d.timbre&&TD_TIPO98[d.timbre.td]==="nota_credito"&&!esNC(d)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push("El timbre del SII dice «Nota de crédito»: cambia el tipo de documento a «Nota de crédito» e indica qué boleta o factura rebaja."); /* v230 */
   if(d.tipo==="peaje"&&gastoDe(d)&&!esGastoPeaje(d))b.push("Un comprobante de peaje solo se rinde con el tipo de gasto «Peajes / barcaza». Cambia el tipo de gasto o el tipo de documento.");
   /* en facturas y boletas de honorarios el RUT viene impreso y Finnegans lo exige; en boletas es opcional */
   const rutObl=d.tipo==="factura"||d.tipo==="boleta_honorarios";
@@ -1374,10 +1408,10 @@ function problemasDoc2(r,d){
     if(rutObl)b.push(msg);else a.push(msg+" Mientras no se corrija, no se usa (en boletas el RUT es opcional).")}
   if(rutObl&&!String(d.rut||"").trim())b.push(`Falta el RUT del emisor: en ${d.tipo==="factura"?"facturas":"boletas de honorarios"} es obligatorio (viene impreso en el documento).`);
   if(d.fecha&&d.fecha>today())b.push("La fecha es futura.");
-  if(!centroDoc(r,d))b.push("Falta el centro de costo.");
-  if(!gastoDe(d))b.push("Falta el tipo de gasto.");
+  if(!esNC(d)){if(!centroDoc(r,d))b.push("Falta el centro de costo.");
+  if(!gastoDe(d))b.push("Falta el tipo de gasto.")} /* v230: la nota de crédito usa los del documento que rebaja */
   /* v133 (M-17): el N° se compara sin ceros a la izquierda; solo la copia más nueva queda bloqueada (la original sigue su curso) */
-  if(d.rut&&d.folio){const fd=folioNorm(d.folio),mismoN=y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&folioNorm(y.folio)===fd,
+  if(d.rut&&d.folio){const fd=folioNorm(d.folio),mismoN=y=>y!==d&&esNC(y)===esNC(d)&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&folioNorm(y.folio)===fd,
     igual=y=>mismoN(y)&&(num(y.total)===num(d.total)||String(y.fecha||"")===String(d.fecha||""))&&docAntes(y,d); /* v202: con otro total y otra fecha no es copia */const otra=Object.values(REND).find(x=>x.id!==r.id&&!x.anulada&&Object.values(x.docs||{}).some(igual));
     if(otra){const quien_=otra.persona&&otra.persona.nombre||quien(otra.creadoPor)||"otra persona",mia=esMiaR(otra);
       b.push(`Documento duplicado: esta boleta o factura (mismo RUT y número) ya está en ${mia?"tu rendición":"la rendición de "+quien_} de ${periodoTxt(otra.periodo).toLowerCase()} (${(RD_ESTADO[otra.estado]||otra.estado||"").toLowerCase()}). Debe quedar en una sola rendición: elimínala de una de las dos.`)}
@@ -1399,7 +1433,7 @@ function problemasDoc2(r,d){
   if(num(d.neto)>0&&num(d.iva)>0&&Math.abs(num(d.neto)+num(d.iva)-(num(d.total)-prop))>2)a.push("Neto más IVA no cuadra con el total.");
   timbreDiferencias(d).forEach(x=>a.push(x));
   if(lecFacturaSinNeto(d)&&!(d.lectura&&/^(leyendo|pendiente)$/.test(d.lectura.estado)))a.push("Falta el neto y el IVA de la factura.");
-  if(!String(d.glosa||"").trim())a.push("Sin detalle del gasto.");
+  if(!String(d.glosa||"").trim()&&!esNC(d))a.push("Sin detalle del gasto.");
   if(colRige(d)&&colDia(r,d.fecha).exc){if(!String(d.glosa||"").trim()&&r.estado!=="aprobada"&&r.estado!=="contabilizada"){b.push("Esta colación es de un día que pasa el tope: en «Detalle» explica por qué (por ejemplo, con quién fue).");const i=a.indexOf("Sin detalle del gasto.");if(i>=0)a.splice(i,1)}a.push(colMsg(r,d))} /* v225 */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.confianza!=null&&d.lectura.confianza<0.6&&!d.revisadoManual)a.push("Lectura automática con baja confianza: conviene revisar los datos.");
   return{b,a};
@@ -1479,10 +1513,12 @@ function validarLinea(l){
    y al HABER el fondo por rendir de la persona, una línea por cada combinación de centro + partida */
 function rdDescAsiento(r){const per=String(r.periodo||"").split("-");return `RENDICION ${per[1]||""}-${per[0]||""} ${normTxt(r.persona&&r.persona.nombre)}${(r.n||1)>1?" N"+r.n:""}`.trim()}
 function rdAsiento(r){
-  const D=docsDe(r),al=[],deb=[],grupos={};const add=(n,m,k)=>al.push({n,m,k:k||""});
+  const D=docsDe(r),al=[],deb=[],grupos={},nc=[];const add=(n,m,k)=>al.push({n,m,k:k||""});
   const c=colabDe(r),per=String(r.periodo||"").split("-");
   const desc=rdDescAsiento(r);
   D.forEach(d=>{
+    if(esNC(d)){const P=problemasDoc2(r,d);P.b.forEach(m=>add("b",m,d.k)); /* v230: va al haber con la imputación del documento que rebaja */
+      const y=ncRef(r,d),tot=Math.round(num(d.total));if(!y||!ncPuedeRef(y)||!(tot>0))return;const im=imputar(r,y);if(im.cuenta)nc.push({d,y,im,tot});return}
     {const P=problemasDoc2(r,d);P.b.forEach(m=>add("b",m,d.k));P.a.filter(esDupMsg).forEach(m=>add("r",m,d.k))} /* v189: posibles duplicados en «Por revisar» */
     const im=imputar(r,d);im.al.forEach(a=>al.push(Object.assign({},a,{k:d.k})));
     const tot=Math.round(num(d.total));if(!im.cuenta||!(tot>0))return;
@@ -1499,19 +1535,28 @@ function rdAsiento(r){
     const base=g.fac?`${serv} - ${(DOCABR[d0.tipo]||DOCABR.otro)[0]}${d0.folio?" "+normTxt(d0.folio):""}`:n>1?`${serv} (${n} ${pl})`:serv;
     rows.forEach((x,i)=>{if(!ms[i])return;const cta=g.fac?im.cuenta:(x.cuenta||im.cuenta);
       L.push({lado:"D",cuenta:cta,prod:CTA_SIN_PROD.includes(cta)?"":(x.prod||im.prod),part:x.part||im.part,centro:x.centro,ter:im.ter,terPend:im.terPend||"",bu:/^4106/.test(cta)?(d0.bu||"OTROS"):"",monto:ms[i],glosa:`${base} - DISTRIBUCION DISPOSITIVOS - ${normTxt(x.centro)}`,docs:ks})})});
+  const NCL=[]; /* v230: notas de crédito al haber */
+  nc.forEach(({d,y,im,tot})=>{const glo=corta(["NOTA DE CREDITO"+(d.folio?" "+normTxt(d.folio):""),normTxt(d.emisor||y.emisor),"REBAJA "+(DOCABR[y.tipo]||DOCABR.otro)[0]+(y.folio?" "+normTxt(y.folio):"")].filter(Boolean).join(" - "),150);
+    if(!im.dist){NCL.push({lado:"H",nc:true,cuenta:im.cuenta,prod:im.prod,part:im.part,centro:im.centro,ter:im.ter,terPend:im.terPend||"",bu:im.bu,monto:tot,glosa:glo,docs:[d.k]});return}
+    const fac=im.cuenta==="210201"||im.cuenta==="210203",rows=im.dist,ms=repartir(tot,rows);
+    rows.forEach((x,i)=>{if(!ms[i])return;const cta=fac?im.cuenta:(x.cuenta||im.cuenta);
+      NCL.push({lado:"H",nc:true,cuenta:cta,prod:CTA_SIN_PROD.includes(cta)?"":(x.prod||im.prod),part:x.part||im.part,centro:x.centro,ter:im.ter,terPend:im.terPend||"",bu:/^4106/.test(cta)?(y.bu||"OTROS"):"",monto:ms[i],glosa:glo,docs:[d.k]})})});
   const ctaF=String(r.ctaFondo||(c&&c.cuenta)||"110106").trim()||"110106";
   const rutCol=String((r.persona&&r.persona.rut)||(c&&c.rut)||"").trim();const org=orgPorRut(rutCol);let terCol=org?org[0]:rutCol,terColPend="";
   if(!rutCol)add("b","Falta el RUT de la persona que rinde (elígela en «Persona que rinde»).");
   else if(maeTiene("orgs")&&!org){terColPend=rutFin(rutCol);terCol="";al.push({n:"p",m:`Persona por crear en Finnegans: ${r.persona&&r.persona.nombre||"quien rinde"}, RUT ${terColPend}.`,k:"",rut:terColPend,nombre:r.persona&&r.persona.nombre||"",tipo:"persona que rinde"})}
   const H=[],hk={};
   L.forEach(l=>{const k=l.centro+"|"+l.part;let h=hk[k];if(!h){h=hk[k]={lado:"H",cuenta:ctaF,prod:"",part:l.part,centro:l.centro,ter:terCol,terPend:terColPend,bu:"",monto:0,glosa:desc,docs:[]};H.push(h)}h.monto+=l.monto});
-  const lineas=L.concat(H);
+  NCL.forEach(l=>{const h=hk[l.centro+"|"+l.part];if(h)h.monto-=l.monto;else add("b","La nota de crédito no calza con el centro de costo y la partida del documento que rebaja.",l.docs[0])}); /* v230 */
+  if(H.some(h=>h.monto<0))add("b","Las notas de crédito rebajan más de lo que suman los documentos de ese centro de costo.");
+  for(let i=H.length-1;i>=0;i--)if(!H[i].monto)H.splice(i,1);
+  const lineas=L.concat(NCL,H);
   lineas.forEach(l=>validarLinea(l).forEach(m=>add(m.n,m.m,"")));
   let f=String(r.fechaAsiento||r.enviada||"");const fd=D.map(d=>d.fecha).filter(Boolean).sort();
   if(!/^\d{4}-\d{2}-\d{2}$/.test(f))f=fd[fd.length-1]||today();
-  const debe=L.reduce((s,l)=>s+l.monto,0),haber=H.reduce((s,l)=>s+l.monto,0);
+  const debe=L.reduce((s,l)=>s+l.monto,0),fondo=H.reduce((s,l)=>s+l.monto,0),haber=fondo+NCL.reduce((s,l)=>s+l.monto,0);
   if(debe!==haber)add("b",`El asiento no cuadra: debe ${fmtP(debe)}, haber ${fmtP(haber)}.`);
-  if(!al.some(a=>a.n==="b")&&debe!==totalRend(r))add("b",`El asiento (${fmtP(debe)}) no coincide con el total de los documentos (${fmtP(totalRend(r))}).`);
+  if(!al.some(a=>a.n==="b")&&fondo!==totalRend(r))add("b",`El asiento (${fmtP(fondo)}) no coincide con el total de los documentos (${fmtP(totalRend(r))}).`); /* v230: sin notas de crédito, fondo = debe */
   const vistos=new Set(),A2=al.filter(a=>{const k=a.n+a.m+a.k;if(vistos.has(k))return false;vistos.add(k);return true}).sort((a,b)=>({b:0,p:1}[a.n]??2)-({b:0,p:1}[b.n]??2));
   return{lineas,debe,haber,fecha:f.slice(8,10)+"-"+f.slice(5,7)+"-"+f.slice(0,4),fechaISO:f,desc,al:A2,bloq:A2.filter(a=>a.n==="b").length,pend:A2.filter(a=>a.n==="p").length};
 }
@@ -1790,7 +1835,7 @@ function rdNavHTML(r,d){const N=rdNavLista(r,d);if(N.keys.length<2||N.i<0)return
     <button class="rdna" data-a="rdIrDoc" data-k="${N.sig?esc(N.sig):""}" ${N.sig?"":"disabled"} aria-label="Documento siguiente"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button></div>`;
 }
 async function rdIrDoc(k){if(!rdv||!k||!rdv.docs[k])return;await flush();RD_ELIGE=null;rdd=rdv.docs[k];go("rdd");window.scrollTo(0,0)}
-function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtP(num(d.total)):"Sin total";
+function rdPieDoc(r,d){const N=rdNavLista(r,d),tot=num(d.total)?fmtDoc(d):"Sin total";
   const Pd=editaPersona(r)?problemasDoc2(r,d):null,ley=!!Pd&&DIS_EDK!==d.k&&rdLeyendo(d,Pd); /* v191: mientras lee, no se cuentan */
   const nf=Pd&&!ley?Pd.b.length:0; /* v179 (quien rinde): cuántos datos faltan para enviar */
   const res=accRes(N.keys.length>1&&N.i>=0?`${N.cola?"Nuevo":"Documento"} ${N.i+1} de ${N.keys.length}`:"Documento",ley?"Leyendo el documento…":nf?`<em>${nf===1?"Falta 1 dato":`Faltan ${nf} datos`} para enviar</em>`:`${esc(d.emisor||"Sin emisor")} · ${tot}`);
@@ -1983,8 +2028,8 @@ function rdDocCard(r,d){
   const lin=pend.length?`<span class="rdcl${soloAv?" aviso":""}">${ICO_ALERTA}<span>${esc(pend[0].t==="pedido"?"Pedido: "+pend[0].m:msgCorto(pend[0].m))}${pend.length>1?` <span class="rdcl-mas">· y ${pend.length-1} más</span>`:""}</span></span>`:L.length?`<span class="rdcl bien">${RDFIC_OK}<span>Corregido</span></span>`:"";
   return `<div class="rdd${soloAv?" aviso":pend.length?" mal":L.length?" bien":""}" role="button" tabindex="0" data-a="rdDoc" data-k="${esc(d.k)}">
     <span class="rdth"><span class="th${src?"":" miss"}"${!src&&d.foto?` data-thref="${esc(d.foto)}"`:""}>${src?`<img src="${esc(src)}" alt="">`:d.foto?(navigator.onLine===false?"Sin señal":"Cargando…"):"Sin foto"}</span></span>
-    <span class="rdx"><span class="rdt">${esc(d.emisor||"Documento sin emisor")}</span><span class="rdm">${d.fecha?fmtD(d.fecha):"Sin fecha"}${d.folio?` · N° ${esc(d.folio)}`:""}${d.tipo?` · ${esc(TIPO_DOC[d.tipo]||d.tipo)}`:""}</span><span class="rdm">${[centro?centroNombre(centro):"",cat?cat.n:""].filter(Boolean).map(esc).join(" · ")||"Sin centro ni tipo de gasto"}${d.dist?` · reparto ${esc(d.dist)}`:""}</span>${lin}<span class="bodc">${pdfCh}${ch.slice(0,2).join("")}</span></span>
-    <span class="rdv"><b>${num(d.total)?fmtP(num(d.total)):"—"}</b></span></div>`;
+    <span class="rdx"><span class="rdt">${esc(d.emisor||"Documento sin emisor")}</span><span class="rdm">${d.fecha?fmtD(d.fecha):"Sin fecha"}${d.folio?` · N° ${esc(d.folio)}`:""}${d.tipo?` · ${esc(TIPO_DOC[d.tipo]||d.tipo)}`:""}</span><span class="rdm">${(esNC(d)?["Rebaja "+(ncRefTxt(ncRef(r,d))||"(falta el documento)")]:[centro?centroNombre(centro):"",cat?cat.n:""]).filter(Boolean).map(esc).join(" · ")||"Sin centro ni tipo de gasto"}${d.dist?` · reparto ${esc(d.dist)}`:""}</span>${lin}<span class="bodc">${pdfCh}${ch.slice(0,2).join("")}</span></span>
+    <span class="rdv${esNC(d)?" nc":""}"><b>${num(d.total)?fmtDoc(d):"—"}</b></span></div>`;
 }
 function rdAlertasHTML(al,r){
   if(!al.length)return `<div class="info" style="border-left:5px solid var(--b-ink)">Sin alertas: el asiento cumple las reglas contables${MAE?" y los códigos existen en los maestros":""}.</div>`;
@@ -2060,11 +2105,11 @@ function rdAjLinea(r,l){
     rdHist(r,"ajuste contable",cambios.join("; "));r.actualizado=new Date().toISOString();saveRend(r);const keep=window.scrollY;render();window.scrollTo(0,keep);toast("Línea actualizada.")});
 }
 function rdTablaAsiento(lineas,edit){const bu=lineas.some(l=>l.bu);
-  return `<div class="asw"><table class="asi"><thead><tr><th>Cuenta</th><th>Centro</th><th>Partida</th><th>Producto</th>${bu?"<th>Bien de uso</th>":""}<th>Glosa</th><th class="n">Debe</th><th class="n">Haber</th></tr></thead><tbody>${lineas.map((l,i)=>`<tr class="${l.lado==="H"?"h":""}"><td>${esc(l.cuenta)}<br><span>${esc(ctaNombre(l.cuenta))}</span>${edit?`<br><button class="lnk" data-a="rdAjLin" data-i="${esc(i)}" style="margin-top:4px">✎ Cambiar</button>`:""}</td><td>${esc(centroNombre(l.centro))}<br><span>${esc(l.centro)}</span></td><td>${esc(l.part)}<br><span>${esc(partNombre(l.part))}</span></td><td>${l.prod?`${esc(l.prod)}<br><span>${esc(prodNombre(l.prod))}</span>`:""}</td>${bu?`<td>${l.bu?`${esc(l.bu)}<br><span>${esc(buNombre(l.bu))}</span>`:""}</td>`:""}<td>${esc(l.glosa)}${l.ter?`<br><span>Tercero ${esc(l.ter)}</span>`:l.terPend?`<br><span>Tercero ${esc(l.terPend)} (por crear en Finnegans)</span>`:""}</td><td class="n">${l.lado==="D"?fmtN(l.monto,0):""}</td><td class="n">${l.lado==="H"?fmtN(l.monto,0):""}</td></tr>`).join("")}</tbody></table></div>
+  return `<div class="asw"><table class="asi"><thead><tr><th>Cuenta</th><th>Centro</th><th>Partida</th><th>Producto</th>${bu?"<th>Bien de uso</th>":""}<th>Glosa</th><th class="n">Debe</th><th class="n">Haber</th></tr></thead><tbody>${lineas.map((l,i)=>`<tr class="${l.lado==="H"?"h":""}"><td>${esc(l.cuenta)}<br><span>${esc(ctaNombre(l.cuenta))}</span>${edit&&!l.nc?`<br><button class="lnk" data-a="rdAjLin" data-i="${esc(i)}" style="margin-top:4px">✎ Cambiar</button>`:""}</td><td>${esc(centroNombre(l.centro))}<br><span>${esc(l.centro)}</span></td><td>${esc(l.part)}<br><span>${esc(partNombre(l.part))}</span></td><td>${l.prod?`${esc(l.prod)}<br><span>${esc(prodNombre(l.prod))}</span>`:""}</td>${bu?`<td>${l.bu?`${esc(l.bu)}<br><span>${esc(buNombre(l.bu))}</span>`:""}</td>`:""}<td>${esc(l.glosa)}${l.ter?`<br><span>Tercero ${esc(l.ter)}</span>`:l.terPend?`<br><span>Tercero ${esc(l.terPend)} (por crear en Finnegans)</span>`:""}</td><td class="n">${l.lado==="D"?fmtN(l.monto,0):""}</td><td class="n">${l.lado==="H"?fmtN(l.monto,0):""}</td></tr>`).join("")}</tbody></table></div>
   <div class="asc">${lineas.map((l,i)=>{const H=l.lado==="H",fila=(t,a,b)=>a?`<div><dt>${t}</dt><dd>${esc(a)}${b?`<small>${esc(b)}</small>`:""}</dd></div>`:"";
     return `<div class="ascl${H?" h":""}"><div class="asct"><span class="ascc"><b>${esc(ctaNombre(l.cuenta)||l.cuenta)}</b><small>${esc(l.cuenta)}</small></span><span class="ascm"><small>${H?"Haber":"Debe"}</small><b>${fmtP(l.monto)}</b></span></div>
     <dl>${fila("Centro",centroNombre(l.centro),l.centro)}${fila("Partida",partNombre(l.part)||l.part,l.part)}${l.prod?fila("Producto",prodNombre(l.prod)||l.prod,l.prod):""}${l.bu?fila("Bien de uso",buNombre(l.bu)||l.bu,l.bu):""}${l.ter?fila("Tercero",(orgPorRut(l.ter)||[])[1]||l.ter,"RUT "+l.ter):l.terPend?fila("Tercero","Por crear en Finnegans","RUT "+l.terPend):""}</dl>
-    ${l.glosa?`<p class="ascg">${esc(l.glosa)}</p>`:""}${edit?`<button class="btn" data-a="rdAjLin" data-i="${esc(i)}" style="width:100%;margin-top:8px">✎ Cambiar esta línea</button>`:""}</div>`}).join("")}</div>`}
+    ${l.glosa?`<p class="ascg">${esc(l.glosa)}</p>`:""}${edit&&!l.nc?`<button class="btn" data-a="rdAjLin" data-i="${esc(i)}" style="width:100%;margin-top:8px">✎ Cambiar esta línea</button>`:""}</div>`}).join("")}</div>`}
 function renderRDV(){
   const r=rdv,D=docsDe(r),edit=editaPersona(r),jef=puedeJefatura(r),con=puedeContab(r),ctz=puedeContabilizar(r);
   const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).filter(m=>!esColMsg(m)).length,0);
@@ -2125,10 +2170,10 @@ function renderRDD(){
   const pideBU=(cat&&cat.bu)||/^4106/.test(im.cuenta),servs=distServicios(),pideDist=cat&&cat.dist&&(servs.length||d.dist);
   const verC=esContab()&&(r.estado==="revcont"||r.estado==="aprobada"||r.estado==="contabilizada"||(r.estado==="enviada"&&sinJefatura(r)))&&contPropiaOk(r);
   let contHTML="";
-  if(verC){const A=rdAsiento(r);const mias=A.lineas.filter(l=>l.lado==="D"&&l.docs.includes(d.k));const al=A.al.filter(a=>a.k===d.k);const aj=d.aj||{};
+  if(verC){const A=rdAsiento(r);const mias=A.lineas.filter(l=>(l.lado==="D"||l.nc)&&l.docs.includes(d.k));const al=A.al.filter(a=>a.k===d.k);const aj=d.aj||{};
     const nm=(v,f)=>v?`<span class="hint">${esc(f(v)||"no está en el maestro")}</span>`:"";
     contHTML=`<h2>Imputación contable</h2>${mias.length?rdTablaAsiento(mias):`<div class="empty">Este documento todavía no genera línea en el asiento.</div>`}${mias.some(l=>l.docs.length>1)?`<p class="note">Este documento va consolidado con otros del mismo tipo, centro y partida.</p>`:""}${al.length?rdAlertasHTML(al,{docs:{}}):""}${editC&&alertaOrgs(al)?`<div class="btns"><button class="btn" data-a="rdOrgsFinn" ${ORGS_TRAYENDO?"disabled":""}>${ORGS_TRAYENDO?"Consultando Finnegans…":"Buscar proveedores nuevos en Finnegans"}</button></div>`:""}
-      ${editC?`<h2>Ajuste contable</h2><p class="note">Si no eliges nada, se usa lo que indica el tipo de gasto (${esc([base.cuenta,base.prod,base.part].filter(Boolean).join(" · ")||"sin imputación")}). Busca por nombre: lo que elijas reemplaza la imputación de este documento y la app guarda el código.</p>
+      ${editC&&!esNC(d)?`<h2>Ajuste contable</h2><p class="note">Si no eliges nada, se usa lo que indica el tipo de gasto (${esc([base.cuenta,base.prod,base.part].filter(Boolean).join(" · ")||"sin imputación")}). Busca por nombre: lo que elijas reemplaza la imputación de este documento y la app guarda el código.</p>
       <div class="skf dupla">${[["cuenta",base.cuenta],["producto",base.prod],["partida",base.part],["tercero",base.ter]].map(([f,b])=>`<div class="f"><label>${esc(AJ_TIT[f])}</label>${ajBtn(f,aj[f]||"",`data-a="rdPickAj" data-f="${esc(f)}"`,b?`Según el tipo de gasto: ${nomAj(f,b)||b}`:"Según el tipo de gasto")}</div>`).join("")}</div>`:""}
       ${d.orig&&Object.keys(d.orig).length?`<p class="note">Cambiado por Contabilidad: ${Object.entries(d.orig).map(([k,v])=>`${esc(k)} (antes: ${esc(String(v||"vacío"))})`).join(" · ")}</p>`:""}`}
   return `<div class="top rddtop"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rdVolver">${esc(rdTituloCorto(r))}</button><div class="ttl">Documento</div>${estadoChip()}</div></div></div>
@@ -2154,6 +2199,7 @@ function renderRDD(){
       <div class="f"><label for="rdFol">N° de boleta / factura</label><input id="rdFol" data-rdf="folio" value="${esc(d.folio||"")}" inputmode="numeric" ${dis}></div>
       <div class="f"><label for="rdFe">Fecha</label><input id="rdFe" type="date" data-rdf="fecha" value="${esc(d.fecha||"")}" ${dis}></div>
       <div class="f"><label for="rdTot">Total ($)</label><input id="rdTot" data-rdf="total" inputmode="numeric" value="${d.total?esc(fmtN(num(d.total),0)):""}" ${dis}></div>
+      ${esNC(d)?(y=>`<div class="f"><label>Rebaja a</label><button type="button" class="pkbtn" id="rdNc" data-a="rdNcRef" ${dis}>${y?`<span>${esc(y.emisor||"Sin emisor")}</span><small>${esc(ncRefTxt(y))}</small>`:`<span class="ph">Elegir la boleta o factura…</span>`}</button><span class="hint">La nota de crédito resta su total de ese documento. El centro de costo y el tipo de gasto son los de ese documento.</span></div>`)(ncRef(rdv,d)):""}
       ${d.tipo==="factura"||num(d.neto)||num(d.iva)?`<div class="f"><label for="rdNe">Neto ($)</label><input id="rdNe" data-rdf="neto" inputmode="numeric" value="${d.neto?esc(fmtN(num(d.neto),0)):""}" ${dis}></div>
       <div class="f"><label for="rdIva">IVA ($)</label><input id="rdIva" data-rdf="iva" inputmode="numeric" value="${d.iva?esc(fmtN(num(d.iva),0)):""}" ${dis}></div>`:""}
       <div class="f"><label>Centro de costo${sugC?` <span class="xp sug">Sugerido</span>`:""}</label><button type="button" class="pkbtn" id="rdCe" data-a="rdPick" data-f="centro" ${dis}>${centro?`<span>${esc(centroNombre(centro))}</span><small>${esc(centro)}</small>`:`<span class="ph">Elegir centro de costo…</span>`}</button>${sugC?`<span class="hint">Es tu centro habitual. Cámbialo si este gasto es de otro predio.</span>`:""}</div>
@@ -2250,7 +2296,7 @@ function rdSetCampo(f,v){
 /* cada aviso del documento lleva al campo que hay que completar */
 function campoDeMsg(m){const t=String(m).toLowerCase();
   if(/tipo de documento/.test(t))return"rdTd";
-  if(/duplicado/.test(t))return"rdFol";if(/\brut\b/.test(t))return"rdRut";
+  if(/duplicado/.test(t))return"rdFol";if(/\brut\b/.test(t))return"rdRut";if(/nota de crédito|notas de crédito/.test(t))return"rdNc"; /* v230 */
   if(/foto|lectura|leído|leer/.test(t))return"rdFotoBox";if(/neto/.test(t))return"rdNe";if(/total/.test(t))return"rdTot";if(/fecha/.test(t))return"rdFe";if(/centro de costo/.test(t))return"rdCe";if(/tipo de gasto/.test(t))return"rdGa";
   if(/duplicado|número de boleta/.test(t))return"rdFol";if(/emisor/.test(t))return"rdEm";if(/detalle/.test(t))return"rdGl";return""}
 const liCampo=p=>{const c=campoDeMsg(p);return `<li>${c?`<span role="button" tabindex="0" class="lnkcampo" data-a="rdIrCampo" data-c="${esc(c)}">${esc(p)}</span>`:esc(p)}</li>`};
@@ -2664,7 +2710,8 @@ async function rdClick(A,b){
     rdv.devueltaEn=rdv.estado;rdv.estado="observada";rdv.comentario=com;rdv.revisadaPor=yo();if(rdv.devueltaEn==="enviada")delete rdv.aprobJef;delete rdv.aprobCont;rdHist(rdv,"devuelta",rdv.comentario);rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"devuelta","Rendición devuelta.").catch(e=>console.warn("correo",e));return true}
   if(A==="rdPickAj"){if(!rdd||!puedeContab(rdv))return true;const f=b.dataset.f,base=imputar(rdv,rdd,true),bk={cuenta:"cuenta",producto:"prod",partida:"part",tercero:"ter"}[f];
     pickAj(f,{actual:(rdd.aj||{})[f]||"",base:base[bk]||"",onPick:v=>{rdd.aj=rdd.aj||{};if(v&&v!==String(base[bk]||""))rdd.aj[f]=v;else delete rdd.aj[f];if(!Object.keys(rdd.aj).length)delete rdd.aj;rdTouch();const keep=window.scrollY;render();window.scrollTo(0,keep)}});return true}
-  if(A==="rdAjLin"){if(!puedeContab(rdv))return true;const l=rdAsiento(rdv).lineas[+b.dataset.i];if(l)rdAjLinea(rdv,l);return true}
+  if(A==="rdAjLin"){if(!puedeContab(rdv))return true;const l=rdAsiento(rdv).lineas[+b.dataset.i];if(l&&l.nc){toast("La nota de crédito sigue al documento que rebaja: cambia la imputación en ese documento.");return true}if(l)rdAjLinea(rdv,l);return true}
+  if(A==="rdNcRef"){ncElegir();return true} /* v230 */
   if(A==="rdAprobarJef"){if(!puedeJefatura(rdv))return true;const D=docsDe(rdv);if(D.some(d=>d.estadoRev==="obs")){toast("Hay documentos por corregir: devuélvela o quita esa marca.");return true}
     if(!(await ask("¿Aprobar la rendición?",`${D.length} ${D.length===1?"documento":"documentos"} por ${fmtP(totalRend(rdv))} de ${rdv.persona.nombre}. Pasa a revisión de Contabilidad, que recibirá un aviso por correo.`,"Aprobar")))return true;
     D.forEach(d=>{d.estadoRev=undefined});rdv.aprobJef={por:yo(),fecha:today()};rdv.estado="revcont";rdHist(rdv,"aprobada por jefatura");rdv.actualizado=new Date().toISOString();await saveRend(rdv);const rr=rdv;go("rd");rdAvisar(rr,"aprobJef","Rendición aprobada; pasa a Contabilidad.").catch(e=>console.warn("correo",e));return true}
@@ -2725,6 +2772,7 @@ function rdInput(ev){const t=ev.target;if(!rdv||!rdd)return false;const f=t.data
   if(f==="gasto"){delete rdd.gastoIA;delete rdd.gastoHist;const c=gastoDe(rdd);if(!c||!c.dist)delete rdd.dist;if((rdd.tipo==="vale"||rdd.tipo==="otro")&&esGastoPeaje(rdd))rdd.tipo="peaje"}
   if(contab&&String(antes==null?"":antes)!==String(rdd[f]==null?"":rdd[f])){rdd.orig=rdd.orig||{};if(!(f in rdd.orig))rdd.orig[f]=antes==null?"":antes}
   if(f==="tipo"&&rdd.tipo==="peaje"&&!rdd.gasto&&catalogo().some(c=>c.id===GASTO_PEAJE))rdd.gasto=GASTO_PEAJE;
+  if(f==="tipo"&&esNC(rdd))ncAuto(rdv,rdd); /* v230 */
   rdd.revisadoManual=true;rdTouch();
   if(f==="fecha"){rdFechaLuego(t);return true}
   if(ev.type==="change")sinPerderFoco(render);else if(["tipo","centro","gasto","bu","dist"].includes(f))render();return true}
@@ -2889,7 +2937,7 @@ function rdXlsxLibro(RS){
   RS=RS.slice().sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));const wb=XLSX.utils.book_new();
   const h=["Período","Persona","RUT","Estado rendición","Tipo documento","Emisor","RUT emisor","Folio","Fecha","Neto","IVA","Total","Centro de costo","Código centro","Tipo de gasto","Detalle","Cuenta","Producto","Partida","Bien de uso","Tercero","Lectura","Datos en blanco","Revisión","Observación","Jefatura","Aprobación jefatura","Contabilidad","Aprobación contable","N° asiento","Contabilizada el","Contabilizada por","Forma de contabilizar","Documento"]; /* v166: contabilización */
   const rows=[h];const links=[];
-  RS.forEach(r=>docsDe(r).forEach(d=>{const le=d.lectura||{},cat=gastoDe(d),ce=centroDoc(r,d),im=imputar(r,d);rows.push([r.periodo,r.persona?r.persona.nombre:"",r.persona&&r.persona.rut||"",RD_ESTADO[r.estado]||r.estado,TIPO_DOC[d.tipo]||d.tipo||"",d.emisor||"",d.rut||"",d.folio||"",d.fecha?fmtD(d.fecha):"",num(d.neto)||"",num(d.iva)||"",num(d.total)||0,centroNombre(ce),ce,cat?cat.n:(d.gasto||""),d.glosa||"",im.cuenta,im.prod,im.part,im.bu,im.ter,le.estado==="ok"?(d.revisadoManual?"IA + corrección manual":"IA"):"Manual",docAdvertencias(r,d).join(" · "),d.estadoRev==="ok"?"Revisada":d.estadoRev==="obs"?"Por corregir":"",d.obsRev||"",r.aprobJef?quien(r.aprobJef.por):(r.jefatura&&r.jefatura.nombre)||"",r.aprobJef?fmtD(r.aprobJef.fecha):"",r.aprobCont?quien(r.aprobCont.por):(r.aprobadaPor?quien(r.aprobadaPor):""),r.aprobCont?fmtD(r.aprobCont.fecha):(r.aprobadaFecha?fmtD(r.aprobadaFecha):""),...rdContabCols(r),rdLinkDoc(r,d).t]);{const L=rdLinkDoc(r,d);if(L.u)links.push([rows.length-1,L.u])}}));
+  RS.forEach(r=>docsDe(r).forEach(d=>{const le=d.lectura||{},cat=gastoDe(d),ce=centroDoc(r,d),im=imputar(r,ncRef(r,d)||d);rows.push([r.periodo,r.persona?r.persona.nombre:"",r.persona&&r.persona.rut||"",RD_ESTADO[r.estado]||r.estado,TIPO_DOC[d.tipo]||d.tipo||"",d.emisor||"",d.rut||"",d.folio||"",d.fecha?fmtD(d.fecha):"",(esNC(d)?-1:1)*num(d.neto)||"",(esNC(d)?-1:1)*num(d.iva)||"",valDoc(d),centroNombre(ce),ce,cat?cat.n:(d.gasto||""),d.glosa||"",im.cuenta,im.prod,im.part,im.bu,im.ter,le.estado==="ok"?(d.revisadoManual?"IA + corrección manual":"IA"):"Manual",docAdvertencias(r,d).join(" · "),d.estadoRev==="ok"?"Revisada":d.estadoRev==="obs"?"Por corregir":"",d.obsRev||"",r.aprobJef?quien(r.aprobJef.por):(r.jefatura&&r.jefatura.nombre)||"",r.aprobJef?fmtD(r.aprobJef.fecha):"",r.aprobCont?quien(r.aprobCont.por):(r.aprobadaPor?quien(r.aprobadaPor):""),r.aprobCont?fmtD(r.aprobCont.fecha):(r.aprobadaFecha?fmtD(r.aprobadaFecha):""),...rdContabCols(r),rdLinkDoc(r,d).t]);{const L=rdLinkDoc(r,d);if(L.u)links.push([rows.length-1,L.u])}}));
   const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[9,24,12,18,16,30,14,10,11,10,10,12,22,16,30,36,9,9,9,11,12,10,30,10,30,20,12,20,12,12,12,20,22,10].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:h.length-1}})};
   links.forEach(([rw,u])=>{const c=ws[XLSX.utils.encode_cell({r:rw,c:h.length-1})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});XLSX.utils.book_append_sheet(wb,ws,"Documentos");
   const res=[["Período","Persona","Estado","Documentos","Total","Jefatura","Contabilidad","N° asiento","Contabilizada por","Forma de contabilizar"]]; /* v166 */
@@ -2899,7 +2947,7 @@ function rdXlsxLibro(RS){
   res.push([]);res.push(["Aprobado por mes","","Rendiciones","","Total"]);Object.entries(sumar(apr,r=>r.periodo)).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([k,v])=>res.push([k,"",v.n,"",v.t]));
   res.push([]);res.push(["Aprobado en Contabilidad por","","Rendiciones","","Total"]);Object.entries(sumar(apr,r=>r.aprobCont?quien(r.aprobCont.por):"")).sort((a,b)=>b[1].t-a[1].t).forEach(([k,v])=>res.push([k,"",v.n,"",v.t]));
   res.push([]);res.push(["Contabilizado por","","Rendiciones","","Total"]);Object.entries(sumar(RS.filter(r=>r.estado==="contabilizada"),r=>r.contab&&r.contab.por?quien(r.contab.por):"")).sort((a,b)=>b[1].t-a[1].t).forEach(([k,v])=>res.push([k,"",v.n,"",v.t]));
-  const porC={},porG={};RS.filter(r=>r.estado==="aprobada"||r.estado==="contabilizada").forEach(r=>docsDe(r).forEach(d=>{const ce=centroNombre(centroDoc(r,d))||"Sin centro",g=(gastoDe(d)||{}).n||"Sin tipo";porC[ce]=(porC[ce]||0)+num(d.total);porG[g]=(porG[g]||0)+num(d.total)}));
+  const porC={},porG={};RS.filter(r=>r.estado==="aprobada"||r.estado==="contabilizada").forEach(r=>docsDe(r).forEach(d=>{const ce=centroNombre(centroDoc(r,d))||"Sin centro",g=(gastoDe(d)||{}).n||"Sin tipo";porC[ce]=(porC[ce]||0)+valDoc(d);porG[g]=(porG[g]||0)+valDoc(d)}));
   res.push([]);res.push(["Aprobado por centro de costo","","","","Total"]);Object.entries(porC).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","","",v]));res.push([]);res.push(["Aprobado por tipo de gasto","","","","Total"]);Object.entries(porG).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","","",v]));
   const w2=XLSX.utils.aoa_to_sheet(res);w2["!cols"]=[{wch:30},{wch:24},{wch:24},{wch:12},{wch:14},{wch:26},{wch:26},{wch:12},{wch:22},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Resumen");
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
@@ -2928,7 +2976,7 @@ async function rdPdf(r,subir){
   headT();
   D.forEach(d=>{const em=doc.splitTextToSize(d.emisor||"",cols[1].w-3),pg=doc.splitTextToSize([centroNombre(centroDoc(r,d)),(gastoDe(d)||{}).n].filter(Boolean).join(" / "),cols[4].w-3);const h=Math.max(5.2,Math.max(em.length,pg.length)*4)+(d.glosa||d.obsRev?4.5:0);chk(h+1);if(y+h>282){nueva();headT()}
     if(d.estadoRev==="obs"){doc.setFillColor(250,228,228);doc.rect(X,y-3.8,W,h,"F")}
-    let x=X;doc.setFontSize(8.5);const v=[d.fecha?fmtD(d.fecha):"",null,d.rut||"",d.folio||"",null,fmtP(num(d.total))];
+    let x=X;doc.setFontSize(8.5);const v=[d.fecha?fmtD(d.fecha):"",null,d.rut||"",d.folio||"",null,fmtDoc(d)];
     cols.forEach((c,i)=>{if(i===1)doc.text(em,x+1.5,y);else if(i===4)doc.text(pg,x+1.5,y);else doc.text(String(v[i]),c.r?x+c.w-1.5:x+1.5,y,c.r?{align:"right"}:undefined);x+=c.w});
     if(d.glosa||d.obsRev){doc.setTextColor(90);doc.setFontSize(7.8);doc.text(doc.splitTextToSize((d.glosa?d.glosa:"")+(d.obsRev?`  · Obs.: ${d.obsRev}`:""),W-22)[0],X+19.5,y+Math.max(em.length,pg.length)*4-0.5);doc.setTextColor(0)}
     y+=h});
@@ -2945,4 +2993,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="229"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="230"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
