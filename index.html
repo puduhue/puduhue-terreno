@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-dRtHxjn3lgxJMIFJWipUr6fXwqXy+qHGxtKIH/rT/Bg=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ioaCb8/JxW+MgsXLAY12IxP/2dfOWC7ZGVuzzsRXs9U=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=230">
+<link rel="stylesheet" href="estilos.css?v=232">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -24,7 +24,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="230";
+const APP_VER="232";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -1150,15 +1150,84 @@ function renderADM(){
       ${lecAdminHTML(lect)}`)}
     ${sec("Check list",`<div class="admit"><b>Catálogo de ítems</b><p>Se lee desde <b>Check list de cumplimiento / Visitas a predios / _config / Catalogo_check_list.xlsx</b> en OneDrive; puedes editarlo aquí o en ese Excel.</p><div class="btns"><button class="btn" data-a="admCat" data-t="visitas">Check list de visitas${cat("visitas")!=null?` (${cat("visitas")})`:""}</button><button class="btn" data-a="admCat" data-t="bodega">Check list de bodega${cat("bodega")!=null?` (${cat("bodega")})`:""}</button><button class="btn" data-a="admCat" data-t="camionetas">Check list de camionetas${cat("camionetas")!=null?` (${cat("camionetas")})`:""}</button></div></div>`)}
     ${fa?sec("Actas de vivienda",`<div class="admit"><b>${fa} fotos de actas antiguas</b><p>Están en la carpeta «fotos» con nombre interno. Puedes moverlas a la carpeta de cada acta con su nombre legible; demora unos minutos y necesita señal.</p><div class="btns"><button class="btn" data-a="ordenarFotos">Ordenar fotos antiguas</button></div></div>`):""}
+    ${sec("Protección de datos",`<div class="admit"><b>Datos de una persona</b><p>Cuando alguien pide sus datos (Ley 21.719), la app arma un Excel con todo lo que tiene de esa persona: rendiciones, actas, capacitaciones, check list y bodega. Las fotos y firmas quedan en OneDrive.</p><div class="btns"><button class="btn" data-a="admDatos">Elegir persona</button></div></div>`)}
     <p class="note">Anular o restaurar una acta, visita o conteo cerrado se hace desde su «⋯». Versión ${APP_VER}.</p>
   </main>`;
 }
+/* ---------- v231: datos de una persona (Ley 21.719: acceso y portabilidad) ----------
+   Administración › Protección de datos. Busca el nombre, el RUT y los correos de la persona en todo lo que la app tiene en este
+   equipo y arma un Excel. No baja fotos ni firmas (van como «[imagen]»; están en OneDrive). */
+function dpPersonas(){const M=new Map();
+  colabs().forEach(c=>{const L=correosDe(c),k=c.rut?"rut:"+normRut(c.rut):L[0]?"c:"+L[0]:"n:"+normTxt(c.nombre);if(!M.has(k))M.set(k,{nombre:String(c.nombre||L[0]||""),rut:c.rut||"",correos:L,col:c})});
+  permPersonas().forEach(p=>{const ya=[...M.values()].some(x=>x.correos.includes(p.c));if(!ya)M.set("c:"+p.c,{nombre:p.n,rut:"",correos:[p.c],col:null})});
+  return [...M.values()].filter(x=>x.nombre||x.correos.length).sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"))}
+function dpCoincide(P){const nr=P.rut&&rutValido(P.rut)?normRut(P.rut):"",nn=normTxt(P.nombre||""),cs=new Set(P.correos.map(x=>String(x).toLowerCase()));
+  return (v,k)=>{if(typeof v!=="string"||!v||v.length>200)return false;const s=v.trim();
+    if(cs.has(s.toLowerCase()))return true;
+    if(nr&&/\d/.test(s)&&s.length<=14&&rutValido(s)&&normRut(s)===nr)return true;
+    if(P.ids&&P.ids.has(s)&&(k==="id"||k==="por"))return true;
+    return !!(nn&&nn.length>=6&&normTxt(s)===nn)}}
+function dpRutas(x,m){const out=[];const walk=(o,p)=>{if(o==null)return;if(Array.isArray(o)){o.forEach((y,i)=>walk(y,`${p}[${i}]`));return}
+    if(typeof o!=="object")return;for(const [k,v] of Object.entries(o)){const q=p?p+"."+k:k;if(typeof v==="string"){if(m(v,k))out.push(q)}else walk(v,q)}};
+  walk(x,"");return out}
+/* ids de Microsoft de la persona: los objetos {id, nombre} o {id, correo} que son de ella */
+function dpIds(P,regs){const m=dpCoincide(P),ids=new Set();const walk=o=>{if(!o||typeof o!=="object")return;if(Array.isArray(o)){o.forEach(walk);return}
+    if(typeof o.id==="string"&&o.id&&((o.nombre&&m(o.nombre,"nombre"))||(o.correo&&m(o.correo,"correo"))))ids.add(o.id);Object.values(o).forEach(walk)};
+  regs.forEach(walk);return ids}
+function dpTexto(x){const L=[];const walk=(o,p)=>{if(o==null||o==="")return;if(Array.isArray(o)){o.forEach((y,i)=>walk(y,`${p}[${i}]`));return}
+    if(typeof o==="object"){for(const [k,v] of Object.entries(o)){if(k.startsWith("_"))continue;walk(v,p?p+"."+k:k)}return}
+    let s=String(o);if(/^data:/.test(s)||/^a:/.test(s)||s.length>400&&/^[A-Za-z0-9+/=]+$/.test(s))s="[imagen o archivo]";else if(s.length>400)s=s.slice(0,400)+"…";L.push(`${p}: ${s}`)};
+  walk(x,"");const t=L.join("\n");return t.length>32000?t.slice(0,32000)+"\n…":t}
+const dpFecha=x=>String(x.fecha||x.fechaVisita||x.cerrada||x.creado||x.periodo||x.actualizado||"").slice(0,10);
+const dpTitulo=(mod,x)=>[mod==="Actas"?({vivienda:"Acta de vivienda",vehiculo:"Acta de vehículo",activo:"Acta de activo fijo",capacitacion:"Capacitación"}[x.tipo]||"Acta de vivienda"):mod,x.predio||x.patente||x.tema||x.bodega||x.casa||"",x.n?"N° "+x.n:"",x.periodo||""].filter(Boolean).join(" · ");
+function dpLibro(P){
+  const RS=Object.values(REND||{}),AC=Object.values(ACTAS||{}),VS=Object.values(typeof VIS!=="undefined"?VIS:{}),CS=Object.values(typeof CONT!=="undefined"?CONT:{});
+  P=Object.assign({},P,{ids:null});P.ids=dpIds(P,RS.concat(AC,VS,CS));const m=dpCoincide(P);
+  const mias=RS.filter(r=>!r.anulada&&r.persona&&(m(r.persona.rut||"","rut")||m(r.persona.correo||"","correo")||(!r.persona.rut&&m(r.cuenta||"","cuenta"))));
+  const wb=mias.length?rdXlsxLibro(mias,true):XLSX.utils.book_new();
+  if(mias.length){wb.SheetNames=wb.SheetNames.map(n=>n==="Documentos"?"Rendiciones":n==="Resumen"?"Rendiciones (resumen)":n);wb.Sheets["Rendiciones"]=wb.Sheets["Documentos"];wb.Sheets["Rendiciones (resumen)"]=wb.Sheets["Resumen"];delete wb.Sheets["Documentos"];delete wb.Sheets["Resumen"]}
+  const hojas=[["Rendiciones (todas)",RS],["Actas",AC],["Check list",VS],["Control de bodega",CS]],cuenta={};
+  hojas.forEach(([mod,L])=>{const rows=[["Registro","Fecha","Estado","Dónde aparece","Datos del registro","Id"]];
+    L.forEach(x=>{if(!x||typeof x!=="object")return;const rt=dpRutas(x,m);if(!rt.length)return;rows.push([dpTitulo(mod==="Rendiciones (todas)"?"Rendición":mod,x),dpFecha(x),String(x.anulada?"anulada":x.estado||""),rt.join(", "),dpTexto(x),String(x.id||"")])});
+    cuenta[mod]=rows.length-1;const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[{wch:40},{wch:12},{wch:14},{wch:40},{wch:90},{wch:16}];XLSX.utils.book_append_sheet(wb,ws,mod)});
+  const c=P.col||{},pm=P.correos.map(x=>[x,PERM.personas[x]]).filter(x=>x[1]);
+  const fic=[["Lista de colaboradores (Rendiciones)",""]].concat(Object.entries(RDCOL_ETQ).map(([k,t])=>[t,k==="activo"?(c.activo===false?"Inactivo":c.nombre?"Activo":""):String(c[k]||"")]),[[""],["Permisos en la app",""]],
+    pm.length?pm.flatMap(([cr,p])=>PERM_MODS.map(x=>[`${x.t||x.k} (${cr})`,({agregar:"Ve y agrega",ver:"Solo ve",no:"No ve"})[permDe(x.k,cr)]||permDe(x.k,cr)])):[["Sin permisos especiales","Ve y agrega en todo (valor por defecto)"]]);
+  const wf=XLSX.utils.aoa_to_sheet(fic);wf["!cols"]=[{wch:36},{wch:50}];XLSX.utils.book_append_sheet(wb,wf,"Ficha");
+  const ahora=new Date(),res=[["Datos personales en Puduhue Terreno"],[""],["Persona",P.nombre],["RUT",P.rut||"(sin RUT en la lista de colaboradores)"],["Correo",P.correos.join(", ")],[""],
+    ["Generado por",ME?ME.nombre||ME.correo:""],["Fecha",ahora.toLocaleString("es-CL")],["Datos del equipo sincronizados",SYNC_INFO.ultima?new Date(SYNC_INFO.ultima).toLocaleString("es-CL"):"sin dato"],[""],
+    ["Hoja","Registros"],["Rendiciones (las suyas)",mias.length]].concat(hojas.map(([mod])=>[mod,cuenta[mod]]),[[""],
+    ["Cómo se buscó","Se buscan su nombre, su RUT y sus correos en todos los registros que la app tiene en este equipo. «Dónde aparece» dice en qué dato está."],
+    ["Fotos, firmas y PDF","No van en este archivo: aparecen como «[imagen o archivo]» y están en OneDrive, en la carpeta de cada registro."],
+    ["Fondo por rendir","Los movimientos de su cuenta en Finnegans se consultan en Rendiciones › Fondos por rendir."],
+    ["Responsable","CAPAC SpA, RUT 76.459.811-3. Contacto: privacidad@puduhue.cl"]]);
+  const wr=XLSX.utils.aoa_to_sheet(res);wr["!cols"]=[{wch:32},{wch:90}];XLSX.utils.book_append_sheet(wb,wr,"Resumen");
+  wb.SheetNames=["Resumen","Ficha"].concat(wb.SheetNames.filter(n=>n!=="Resumen"&&n!=="Ficha"));
+  return {wb,cuenta:Object.assign({"Rendiciones (las suyas)":mias.length},cuenta)}}
+async function dpExportar(P){try{await flush()}catch(e){}
+  const {wb,cuenta}=dpLibro(P);const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});const n=Object.values(cuenta).reduce((s,x)=>s+x,0);
+  await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`Datos_personales_${limpiaNombre(P.nombre||P.correos[0]||"persona")}_${today()}.xlsx`,`Excel listo: ${n} ${n===1?"registro":"registros"}.`)}
+function dpElegir(){if(!esAdmin())return;const L=dpPersonas();
+  const m=document.createElement("div");m.className="modal";
+  m.innerHTML=`<div class="sheet pksheet dpsheet" role="dialog" aria-modal="true" aria-label="Datos de una persona"><h3>Datos de una persona</h3>
+    <p class="dps-p">Elige a la persona: la app arma un Excel con todo lo que tiene de ella (nombre, RUT y correo en rendiciones, actas, check list y bodega).</p>
+    <input class="pksearch" type="search" placeholder="Buscar por nombre, RUT o correo" autocomplete="off" aria-label="Buscar persona"><div class="pklist"></div>
+    <div class="btns"><button class="btn" data-m="no">Cancelar</button></div></div>`;
+  document.body.appendChild(m);document.body.style.overflow="hidden";
+  const lista=m.querySelector(".pklist"),inp=m.querySelector(".pksearch"),cerrar=()=>{m.remove();document.body.style.overflow=""};
+  const pintar=()=>{const q=normTxt(inp.value);const V=L.map((p,i)=>[p,i]).filter(([p])=>!q||normTxt([p.nombre,p.rut,p.correos.join(" ")].join(" ")).includes(q)).slice(0,60);
+    lista.innerHTML=V.length?V.map(([p,i])=>`<button class="pkit" data-i="${i}"><span class="pkt">${esc(p.nombre||p.correos[0])}</span><span class="pks">${esc([p.rut,p.correos[0]].filter(Boolean).join(" · ")||"sin RUT ni correo")}</span></button>`).join(""):`<div class="empty">Sin resultados.</div>`};
+  pintar();inp.addEventListener("input",pintar);
+  m.addEventListener("click",async e=>{e.stopPropagation();const b=e.target.closest(".pkit");if(b){const P=L[+b.dataset.i];cerrar();await dpExportar(P);return}
+    if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m)cerrar()});
+  if(!matchMedia("(pointer:coarse)").matches)setTimeout(()=>inp.focus(),30)}
 async function admClick(A,b){
   if(A==="adm"){go("adm");window.scrollTo(0,0);return true}
   if(A==="admSalud"){ADM.salud=null;await admSalud();return true}
   if(A==="admAvisos"){ADM_AV.L=null;ADM_AV.todos=false;await admAvisos();return true} /* v218 */
   if(A==="admAvTodos"){ADM_AV.todos=true;render();return true}
   if(A==="admPerm"){permQ="";permSolo=false;go("perm");return true}
+  if(A==="admDatos"){dpElegir();return true} /* v231 */
   if(A==="admCat"){clTipo=["bodega","camionetas","huespedes"].includes(b.dataset.t)?b.dataset.t:"visitas";await clClick("clCat",b);return true}
   return false;
 }
@@ -3897,10 +3966,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=230"></script>
-<script src="modulos/bodega.js?v=230"></script>
-<script src="modulos/rendiciones.js?v=230"></script>
-<script src="modulos/actas-entrega.js?v=230"></script>
+<script src="modulos/checklist.js?v=232"></script>
+<script src="modulos/bodega.js?v=232"></script>
+<script src="modulos/rendiciones.js?v=232"></script>
+<script src="modulos/actas-entrega.js?v=232"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
