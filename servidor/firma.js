@@ -15,6 +15,8 @@
     sin sesión (las abre la persona que firma):  GET /f/<link> (página), GET /f/<link>/pdf (el documento), POST /f/<link> (firma)
     con sesión de Puduhue (la app):  POST /firma/crear, /firma/estado, /firma/anular, /firma/recibida
 */
+/* v229: correo de contacto de privacidad (Ley 21.719), el mismo de PRIV.correo en la app */
+const PRIV_CORREO = "privacidad@puduhue.cl";
 export const FL_DIAS = 7;
 export const FL_MAX_PDF = 8_000_000;       // caracteres en base64 (unos 6 MB de PDF)
 export const FL_MAX_FIRMA = 400_000;       // caracteres de la imagen de la firma (data:image/png;base64,...)
@@ -119,7 +121,8 @@ export function htmlFirma(m, t, estado, nonce) {
     <p class="muted" style="margin:0 0 6px">Firma con el dedo dentro del recuadro:</p><canvas id="pad" aria-label="Recuadro para firmar"></canvas>
     <div class="fila"><button class="btn" id="borrar" type="button">Borrar</button><button class="btn pri" id="firmar" type="button" disabled>Firmar</button></div>
     <p class="muted" id="msg" role="status" aria-live="polite"></p>
-    <p class="nota">Firma electrónica simple. Se registran la fecha y la hora de la firma. Tu firma queda en el documento que lleva Puduhue.</p></div>`;
+    <p class="nota">Firma electrónica simple. Se registran la fecha y la hora de la firma. Tu firma queda en el documento que lleva Puduhue.</p>
+    <p class="nota">Puduhue registra tu nombre y tu firma en este documento para respaldarlo, y lo guarda en Microsoft 365 el tiempo necesario para ese fin. Para consultar o ejercer tus derechos sobre tus datos: ${PRIV_CORREO ? `<a href="mailto:${escH(PRIV_CORREO)}">${escH(PRIV_CORREO)}</a>` : "[correo de contacto]"}.</p></div>`;
   const script = `(()=>{const c=document.getElementById("pad"),acc=document.getElementById("acepto"),bf=document.getElementById("firmar"),msg=document.getElementById("msg");
 const dpr=Math.max(1,window.devicePixelRatio||1);let g,W,H,largo=0,last=null,dib=false;
 const prep=()=>{W=c.clientWidth;H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;g=c.getContext("2d");g.scale(dpr,dpr);g.lineCap="round";g.lineJoin="round";g.strokeStyle="#0E2238";g.lineWidth=2.6;largo=0;upd()};
