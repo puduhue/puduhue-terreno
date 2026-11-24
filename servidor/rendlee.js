@@ -76,14 +76,113 @@ const VV = new WeakMap();
 export function versionVis(M) { if (!M) return "0"; if (VV.has(M)) return VV.get(M); const t = JSON.stringify([M.colab || [], M.aprob || []]); let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; const v = (h >>> 0).toString(36); VV.set(M, v); return v; }
 export const PAGINA = 300;
 
+/* v232: duplicados. Seguro: mismo RUT del emisor y mismo N° (3 o más dígitos). Posible: mismo día y mismo total, RUT compatible y sin
+   N° distinto. Solo se marca el documento más nuevo (si el otro se subió después, no). Nota de crédito solo con nota de crédito. */
+const dRut = s => String(s || "").replace(/[^0-9kK]/g, "").toUpperCase().replace(/^0+/, "");
+const dFol = s => String(s || "").replace(/\D/g, "").replace(/^0+/, "");
+export function buscarDups(docs, rid, L, correo) {
+  const out = {}, yo = String(correo || "").toLowerCase();
+  for (const q of docs || []) {
+    if (!q || !q.k) continue;
+    const ru = dRut(q.rut), fo = dFol(q.folio), tot = Math.round(Number(q.total) || 0), fe = String(q.fecha || ""), nc = q.tipo === "nota_credito", cr = String(q.creado || "");
+    if (!(tot > 0)) continue;
+    let best = null;
+    for (const r of L || []) {
+      if (r.id === rid) continue;
+      for (const [, tipo, rut, folio, fecha, total, creado] of r.d) {
+        if ((tipo === "nota_credito") !== nc) continue;
+        if (cr && creado && creado > cr) continue; /* el otro es más nuevo: se marca allá, no aquí */
+        const ru2 = dRut(rut), fo2 = dFol(folio);
+        const seguro = !!(ru && ru2 && ru === ru2 && fo && fo2 && fo === fo2 && fo.length >= 3);
+        const posible = !seguro && total === tot && !!fe && fe === fecha && !(ru && ru2 && ru !== ru2) && !(fo && fo2 && fo !== fo2);
+        if (!seguro && !posible) continue;
+        if (!best || (seguro && !best.seguro)) best = { seguro, persona: r.n, periodo: r.per, estado: r.est, mia: !!(yo && r.pc === yo), cuando: String(r.env || creado || "").slice(0, 10) };
+        if (best.seguro) break;
+      }
+      if (best && best.seguro) break;
+    }
+    if (best) out[q.k] = best;
+  }
+  return out;
+}
+/* v232: devolución automática. Cada hora (tarea programada) el servidor revisa las rendiciones «enviada» (en revisión de
+   jefatura); si una tiene un documento que ya rindió otra persona (o la misma en otra rendición) con el mismo RUT y N°, la devuelve
+   sola: estado «observada», comentario y historial de «Revisión automática» (no de la jefatura) y esos documentos marcados con
+   «Pedir corrección». Vuelve a leer el archivo de OneDrive y guarda con If-Match: si alguien la cambió entremedio, no hace nada. */
+export const SISTEMA = { id: "sistema", nombre: "Revisión automática" };
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const perTxt = p => { const [y, m] = String(p || "").split("-"); return MESES[+m - 1] ? `${MESES[+m - 1]} de ${y}` : String(p || ""); };
+const EST_TXT = { borrador: "borrador", enviada: "en revisión de jefatura", revcont: "en revisión contable", aprobada: "aprobada", contabilizada: "contabilizada", observada: "devuelta" };
+const pesos = n => "$" + String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const fechaTxt = f => /^\d{4}-\d{2}-\d{2}$/.test(String(f || "")) ? `${f.slice(8, 10)}-${f.slice(5, 7)}-${f.slice(0, 4)}` : "";
+export function devolucionAuto(r, dups, ahora = Date.now()) {
+  const ks = Object.keys(dups || {}).filter(k => dups[k] && dups[k].seguro && r && r.docs && r.docs[k]);
+  if (!ks.length) return null;
+  const x = JSON.parse(JSON.stringify(r)), f = new Date(ahora).toISOString();
+  const lin = ks.map(k => {
+    const d = x.docs[k], s = dups[k], cu = fechaTxt(s.cuando), q = `${s.mia ? "ya está en tu rendición" : `ya lo rindió ${s.persona || "otra persona"}${cu ? " el " + cu : ""} en su rendición`} de ${perTxt(s.periodo)} (${EST_TXT[s.estado] || s.estado || ""})`;
+    d.estadoRev = "obs"; d.obsCampo = "folio"; d.obsValor = String(d.folio || ""); d.obsRev = `Documento duplicado: ${q}. Elimínalo de esta rendición.`;
+    return `${d.emisor || "Documento"}${d.folio ? " N° " + d.folio : ""}${fechaTxt(d.fecha) ? " del " + fechaTxt(d.fecha) : ""} por ${pesos(d.total)}: ${q}`;
+  });
+  const com = `Devuelta automáticamente porque ${ks.length === 1 ? "un documento ya está rendido" : ks.length + " documentos ya están rendidos"}. ${lin.join(". ")}. Elimínalos y vuelve a enviar la rendición.`.slice(0, 1500);
+  x.devueltaEn = x.estado; x.estado = "observada"; x.comentario = com; x.revisadaPor = SISTEMA;
+  delete x.aprobJef; delete x.aprobCont; delete x.huellaDev;
+  x.hist = (Array.isArray(x.hist) ? x.hist : []).concat([{ a: "devuelta", por: SISTEMA, fecha: f, nota: com }]);
+  x.devAuto = { fecha: f, docs: ks }; x.actualizado = f; x.modificadoPor = SISTEMA;
+  return x;
+}
+export function ioOneDrive(env) {
+  const c = odConfig(env), d = encodeURIComponent(c.drive);
+  return {
+    async leer(id) {
+      const datos = await carpetaDatos(env), r0 = await graphApp(env, `/drives/${d}/items/${datos}:/${encodeURIComponent(id + ".json")}?$select=id,eTag`);
+      if (!r0.ok) return null; const m = await r0.json(), rc = await graphApp(env, `/drives/${d}/items/${m.id}/content`);
+      if (!rc.ok) return null; try { return { datos: await rc.json(), eTag: m.eTag }; } catch (e) { return null; }
+    },
+    async escribir(id, datos, eTag) {
+      const carpeta = await carpetaDatos(env);
+      const r = await graphApp(env, `/drives/${d}/items/${carpeta}:/${encodeURIComponent(id + ".json")}:/content`, { method: "PUT", headers: { "Content-Type": "application/json", "If-Match": eTag }, body: JSON.stringify(datos) });
+      if (!r.ok) return null; const it = await r.json(); return { eTag: it.eTag };
+    }
+  };
+}
+let DEV_T = 0; /* v232: última revisión de duplicados hecha al sincronizar (en este servidor) */
+export async function devolverDuplicadas(env, avisos, io, ahora = Date.now()) {
+  if (!avisos || !avisos.rlDocs) return [];
+  const L = await avisos.rlDocs(), out = [];
+  for (const r of L) {
+    if (r.est !== "enviada") continue;
+    const docs = r.d.map(([k, tipo, rut, folio, fecha, total, creado]) => ({ k, tipo, rut, folio, fecha, total, creado }));
+    const dups = buscarDups(docs, r.id, L, r.pc);
+    if (!Object.values(dups).some(x => x.seguro)) continue;
+    const cur = await io.leer(r.id);
+    if (!cur || !cur.datos || cur.datos.estado !== "enviada") continue;
+    const nuevo = devolucionAuto(cur.datos, dups, ahora);
+    if (!nuevo) continue;
+    const w = await io.escribir(r.id, nuevo, cur.eTag);
+    if (!w) continue;
+    if (avisos.rlAplicar) await avisos.rlAplicar({ [r.id]: { meta: metaDe(nuevo, w.eTag), data: nuevo } }).catch(() => {});
+    out.push({ id: r.id, persona: (nuevo.persona || {}).nombre || "", docs: nuevo.devAuto.docs.length });
+  }
+  return out;
+}
+
 export async function rutasLectura(req, env, ctx, url, { correo, json, crudo, autorizado, esContab, avisos }) {
-  const rutas = ["/od/rend/bajar", "/od/rend/cambios", "/od/rend/leer", "/od/maestros/leer", "/od/permisos/leer", "/od/archivo", "/sync/medida", "/od/medidas"];
+  const rutas = ["/od/rend/dups", "/od/rend/bajar", "/od/rend/cambios", "/od/rend/leer", "/od/maestros/leer", "/od/permisos/leer", "/od/archivo", "/sync/medida", "/od/medidas"];
   if (!rutas.includes(url.pathname)) return null;
   if (req.method !== "POST" && !(url.pathname === "/od/medidas" && req.method === "GET")) return json({ error: "Usa POST." }, 405);
   if (!odLeeActivo(env) || !avisos) return json({ error: "El servidor no está leyendo rendiciones.", status: 503 }, 503);
   let b = {}; if (req.method === "POST") try { b = await req.json(); } catch (e) {}
   const c = odConfig(env), d = encodeURIComponent(c.drive), quien = { correo, admin: autorizado, contab: await esContab() };
   try {
+    if ((url.pathname === "/od/rend/cambios" || url.pathname === "/od/rend/bajar") && ctx && ctx.waitUntil && odRendActivo(env) && Date.now() - DEV_T > 300000) { /* v232: al sincronizar, como máximo cada 5 minutos */
+      DEV_T = Date.now(); ctx.waitUntil(devolverDuplicadas(env, avisos, ioOneDrive(env)).then(r => r.length && console.log("devueltas por duplicados", JSON.stringify(r))).catch(e => console.error("duplicados", (e && (e.error || e.message)) || e)));
+    }
+    if (url.pathname === "/od/rend/dups") { /* v232: duplicados con las rendiciones de todas las personas */
+      try { await conciliar(env, avisos); } catch (e) {}
+      const docs = Array.isArray(b && b.docs) ? b.docs.slice(0, 400) : [], L = avisos.rlDocs ? await avisos.rlDocs() : [];
+      return json({ ok: true, dups: buscarDups(docs, String((b && b.rid) || ""), L, correo) });
+    }
     if (url.pathname === "/od/rend/bajar") { /* v196 (lo usan los teléfonos que no tienen la v197): todo lo visible, con eTag */
       await conciliar(env, avisos);
       const metas = await avisos.rlMetas(), M = await maestrosSrv(env), con = (b && b.conocidos) || {};

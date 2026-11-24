@@ -73,7 +73,7 @@ import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v16
 import { rutasOneDrive, odListo } from "./onedrive.js";
 import { rutaRend, rutasArchivos, odRendActivo, odModo } from "./rendod.js";
 import { rutasModulos, odModsActivo, odModsLeeActivo } from "./odmod.js"; /* v212: Stock y Control de bodega guardan por el servidor */
-import { rutasLectura, odLeeActivo } from "./rendlee.js"; /* v196: Rendiciones lee por el servidor */ /* v194: Rendiciones guarda por el servidor, con reglas */ /* v193.1: OneDrive con la credencial propia del servidor (certificado) */
+import { rutasLectura, odLeeActivo, devolverDuplicadas, ioOneDrive } from "./rendlee.js"; /* v196: Rendiciones lee por el servidor */ /* v194: Rendiciones guarda por el servidor, con reglas */ /* v193.1: OneDrive con la credencial propia del servidor (certificado) */
 export { Avisos };
 /* v134 (A-08): la sesión debe ser de la organización de Puduhue en Microsoft y de la aplicación de Entra de la app (los dos datos
    son públicos: están en la app). Graph ya revisa la firma y el vencimiento del token; aquí se leen sus datos. */
@@ -127,7 +127,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v229"; /* v229: aviso de privacidad en la página de firma por link */ /* v227.1: /od/archivo solo entrega archivos de Rendiciones */ /* v227: recordatorios hasta el plazo de envío */ /* v226: avisos de lecturas negadas sin notificación; título general */ /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
+const VERSION_SERVIDOR = "v232"; /* v232: /od/rend/dups (duplicados con las rendiciones de todas las personas) */ /* v229: aviso de privacidad en la página de firma por link */ /* v227.1: /od/archivo solo entrega archivos de Rendiciones */ /* v227: recordatorios hasta el plazo de envío */ /* v226: avisos de lecturas negadas sin notificación; título general */ /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
 /* v204: tiempo máximo de espera con Finnegans (antes no había: si Finnegans no respondía, la app quedaba esperando para siempre) */
 const finnEspera = (env, ms) => AbortSignal.timeout(+env.FINN_ESPERA_MS > 0 ? +env.FINN_ESPERA_MS : ms);
 const finnTarde = e => e && (e.name === "TimeoutError" || e.name === "AbortError") ? { status: 504, error: "Finnegans está tardando en responder. Intenta de nuevo en unos minutos." } : e;
@@ -326,6 +326,7 @@ export default {
     if (!env.AVISOS) return;
     ctx.waitUntil(objetoAvisos(env).correrRecordatorios(sujetoDe(env), ev.scheduledTime, false).then(r => console.log("recordatorios", JSON.stringify(r))).catch(e => console.error("recordatorios", e)));
     ctx.waitUntil(avisosDePago(env, ctx, objetoAvisos(env), reporte, sujetoDe(env), ev.scheduledTime).then(r => console.log("pagos", JSON.stringify(r))).catch(e => console.error("pagos", (e && (e.error || e.message)) || e))); /* v186 */
+    if (odRendActivo(env)) ctx.waitUntil(devolverDuplicadas(env, objetoAvisos(env), ioOneDrive(env), ev.scheduledTime).then(r => r.length && console.log("devueltas por duplicados", JSON.stringify(r))).catch(e => console.error("duplicados", (e && (e.error || e.message)) || e))); /* v232 */
     ctx.waitUntil(revisionClaude(env, ev.scheduledTime).then(r => r && console.log("clave de Claude", JSON.stringify(r))).catch(e => console.error("clave de Claude", e))); /* v142 */
   }
 };

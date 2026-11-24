@@ -1262,7 +1262,7 @@ function saveRend(r,deb){
   if(deb){LT[r.id]=setTimeout(run,250);return Promise.resolve()}
   return run();
 }
-function rdTouch(){if(!rdv)return;rdv.actualizado=new Date().toISOString();if(ME)rdv.modificadoPor=yo();saveRend(rdv,true)}
+function rdTouch(){if(!rdv)return;rdv.actualizado=new Date().toISOString();if(ME)rdv.modificadoPor=yo();saveRend(rdv,true);if(editaPersona(rdv))rdDupSrvLuego(rdv)} /* v232 */
 const docsDe=r=>Object.values(r.docs||{}).sort((a,b)=>String(a.fecha||"9")<String(b.fecha||"9")?-1:String(a.fecha||"9")>String(b.fecha||"9")?1:String(a.creado).localeCompare(String(b.creado)));
 /* ---------- v225: tope de colación por persona al día ---------- */
 const COL_TOPE_DEF=13000,COL_DESDE_DEF="2026-11-01";
@@ -1328,6 +1328,22 @@ function ncElegir(){if(!rdv||!rdd||!esNC(rdd)||rdRO(rdv))return;const r=rdv,d=rd
   document.body.appendChild(m);document.body.style.overflow="hidden";const cerrar=()=>{m.remove();document.body.style.overflow=""};
   m.addEventListener("click",e=>{e.stopPropagation();const b=e.target.closest(".pkit");if(b){cerrar();ncPoner(r,d,r.docs[b.dataset.k]);return}
     if((e.target.dataset&&e.target.dataset.m==="no")||e.target===m)cerrar()})}
+/* ---------- v232: duplicados con las rendiciones de todas las personas (los compara el servidor) ---------- */
+const DUPSRV={};let DUPSRV_T=null;
+const dupHuella=r=>docsDe(r).map(d=>[d.k,d.tipo||"",d.rut||"",d.folio||"",d.fecha||"",Math.round(num(d.total)||0)].join("|")).join(";");
+const dupCuando=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x.cuando||""))?fmtD(x.cuando):"";
+const dupQuien=x=>`${x.mia?"ya está en tu rendición":`ya lo rindió ${x.persona||"otra persona"}${dupCuando(x)?" el "+dupCuando(x):""} en su rendición`} de ${periodoTxt(x.periodo).toLowerCase()} (${(RD_ESTADO[x.estado]||x.estado||"").toLowerCase()})`;
+async function rdDupSrvRevisar(r,forzar){
+  if(!r||!r.id||navigator.onLine===false||typeof odPedir!=="function")return;const h=dupHuella(r),ya=DUPSRV[r.id];
+  if(!forzar&&ya&&ya.h===h&&Date.now()-ya.t<300000)return;
+  const docs=docsDe(r).filter(d=>num(d.total)>0).map(d=>({k:d.k,tipo:d.tipo||"",rut:d.rut||"",folio:String(d.folio||""),fecha:d.fecha||"",total:Math.round(num(d.total)),creado:d.creado||""}));
+  if(!docs.length){DUPSRV[r.id]={h,t:Date.now(),res:{}};return}
+  let j=null;try{j=await Promise.race([odPedir("/od/rend/dups",{rid:r.id,docs}),new Promise((_,no)=>setTimeout(()=>no({code:"tiempo"}),8000))])}catch(e){return} /* sin señal o sin servidor: no bloquea */
+  const res=(j&&j.dups)||{},antes=(ya&&ya.res)||{};DUPSRV[r.id]={h,t:Date.now(),res};
+  const nuevos=Object.keys(res).filter(k=>res[k].seguro&&!(antes[k]&&antes[k].seguro)&&r.docs&&r.docs[k]);
+  if(nuevos.length&&editaPersona(r))toast(nuevos.length===1?`Documento duplicado: ${(r.docs[nuevos[0]].emisor||"este documento")} ${dupQuien(res[nuevos[0]])}.`:`${nuevos.length} documentos ya están rendidos por otra persona. Revísalos antes de enviar.`,7000);
+  if(rdv&&rdv.id===r.id&&/^rd[vd]$/.test(view)&&JSON.stringify(res)!==JSON.stringify(antes))render()}
+function rdDupSrvLuego(r){clearTimeout(DUPSRV_T);DUPSRV_T=setTimeout(()=>rdDupSrvRevisar(r),1500)}
 const totalRend=r=>docsDe(r).reduce((s,d)=>s+valDoc(d),0); /* v230: la nota de crédito resta */
 const centroDoc=(r,d)=>{const y=ncRef(r,d);return y&&!esNC(y)?centroDoc(r,y):d.centro||PREDIO_CENTRO[d.predio]||""}; /* v230: la nota de crédito, el del documento que rebaja */
 /* v133 (M-17): N° de boleta o factura sin ceros a la izquierda ni otros signos; orden de llegada de dos documentos */
@@ -1378,7 +1394,7 @@ const monMsg=(d,r)=>{const o=rdOtroMira(r);return d.tc?`En ${d.moneda==="EUR"?"e
   :`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)}. ${o?"Falta el total en pesos que cobró el banco.":"Escribe el total en pesos que te cobró el banco."}`};
 const esMonMsg=m=>/^En (dólares|euros):/.test(m);
 /* v203: texto corto de un problema, para la lista (el detalle queda en la ficha) */
-function msgCorto(m){m=String(m||"");
+function msgCorto(m){m=String(m||"");{const q=/^Documento duplicado: .* ya lo rindió (.+?) en su rendición/.exec(m);if(q)return "Ya lo rindió "+q[1]} /* v232 */
   const T=[[/^Falta el tipo de gasto/,"Falta el tipo de gasto"],[/^Falta el centro de costo/,"Falta el centro de costo"],[/^Falta la foto/,"Falta la foto"],[/^Falta el total/,"Falta el total"],
     [/^Falta el RUT/,"Falta el RUT del emisor"],[/^Revisa el N°/,"N° repetido con otra boleta"],[/^No es boleta ni factura/,"No es boleta ni factura"],[/^Documento duplicado/,"Documento repetido"],
     [/^Posible duplicado/,"Posible duplicado"],[/^En (dólares|euros):.*= \$[\d.]+\.$/,"En dólares, pasado a pesos"],[/^En (dólares|euros)/,"En dólares: revisa el total en pesos"],[/^La fecha es futura/,"Fecha futura"],[/^Tipo de documento no válido/,"Tipo de documento no válido"],[/^El RUT .* no calza|^El RUT .* incompleto/,"RUT con error"]];
@@ -1419,6 +1435,9 @@ function problemasDoc2(r,d){
     else if(Object.values(REND).some(x=>!x.anulada&&Object.values(x.docs||{}).some(y=>mismoN(y)&&num(y.total)!==num(d.total)&&String(y.fecha||"")!==String(d.fecha||""))))a.push(`Revisa el N° ${d.folio}: otra boleta de ${d.emisor||"este comercio"} tiene el mismo N° con otro total. Puede que se haya leído otro número del papel.`)}
   /* v189: posible duplicado (mismo total y fecha, o mismo total y N°, en cualquier tipo); aviso en el más nuevo */
   {const x=rdDupDe(r,d);if(x)a.push(rdDupTxt(r,d,x))}
+  {const s=DUPSRV[r.id]&&DUPSRV[r.id].res&&DUPSRV[r.id].res[d.k];if(s&&!b.some(m=>/^Documento duplicado/.test(m))&&!a.some(m=>/^Posible duplicado/.test(m))){ /* v232: lo dice el servidor */
+    if(s.seguro&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Documento duplicado: este documento (mismo RUT y número) ${dupQuien(s)}. Debe quedar en una sola rendición: elimínalo de esta.`);
+    else if(!s.seguro)a.push(`Posible duplicado: ${s.mia?`en tu rendición de ${periodoTxt(s.periodo).toLowerCase()} hay`:`${s.persona||"otra persona"} rindió en ${periodoTxt(s.periodo).toLowerCase()}`} un documento del mismo día y por el mismo total. Compara las fotos.`)}}
   /* v133 (M-16): la lectura con IA dice que la foto no se lee o no es una boleta o factura */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
@@ -1734,7 +1753,7 @@ async function leerDoc(r,d){
     lecturaGuardar(d);
     try{const k="rd-lecturas-"+periodoActual();localStorage.setItem(k,String((+localStorage.getItem(k)||0)+1))}catch(e){}
   }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento."};console.warn("lectura",e)}
-  finally{listo();delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
+  finally{listo();delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if(editaPersona(r))rdDupSrvLuego(r); /* v232: al terminar de leer la foto */if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
   /* v189: si se parece a otro documento, preguntar una vez (solo quien rinde, mientras la puede editar) */
   if(!d.dupPreg&&!d.noDup&&r.docs&&r.docs[d.k]===d&&editaPersona(r)){const x=rdDupDe(r,d);if(x)await rdPreguntarDup(r,d,x)}
 }
@@ -2111,6 +2130,7 @@ function rdTablaAsiento(lineas,edit){const bu=lineas.some(l=>l.bu);
     <dl>${fila("Centro",centroNombre(l.centro),l.centro)}${fila("Partida",partNombre(l.part)||l.part,l.part)}${l.prod?fila("Producto",prodNombre(l.prod)||l.prod,l.prod):""}${l.bu?fila("Bien de uso",buNombre(l.bu)||l.bu,l.bu):""}${l.ter?fila("Tercero",(orgPorRut(l.ter)||[])[1]||l.ter,"RUT "+l.ter):l.terPend?fila("Tercero","Por crear en Finnegans","RUT "+l.terPend):""}</dl>
     ${l.glosa?`<p class="ascg">${esc(l.glosa)}</p>`:""}${edit&&!l.nc?`<button class="btn" data-a="rdAjLin" data-i="${esc(i)}" style="width:100%;margin-top:8px">✎ Cambiar esta línea</button>`:""}</div>`}).join("")}</div>`}
 function renderRDV(){
+  if(rdv&&(!DUPSRV[rdv.id]||DUPSRV[rdv.id].h!==dupHuella(rdv)))rdDupSrvLuego(rdv); /* v232 */
   const r=rdv,D=docsDe(r),edit=editaPersona(r),jef=puedeJefatura(r),con=puedeContab(r),ctz=puedeContabilizar(r);
   const inc=D.filter(d=>!docCompleto(r,d)).length,obs=D.filter(d=>d.estadoRev==="obs").length,adv=D.reduce((n,d)=>n+docAdvertencias(r,d).filter(m=>!esColMsg(m)).length,0);
   const c=colabDe(r),jefE=r.jefatura||(c?jefaturaDe(c):null);
@@ -2624,7 +2644,7 @@ async function rdClick(A,b){
   if(A==="rdDelDoc"){if(!editaPersona(rdv))return true;const d=rdv.docs[b.dataset.k];if(!d)return true;/* v148: deshacer en vez de confirmar; la foto y el PDF se borran de verdad al terminar el plazo */
     const r=rdv;delete r.docs[d.k];rdd=null;rdTouch();go("rdv");
     deshacer("Documento eliminado.",()=>{if(rdv!==r||view!=="rdv")return;r.docs[d.k]=d;rdTouch();render()},()=>{if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d)});return true}
-  if(A==="rdEnviar"){if(!editaPersona(rdv))return true;const D=docsDe(rdv);if(!D.length)return true;const inc=D.filter(d=>!docCompleto(rdv,d)).length;if(inc){toast(`Faltan datos en ${inc} ${inc===1?"documento":"documentos"}.`);return true}
+  if(A==="rdEnviar"){if(!editaPersona(rdv))return true;await rdDupSrvRevisar(rdv,true); /* v232 */const D=docsDe(rdv);if(!D.length)return true;const inc=D.filter(d=>!docCompleto(rdv,d)).length;if(inc){toast(`Faltan datos en ${inc} ${inc===1?"documento":"documentos"}.`);return true}
     /* v193: sin la lista de colaboradores (no se pudo leer _maestros) no se sabe quién aprueba: no se envía, para que la
        rendición no pase directo a Contabilidad saltándose a la jefatura */
     if(!colabs().length){if(await ask("Todavía no se puede enviar","La app no ha podido leer la lista de colaboradores, así que no sabe quién aprueba tu rendición. Con señal, toca «Sincronizar» y vuelve a enviar. Si sigue igual, pide ayuda a TI. Tus documentos quedan guardados.","Sincronizar",false,"","Cerrar"))pull(true);return true}
@@ -2933,7 +2953,7 @@ function rdXlsxBuild(periodo,soloId){return rdXlsxLibro(Object.values(REND).filt
 const rdFormaContab=r=>!r||r.estado!=="contabilizada"?"":r.contab&&r.contab.finnegans?"Directo a FinnegansGO":r.exportada?"Excel para FinnegansGO":"Marcar contabilizada";
 const rdContabCols=r=>{const c=r.estado==="contabilizada"&&r.contab||null;return c?[c.asiento||"",c.fecha?fmtD(String(c.fecha).slice(0,10)):"",c.por?quien(c.por):"",rdFormaContab(r)]:["","","",""]};
 /* v166: un libro con las rendiciones que se le pasen (un mes, una rendición o un rango de meses) */
-function rdXlsxLibro(RS){
+function rdXlsxLibro(RS,comoLibro){ /* v231: comoLibro devuelve el libro (datos de una persona) */
   RS=RS.slice().sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));const wb=XLSX.utils.book_new();
   const h=["Período","Persona","RUT","Estado rendición","Tipo documento","Emisor","RUT emisor","Folio","Fecha","Neto","IVA","Total","Centro de costo","Código centro","Tipo de gasto","Detalle","Cuenta","Producto","Partida","Bien de uso","Tercero","Lectura","Datos en blanco","Revisión","Observación","Jefatura","Aprobación jefatura","Contabilidad","Aprobación contable","N° asiento","Contabilizada el","Contabilizada por","Forma de contabilizar","Documento"]; /* v166: contabilización */
   const rows=[h];const links=[];
@@ -2950,6 +2970,7 @@ function rdXlsxLibro(RS){
   const porC={},porG={};RS.filter(r=>r.estado==="aprobada"||r.estado==="contabilizada").forEach(r=>docsDe(r).forEach(d=>{const ce=centroNombre(centroDoc(r,d))||"Sin centro",g=(gastoDe(d)||{}).n||"Sin tipo";porC[ce]=(porC[ce]||0)+valDoc(d);porG[g]=(porG[g]||0)+valDoc(d)}));
   res.push([]);res.push(["Aprobado por centro de costo","","","","Total"]);Object.entries(porC).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","","",v]));res.push([]);res.push(["Aprobado por tipo de gasto","","","","Total"]);Object.entries(porG).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>res.push([k,"","","",v]));
   const w2=XLSX.utils.aoa_to_sheet(res);w2["!cols"]=[{wch:30},{wch:24},{wch:24},{wch:12},{wch:14},{wch:26},{wch:26},{wch:12},{wch:22},{wch:22}];XLSX.utils.book_append_sheet(wb,w2,"Resumen");
+  if(comoLibro)return wb;
   return XLSX.write(wb,{bookType:"xlsx",type:"array"});
 }
 /* v196: con odLee, quien rinde solo tiene sus rendiciones: el Excel del mes lo rearma Contabilidad (o el administrador) */
@@ -2993,4 +3014,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="230"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="232"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

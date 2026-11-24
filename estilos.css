@@ -2606,3 +2606,6 @@ mark.privph{background:#FFF1B8;color:#5A4300;border-radius:4px;padding:0 3px}
 @media (max-width:380px){.seg.segtd{grid-template-columns:repeat(3,1fr)}}
 .rdv.nc b,.rdok-tot.nc{color:var(--b-ink)}
 .ncsheet .ncs-p{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.4}
+
+/* ---------- v231: datos de una persona ---------- */
+.dpsheet .dps-p{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.4}

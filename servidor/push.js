@@ -150,6 +150,13 @@ export class Avisos extends DurableObject {
     for (const [k, id] of usar) out.push({ id, s: +k.slice(5), m: await this.ctx.storage.get("rl:m:" + id) });
     return { lista: out, mas, seq: (await this.ctx.storage.get("rl:seq")) || 0 };
   }
+  /* v232: índice compacto de los documentos de todas las rendiciones (duplicados entre personas); se rehace cuando cambia rl:seq */
+  async rlDocs() { const seq = (await this.ctx.storage.get("rl:seq")) || 0; if (this._rld && this._rld.seq === seq) return this._rld.L;
+    const m = await this.ctx.storage.list({ prefix: "rl:d:" }), L = [];
+    for (const [k, r] of m) { if (!r || r.anulada) continue; const p = r.persona || {};
+      L.push({ id: k.slice(5), n: String(p.nombre || ""), pc: String(p.correo || r.cuenta || "").toLowerCase(), per: String(r.periodo || ""), est: String(r.estado || ""), env: String(r.enviada || ""),
+        d: Object.values(r.docs || {}).map(x => [String(x.k || ""), String(x.tipo || ""), String(x.rut || ""), String(x.folio || ""), String(x.fecha || ""), Math.round(Number(x.total) || 0), String(x.creado || "")]) }); }
+    this._rld = { seq, L }; return L; }
   async rlEstado() { return { seq: (await this.ctx.storage.get("rl:seq")) || 0, lista: (await this.ctx.storage.get("rl:lista")) || 0 }; }
   async rlListado(t) { await this.ctx.storage.put("rl:lista", t); await this.ctx.storage.delete("rl:idx"); /* el índice de la v196 ya no se usa */ }
   /* v197: medidas de la sincronización que mandan los teléfonos (las últimas 500) */
