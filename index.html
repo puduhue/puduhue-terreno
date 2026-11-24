@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JDPrcz69ygnO20O263SqZH8nbOUMP+/E/39cCS2qrQw=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-jLHEGC8eKJ/sFgl0+XtmrvYsdu+dCYJfCn3SSXbMBVw=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=228">
+<link rel="stylesheet" href="estilos.css?v=229">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -24,7 +24,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="228";
+const APP_VER="229";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -1034,6 +1034,7 @@ function tbMas(){
     ${disLetraHTML()}
     ${op("tema",temaActual()==="dark"?ICO.sun:ICO.moon,temaActual()==="dark"?"Modo día":"Modo noche","")}
     ${pushFilaHTML()}
+    ${op("priv",ICO_PRIV,"Privacidad y tus datos","Qué datos usa la app y tus derechos")}
     ${op("logout",`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg>`,"Cerrar sesión",ME?(ME.nombre||ME.correo):"")}
     <p class="note tbver lx-ver">Puduhue Terreno · versión ${APP_VER} · <button class="lnk" data-a="buscarUpd">Buscar actualización</button>${instPieHTML()}</p></div>`;
   document.body.appendChild(m);
@@ -1635,6 +1636,23 @@ function pushSwVer(on){const f=$("#pushLinea");if(!f)return;const b=f.querySelec
   const sm=f.querySelector("small");if(sm)sm.textContent=on?"Activando…":"Desactivando…";const l=f.querySelector(".lnk");if(l)l.hidden=true}
 
 /* ---------- Render ---------- */
+/* ---------- v229: aviso de privacidad (Ley 21.719) ---------- */
+const PRIV={empresa:"CAPAC SpA",rut:"76.459.811-3",domicilio:"Hijuela 4 San Benito S/N, comuna de Chimbarongo",correo:"privacidad@puduhue.cl",vigente:"1 de diciembre de 2026"};
+const privDato=(v,t)=>v?esc(v):`<mark class="privph">[${esc(t)}]</mark>`;
+const privCorreo=()=>PRIV.correo?`<a href="mailto:${esc(PRIV.correo)}">${esc(PRIV.correo)}</a>`:privDato("","correo de contacto");
+const ICO_PRIV=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 8.3-7 10-4-1.7-7-5.6-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>`;
+function privFirmaHTML(){return `<p class="note privfirma">Puduhue registra el nombre y la firma de quien firma en este documento para respaldarlo, y lo guarda en Microsoft 365 el tiempo necesario para ese fin. Para consultar o ejercer tus derechos sobre tus datos: ${privCorreo()}.</p>`}
+function privTipHTML(){return disTip("priv-2026-12",`<b>Tus datos.</b> Puduhue usa los datos que registras en la app para tus rendiciones, actas y controles. <button class="lnk" data-a="priv">Ver cómo los usamos y tus derechos</button>`)}
+function renderPRIV(){
+  const s=(t,h)=>`<section class="privsec"><h2>${t}</h2>${h}</section>`;
+  return band("Privacidad")+`<main class="wrap priv"><h1>Cómo usamos tus datos</h1>
+    <p class="lead">${privDato(PRIV.empresa,"razón social de Puduhue")}${PRIV.rut?`, RUT ${esc(PRIV.rut)}`:`, RUT ${privDato("","RUT")}`}, con domicilio en ${privDato(PRIV.domicilio,"domicilio")}, es responsable de los datos personales que se registran en Puduhue Terreno.</p>
+    ${s("Qué datos",`<p>Tu nombre, RUT, correo y cargo; los gastos que rindes y las fotos de tus boletas y facturas; las actas, capacitaciones, revisiones y conteos que registras o firmas; y datos técnicos de uso, como la versión de la app y los avisos.</p>`)}
+    ${s("Para qué",`<p>Para reembolsar tus gastos y registrarlos en la contabilidad, respaldar la entrega de viviendas, vehículos y equipos, acreditar capacitaciones y llevar el control de predios y bodegas. Lo hacemos por tu relación laboral con Puduhue y para cumplir obligaciones legales y tributarias.</p>`)}
+    ${s("Quién los ve",`<p>Tú, tu jefatura (lo que debe aprobar), Contabilidad y el administrador de la app. Cada persona ve solo lo que le corresponde.</p><p>Los guardamos en Microsoft 365 y usamos proveedores que los tratan por cuenta nuestra: Cloudflare (servidor de la app), Anthropic (lectura automática de boletas) y Finnegans (contabilidad). Algunos están fuera de Chile y operan con resguardos contractuales.</p>`)}
+    ${s("Cuánto tiempo",`<p>Las rendiciones, el plazo que exige la ley tributaria; lo demás, el tiempo necesario para su fin, según la política de conservación de Puduhue.</p>`)}
+    ${s("Tus derechos",`<p>Puedes pedir acceso a tus datos, corregirlos, suprimirlos, oponerte a un tratamiento, pedir su portabilidad o su bloqueo, escribiendo a ${privCorreo()}. Respondemos en el plazo que fija la ley. También puedes reclamar ante la Agencia de Protección de Datos Personales.</p>`)}
+    <p class="note">Vigente desde el ${esc(PRIV.vigente)}.</p></main>`}
 function band(sub,back,backTxt){return PWA?`<div class="top"><div class="in"><div class="bar"><button class="back" data-a="${back||"launch"}"${back?"":` aria-label="Volver al inicio" title="Volver al inicio"`}>${esc(backTxt||"Inicio")}</button><div class="ttl">${esc(sub)}</div>${estadoChip()}</div></div></div>`:`<div class="band"><div class="in"><span class="bl"><img src="${esc(MARCA)}" alt="Puduhue"></span><span class="bsub">${esc(sub)}</span></div></div>`}
 function render(){RENDER_MEMO=new Map();try{return renderPantalla()}finally{RENDER_MEMO=null;insignia();pantSigue();flDecorar();try{iniModColor()}catch(e){}try{iniTitulo()}catch(e){}}}
 /* v150: esqueleto de carga (la forma del Inicio en gris, con un brillo) */
@@ -1657,6 +1675,7 @@ function renderPantalla(){
   else if(view==="clcat")app.innerHTML=renderCLCat();
   else if(view==="finn")app.innerHTML=renderFinn();
   else if(view==="adm")app.innerHTML=renderADM();
+  else if(view==="priv")app.innerHTML=renderPRIV(); /* v229 */
   else if(view==="perm")app.innerHTML=renderPerm();
   else if(view==="fdl")app.innerHTML=renderFDL();
   else if(view==="stock")app.innerHTML=renderStock();
@@ -1948,6 +1967,7 @@ async function onClickAccion(ev,b,A){
     try{if(view==="clcat"&&typeof CAT_PEND!=="undefined"){clearTimeout(catSaveT);if(CAT_PEND)await guardarCatalogo(false)}}catch(e){console.warn("lateral, catálogo",e)}
     await flush();cur=null;try{clv=null}catch(e){}try{cbv=null}catch(e){}try{rdv=null;rdd=null}catch(e){}
     A=String(b.dataset.d||"launch")}
+  if(A==="priv"){go("priv");return} /* v229: aviso de privacidad */
   if(PERM_ACC[A]&&permBloquea(A))return; /* v121 */
   if(A==="fabRd"||A.startsWith("dis")){if(await disClick(A,b))return}
   if(A.startsWith("lec")){if(await lecClick(A,b))return}
@@ -2164,7 +2184,7 @@ function openSign(role){
   const rr=rolesDe(cur).find(r=>r[0]===role)||[role,"Firma",""];const l=rr[1]+" · "+rr[2];const f=cur.firmas[role]||{};
   const m=document.createElement("div");m.className="modal";
   m.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(l)}"><h3>${esc(l)}</h3><p>${esc(f.nombre||"Escribe el nombre en el acta antes o después de firmar.")}</p>
-   <canvas></canvas><div class="btns"><button class="btn" data-m="clear">Borrar</button><button class="btn" data-m="cancel">Cancelar</button><button class="btn pri" data-m="ok" style="flex:1">Guardar firma</button></div></div>`;
+   <canvas></canvas><div class="btns"><button class="btn" data-m="clear">Borrar</button><button class="btn" data-m="cancel">Cancelar</button><button class="btn pri" data-m="ok" style="flex:1">Guardar firma</button></div>${privFirmaHTML()}</div>`;
   document.body.appendChild(m);document.body.style.overflow="hidden";
   const c=m.querySelector("canvas"),dpr=Math.max(1,window.devicePixelRatio||1);
   const W=c.clientWidth,H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;
@@ -2824,7 +2844,7 @@ function renderLaunch(){
     <div><b>${nv}</b><span>${nv===1?"visita":"visitas"} de check list</span></div>
     <div class="${nh?"warn":""}"><b>${nh}</b><span>${nh===1?"hallazgo abierto":"hallazgos abiertos"}</span></div></div>${np?`<p class="lx-foot">${np} ${np===1?"cambio pendiente":"cambios pendientes"} de subir.</p>`:""}</section>`;
   const nb=todas.filter(a=>a.estado!=="cerrada").length,nbAx=todasAx.filter(a=>a.estado!=="cerrada").length;
-  return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${iniTipNav()}${(()=>{try{return typeof rdInicioFondo==="function"?rdInicioFondo():""}catch(e){console.warn("inicio fondo",e);return""}})()}${cont}
+  return hero(`${saludo()}, ${esc((ME.nombre||"").split(" ")[0]||"")}.`,"")+`<main class="wrap lx-main">${mudanzaCardHTML()}${instCardHTML(false)}${iniTipNav()}${privTipHTML()}${(()=>{try{return typeof rdInicioFondo==="function"?rdInicioFondo():""}catch(e){console.warn("inicio fondo",e);return""}})()}${cont}
   </main>`;
 }
 
@@ -3877,10 +3897,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=228"></script>
-<script src="modulos/bodega.js?v=228"></script>
-<script src="modulos/rendiciones.js?v=228"></script>
-<script src="modulos/actas-entrega.js?v=228"></script>
+<script src="modulos/checklist.js?v=229"></script>
+<script src="modulos/bodega.js?v=229"></script>
+<script src="modulos/rendiciones.js?v=229"></script>
+<script src="modulos/actas-entrega.js?v=229"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
