@@ -2637,3 +2637,14 @@ mark.privph{background:#FFF1B8;color:#5A4300;border-radius:4px;padding:0 3px}
 .dupc span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .dupc .btn{margin-top:6px;width:100%}
 @media (min-width:1100px){body.conlat .dupcsh{max-width:720px}}
+
+/* ---------- v235: documentos quitados y revisión de las fotos ---------- */
+.quitbox{margin:0 0 14px;padding:12px 14px 6px;border-radius:16px;background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+.quitbox h3{margin:2px 0 2px;font-size:17px}
+.quitbox>p{margin:0 0 6px;font-size:14px;color:var(--muted)}
+.quitbox ul{list-style:none;margin:0 0 6px;padding:0}
+.quitbox li{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}
+.quitbox .dupi{display:flex;flex-direction:column;min-width:0;flex:1 1 200px}
+.quitbox .dupi span{color:var(--muted);font-size:14px}
+.quitbox .btn{min-height:40px;padding:8px 14px}
+.dupsh .dupia{margin:0 0 10px;padding:8px 12px;border-radius:12px;background:var(--soft);color:var(--ink);font-size:14px}

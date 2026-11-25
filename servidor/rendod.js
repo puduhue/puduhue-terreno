@@ -92,6 +92,7 @@ export function correosDueno(M, r) {
 export function metaDe(r, eTag) {
   const p = (r && r.persona) || {}, f = [];
   Object.values((r && r.docs) || {}).forEach(d => { [d && d.foto, d && d.pdf].forEach(x => { if (/^a:/.test(String(x || ""))) f.push(String(x).slice(2)); }); });
+  (r && Array.isArray(r.quitados) ? r.quitados : []).forEach(q => { const x = q && q.doc && q.doc.foto; if (/^a:/.test(String(x || ""))) f.push(String(x).slice(2)); }); /* v235: quien rinde ve la foto del quitado */
   return { e: eTag, c: String((r && r.cuenta) || "").toLowerCase(), pc: String(p.correo || "").toLowerCase(), rut: p.rut || "", j: String(((r && r.jefatura) || {}).correo || "").toLowerCase(), f };
 }
 

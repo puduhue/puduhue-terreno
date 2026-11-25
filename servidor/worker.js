@@ -127,7 +127,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v234"; /* v234: lectura del N° y la hora de los tickets de peaje */ /* v233: textos cortos de la devolución automática */ /* v232: /od/rend/dups (duplicados con las rendiciones de todas las personas) */ /* v229: aviso de privacidad en la página de firma por link */ /* v227.1: /od/archivo solo entrega archivos de Rendiciones */ /* v227: recordatorios hasta el plazo de envío */ /* v226: avisos de lecturas negadas sin notificación; título general */ /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
+const VERSION_SERVIDOR = "v235"; /* v235: /od/rend/comparar (fotos de posibles duplicados) y aviso de documentos quitados */ /* v234: lectura del N° y la hora de los tickets de peaje */ /* v233: textos cortos de la devolución automática */ /* v232: /od/rend/dups (duplicados con las rendiciones de todas las personas) */ /* v229: aviso de privacidad en la página de firma por link */ /* v227.1: /od/archivo solo entrega archivos de Rendiciones */ /* v227: recordatorios hasta el plazo de envío */ /* v226: avisos de lecturas negadas sin notificación; título general */ /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
 /* v204: tiempo máximo de espera con Finnegans (antes no había: si Finnegans no respondía, la app quedaba esperando para siempre) */
 const finnEspera = (env, ms) => AbortSignal.timeout(+env.FINN_ESPERA_MS > 0 ? +env.FINN_ESPERA_MS : ms);
 const finnTarde = e => e && (e.name === "TimeoutError" || e.name === "AbortError") ? { status: 504, error: "Finnegans está tardando en responder. Intenta de nuevo en unos minutos." } : e;

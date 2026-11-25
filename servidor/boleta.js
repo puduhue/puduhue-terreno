@@ -181,3 +181,13 @@ export async function leerBoleta(env, { imagen, mime, tipos, timbre, escaneo }) 
     return { datos: marcarDiferencia(r1.datos, t), uso: r1.uso, modelo: r1.modelo, revision: { modelo: m2, motivos, error: (e && e.error) || "no se pudo revisar" } };
   }
 }
+
+/* v235: ¿las dos fotos son el mismo comprobante? (posibles duplicados; sirve aunque el fondo o el ángulo sean otros) */
+export const PROMPT_COMPARAR = `Estas dos fotos son comprobantes de gastos (boletas, facturas, comprobantes de tarjeta o tickets de peaje). Di si son el MISMO comprobante (la misma compra o la misma pasada, aunque las fotos tengan otro fondo, ángulo, luz o recorte) o dos comprobantes DISTINTOS. Compara el número del documento o el Id, el número del código de barras, la operación o autorización, la fecha y la hora, la vía, caja o terminal, el monto y el comercio. Dos pasadas por el mismo peaje el mismo día y con el mismo monto son DISTINTAS si cambia la hora, la vía o el número. Devuelve SOLO un objeto JSON, sin texto adicional: {"mismo":true,"razon":"máximo 12 palabras"}; usa false si son distintos y null si no se puede saber.`;
+export async function compararFotos(env, a, b) {
+  if (!env.ANTHROPIC_API_KEY) throw { status: 500, error: "La comparación no está configurada: falta ANTHROPIC_API_KEY en el servidor." };
+  const img = x => ({ type: "image", source: { type: "base64", media_type: x.mime || "image/jpeg", data: x.b64 } });
+  const r = await llamar(env, env.MODELO_REVISION || MODELO_REVISION, [img(a), img(b), { type: "text", text: PROMPT_COMPARAR }], true);
+  const d = r.datos || {};
+  return { mismo: d.mismo === true ? true : d.mismo === false ? false : null, razon: String(d.razon || "").slice(0, 120), modelo: r.modelo };
+}
