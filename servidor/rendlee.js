@@ -20,6 +20,7 @@
 */
 import { odConfig, graphApp } from "./onedrive.js";
 import { odRendActivo, maestrosSrv, correosDueno, carpetaDatos, idHijo, correosDe, RD_ROOT, metaDe } from "./rendod.js";
+import { compararFotos } from "./boleta.js"; /* v235 */
 /* v227.1: ¿el archivo (no carpeta) está dentro de la carpeta Rendiciones? Sube por las carpetas, por id, hasta 6 niveles.
    true / false; null si el id no existe */
 export async function dentroDeRendiciones(env, d, id) {
@@ -89,14 +90,14 @@ export function buscarDups(docs, rid, L, correo) {
     let best = null;
     for (const r of L || []) {
       if (r.id === rid) continue;
-      for (const [, tipo, rut, folio, fecha, total, creado] of r.d) {
+      for (const [k2, tipo, rut, folio, fecha, total, creado] of r.d) {
         if ((tipo === "nota_credito") !== nc) continue;
         if (cr && creado && creado > cr) continue; /* el otro es más nuevo: se marca allá, no aquí */
         const ru2 = dRut(rut), fo2 = dFol(folio);
         const seguro = !!(ru && ru2 && ru === ru2 && fo && fo2 && fo === fo2 && fo.length >= 3);
         const posible = !seguro && total === tot && !!fe && fe === fecha && !(ru && ru2 && ru !== ru2) && !(fo && fo2 && fo !== fo2);
         if (!seguro && !posible) continue;
-        if (!best || (seguro && !best.seguro)) best = { seguro, persona: r.n, periodo: r.per, estado: r.est, mia: !!(yo && r.pc === yo), cuando: String(r.env || creado || "").slice(0, 10) };
+        if (!best || (seguro && !best.seguro)) best = { seguro, rid: r.id, k: k2, persona: r.n, periodo: r.per, estado: r.est, mia: !!(yo && r.pc === yo), cuando: String(r.env || creado || "").slice(0, 10) };
         if (best.seguro) break;
       }
       if (best && best.seguro) break;
@@ -168,7 +169,7 @@ export async function devolverDuplicadas(env, avisos, io, ahora = Date.now()) {
 }
 
 export async function rutasLectura(req, env, ctx, url, { correo, json, crudo, autorizado, esContab, avisos }) {
-  const rutas = ["/od/rend/dups", "/od/rend/bajar", "/od/rend/cambios", "/od/rend/leer", "/od/maestros/leer", "/od/permisos/leer", "/od/archivo", "/sync/medida", "/od/medidas"];
+  const rutas = ["/od/rend/dups", "/od/rend/comparar", "/od/rend/bajar", "/od/rend/cambios", "/od/rend/leer", "/od/maestros/leer", "/od/permisos/leer", "/od/archivo", "/sync/medida", "/od/medidas"];
   if (!rutas.includes(url.pathname)) return null;
   if (req.method !== "POST" && !(url.pathname === "/od/medidas" && req.method === "GET")) return json({ error: "Usa POST." }, 405);
   if (!odLeeActivo(env) || !avisos) return json({ error: "El servidor no está leyendo rendiciones.", status: 503 }, 503);
@@ -182,6 +183,30 @@ export async function rutasLectura(req, env, ctx, url, { correo, json, crudo, au
       try { await conciliar(env, avisos); } catch (e) {}
       const docs = Array.isArray(b && b.docs) ? b.docs.slice(0, 400) : [], L = avisos.rlDocs ? await avisos.rlDocs() : [];
       return json({ ok: true, dups: buscarDups(docs, String((b && b.rid) || ""), L, correo) });
+    }
+    if (url.pathname === "/od/rend/comparar") { /* v235: la inteligencia artificial mira las dos fotos de un posible duplicado */
+      const rid = String(b.rid || ""), k = String(b.k || ""), rid2 = String(b.rid2 || rid), k2 = String(b.k2 || "");
+      const metas = await avisos.rlMetas(), M = await maestrosSrv(env);
+      if (!metas[rid] || metas[rid].borrado || !metas[rid2] || metas[rid2].borrado) return json({ ok: true, final: false, mismo: null, razon: "todavía no está en el servidor" });
+      if (!quien.admin && !quien.contab && !puedeVer(M, metas[rid], quien)) return json({ error: "No es una rendición tuya.", status: 403 }, 403);
+      const D = await avisos.odDatos([...new Set([rid, rid2])]), d1 = ((D[rid] || {}).docs || {})[k], d2 = ((D[rid2] || {}).docs || {})[k2];
+      const f1 = String((d1 && d1.foto) || ""), f2 = String((d2 && d2.foto) || "");
+      if (!/^a:/.test(f1) || !/^a:/.test(f2)) return json({ ok: true, final: false, mismo: null, razon: "falta una foto" });
+      const clave = "cmp:" + [f1, f2].sort().join("|"), ya = await avisos.cmpLeer(clave);
+      if (ya) return json({ ok: true, final: true, mismo: ya.mismo, razon: ya.razon, guardado: true });
+      const u = await avisos.usar("cmp", correo, +env.LIMITE_COMPARAR || 80, new Date().toISOString().slice(0, 10));
+      if (!u.ok) return json({ ok: true, final: false, mismo: null, razon: "límite de comparaciones de hoy" });
+      const bajar = async f => {
+        const r = await graphApp(env, `/drives/${d}/items/${f.slice(2)}/content`); if (!r.ok) throw { status: 502, error: `No se pudo leer la foto (${r.status}).` };
+        const mime = String(r.headers.get("Content-Type") || "image/jpeg").split(";")[0]; if (!/^image\/(jpeg|png|webp|gif)$/.test(mime)) throw { status: 415, error: "La foto no es una imagen." };
+        const ab = await r.arrayBuffer(); if (ab.byteLength > 4500000) throw { status: 413, error: "La foto es muy grande." };
+        const x = new Uint8Array(ab); let s = ""; for (let i = 0; i < x.length; i += 0x8000) s += String.fromCharCode.apply(null, x.subarray(i, i + 0x8000));
+        return { b64: btoa(s), mime };
+      };
+      let res; try { const [a1, a2] = await Promise.all([bajar(f1), bajar(f2)]); res = await compararFotos(env, a1, a2); }
+      catch (e) { return json({ ok: true, final: false, mismo: null, razon: (e && e.error) || "no se pudo comparar" }); }
+      await avisos.cmpGuardar(clave, { mismo: res.mismo, razon: res.razon, modelo: res.modelo, hora: new Date().toISOString() });
+      return json({ ok: true, final: true, mismo: res.mismo, razon: res.razon });
     }
     if (url.pathname === "/od/rend/bajar") { /* v196 (lo usan los teléfonos que no tienen la v197): todo lo visible, con eTag */
       await conciliar(env, avisos);

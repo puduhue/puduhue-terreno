@@ -142,8 +142,29 @@ export class Avisos extends DurableObject {
       if (!c) { await S.put("rl:m:" + id, { borrado: true, s: seq }); await S.delete("rl:d:" + id); }
       else { await S.put("rl:m:" + id, { ...c.meta, s: seq }); await S.put("rl:d:" + id, c.data); }
     }
-    await S.put("rl:seq", seq); return seq;
+    await S.put("rl:seq", seq); try { await this.avisarQuitados(cambios); } catch (e) {} /* v235 */ return seq;
   }
+  /* v235: documentos quitados por repetidos (r.quitados): una notificación a quien rinde, una vez por documento y solo si se
+     quitó hace menos de 7 días. Sirve también cuando se quitan directo en OneDrive (llega por conciliar). */
+  async avisarQuitados(cambios) {
+    const S = this.ctx.storage, vistos = new Set((await S.get("quit:vistos")) || []); let nuevos = 0;
+    const MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    for (const [id, c] of Object.entries(cambios || {})) {
+      const x = c && c.data; if (!x || x.anulada || !Array.isArray(x.quitados)) continue;
+      const L = x.quitados.filter(q => q && q.k && !vistos.has(id + "|" + q.k) && Date.now() - Date.parse(q.fecha || 0) < 7 * 864e5);
+      if (!L.length) continue; L.forEach(q => vistos.add(id + "|" + q.k)); nuevos++;
+      const para = [...new Set([x.cuenta, x.persona && x.persona.correo].map(s => String(s || "").trim().toLowerCase()).filter(s => /@puduhue\.cl$/.test(s)))];
+      if (!para.length) continue;
+      const tot = L.reduce((s, q) => s + (Math.round(+((q.doc || {}).total)) || 0), 0), m = /^(\d{4})-(\d{2})$/.exec(String(x.periodo || ""));
+      const titulo = L.length === 1 ? "Se quitó un documento repetido" : `Se quitaron ${L.length} documentos repetidos`;
+      const texto = `De tu rendición${m ? " de " + MES[+m[2] - 1] : ""}: estaban dos veces${tot ? " ($" + String(tot).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + ")" : ""}. Toca para ver las fotos.`;
+      await this.enviar(para, { titulo, texto, url: "./?rd=" + encodeURIComponent(id), etiqueta: "quit-" + id }, sujetoDe());
+    }
+    if (nuevos) await S.put("quit:vistos", [...vistos].slice(-3000));
+    return nuevos;
+  }
+  async cmpLeer(k) { return /^cmp:/.test(k) ? (await this.ctx.storage.get(k)) || null : null; }
+  async cmpGuardar(k, v) { if (/^cmp:/.test(k)) await this.ctx.storage.put(k, v); }
   async rlDesde(cursor, limite) {
     const n = x => String(x).padStart(12, "0"), L = await this.ctx.storage.list({ prefix: "rl:s:", start: "rl:s:" + n((+cursor || 0) + 1), limit: limite + 1 });
     const filas = [...L], mas = filas.length > limite, usar = filas.slice(0, limite), out = [];
