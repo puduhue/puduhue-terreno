@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 244 | 2026-11-25 | [c165f6e](https://github.com/puduhue/puduhue-terreno/tree/c165f6e) | Check list, informe del ranking más ordenado: cuadro «Cada predio por sección» (puntaje a la fecha), detalle por visita solo con 2 visitas o más y de a dos por fila, «Todas las visitas» sin cortarse y con solo las columnas usadas, gráfico por mes en la página 1. |
 | 243 | 2026-11-25 | [65020e9](https://github.com/puduhue/puduhue-terreno/tree/65020e9) | Check list, ranking: el título del puntaje por mes dice «Puntaje general por mes · Compañía» (informe PDF y pantalla). |
 | 242 | 2026-11-25 | [d2711ca](https://github.com/puduhue/puduhue-terreno/tree/d2711ca) | Check list, informe del ranking: vuelve el cuadro «Todas las visitas» con los puntajes y se agrega un cuadro pequeño por predio con el puntaje de cada sección en cada visita (reemplaza los gráficos de la v241). Los informes avisan «Preparando el informe…» y el motivo si fallan. |
 | 241 | 2026-11-25 | [bf69e6e](https://github.com/puduhue/puduhue-terreno/tree/bf69e6e) | Check list: el informe PDF de una visita puede ser solo de una sección (ej.: Casa de huéspedes). Informe del ranking más grande: consolidado primero, puntaje por mes en línea, gráfico de tendencia por predio en vez del cuadro de notas y lo mismo por cada sección. |
