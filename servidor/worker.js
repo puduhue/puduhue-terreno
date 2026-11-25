@@ -67,6 +67,7 @@
 import { rutasPush, Avisos, sujetoDe, objetoAvisos } from "./push.js";
 import { rutasFondo, esContabSrv, contabDef, avisosDePago } from "./fondo.js";
 import { santiago } from "./recordatorios.js";
+import { rutaKm, buscarLugar } from "./ruta.js"; /* v236: kilometraje en vehículo propio */
 import { leerBoleta, convertirMoneda, sugerirGasto, MODELO_LECTURA, MODELO_REVISION, REGLAS_LECTURA, revisarClaveClaude } from "./boleta.js";
 import { rutasFirmaPublica, rutasFirma, FL_LIMITE } from "./firma.js"; /* v154: firma por link */
 import { contabilizarAsiento, adjuntarArchivo } from "./contabilizar.js"; /* v163: contabilizar una rendición en FinnegansGO */
@@ -127,7 +128,7 @@ export async function verificarTokenApi(auth, env, ahora = Date.now()) {
   return correo ? { correo, nombre: String(t.name || "") } : null;
 }
 const FINN = "https://api.finneg.com/api";
-const VERSION_SERVIDOR = "v235"; /* v235: /od/rend/comparar (fotos de posibles duplicados) y aviso de documentos quitados */ /* v234: lectura del N° y la hora de los tickets de peaje */ /* v233: textos cortos de la devolución automática */ /* v232: /od/rend/dups (duplicados con las rendiciones de todas las personas) */ /* v229: aviso de privacidad en la página de firma por link */ /* v227.1: /od/archivo solo entrega archivos de Rendiciones */ /* v227: recordatorios hasta el plazo de envío */ /* v226: avisos de lecturas negadas sin notificación; título general */ /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
+const VERSION_SERVIDOR = "v236"; /* v236: /ruta y /lugar (kilometraje en vehículo propio, OpenRouteService) */ /* v235: /od/rend/comparar (fotos de posibles duplicados) y aviso de documentos quitados */ /* v234: lectura del N° y la hora de los tickets de peaje */ /* v233: textos cortos de la devolución automática */ /* v232: /od/rend/dups (duplicados con las rendiciones de todas las personas) */ /* v229: aviso de privacidad en la página de firma por link */ /* v227.1: /od/archivo solo entrega archivos de Rendiciones */ /* v227: recordatorios hasta el plazo de envío */ /* v226: avisos de lecturas negadas sin notificación; título general */ /* v215.1: OD_MODO = "bloquear" en wrangler.toml */
 /* v204: tiempo máximo de espera con Finnegans (antes no había: si Finnegans no respondía, la app quedaba esperando para siempre) */
 const finnEspera = (env, ms) => AbortSignal.timeout(+env.FINN_ESPERA_MS > 0 ? +env.FINN_ESPERA_MS : ms);
 const finnTarde = e => e && (e.name === "TimeoutError" || e.name === "AbortError") ? { status: 504, error: "Finnegans está tardando en responder. Intenta de nuevo en unos minutos." } : e;
@@ -226,7 +227,7 @@ export default {
     const crudo = (cuerpo, h) => new Response(cuerpo, { status: 200, headers: { ...cors, ...h } }); /* v196: archivos (fotos y PDF) */
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json; charset=utf-8" } });
     const url = new URL(req.url);
-    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, oneDriveServidor: odListo(env), rendicionesPorServidor: odRendActivo(env) ? odModo(env) : false, rendicionesLeePorServidor: odLeeActivo(env), modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null, firmaPorLink: !!env.AVISOS });
+    if (url.pathname === "/" || url.pathname === "/salud") return json({ ok: true, servicio: "Puduhue Terreno", version: VERSION_SERVIDOR, hora: new Date().toISOString(), credenciales: !!((env.FINN_CLIENT_ID || env.FINN_API_KEY) && (env.FINN_CLIENT_SECRET || env.FINN_SECRET_KEY)), reporteStock: env.FINN_REPORTE_STOCK || null, lecturaBoletas: !!env.ANTHROPIC_API_KEY, oneDriveServidor: odListo(env), rendicionesPorServidor: odRendActivo(env) ? odModo(env) : false, rendicionesLeePorServidor: odLeeActivo(env), modeloLectura: env.MODELO_LECTURA || MODELO_LECTURA, modeloRevision: env.MODELO_REVISION || MODELO_REVISION, notificaciones: !!env.AVISOS, recordatorios: env.AVISOS ? await objetoAvisos(env).estadoRec().catch(() => null) : null, direccionAntigua: env.AVISOS ? await objetoAvisos(env).leerAntiguo().catch(() => null) : null, claveClaude: env.AVISOS ? await objetoAvisos(env).leerClaude().then(c => c && { estado: c.estado, detalle: c.detalle, fecha: c.fecha, alerta: c.alerta }).catch(() => null) : null, sesiones: env.AVISOS ? await objetoAvisos(env).leerSesiones(hoyChile()).catch(() => null) : null, firmaPorLink: !!env.AVISOS, rutasKm: !!env.ORS_CLAVE });
     /* v154: firma por link: la persona que firma abre /f/<link> sin cuenta (el link es la autorización) */
     if (url.pathname.startsWith("/f/")) { const av = env.AVISOS ? objetoAvisos(env) : null;
       const r = await rutasFirmaPublica(req, env, ctx, url, av, av ? (m, t) => av.enviar([m.por], { titulo: "Firma recibida", texto: `${(m.acta && m.acta.nombre) || "La persona"} firmó: ${(m.acta && m.acta.titulo) || "el documento"}.`, url: "./", etiqueta: "fl-" + t.slice(0, 10) }, sujetoDe(env)) : null);
@@ -293,6 +294,15 @@ export default {
           if (!u.ok) return json({ error: `Llegaste al límite de ${tope} sugerencias de hoy. Elige el tipo de gasto de la lista.` }, 429); }
         const r = await sugerirGasto(env, body);
         return json({ ok: true, opciones: r.opciones, segura: r.segura, centro: r.centro, modelo: r.modelo });
+      }
+      // /ruta y /lugar → v236: kilometraje en vehículo propio (km por camino y búsqueda de lugares; límite propio: LIMITE_RUTAS, 300 al día)
+      if ((url.pathname === "/ruta" && req.method === "POST") || (url.pathname === "/lugar" && req.method === "GET")) {
+        if (env.AVISOS) { const tope = +env.LIMITE_RUTAS || 300, u = await objetoAvisos(env).usar("ruta", correo, tope, santiago().fecha);
+          if (!u.ok) return json({ error: `Llegaste al límite de ${tope} consultas de rutas de hoy. Vuelve a intentar mañana.` }, 429); }
+        let r;
+        if (url.pathname === "/ruta") { let body; try { body = await req.json() } catch (e) { return json({ error: "Cuerpo inválido." }, 400); } r = await rutaKm(env, body); }
+        else r = await buscarLugar(env, url);
+        return json(r.cuerpo, r.estado);
       }
       // /stock → reporte de stock por depósito configurado en el servidor
       if (url.pathname === "/stock") {
