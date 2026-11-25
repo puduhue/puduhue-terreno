@@ -742,88 +742,122 @@ async function rkXlsx(){
   const buf=rkXlsxBuild(R);await compartirBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),rkArchivo(R,"xlsx"),"Excel del ranking listo.");
 }
 /* Informe PDF: resumen, ranking, todas las visitas y puntaje por mes */
-function rkPdfBuild(R){
+/* v241: datos de una sección (área) para el ranking: cada predio con sus visitas y el puntaje de esa sección */
+function rkAreaDatos(R,aid){
+  const g=it=>(it.areaOrig||it.area)===aid;
+  const con=R.con.map(x=>{let s=0,n=0;const pts=[];x.vis.forEach(vv=>{const v=VIS[vv.id];if(!v)return;const p=puntaje(v,g);if(!p.n)return;s+=p.s;n+=p.n;pts.push({id:vv.id,n:vv.n,fecha:vv.fecha,pct:p.pct,s:p.s,nn:p.n})});
+      const ult=pts[pts.length-1]||null,ant=pts[pts.length-2]||null,P=pts.map(q=>q.pct);
+      return{u:x.u,vis:pts,s,n,acc:n?s/n*100:null,ult,dif:ult&&ant?ult.pct-ant.pct:null,mejor:P.length?Math.max(...P):null,peor:P.length?Math.min(...P):null}})
+    .filter(x=>x.acc!==null).sort((a,b)=>(b.acc-a.acc)||a.u.localeCompare(b.u,"es"));
+  let pos=0,prev=null;con.forEach((x,i)=>{const r=Math.round(x.acc*10);if(r!==prev){pos=i+1;prev=r}x.pos=pos});
+  const S=con.reduce((t,x)=>t+x.s,0),N=con.reduce((t,x)=>t+x.n,0),M={};
+  con.forEach(x=>x.vis.forEach(q=>{const k=String(q.fecha||"").slice(0,7);if(!/^\d{4}-\d\d$/.test(k))return;const m=M[k]||(M[k]={k,s:0,n:0,c:0});m.s+=q.s;m.n+=q.nn;m.c++}));
+  const meses=Object.values(M).sort((a,b)=>a.k.localeCompare(b.k)).map(m=>Object.assign(m,{pct:m.n?m.s/m.n*100:null}));
+  return{con,gen:N?S/N*100:null,meses,sobre:con.filter(x=>Math.round(x.acc)>=90).length,bajo:con.filter(x=>Math.round(x.acc)<80).length};
+}
+function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráficos y lo mismo por cada sección */
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const L=15,W=180;let y=10;
   const K=CLK[R.tipo],U=K.Unis.replace(/s$/,"");
-  const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282){nueva();return true}return false};
+  const nueva=()=>{d.addPage();y=16};const chk=h=>{if(y+h>282){nueva();return true}return false};
   const COL={v:[30,110,50],a:[150,110,20],r:[170,40,40],n:[110,110,110]},FILL={v:[226,240,224],a:[244,236,206],r:[246,222,222],n:[240,240,240]};
-  const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];
-  const titulo=t=>{chk(14);d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(...AZ);d.text(t,L,y);d.setTextColor(0);y+=6.5};
-  /* encabezado (igual al informe de una visita) */
-  try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
-  d.setFont("helvetica","bold");d.setFontSize(15);d.setTextColor(...AZ);d.text("Ranking de cumplimiento · "+clNom(R.tipo),L+28,y+9);
-  d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");
-  d.text(`${rkPerTxt(R.per,R)}${R.hasta?` · última visita ${fmtD(R.hasta)}`:""} · emitido el ${fmtD(today())}`,L+28,y+16);d.setTextColor(0);
-  d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
-  /* resumen */
-  const gc=semColor(R.gen===null?null:Math.round(R.gen));
-  d.setFillColor(242,245,248);d.roundedRect(L,y-2,W,27,2,2,"F");
-  d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(90);d.text("Puntaje general",L+4,y+3);
-  d.setFont("helvetica","bold");d.setFontSize(22);d.setTextColor(...COL[gc]);d.text(rkNum(R.gen)+" %",L+4,y+13);
-  d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(90);d.text(`${R.nv} ${R.nv===1?"visita cerrada":"visitas cerradas"} · ${R.con.length} ${R.con.length===1?K.uni:K.unis}`,L+4,y+20);
-  const top=R.con[0];
-  const KP=[["Primer lugar",top?top.u:"-",top?rkNum(top.acc)+" %":"",COL.v],["Con 90 % o más",String(R.sobre),R.sobre===1?K.uni:K.unis,COL.v],["Bajo 80 %",String(R.bajo),R.bajo===1?K.uni:K.unis,R.bajo?COL.r:[90,90,90]],["Mayor mejora",R.mej?R.mej.u:"-",R.mej?`+${R.mej.mejora} puntos`:"",AZ]];
-  KP.forEach(([t,v,s,c],i)=>{const x=L+60+i*30;d.setFillColor(255);d.roundedRect(x,y,28.5,21,1.5,1.5,"F");d.setFont("helvetica","normal");d.setFontSize(7);d.setTextColor(90);d.text(t,x+14.25,y+4.5,{align:"center"});
-    d.setFont("helvetica","bold");let fs=v.length>4?9.5:16;d.setFontSize(fs);while(d.getTextWidth(v)>26.5&&fs>6.5){fs-=0.5;d.setFontSize(fs)}d.setTextColor(...c);d.text(v,x+14.25,y+(v.length>4?12:13),{align:"center"});
-    d.setFont("helvetica","normal");d.setFontSize(7);d.setTextColor(90);d.text(s,x+14.25,y+18,{align:"center"})});
-  d.setTextColor(0);y+=32;
-  /* 1. ranking */
-  titulo(`Ranking (${R.con.length})`);
-  const cR=[{t:"N.º",w:10,c:1},{t:U,w:40},{t:"Visitas",w:15,c:1},{t:"Puntaje a la fecha",w:49},{t:"Última visita",w:24,c:1},{t:"Cambio",w:16,c:1},{t:"Mejor / peor",w:26,c:1}];
-  const thR=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.3);let x=L;cR.forEach(c=>{c.c?d.text(c.t,x+c.w/2,y,{align:"center"}):d.text(c.t,x+1.5,y);x+=c.w});d.setFont("helvetica","normal");y+=4};
-  thR();
+  const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20],GR=[90,90,90];
+  const sc=p=>semColor(p===null||p===undefined?null:Math.round(p));
+  const titulo=(t,sub)=>{chk(40);d.setFont("helvetica","bold");d.setFontSize(15);d.setTextColor(...AZ);d.text(t,L,y);d.setTextColor(0);y+=4;
+    d.setFillColor(...AZ);d.rect(L,y,W,0.7,"F");y+=5;if(sub){d.setFont("helvetica","normal");d.setFontSize(9.5);d.setTextColor(...GR);const l=d.splitTextToSize(sub,W);d.text(l,L,y);y+=l.length*4.3+2;d.setTextColor(0)}};
+  const sub2=(t,extra,need)=>{chk(14+(need||0));d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(50);d.text(t,L,y);if(extra){d.setFont("helvetica","normal");d.setFontSize(9);d.setTextColor(...GR);d.text(extra,L+W,y,{align:"right"})}d.setTextColor(0);y+=6.5};
+  const nota=t=>{d.setFont("helvetica","italic");d.setFontSize(8.3);d.setTextColor(...GR);const l=d.splitTextToSize(t,W);chk(l.length*3.8+2);d.text(l,L,y);y+=l.length*3.8+2;d.setTextColor(0);d.setFont("helvetica","normal")};
+  /* resumen: puntaje y 4 indicadores */
+  const resumen=(gen,nv,nu,top,sobre,bajo,mej)=>{chk(32);const gc=sc(gen);d.setFillColor(242,245,248);d.roundedRect(L,y-2,W,29,2,2,"F");
+    d.setFont("helvetica","normal");d.setFontSize(9);d.setTextColor(...GR);d.text("Puntaje general",L+4,y+3.5);
+    d.setFont("helvetica","bold");d.setFontSize(24);d.setTextColor(...COL[gc]);d.text(rkNum(gen)+" %",L+4,y+14);
+    d.setFont("helvetica","normal");d.setFontSize(8.8);d.setTextColor(...GR);d.text(`${nv} ${nv===1?"visita cerrada":"visitas cerradas"} · ${nu} ${nu===1?K.uni:K.unis}`,L+4,y+21.5);
+    const KP=[["Primer lugar",top?top.u:"-",top?rkNum(top.acc)+" %":"",COL.v],["Con 90 % o más",String(sobre),sobre===1?K.uni:K.unis,COL.v],["Bajo 80 %",String(bajo),bajo===1?K.uni:K.unis,bajo?COL.r:GR]].concat(mej!==undefined?[["Mayor mejora",mej?mej.u:"-",mej?`+${mej.mejora} puntos`:"",AZ]]:[]);
+    const w0=(W-62)/KP.length;
+    KP.forEach(([t,v,s2,c],i)=>{const x=L+62+i*w0;d.setFillColor(255);d.roundedRect(x,y,w0-1.5,23,1.5,1.5,"F");d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(...GR);d.text(t,x+(w0-1.5)/2,y+4.8,{align:"center"});
+      d.setFont("helvetica","bold");let fs=v.length>4?10:17;d.setFontSize(fs);while(d.getTextWidth(v)>w0-4&&fs>6.5){fs-=0.5;d.setFontSize(fs)}d.setTextColor(...c);d.text(v,x+(w0-1.5)/2,y+(v.length>4?13:14),{align:"center"});
+      d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(...GR);d.text(s2,x+(w0-1.5)/2,y+19.5,{align:"center"})});
+    d.setTextColor(0);y+=33};
+  /* tabla del ranking */
   const MED=[[201,162,39],[150,160,170],[184,115,51]];
-  R.con.forEach(x=>{const h=8.5;if(chk(h))thR();const yc=y+5.2;let cx=L;const c=semColor(Math.round(x.acc));
-    if(x.pos<=3){d.setFillColor(...MED[x.pos-1]);d.circle(cx+5,yc-1.3,3,"F");d.setTextColor(255)}else d.setTextColor(60);
-    d.setFont("helvetica","bold");d.setFontSize(8.5);d.text(String(x.pos),cx+5,yc,{align:"center"});d.setTextColor(0);cx+=cR[0].w;
-    d.setFontSize(9);d.text(d.splitTextToSize(x.u,cR[1].w-2)[0],cx+1.5,yc);cx+=cR[1].w;
-    d.setFont("helvetica","normal");d.text(String(x.vis.length),cx+cR[2].w/2,yc,{align:"center"});cx+=cR[2].w;
-    d.setFillColor(236,239,243);d.roundedRect(cx+1.5,yc-3,30,3.6,1,1,"F");d.setFillColor(...COL[c]);d.roundedRect(cx+1.5,yc-3,Math.max(1,30*Math.min(100,x.acc)/100),3.6,1,1,"F");
-    d.setFont("helvetica","bold");d.setTextColor(...COL[c]);d.text(rkNum(x.acc)+" %",cx+cR[3].w-1.5,yc,{align:"right"});d.setTextColor(0);d.setFont("helvetica","normal");cx+=cR[3].w;
-    d.text(x.ult?`${x.ult.pct} % · ${fmtD(x.ult.fecha).slice(0,5)}`:"-",cx+cR[4].w/2,yc,{align:"center"});cx+=cR[4].w;
-    if(x.dif!==null){d.setTextColor(...(x.dif>0?COL.v:x.dif<0?COL.r:[90,90,90]));d.text(x.dif===0?"igual":(x.dif>0?"+":"-")+Math.abs(x.dif)+(Math.abs(x.dif)===1?" pt":" pts"),cx+cR[5].w/2,yc,{align:"center"});d.setTextColor(0)}else d.text("-",cx+cR[5].w/2,yc,{align:"center"});cx+=cR[5].w;
-    d.text(x.mejor===null?"-":`${x.mejor} % / ${x.peor} %`,cx+cR[6].w/2,yc,{align:"center"});
-    d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
-  if(R.sin.length){y+=3;d.setFont("helvetica","italic");d.setFontSize(8.3);d.setTextColor(90);const l=d.splitTextToSize(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`,W);chk(l.length*3.8+2);d.text(l,L,y+1);y+=l.length*3.8+1;d.setTextColor(0);d.setFont("helvetica","normal")}
-  y+=6;
-  /* v206: qué se revisa (área, puntos, qué incluye y cumplimiento del período) */
-  {const A=rkAreas(R);if(A.length){titulo(`Qué se revisa (${A.reduce((t,a)=>t+a.n,0)} puntos en el check list)`);
-    const cw=[38,16,104,22];
-    const th=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8.3);d.text("Área",L+1.5,y);d.text("Puntos",L+cw[0]+cw[1]/2,y,{align:"center"});d.text("Qué incluye",L+cw[0]+cw[1]+1.5,y);d.text("Cumplimiento",L+W-cw[3]/2,y,{align:"center"});d.setFont("helvetica","normal");y+=4};
+  const tabla=(con)=>{const cR=[{t:"N.º",w:11,c:1},{t:U,w:42},{t:"Visitas",w:15,c:1},{t:"Puntaje a la fecha",w:46},{t:"Última visita",w:25,c:1},{t:"Cambio",w:16,c:1},{t:"Mejor / peor",w:25,c:1}];
+    const th=()=>{chk(9);d.setFillColor(228,234,248);d.rect(L,y-4.8,W,7,"F");d.setFont("helvetica","bold");d.setFontSize(8.8);let x=L;cR.forEach(c=>{c.c?d.text(c.t,x+c.w/2,y,{align:"center"}):d.text(c.t,x+1.5,y);x+=c.w});d.setFont("helvetica","normal");y+=4};
     th();
-    A.forEach(a=>{d.setFontSize(8.3);const tl=d.splitTextToSize(a.resumen.charAt(0).toUpperCase()+a.resumen.slice(1)+".",cw[2]-3);const h=Math.max(7.5,tl.length*3.7+3.5);if(chk(h))th();const yc=y+4.6;
-      d.setFont("helvetica","bold");d.setFontSize(9);d.text(d.splitTextToSize(a.nom,cw[0]-2)[0],L+1.5,yc);d.setFont("helvetica","normal");d.setFontSize(8.5);d.text(String(a.n),L+cw[0]+cw[1]/2,yc,{align:"center"});
-      d.setFontSize(8.3);d.setTextColor(60);d.text(tl,L+cw[0]+cw[1]+1.5,yc,{lineHeightFactor:1.25});d.setTextColor(0);
-      const p=a.pct===null?null:Math.round(a.pct),k=semColor(p);d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(...COL[k]);d.text(p===null?"-":p+" %",L+W-cw[3]/2,yc,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
+    con.forEach(x=>{const h=9.5;if(chk(h))th();const yc=y+5.8;let cx=L;const c=sc(x.acc);
+      if(x.pos<=3){d.setFillColor(...MED[x.pos-1]);d.circle(cx+5.5,yc-1.4,3.2,"F");d.setTextColor(255)}else d.setTextColor(60);
+      d.setFont("helvetica","bold");d.setFontSize(9);d.text(String(x.pos),cx+5.5,yc,{align:"center"});d.setTextColor(0);cx+=cR[0].w;
+      d.setFontSize(9.8);d.text(d.splitTextToSize(x.u,cR[1].w-2)[0],cx+1.5,yc);cx+=cR[1].w;
+      d.setFont("helvetica","normal");d.setFontSize(9.5);d.text(String(x.vis.length),cx+cR[2].w/2,yc,{align:"center"});cx+=cR[2].w;
+      d.setFillColor(236,239,243);d.roundedRect(cx+1.5,yc-3.2,27,3.8,1,1,"F");d.setFillColor(...COL[c]);d.roundedRect(cx+1.5,yc-3.2,Math.max(1,27*Math.min(100,x.acc)/100),3.8,1,1,"F");
+      d.setFont("helvetica","bold");d.setTextColor(...COL[c]);d.text(rkNum(x.acc)+" %",cx+cR[3].w-1.5,yc,{align:"right"});d.setTextColor(0);d.setFont("helvetica","normal");cx+=cR[3].w;
+      d.setFontSize(9);d.text(x.ult?`${x.ult.pct} % · ${fmtD(x.ult.fecha).slice(0,5)}`:"-",cx+cR[4].w/2,yc,{align:"center"});cx+=cR[4].w;
+      if(x.dif!==null){d.setTextColor(...(x.dif>0?COL.v:x.dif<0?COL.r:GR));d.text(x.dif===0?"igual":(x.dif>0?"+":"-")+Math.abs(x.dif)+(Math.abs(x.dif)===1?" pt":" pts"),cx+cR[5].w/2,yc,{align:"center"});d.setTextColor(0)}else d.text("-",cx+cR[5].w/2,yc,{align:"center"});cx+=cR[5].w;
+      d.text(x.mejor===null?"-":`${x.mejor} % / ${x.peor} %`,cx+cR[6].w/2,yc,{align:"center"});
       d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
-    d.setFont("helvetica","italic");d.setFontSize(7.8);d.setTextColor(90);const nl=d.splitTextToSize("Cumplimiento: todas las visitas cerradas del período en esa área. Cada punto, con su código y cómo verificarlo, está en el Excel (hoja «Puntos del check list»).",W);
-    chk(nl.length*3.5+2);d.text(nl,L,y+3.5);y+=nl.length*3.5+3;d.setTextColor(0);d.setFont("helvetica","normal");y+=6}}
-  /* 2. todas las visitas (una fila por unidad, una columna por visita; de a 10 columnas) */
-  const maxV=Math.max(1,...R.con.map(x=>x.vis.length)),POR=10;
-  for(let b=0;b<maxV;b+=POR){const nC=Math.min(POR,maxV-b),wU=40,wA=20,wc=(W-wU-wA)/POR;
-    titulo(b===0?`Todas las visitas${maxV>POR?` (visitas 1 a ${Math.min(POR,maxV)})`:""}`:`Todas las visitas (visitas ${b+1} a ${b+nC})`);
-    const th=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.5,W,6.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.text(U,L+1.5,y);for(let i=0;i<nC;i++)d.text(`${b+i+1}.ª`,L+wU+i*wc+wc/2,y,{align:"center"});d.text("A la fecha",L+W-wA/2,y,{align:"center"});d.setFont("helvetica","normal");y+=3};
-    th();
-    R.con.forEach(x=>{const h=10;if(chk(h))th();d.setFont("helvetica","bold");d.setFontSize(8.5);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,wU-2)[0],L+1.5,y+6);
-      for(let i=0;i<nC;i++){const v=x.vis[b+i];const cx=L+wU+i*wc;if(!v)continue;const k=semColor(v.pct);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.6,y+1,wc-1.2,h-2,1,1,"F");
-        d.setFont("helvetica","bold");d.setFontSize(8.3);d.setTextColor(...COL[k]);d.text(v.pct===null?"-":v.pct+" %",cx+wc/2,y+5,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.3);d.setTextColor(90);d.text(rkFc(v.fecha),cx+wc/2,y+8.2,{align:"center"});d.setTextColor(0)}
-      const k=semColor(Math.round(x.acc));d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(...COL[k]);d.text(rkNum(x.acc)+" %",L+W-wA/2,y+6,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
-      d.setDrawColor(230);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
-    y+=6}
-  /* 3. puntaje general por mes */
-  const MS=R.meses.slice(-12);
-  if(MS.length>=2){chk(62);titulo("Puntaje general por mes");const H=40,x0=L+8,wb=(W-12)/MS.length,base=y+H,alto=p=>p===null?0:Math.min(1,Math.max(0.04,(p-40)/60))*H;
-    d.setDrawColor(200);d.setLineDashPattern([1.2,1.2],0);const y90=base-alto(90);d.line(x0,y90,L+W,y90);d.setLineDashPattern([],0);d.setFontSize(7);d.setTextColor(110);d.text("90 %",L,y90+1);
-    d.line(x0,base,L+W,base);d.setDrawColor(0);
+    y+=5};
+  /* eje del puntaje: de 40 % a 100 % (lo bajo 40 % queda en la base) */
+  const yP=(p,top,h)=>top+h-Math.min(1,Math.max(0,(p-40)/60))*h;
+  /* tendencia por mes (línea) */
+  const lineaMeses=(MS0)=>{const MS=MS0.slice(-12);if(MS.length<2){nota("Hace falta más de un mes con visitas para ver la tendencia por mes.");y+=2;return}
+    chk(66);const H=44,x0=L+12,wP=W-16,top=y+4,base=top+H,dx=wP/(MS.length-1||1),xs=MS.map((m,i)=>x0+i*dx);
+    d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(140);
+    [40,60,80,100].forEach(p=>{const yy=yP(p,top,H);d.setDrawColor(232);d.line(x0,yy,x0+wP,yy);d.text(p+" %",L,yy+1)});
+    d.setDrawColor(120,160,120);d.setLineDashPattern([1.2,1.2],0);const y9=yP(90,top,H);d.line(x0,y9,x0+wP,y9);d.setLineDashPattern([],0);d.setTextColor(...COL.v);d.text("90 %",L,y9+1);
+    d.setDrawColor(...AZ);d.setLineWidth(0.7);let pr=null;MS.forEach((m,i)=>{if(m.pct===null){pr=null;return}const pt=[xs[i],yP(m.pct,top,H)];if(pr)d.line(pr[0],pr[1],pt[0],pt[1]);pr=pt});d.setLineWidth(0.2);
     const anios=new Set(MS.map(m=>m.k.slice(0,4))).size>1;
-    MS.forEach((m,i)=>{const p=m.pct===null?null:Math.round(m.pct),k=semColor(p),hh=alto(p),bx=x0+i*wb+wb*0.2,bw=wb*0.6;d.setFillColor(...COL[k]);if(hh)d.roundedRect(bx,base-hh,bw,hh,0.8,0.8,"F");
-      d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(...COL[k]);d.text(p===null?"-":p+" %",bx+bw/2,base-hh-1.5,{align:"center"});
-      d.setFont("helvetica","normal");d.setFontSize(7.3);d.setTextColor(90);d.text(RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):""),bx+bw/2,base+4,{align:"center"});d.text(`${m.c} ${m.c===1?"visita":"visitas"}`,bx+bw/2,base+7.5,{align:"center"})});
-    d.setTextColor(0);y=base+18}
-  /* 4. cómo se calcula */
-  titulo("Cómo se calcula");d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(60);
-  const nota=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. Las visitas en curso y las anuladas no cuentan. «Cambio» compara la última visita con la anterior. Colores: verde 90 % o más, amarillo 80 a 89 %, rojo menos de 80 %.`;
-  const nl=d.splitTextToSize(nota,W);chk(nl.length*3.8+4);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*3.8+3;d.setTextColor(0);
+    MS.forEach((m,i)=>{const p=m.pct===null?null:Math.round(m.pct),k=sc(p);if(p!==null){const yy=yP(p,top,H);d.setFillColor(...COL[k]);d.circle(xs[i],yy,1.4,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);d.setTextColor(...COL[k]);d.text(p+" %",xs[i],yy-2.6,{align:"center"})}
+      d.setFont("helvetica","normal");d.setFontSize(7.8);d.setTextColor(...GR);d.text(RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):""),xs[i],base+5,{align:"center"});d.setFontSize(6.8);d.text(`${m.c} ${m.c===1?"visita":"visitas"}`,xs[i],base+8.5,{align:"center"})});
+    d.setTextColor(0);d.setDrawColor(0);y=base+14};
+  /* tendencia de cada predio: un gráfico pequeño por predio, con sus visitas */
+  const mini=(x0,y0,w,h,x)=>{const P=x.vis.filter(q=>q.pct!==null);d.setDrawColor(222);d.roundedRect(x0,y0,w,h,1.5,1.5,"S");
+    d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(30);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,w-22)[0],x0+3,y0+5.5);
+    const k0=sc(x.acc);d.setTextColor(...COL[k0]);d.text(rkNum(x.acc)+" %",x0+w-3,y0+5.5,{align:"right"});
+    const top=y0+11,H=h-22,px=x0+10,pw=w-16;d.setFont("helvetica","normal");d.setFontSize(6.5);d.setTextColor(150);
+    [40,70,100].forEach(p=>{const yy=yP(p,top,H);d.setDrawColor(236);d.line(px,yy,px+pw,yy);d.text(String(p),x0+2.5,yy+1)});
+    d.setDrawColor(120,160,120);d.setLineDashPattern([1,1],0);const y9=yP(90,top,H);d.line(px,y9,px+pw,y9);d.setLineDashPattern([],0);
+    if(!P.length){d.setFontSize(8);d.setTextColor(...GR);d.text("Sin puntaje",x0+w/2,top+H/2,{align:"center"});d.setTextColor(0);d.setDrawColor(0);return}
+    const xs=P.length===1?[px+pw/2]:P.map((q,i)=>px+i*pw/(P.length-1));d.setDrawColor(...AZ);d.setLineWidth(0.5);
+    for(let i=1;i<P.length;i++)d.line(xs[i-1],yP(P[i-1].pct,top,H),xs[i],yP(P[i].pct,top,H));d.setLineWidth(0.2);
+    const cada=Math.ceil(P.length/5);
+    P.forEach((q,i)=>{const k=sc(q.pct),yy=yP(q.pct,top,H);d.setFillColor(...COL[k]);d.circle(xs[i],yy,1.1,"F");
+      if(P.length<=8||i===P.length-1||i%cada===0){d.setFont("helvetica","bold");d.setFontSize(7);d.setTextColor(...COL[k]);d.text(String(q.pct),xs[i],yy-2,{align:"center"})}
+      if(i%cada===0||i===P.length-1){d.setFont("helvetica","normal");d.setFontSize(6.3);d.setTextColor(...GR);d.text(`V${q.n}`,xs[i],top+H+4,{align:"center"});d.text(rkFc(q.fecha).slice(0,5),xs[i],top+H+7.3,{align:"center"})}});
+    d.setTextColor(0);d.setDrawColor(0)};
+  const grilla=(con)=>{const n=3,g=4,w=(W-g*(n-1))/n,h=44;for(let i=0;i<con.length;i+=n){chk(h+3);for(let j=0;j<n&&con[i+j];j++)mini(L+j*(w+g),y,w,h,con[i+j]);y+=h+3}y+=3};
+  /* encabezado */
+  try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
+  d.setFont("helvetica","bold");d.setFontSize(16);d.setTextColor(...AZ);d.text("Ranking de cumplimiento · "+clNom(R.tipo),L+28,y+9);
+  d.setTextColor(...GR);d.setFontSize(10.5);d.setFont("helvetica","normal");
+  d.text(`${rkPerTxt(R.per,R)}${R.hasta?` · última visita ${fmtD(R.hasta)}`:""} · emitido el ${fmtD(today())}`,L+28,y+16);d.setTextColor(0);
+  d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=33;
+  /* 1. consolidado */
+  const A=rkAreas(R);
+  titulo("1. Consolidado",`Todas las secciones del check list juntas.${A.length>1?` Después viene cada sección por separado (${A.length}).`:""}`);
+  resumen(R.gen,R.nv,R.con.length,R.con[0],R.sobre,R.bajo,R.mej);
+  sub2(`Ranking (${R.con.length})`);tabla(R.con);
+  if(R.sin.length)nota(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`);
+  sub2("Puntaje general por mes","línea punteada: meta 90 %",66);lineaMeses(R.meses);
+  sub2(`Todas las visitas: tendencia de cada ${K.uni}`,"puntaje de cada visita",48);grilla(R.con);
+  /* 2. por sección */
+  if(A.length){chk(60+A.length*12);y+=4;titulo("2. Por sección",`Cumplimiento de cada sección en todas las visitas del período. Cada punto, con su código y cómo verificarlo, está en el Excel (hoja «Puntos del check list»).`);
+    sub2(`Qué se revisa (${A.length} ${A.length===1?"sección":"secciones"})`);const cw=[40,16,100,24];
+    const th=()=>{chk(9);d.setFillColor(228,234,248);d.rect(L,y-4.8,W,7,"F");d.setFont("helvetica","bold");d.setFontSize(8.8);d.text("Sección",L+1.5,y);d.text("Puntos",L+cw[0]+cw[1]/2,y,{align:"center"});d.text("Qué incluye",L+cw[0]+cw[1]+1.5,y);d.text("Cumplimiento",L+W-cw[3]/2,y,{align:"center"});d.setFont("helvetica","normal");y+=4};
+    th();
+    A.forEach(a=>{d.setFontSize(8.6);const tl=d.splitTextToSize(a.resumen.charAt(0).toUpperCase()+a.resumen.slice(1)+".",cw[2]-3);const h=Math.max(8,tl.length*3.9+3.8);if(chk(h))th();const yc=y+5;
+      d.setFont("helvetica","bold");d.setFontSize(9.5);d.text(d.splitTextToSize(a.nom,cw[0]-2)[0],L+1.5,yc);d.setFont("helvetica","normal");d.setFontSize(9);d.text(String(a.n),L+cw[0]+cw[1]/2,yc,{align:"center"});
+      d.setFontSize(8.6);d.setTextColor(60);d.text(tl,L+cw[0]+cw[1]+1.5,yc,{lineHeightFactor:1.25});d.setTextColor(0);
+      const p=a.pct===null?null:Math.round(a.pct),k=semColor(p);d.setFont("helvetica","bold");d.setFontSize(9.5);d.setTextColor(...COL[k]);d.text(p===null?"-":p+" %",L+W-cw[3]/2,yc,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
+      d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
+    A.forEach((a,i)=>{const X=rkAreaDatos(R,a.id);y+=6;chk(80+X.con.length*9.5);
+      titulo(`2.${i+1} ${a.nom}`,`${a.n} ${a.n===1?"punto":"puntos"}: ${a.resumen}.`);
+      if(!X.con.length){nota("Ninguna visita del período revisó esta sección.");return}
+      resumen(X.gen,X.con.reduce((t,x)=>t+x.vis.length,0),X.con.length,X.con[0],X.sobre,X.bajo);
+      sub2(`Ranking en ${a.nom} (${X.con.length})`);tabla(X.con);
+      sub2(`Puntaje por mes en ${a.nom}`,"línea punteada: meta 90 %",66);lineaMeses(X.meses);
+      sub2(`Todas las visitas en ${a.nom}`,"puntaje de cada visita",48);grilla(X.con)})}
+  /* 3. cómo se calcula */
+  chk(30);titulo(`${A.length?"3":"2"}. Cómo se calcula`);d.setFont("helvetica","normal");d.setFontSize(9);d.setTextColor(60);
+  const tx=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. En cada sección se cuentan solo los puntos de esa sección. Los gráficos de cada ${K.uni} muestran el puntaje de cada visita (V1, V2…) con su fecha; la línea punteada es la meta de 90 %. Las visitas en curso y las anuladas no cuentan.`;
+  const nl=d.splitTextToSize(tx,W);chk(nl.length*4+4);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*4+3;d.setTextColor(0);
   const n=d.getNumberOfPages();const por=ME&&ME.nombre?`Emitido por ${ME.nombre} el ${fmtD(today())}`:`Emitido el ${fmtD(today())}`;
   for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});d.text(por,15,289);d.setTextColor(0)}
   return d;
@@ -1223,7 +1257,11 @@ async function clClick(A,b){
     delete v.anulada;v.actualizado=new Date().toISOString();await saveVis(v);
     {const bo=VIS["bod-"+v.id];if(bo&&bo.anulada){delete bo.anulada;bo.actualizado=v.actualizado;await saveVis(bo);if(DB&&navigator.onLine!==false)clXlsx(bo.predio,false,"bodega")}} /* v136 (M-11) */
     render();toast(`Visita ${esc(v.n)} restaurada.`);if(DB&&navigator.onLine!==false)clXlsx(v.predio,false,tipoDe(v));return true}
-  if(A==="clPdf"){const v=VIS[b.dataset.id];if(v)await clPdf(v);return true}
+  if(A==="clPdf"){const v=VIS[b.dataset.id];if(!v)return true; /* v241: todo el informe o solo una sección (hoja como la del «⋯») */
+    const IT=itemsDe(v),S=seccionesDe(tipoDe(v),IT).filter(x=>IT.some(i=>x.f(i)&&!(v.items&&v.items[i.key]&&v.items[i.key].e==="NA")));
+    if(S.length>1&&typeof mnHoja==="function"){mnHoja("Informe PDF",`${v.predio} · Visita ${v.n} · elige qué incluir`,[{a:"clPdfSec",id:v.id,t:"Todo el informe"}].concat(S.map(x=>({a:"clPdfSec",id:v.id,t:`Solo «${x.name}»`,t2:x.name}))));return true}
+    await clPdf(v);return true}
+  if(A==="clPdfSec"){const v=VIS[b.dataset.id];if(v)await clPdf(v,false,b.dataset.t||"");return true}
   if(A==="clXlsx"){await clXlsx(b.dataset.p,true,clTipo);return true}
   return false;
 }
@@ -1321,11 +1359,13 @@ async function clXlsxUpload(p,tipo){tipo=tipo||"visitas";
 function clXlsx(p,manual,tipo){tipo=tipo||"visitas";return subirExcel(tipo+":"+p,manual,()=>clXlsxUpload(p,tipo))}
 
 /* ---------- Informe PDF de la visita ---------- */
-async function clPdf(v,subir){
+async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del resumen (solo esa) */
   if(!window.jspdf){toast("No se pudo cargar el generador de PDF.");return}
   await flush();if(!subir)toast("Preparando el informe…");
   const TV=tipoDe(v),KV=CLK[TV];const prev=visitaAnterior(v),H=hallazgos(v.predio,TV);
-  const ITV=itemsDe(v);
+  const SEC0=sec?seccionesDe(TV,itemsDe(v)).find(x=>x.name===sec)||null:null; /* v241 */
+  const ITV=SEC0?itemsDe(v).filter(SEC0.f):itemsDe(v);
+  const PJ=(x,g)=>puntaje(x,SEC0?(g?(i=>SEC0.f(i)&&g(i)):SEC0.f):g);
   /* v82: el informe muestra solo los puntos que aplican; los N/A y las áreas donde no aplica ninguno se omiten */
   const esNA=it=>{const r=v.items&&v.items[it.key];return !!(r&&r.e==="NA")};
   const ITA=ITV.filter(it=>!esNA(it)),nNA=ITV.length-ITA.length;
@@ -1338,10 +1378,10 @@ async function clPdf(v,subir){
   const titulo=t=>{chk(14);d.setFont("helvetica","bold");d.setFontSize(12);d.setTextColor(44,76,164);d.text(t,L,y);d.setTextColor(0);y+=6.5};
   /* encabezado */
   const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
-  d.setFont("helvetica","bold");{let fs=15;d.setFontSize(fs);while(d.getTextWidth(KV.pdf)>W-30&&fs>10){fs-=0.5;d.setFontSize(fs)}}d.setTextColor(...AZ);d.text(KV.pdf,L+28,y+9);d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+28,y+16);d.setTextColor(0);d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
+  d.setFont("helvetica","bold");{let fs=15;d.setFontSize(fs);while(d.getTextWidth(KV.pdf)>W-30&&fs>10){fs-=0.5;d.setFontSize(fs)}}d.setTextColor(...AZ);d.text(KV.pdf,L+28,y+9);d.setTextColor(90);d.setFontSize(10);d.setFont("helvetica","normal");d.text(`${v.predio} · Visita ${esc(v.n)} · ${fmtD(v.fecha)}${SEC0?" · Solo «"+SEC0.name+"»":""}${v.anulada?" · ANULADA":v.estado!=="cerrada"?" · BORRADOR":""}`,L+28,y+16);d.setTextColor(0);d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=31;
   d.setFontSize(9.5);d.text(`${KV.rev||"Revisor(es)"}: ${v.revisor||"-"}`,L,y);d.text(`${KV.acomp}: ${v.administrador||"-"}`,L+95,y);y+=5;
   if(v.reabierta&&v.reabierta.length){const r=v.reabierta[v.reabierta.length-1];d.setFontSize(8.5);d.setTextColor(90);const ls=d.splitTextToSize(`Reabierta el ${fmtD(r.fecha)} por ${quien(r.por)}${r.motivo?": "+r.motivo:""}${v.reabierta.length>1?` (reabierta ${v.reabierta.length} veces)`:""}.`,175);d.text(ls,L,y);y+=ls.length*3.8+1;d.setTextColor(0);d.setFontSize(9.5)} /* v162 */
-  const CHP=TV==="huespedes"||chEval(v); /* v152: también en Visitas a predios, si se revisó la casa */
+  const CHP=(TV==="huespedes"||chEval(v))&&(!SEC0||TV==="huespedes"||chItems(v).some(SEC0.f)); /* v241: con una sección que no es la casa, sin los datos de la casa */ /* v152: también en Visitas a predios, si se revisó la casa */
   if(CHP){d.text(`${TV==="huespedes"?"":"Casa de huéspedes: "}Casa: ${v.casa||"-"} · Capacidad: ${v.capacidad?v.capacidad+" personas":"-"} · Tipo de uso: ${v.uso||"-"} · Ocupación: ${v.ocup||"-"}`,L,y);y+=5;
     const rr=chRes(v),rc=rr==="conf"?[30,110,50]:rr==="obs"?[150,110,20]:[170,40,40];d.setFont("helvetica","bold");const rt=TV==="huespedes"?"Resultado de inspección:":"Casa de huéspedes, resultado:";d.text(rt,L,y);const xr=L+d.getTextWidth(rt+" ");d.setTextColor(...rc);d.text(CH_RES[rr]+(v.resultado&&v.resultado!==chResProp(v)?" (elegido por quien revisa)":""),xr,y);d.setTextColor(0);d.setFont("helvetica","normal");y+=5}
   if(TV==="camionetas"){const a=actaPatente(v.predio),ve=(a&&a.veh)||{},ki=cmKmInfo(v);
@@ -1351,7 +1391,7 @@ async function clPdf(v,subir){
   const EV=it=>{const r=v.items&&v.items[it.key];return r&&r.e},PV=it=>{const r=prev&&prev.items&&prev.items[it.key];return r&&r.e},RK={C:0,P:1,N:2};
   const CK={};if(prev)ITA.forEach(it=>{const a=PV(it),b=EV(it);let k="";if(a&&a!=="NA"&&b&&b!=="NA"){if(esHallazgo(a)&&b==="C")k="corr";else if(RK[b]>RK[a])k="emp";else if(esHallazgo(a)&&esHallazgo(b))k=RK[b]<RK[a]?"mej":"sig"}else if(b&&esHallazgo(b))k="nue";CK[it.key]=k});
   const nK=(...ks)=>Object.values(CK).filter(k=>ks.includes(k)).length;
-  const P0=prev?puntaje(prev).pct:null,P1=puntaje(v).pct;
+  const P0=prev?PJ(prev).pct:null,P1=PJ(v).pct;
   if(prev){chk(34);d.setFillColor(242,245,248);d.roundedRect(L,y-2,W,27,2,2,"F");
     d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(90);d.text("Cumplimiento",L+4,y+3);
     d.setFont("helvetica","bold");d.setFontSize(22);d.setTextColor(44,76,164);d.text(P1===null?"-":P1+" %",L+4,y+13);
@@ -1360,7 +1400,7 @@ async function clPdf(v,subir){
     K.forEach(([t,nn,c],i)=>{const x=L+62+i*29.5;d.setFillColor(255);d.roundedRect(x,y,27.5,21,1.5,1.5,"F");d.setFont("helvetica","bold");d.setFontSize(17);d.setTextColor(...c);d.text(String(nn),x+13.75,y+10,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(70);d.text(t,x+13.75,y+16.5,{align:"center"})});
     d.setTextColor(0);y+=29;
     const hist=validas(v.predio,TV).filter(x=>!x.anulada&&(x.estado==="cerrada"||x.id===v.id)&&(+x.n||0)<=(+v.n||0)).sort((a,b)=>(+a.n||0)-(+b.n||0)).slice(-6);
-    if(hist.length>1){d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(70);d.text("Últimas visitas: "+hist.map(x=>`visita ${esc(x.n)} ${puntaje(x).pct===null?"-":puntaje(x).pct+" %"}`).join("  ->  "),L,y);d.setTextColor(0);y+=7}
+    if(hist.length>1){d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(70);d.text("Últimas visitas: "+hist.map(x=>`visita ${esc(x.n)} ${PJ(x).pct===null?"-":PJ(x).pct+" %"}`).join("  ->  "),L,y);d.setTextColor(0);y+=7}
   }
   /* 1. resumen por área */
   titulo("Resumen");d.setFontSize(8.5);
@@ -1370,8 +1410,8 @@ async function clPdf(v,subir){
   const fila=(cells,bold,fill)=>{chk(7);let x=L;if(fill){d.setFillColor(...fill);d.rect(L,y-4.2,W,6.5,"F")}d.setFont("helvetica",bold?"bold":"normal");cells.forEach((c,i)=>{if(c&&typeof c==="object"){d.setTextColor(...c.c);d.text(String(c.t),x+1.5,y);d.setTextColor(0)}else d.text(String(c),x+1.5,y);x+=colsR[i]});y+=6.5};
   fila(headR,true,[228,234,248]);
   const cnt=(f,e)=>ITV.filter(i=>f(i)&&v.items&&v.items[i.key]&&v.items[i.key].e===e).length;
-  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=puntaje(v,f);const s0=prev?puntaje(prev,f).pct:null;fila([a.name].concat([cnt(f,"C"),cnt(f,"P"),cnt(f,"N")]).concat([s.n,s.pct===null?"-":s.pct+" %"]).concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
-  const T=puntaje(v);fila(["Total"].concat([cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N")]).concat([T.n,T.pct===null?"-":T.pct+" %"]).concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
+  SECV.forEach(a=>{const f=a.f;if(!ITA.some(f))return;const s=PJ(v,f);const s0=prev?PJ(prev,f).pct:null;fila([a.name].concat([cnt(f,"C"),cnt(f,"P"),cnt(f,"N")]).concat([s.n,s.pct===null?"-":s.pct+" %"]).concat(prev?[s0===null?"-":s0+" %",dl(s0,s.pct)]:[]),false,null)});
+  const T=PJ(v);fila(["Total"].concat([cnt(()=>true,"C"),cnt(()=>true,"P"),cnt(()=>true,"N")]).concat([T.n,T.pct===null?"-":T.pct+" %"]).concat(prev?[P0===null?"-":P0+" %",dl(P0,T.pct)]:[]),true,[242,245,248]);
   y+=5;
   /* 2. check list completo: cada punto con su resultado */
   titulo(`Check list (${ITA.length} ${ITA.length===1?"punto que aplica":"puntos que aplican"})`);
@@ -1452,11 +1492,11 @@ async function clPdf(v,subir){
     titulo("Referencia normativa y aclaración sobre baños mixtos");d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(60);const nl=d.splitTextToSize(CH_NOTA,W);chk(nl.length*3.8+8);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*3.8+3;
     d.text("Texto vigente consultado: D.S. N.º 594/1999, Biblioteca del Congreso Nacional (Ley Chile).",L,y);d.setTextColor(0);y+=6}
   const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});const a=autoriaTxt(v);if(a)d.text(d.splitTextToSize("Registro en la app: "+a.charAt(0).toLowerCase()+a.slice(1),150)[0],15,289);d.setTextColor(0)}
-  const name=`Informe_${KV.archivo}_${esc(v.n)}_${v.predio.replace(/\s+/g,"_")}_${fmtD(v.fecha)}.pdf`;
+  const name=`Informe_${KV.archivo}_${esc(v.n)}_${v.predio.replace(/\s+/g,"_")}${SEC0?"_"+SEC0.name.replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g,"_"):""}_${fmtD(v.fecha)}.pdf`;
   if(subir){try{await clSubir(carpetaVisita(v),name,d.output("blob"),"application/pdf",TV)}catch(e){console.warn(e)}return}
   await guardarPDF(d,name,"Informe listo.");
 }
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="240"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="241"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
