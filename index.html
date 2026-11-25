@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-qimKytQYAtAnzC+XmmXYgLT1x+wIdxYC5p8B7dZeO00=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ZSJhQvUXLrbqtFE4XfdOMeFkN4/ZkV328i2OijPLf8E=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=239">
+<link rel="stylesheet" href="estilos.css?v=240">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -24,7 +24,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="239";
+const APP_VER="240";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -281,10 +281,18 @@ async function initM365(){
 function limpiarInteraccion(){for(const st of [sessionStorage,localStorage]){try{Object.keys(st).filter(k=>/msal\.interaction\.status|\.request\.(state|params|origin)/.test(k)).forEach(k=>st.removeItem(k))}catch(e){}}}
 function iniciarSesion(reintento){if(!MSAL)return toast(AUTH_ERR||"Inicio de sesión no disponible.");try{sessionStorage.setItem("actas-login","1")}catch(e){}MSAL.loginRedirect({scopes:M365.scopes,prompt:"select_account"}).catch(e=>{if(e&&e.errorCode==="interaction_in_progress"&&!reintento){limpiarInteraccion();iniciarSesion(true);return}toast("No se pudo iniciar sesión: "+((e&&e.errorCode)||"error"))})}
 async function cerrarSesion(){
-  if(pend()){if(!(await ask("Hay cambios sin subir","Si cierras sesión ahora, lo pendiente queda en este teléfono y se sube cuando vuelvas a iniciar sesión. Si entra otra persona, la app le preguntará si lo sube con su cuenta o lo borra. ¿Cerrar sesión igual?","Cerrar sesión",true)))return}
-  else if(!(await ask("¿Cerrar sesión?","Las actas ya sincronizadas siguen en OneDrive. Para volver a usar la app habrá que iniciar sesión con señal.","Cerrar sesión")))return;
+  const hay=pend()>0||(typeof correosPend==="function"&&correosPend().length>0); /* v240 */
+  if(hay){if(!(await ask("Hay cambios sin subir","Si cierras sesión ahora, lo pendiente queda en este teléfono y se sube cuando vuelvas a iniciar sesión. Si entra otra persona, la app le preguntará si lo sube con su cuenta o lo borra. ¿Cerrar sesión igual?","Cerrar sesión",true)))return}
+  else if(!(await ask("¿Cerrar sesión?","Se borra de este teléfono la copia de tus datos. Todo sigue en OneDrive y se vuelve a bajar al entrar (con señal).","Cerrar sesión")))return;
   try{if(pushGuardado())await Promise.race([pushDesactivar(true),new Promise(r=>setTimeout(r,3000))])}catch(e){}
+  if(!hay){try{await borrarCopiaLocal()}catch(e){}} /* v240 */
   try{await MSAL.logoutRedirect({account:CUENTA,postLogoutRedirectUri:location.origin+location.pathname})}catch(e){toast("No se pudo cerrar sesión.")}
+}
+/* v240: al cerrar sesión, sin nada por subir, no queda en el teléfono la copia de los datos (Ley 21.719) */
+async function borrarCopiaLocal(){
+  await cacheBorrarCuenta();
+  const fijas=[PERM_K,ROLES_K,CUENTA_K,"rd-dupia"];
+  try{Object.keys(localStorage).filter(k=>fijas.includes(k)||k.startsWith("actas-rl-cursor:")||k.startsWith("rd-lecturas-")).forEach(k=>localStorage.removeItem(k))}catch(e){}
 }
 let TOKEN_P=null;
 function getToken(){
@@ -3966,10 +3974,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=239"></script>
-<script src="modulos/bodega.js?v=239"></script>
-<script src="modulos/rendiciones.js?v=239"></script>
-<script src="modulos/actas-entrega.js?v=239"></script>
+<script src="modulos/checklist.js?v=240"></script>
+<script src="modulos/bodega.js?v=240"></script>
+<script src="modulos/rendiciones.js?v=240"></script>
+<script src="modulos/actas-entrega.js?v=240"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */
