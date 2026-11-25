@@ -649,7 +649,7 @@ function rkPodio(con){
 function rkMesesHTML(meses){
   const L=meses.slice(-12);if(L.length<2)return"";const anios=new Set(L.map(m=>m.k.slice(0,4))).size>1;
   const alto=p=>p===null?0:Math.min(100,Math.max(4,(p-40)/60*100));
-  return `<div class="evo rkevo"><div class="evt"><span>Puntaje general por mes</span><span class="evl">- - meta 90 %</span></div>
+  return `<div class="evo rkevo"><div class="evt"><span>Puntaje general por mes · Compañía</span><span class="evl">- - meta 90 %</span></div>
     <div class="evb">${L.map(m=>{const p=m.pct===null?null:Math.round(m.pct),k=semColor(p),mm=RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):"");
       return `<div class="evc" role="img" aria-label="${mm}: ${p===null?"sin puntaje":p+" %"}, ${m.c} ${m.c===1?"visita":"visitas"}"><span class="evp ${k}">${p===null?"–":p}</span><span class="evr"><i class="${esc(k)}" style="height:${alto(p)}%"></i></span><span class="evn">${mm}</span></div>`}).join("")}</div></div>`;
 }
@@ -850,7 +850,7 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   resumen(R.gen,R.nv,R.con.length,R.con[0],R.sobre,R.bajo,R.mej);
   sub2(`Ranking (${R.con.length})`);tabla(R.con);
   if(R.sin.length)nota(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`);
-  sub2("Puntaje general por mes","línea punteada: meta 90 %",66);lineaMeses(R.meses);
+  sub2("Puntaje general por mes · Compañía",`todos los ${K.unis} · línea punteada: meta 90 %`,66);lineaMeses(R.meses); /* v243 */
   cuadro(R.con);
   /* 2. por campo */
   if(conCampo){const ACC=AC(A);chk(60);y+=4;titulo(`${np++}. Por ${K.uni}`,`Puntaje de cada sección en cada visita (V1, V2…, con su fecha). «A la fecha» junta todas las visitas del período; «Total de la visita» es el puntaje de la visita completa.`);
@@ -1512,4 +1512,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="242"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="243"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
