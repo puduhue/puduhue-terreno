@@ -120,11 +120,11 @@ export function devolucionAuto(r, dups, ahora = Date.now()) {
   if (!ks.length) return null;
   const x = JSON.parse(JSON.stringify(r)), f = new Date(ahora).toISOString();
   const lin = ks.map(k => {
-    const d = x.docs[k], s = dups[k], cu = fechaTxt(s.cuando), q = `${s.mia ? "ya está en tu rendición" : `ya lo rindió ${s.persona || "otra persona"}${cu ? " el " + cu : ""} en su rendición`} de ${perTxt(s.periodo)} (${EST_TXT[s.estado] || s.estado || ""})`;
-    d.estadoRev = "obs"; d.obsCampo = "folio"; d.obsValor = String(d.folio || ""); d.obsRev = `Documento duplicado: ${q}. Elimínalo de esta rendición.`;
+    const d = x.docs[k], s = dups[k], cu = fechaTxt(s.cuando).slice(0, 5), q = s.mia ? "Ya está en otra rendición tuya" : `Ya lo rindió ${s.persona || "otra persona"}${cu ? " el " + cu : ""}`; /* v233: corto */
+    d.estadoRev = "obs"; d.obsCampo = "folio"; d.obsValor = String(d.folio || ""); d.obsRev = `${q}. Elimínalo.`;
     return `${d.emisor || "Documento"}${d.folio ? " N° " + d.folio : ""}${fechaTxt(d.fecha) ? " del " + fechaTxt(d.fecha) : ""} por ${pesos(d.total)}: ${q}`;
   });
-  const com = `Devuelta automáticamente porque ${ks.length === 1 ? "un documento ya está rendido" : ks.length + " documentos ya están rendidos"}. ${lin.join(". ")}. Elimínalos y vuelve a enviar la rendición.`.slice(0, 1500);
+  const com = `Devuelta automáticamente: ${ks.length === 1 ? "1 documento ya estaba rendido" : ks.length + " documentos ya estaban rendidos"}. ${ks.length === 1 ? "Elimínalo" : "Elimínalos"} y vuelve a enviar.`; /* v233: corto; el detalle va en cada documento */
   x.devueltaEn = x.estado; x.estado = "observada"; x.comentario = com; x.revisadaPor = SISTEMA;
   delete x.aprobJef; delete x.aprobCont; delete x.huellaDev;
   x.hist = (Array.isArray(x.hist) ? x.hist : []).concat([{ a: "devuelta", por: SISTEMA, fecha: f, nota: com }]);

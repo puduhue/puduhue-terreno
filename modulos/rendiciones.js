@@ -1340,10 +1340,49 @@ async function rdDupSrvRevisar(r,forzar){
   if(!docs.length){DUPSRV[r.id]={h,t:Date.now(),res:{}};return}
   let j=null;try{j=await Promise.race([odPedir("/od/rend/dups",{rid:r.id,docs}),new Promise((_,no)=>setTimeout(()=>no({code:"tiempo"}),8000))])}catch(e){return} /* sin señal o sin servidor: no bloquea */
   const res=(j&&j.dups)||{},antes=(ya&&ya.res)||{};DUPSRV[r.id]={h,t:Date.now(),res};
-  const nuevos=Object.keys(res).filter(k=>res[k].seguro&&!(antes[k]&&antes[k].seguro)&&r.docs&&r.docs[k]);
-  if(nuevos.length&&editaPersona(r))toast(nuevos.length===1?`Documento duplicado: ${(r.docs[nuevos[0]].emisor||"este documento")} ${dupQuien(res[nuevos[0]])}.`:`${nuevos.length} documentos ya están rendidos por otra persona. Revísalos antes de enviar.`,7000);
+  const nuevos=Object.keys(res).filter(k=>r.docs&&r.docs[k]&&!r.docs[k].noDup2&&(res[k].seguro?!(antes[k]&&antes[k].seguro):!antes[k])).sort((a,b)=>(res[b].seguro?1:0)-(res[a].seguro?1:0));
+  if(nuevos.length&&editaPersona(r)&&rdv&&rdv.id===r.id&&/^rd[vd]$/.test(view)){setTimeout(()=>dupModal(r,nuevos[0]),50)} /* v233: ventana */
+  else if(nuevos.length&&editaPersona(r))toast(nuevos.length===1?`${(r.docs[nuevos[0]].emisor||"Documento")}: ${dupQuienC(res[nuevos[0]])}.`:`${nuevos.length} documentos ya están rendidos.`,6000); /* v233: corto */
   if(rdv&&rdv.id===r.id&&/^rd[vd]$/.test(view)&&JSON.stringify(res)!==JSON.stringify(antes))render()}
 function rdDupSrvLuego(r){clearTimeout(DUPSRV_T);DUPSRV_T=setTimeout(()=>rdDupSrvRevisar(r),1500)}
+/* ---------- v233: duplicados agrupados y en rojo ---------- */
+const DUP_ACT=new Set(["borrador","observada"]); /* mientras quien rinde puede editar, el posible duplicado bloquea hasta que responda */
+const dupSrvDe=(r,d)=>DUPSRV[r.id]&&DUPSRV[r.id].res&&DUPSRV[r.id].res[d.k]||null;
+const dupDM=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x&&x.cuando||""))?x.cuando.slice(8,10)+"-"+x.cuando.slice(5,7):""; /* día y mes: textos cortos */
+const dupQuienC=x=>x.mia?"ya está en otra rendición tuya":`ya lo rindió ${x.persona||"otra persona"}${dupDM(x)?" el "+dupDM(x):""}`;
+/* mismo comercio, mismo día y mismo monto dentro de la misma rendición (uno sin N°): se marca el más nuevo */
+function dupIntDe(r,d){if(!d||!(num(d.total)>0)||!d.fecha)return null;const ru=rdDupRut(d),em=normTxt(d.emisor||"");
+  return docsDe(r).find(y=>y!==d&&docAntes(y,d)&&esNC(y)===esNC(d)&&Math.round(num(y.total))===Math.round(num(d.total))&&y.fecha===d.fecha
+    &&(ru?rdDupRut(y)===ru:!!em&&normTxt(y.emisor||"")===em)&&(!folioNorm(d.folio)||!folioNorm(y.folio)))||null}
+const dupCorto=m=>{let q=/^Documento duplicado: ya lo rindió (.+?)(?: el (\d\d-\d\d))?\./.exec(m);if(q)return `Lo rindió ${q[1]}${q[2]?" · "+q[2]:""}`;
+  q=/^Posible duplicado: (.+?) rindió uno igual(?: el (\d\d-\d\d))?/.exec(m);if(q)return `¿El mismo que rindió ${q[1]}${q[2]?" el "+q[2]:""}?`;
+  if(/^Posible repetido/.test(m))return "Está dos veces en esta rendición";if(/otra rendición tuya/.test(m))return "Ya está en otra rendición tuya";return msgCorto(m)};
+function dupBoxHTML(r){const edit=editaPersona(r),S=[],P=[];
+  docsDe(r).forEach(d=>{const pb=problemasDoc2(r,d),seg=pb.b.find(m=>/^Documento duplicado/.test(m));
+    if(seg){S.push({d,m:seg});return}const p=pb.b.concat(pb.a).find(m=>/^Posible (duplicado|repetido)/.test(m));if(p&&!d.noDup2)P.push({d,m:p})});
+  if(!S.length&&!P.length)return"";
+  const ver=k=>`<button class="btn" data-a="rdDoc" data-k="${esc(k)}">Ver</button>`;
+  const li=(x,bt)=>`<li><div class="dupi"><b>${esc(x.d.emisor||"Documento")}${x.d.folio?` · N° ${esc(x.d.folio)}`:""}</b><span>${x.d.fecha?fmtD(x.d.fecha):"Sin fecha"} · ${fmtDoc(x.d)}</span><small>${esc(dupCorto(x.m))}</small></div><div class="dupb">${bt}${ver(x.d.k)}</div></li>`;
+  return `<section class="dupbox" role="alert" aria-label="Documentos duplicados">
+    ${S.length?`<h3>${ICO_ALERTA}<span>${S.length===1?"1 ya rendido":S.length+" ya rendidos"}</span></h3><p>${edit?"Elimínalos para poder enviar.":"Quien rinde debe eliminarlos."}</p>
+      <ul>${S.map(x=>li(x,edit?`<button class="btn dupdel" data-a="rdDelDoc" data-k="${esc(x.d.k)}">Eliminar</button>`:"")).join("")}</ul>`:""}
+    ${P.length?`<h3>${ICO_ALERTA}<span>${P.length===1?"1 posible duplicado":P.length+" posibles duplicados"}</span></h3><p>${edit?"Mira la foto: ¿es el mismo?":"Compara las fotos."}</p>
+      <ul>${P.map(x=>li(x,edit?`<button class="btn dupdel" data-a="rdDelDoc" data-k="${esc(x.d.k)}">Eliminar</button><button class="btn" data-a="rdDupOtro" data-k="${esc(x.d.k)}">Es otro</button>`:"")).join("")}</ul>`:""}
+  </section>`}
+/* ventana al detectar un duplicado (en vez del aviso que desaparece) */
+function dupModal(r,k){const d=r&&r.docs&&r.docs[k],s=d&&dupSrvDe(r,d);if(!s||document.querySelector(".dupmodal"))return;
+  const det=`${esc(d.emisor||"Documento")} · ${fmtDoc(d)}`;
+  const m=document.createElement("div");m.className="modal dupmodal";
+  m.innerHTML=s.seguro?`<div class="sheet dupsh" role="alertdialog" aria-modal="true" aria-label="Documento ya rendido"><h3>${ICO_ALERTA}<span>Ya rendido</span></h3><p>${det}</p>
+      <p class="dupq">${esc(dupQuienC(s).replace(/^y/,"Y"))}.</p>
+      <div class="btns col"><button class="btn dupdel" data-m="del">Eliminar</button><button class="btn" data-m="ver">Ver foto</button></div></div>`
+    :`<div class="sheet dupsh" role="alertdialog" aria-modal="true" aria-label="Posible duplicado"><h3>${ICO_ALERTA}<span>¿Es el mismo?</span></h3><p>${det}</p>
+      <p class="dupq">${esc(s.mia?"Hay uno igual en otra rendición tuya":`${s.persona||"Otra persona"} rindió uno igual${dupDM(s)?" el "+dupDM(s):""}`)} (mismo día y monto).</p>
+      <div class="btns col"><button class="btn dupdel" data-m="del">Sí, eliminar</button><button class="btn" data-m="otro">No, es otro</button><button class="btn" data-m="ver">Ver foto</button></div></div>`;
+  document.body.appendChild(m);document.body.style.overflow="hidden";const cerrar=()=>{m.remove();document.body.style.overflow=""};
+  m.addEventListener("click",async e=>{e.stopPropagation();const a=e.target.closest("[data-m]"),v=a&&a.dataset.m;if(!v&&e.target!==m)return;cerrar();if(!v||rdv!==r)return;
+    if(v==="del")await rdClick("rdDelDoc",{dataset:{k}});else if(v==="otro")dupOtro(r,d);else if(v==="ver"){rdd=d;go("rdd")}})}
+function dupOtro(r,d){if(!r||!d||!editaPersona(r))return;d.noDup2={fecha:new Date().toISOString(),por:yo()};rdTouch();render();toast("Anotado: es otro gasto.")}
 const totalRend=r=>docsDe(r).reduce((s,d)=>s+valDoc(d),0); /* v230: la nota de crédito resta */
 const centroDoc=(r,d)=>{const y=ncRef(r,d);return y&&!esNC(y)?centroDoc(r,y):d.centro||PREDIO_CENTRO[d.predio]||""}; /* v230: la nota de crédito, el del documento que rebaja */
 /* v133 (M-17): N° de boleta o factura sin ceros a la izquierda ni otros signos; orden de llegada de dos documentos */
@@ -1394,7 +1433,7 @@ const monMsg=(d,r)=>{const o=rdOtroMira(r);return d.tc?`En ${d.moneda==="EUR"?"e
   :`En ${d.moneda==="EUR"?"euros":"dólares"}: ${fmtMon(d.moneda,d.montoMoneda)}. ${o?"Falta el total en pesos que cobró el banco.":"Escribe el total en pesos que te cobró el banco."}`};
 const esMonMsg=m=>/^En (dólares|euros):/.test(m);
 /* v203: texto corto de un problema, para la lista (el detalle queda en la ficha) */
-function msgCorto(m){m=String(m||"");{const q=/^Documento duplicado: .* ya lo rindió (.+?) en su rendición/.exec(m);if(q)return "Ya lo rindió "+q[1]} /* v232 */
+function msgCorto(m){m=String(m||"");{const q=/^Documento duplicado: ya lo rindió (.+?)(?: el \d\d-\d\d)?\./.exec(m);if(q)return "Ya lo rindió "+q[1];const q2=/^Posible duplicado: (.+?) rindió uno igual/.exec(m);if(q2)return "¿El mismo que "+q2[1]+"?";if(/^Posible repetido/.test(m))return "¿Repetido aquí?";if(/^Documento duplicado: ya está en otra rendición tuya/.test(m))return "Ya está en otra rendición tuya"} /* v233: corto */
   const T=[[/^Falta el tipo de gasto/,"Falta el tipo de gasto"],[/^Falta el centro de costo/,"Falta el centro de costo"],[/^Falta la foto/,"Falta la foto"],[/^Falta el total/,"Falta el total"],
     [/^Falta el RUT/,"Falta el RUT del emisor"],[/^Revisa el N°/,"N° repetido con otra boleta"],[/^No es boleta ni factura/,"No es boleta ni factura"],[/^Documento duplicado/,"Documento repetido"],
     [/^Posible duplicado/,"Posible duplicado"],[/^En (dólares|euros):.*= \$[\d.]+\.$/,"En dólares, pasado a pesos"],[/^En (dólares|euros)/,"En dólares: revisa el total en pesos"],[/^La fecha es futura/,"Fecha futura"],[/^Tipo de documento no válido/,"Tipo de documento no válido"],[/^El RUT .* no calza|^El RUT .* incompleto/,"RUT con error"]];
@@ -1436,8 +1475,11 @@ function problemasDoc2(r,d){
   /* v189: posible duplicado (mismo total y fecha, o mismo total y N°, en cualquier tipo); aviso en el más nuevo */
   {const x=rdDupDe(r,d);if(x)a.push(rdDupTxt(r,d,x))}
   {const s=DUPSRV[r.id]&&DUPSRV[r.id].res&&DUPSRV[r.id].res[d.k];if(s&&!b.some(m=>/^Documento duplicado/.test(m))&&!a.some(m=>/^Posible duplicado/.test(m))){ /* v232: lo dice el servidor */
-    if(s.seguro&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Documento duplicado: este documento (mismo RUT y número) ${dupQuien(s)}. Debe quedar en una sola rendición: elimínalo de esta.`);
-    else if(!s.seguro)a.push(`Posible duplicado: ${s.mia?`en tu rendición de ${periodoTxt(s.periodo).toLowerCase()} hay`:`${s.persona||"otra persona"} rindió en ${periodoTxt(s.periodo).toLowerCase()}`} un documento del mismo día y por el mismo total. Compara las fotos.`)}}
+    if(s.seguro&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Documento duplicado: ${dupQuienC(s)}. Elimínalo para enviar.`); /* v233: corto */
+    else if(!s.seguro){const m=`Posible duplicado: ${s.mia?"hay uno igual en otra rendición tuya":`${s.persona||"otra persona"} rindió uno igual${dupDM(s)?" el "+dupDM(s):""}`}. ¿Es el mismo?`; /* v233: rojo hasta que responda */
+      if(DUP_ACT.has(r.estado||"borrador")&&!d.noDup2)b.push(m);else a.push(d.noDup2?m.replace(" ¿Es el mismo?"," Dijo que es otro gasto."):m)}}}
+  {const y=!b.some(m=>/^Documento duplicado|^Posible duplicado/.test(m))&&!a.some(m=>/^Posible duplicado/.test(m))&&dupIntDe(r,d); /* lo que ya avisa la v189 (no peajes) sigue con su pregunta */if(y){const m="Posible repetido: está dos veces en esta rendición. ¿Es el mismo?"; /* v233 */
+    if(DUP_ACT.has(r.estado||"borrador")&&!d.noDup2)b.push(m);else a.push(d.noDup2?m.replace(" ¿Es el mismo?"," Dijo que es otro gasto."):m)}}
   /* v133 (M-16): la lectura con IA dice que la foto no se lee o no es una boleta o factura */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
@@ -2164,6 +2206,7 @@ function renderRDV(){
     ${acciones}
     ${rdRevisa(r)&&D.length?(n=>`<div class="start rdrevini" style="grid-template-columns:1fr"><button class="big dev acc" data-a="rdRevIni"><strong>${n===D.length?"Ver los documentos":n?"Seguir revisando":D.length===1?"Revisar el documento":`Revisar los ${D.length} documentos`}</strong><span>${n?`${n} de ${D.length} revisados`:"Foto y datos de cada uno, uno tras otro"}</span></button></div>`)(D.filter(d=>d.estadoRev).length):""}
     ${colBoxHTML(r,jef||con)}
+    ${dupBoxHTML(r)}
     <h2>Documentos<span class="cnt">${D.length}</span></h2>
     <div class="list">${D.map(d=>rdDocCard(r,d)).join("")||`<div class="empty">Todavía no hay documentos. Toca <b>Agregar documento</b> y saca la foto de la factura o boleta.</div>`}</div>
     ${asi}
@@ -2641,6 +2684,7 @@ async function rdClick(A,b){
   if(A==="rdIrDoc"){await rdIrDoc(b.dataset.k);return true}
   if(A==="rdVolver"){await flush();RD_ELIGE=null;rdd=null;RD_COLA=null;go("rdv");return true}
   if(A==="rdReleer"){if(!rdd||!editaPersona(rdv))return true;rdd.revisadoManual=false;await leerDoc(rdv,rdd);return true}
+  if(A==="rdDupOtro"){const d=rdv&&rdv.docs[b.dataset.k];if(d)dupOtro(rdv,d);return true} /* v233 */
   if(A==="rdDelDoc"){if(!editaPersona(rdv))return true;const d=rdv.docs[b.dataset.k];if(!d)return true;/* v148: deshacer en vez de confirmar; la foto y el PDF se borran de verdad al terminar el plazo */
     const r=rdv;delete r.docs[d.k];rdd=null;rdTouch();go("rdv");
     deshacer("Documento eliminado.",()=>{if(rdv!==r||view!=="rdv")return;r.docs[d.k]=d;rdTouch();render()},()=>{if(d.foto)borrarFotoRef(d.foto);rdQuitarPdf(d)});return true}
@@ -3014,4 +3058,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="232"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="233"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

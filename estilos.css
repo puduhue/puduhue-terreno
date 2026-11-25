@@ -2609,3 +2609,19 @@ mark.privph{background:#FFF1B8;color:#5A4300;border-radius:4px;padding:0 3px}
 
 /* ---------- v231: datos de una persona ---------- */
 .dpsheet .dps-p{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.4}
+
+/* ---------- v233: duplicados agrupados y en rojo ---------- */
+.dupbox{margin:0 0 14px;padding:12px 14px 6px;border-radius:16px;background:var(--m-bg);color:var(--m-ink);border:1px solid color-mix(in srgb,var(--m-ink) 30%,transparent)}
+.dupbox h3{display:flex;align-items:center;gap:8px;margin:2px 0 2px;font-size:17px}
+.dupbox h3 svg{width:20px;height:20px;flex:none}
+.dupbox>p{margin:0 0 6px;font-size:14px}
+.dupbox ul{list-style:none;margin:0 0 6px;padding:0}
+.dupbox li{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid color-mix(in srgb,currentColor 25%,transparent)}
+.dupbox .dupi{display:flex;flex-direction:column;min-width:0;flex:1 1 200px}
+.dupbox .dupi b{color:var(--ink)}.dupbox .dupi span{color:var(--muted);font-size:14px}.dupbox .dupi small{font-size:14px;font-weight:600}
+.dupbox .dupb{display:flex;flex-wrap:wrap;gap:6px}
+.dupbox .btn,.dupsh .btn{min-height:40px;padding:8px 14px}
+.dupbox .btn.dupdel,.dupsh .btn.dupdel,.btn.dupdel{background:var(--m-ink)!important;border-color:var(--m-ink)!important;color:var(--m-bg)!important} /* el texto usa el fondo rojo claro (día) u oscuro (noche): contraste en los dos */
+.dupsh h3{display:flex;align-items:center;gap:8px;color:var(--m-ink)}.dupsh h3 svg{width:22px;height:22px;flex:none}
+.dupsh .dupq{background:var(--m-bg);color:var(--m-ink);border-radius:12px;padding:10px 12px;font-weight:600}
+.btns.col{flex-direction:column;align-items:stretch}.btns.col .btn{width:100%}
