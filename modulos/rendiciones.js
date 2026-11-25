@@ -1350,19 +1350,36 @@ const DUP_ACT=new Set(["borrador","observada"]); /* mientras quien rinde puede e
 const dupSrvDe=(r,d)=>DUPSRV[r.id]&&DUPSRV[r.id].res&&DUPSRV[r.id].res[d.k]||null;
 const dupDM=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x&&x.cuando||""))?x.cuando.slice(8,10)+"-"+x.cuando.slice(5,7):""; /* día y mes: textos cortos */
 const dupQuienC=x=>x.mia?"ya está en otra rendición tuya":`ya lo rindió ${x.persona||"otra persona"}${dupDM(x)?" el "+dupDM(x):""}`;
-/* mismo comercio, mismo día y mismo monto dentro de la misma rendición (uno sin N°): se marca el más nuevo */
-function dupIntDe(r,d){if(!d||!(num(d.total)>0)||!d.fecha)return null;const ru=rdDupRut(d),em=normTxt(d.emisor||"");
-  return docsDe(r).find(y=>y!==d&&docAntes(y,d)&&esNC(y)===esNC(d)&&Math.round(num(y.total))===Math.round(num(d.total))&&y.fecha===d.fecha
-    &&(ru?rdDupRut(y)===ru:!!em&&normTxt(y.emisor||"")===em)&&(!folioNorm(d.folio)||!folioNorm(y.folio)))||null}
+/* mismo comercio, mismo día y mismo monto dentro de la misma rendición (uno sin N°).
+   v234: con otra hora impresa no es repetido; sin fecha (foto que no se leyó) basta el mismo monto; se marca el que tiene menos
+   datos (sin fecha o sin N°) y, si tienen los mismos, el más nuevo */
+const dupHora=x=>{const m=/^(\d{1,2}):(\d{2})/.exec(String(x&&x.horaDoc||""));return m?(+m[1])*60+(+m[2]):null};
+const dupNota=x=>(x.fecha?2:0)+(folioNorm(x.folio)?1:0);
+function dupIntPar(d,y){if(!y||y===d||esNC(y)!==esNC(d)||Math.round(num(y.total))!==Math.round(num(d.total)))return false;
+  if(folioNorm(d.folio)&&folioNorm(y.folio))return false; /* los dos con N°: si es el mismo, lo dice «Documento duplicado» */
+  const hd=dupHora(d),hy=dupHora(y);if(hd!=null&&hy!=null&&hd!==hy)return false; /* v234: otra hora, otra pasada */
+  const ra=rdDupRut(d),rb=rdDupRut(y);
+  if(d.fecha&&y.fecha){if(d.fecha!==y.fecha)return false;const ea=normTxt(d.emisor||"");return ra?rb===ra:!!ea&&normTxt(y.emisor||"")===ea}
+  return !(ra&&rb&&ra!==rb)} /* v234: uno sin fecha */
+function dupIntDe(r,d){if(!d||!(num(d.total)>0))return null;const nd=dupNota(d);
+  return docsDe(r).find(y=>dupIntPar(d,y)&&(nd<dupNota(y)||(nd===dupNota(y)&&docAntes(y,d))))||null}
+const dupNombre=x=>{const e=String(x||"").trim(),c=e.replace(/\(.*?\)/g," ").replace(/(^|\s)(Sociedad|Soc\.?|Concesionaria|Limitada|Ltda\.?|SpA|S\.A\.?|E\.I\.R\.L\.?)(?=\s|,|$)/gi," ").replace(/\s+/g," ").replace(/^[\s,.-]+|[\s,-]+$/g,"").trim()||e;return c.length>24?c.slice(0,23).trim()+"…":c}; /* v234: sin «Sociedad Concesionaria», «S.A.»… */
+const dupRef=y=>{const e=String(y.emisor||"").trim();return `${e?dupNombre(e):"otro documento"}${y.fecha?" del "+y.fecha.slice(8,10)+"-"+y.fecha.slice(5,7):""}${folioNorm(y.folio)?", N° …"+String(y.folio).replace(/\s/g,"").slice(-4):", sin N°"}`};
+/* v234: el otro documento del par, para comparar las fotos (misma rendición o, en la v189, otra que esté en el teléfono) */
+function dupOtroDoc(r,d){if(!r||!d)return null;
+  if(d.rut&&d.folio){const fd=folioNorm(d.folio),y=docsDe(r).find(y=>y!==d&&y.rut&&y.folio&&normRut(y.rut)===normRut(d.rut)&&folioNorm(y.folio)===fd);if(y)return y}
+  const x=rdDupDe(r,d);if(x&&x.y)return x.y;return dupIntDe(r,d)}
 const dupCorto=m=>{let q=/^Documento duplicado: ya lo rindió (.+?)(?: el (\d\d-\d\d))?\./.exec(m);if(q)return `Lo rindió ${q[1]}${q[2]?" · "+q[2]:""}`;
   q=/^Posible duplicado: (.+?) rindió uno igual(?: el (\d\d-\d\d))?/.exec(m);if(q)return `¿El mismo que rindió ${q[1]}${q[2]?" el "+q[2]:""}?`;
+  q=/^Posible repetido con (.+?)\.(?: ¿Es| Dijo)/.exec(m);if(q)return `¿Igual a ${q[1]}?`; /* v234 */
   if(/^Posible repetido/.test(m))return "Está dos veces en esta rendición";if(/otra rendición tuya/.test(m))return "Ya está en otra rendición tuya";return msgCorto(m)};
 function dupBoxHTML(r){const edit=editaPersona(r),S=[],P=[];
   docsDe(r).forEach(d=>{const pb=problemasDoc2(r,d),seg=pb.b.find(m=>/^Documento duplicado/.test(m));
     if(seg){S.push({d,m:seg});return}const p=pb.b.concat(pb.a).find(m=>/^Posible (duplicado|repetido)/.test(m));if(p&&!d.noDup2)P.push({d,m:p})});
   if(!S.length&&!P.length)return"";
   const ver=k=>`<button class="btn" data-a="rdDoc" data-k="${esc(k)}">Ver</button>`;
-  const li=(x,bt)=>`<li><div class="dupi"><b>${esc(x.d.emisor||"Documento")}${x.d.folio?` · N° ${esc(x.d.folio)}`:""}</b><span>${x.d.fecha?fmtD(x.d.fecha):"Sin fecha"} · ${fmtDoc(x.d)}</span><small>${esc(dupCorto(x.m))}</small></div><div class="dupb">${bt}${ver(x.d.k)}</div></li>`;
+  const cmp=d=>dupOtroDoc(r,d)?`<button class="btn" data-a="rdDupComp" data-k="${esc(d.k)}">Comparar</button>`:""; /* v234 */
+  const li=(x,bt)=>`<li><div class="dupi"><b>${esc(x.d.emisor||"Documento")}${x.d.folio?` · N° ${esc(x.d.folio)}`:""}</b><span>${x.d.fecha?fmtD(x.d.fecha):"Sin fecha"} · ${fmtDoc(x.d)}</span><small>${esc(dupCorto(x.m))}</small></div><div class="dupb">${bt}${cmp(x.d)||ver(x.d.k)}</div></li>`;
   return `<section class="dupbox" role="alert" aria-label="Documentos duplicados">
     ${S.length?`<h3>${ICO_ALERTA}<span>${S.length===1?"1 ya rendido":S.length+" ya rendidos"}</span></h3><p>${edit?"Elimínalos para poder enviar.":"Quien rinde debe eliminarlos."}</p>
       <ul>${S.map(x=>li(x,edit?`<button class="btn dupdel" data-a="rdDelDoc" data-k="${esc(x.d.k)}">Eliminar</button>`:"")).join("")}</ul>`:""}
@@ -1382,6 +1399,20 @@ function dupModal(r,k){const d=r&&r.docs&&r.docs[k],s=d&&dupSrvDe(r,d);if(!s||do
   document.body.appendChild(m);document.body.style.overflow="hidden";const cerrar=()=>{m.remove();document.body.style.overflow=""};
   m.addEventListener("click",async e=>{e.stopPropagation();const a=e.target.closest("[data-m]"),v=a&&a.dataset.m;if(!v&&e.target!==m)return;cerrar();if(!v||rdv!==r)return;
     if(v==="del")await rdClick("rdDelDoc",{dataset:{k}});else if(v==="otro")dupOtro(r,d);else if(v==="ver"){rdd=d;go("rdd")}})}
+/* v234: las dos fotos lado a lado */
+function dupComp(r,k){const d=r&&r.docs&&r.docs[k],y=d&&dupOtroDoc(r,d);if(!y||document.querySelector(".dupmodal"))return;
+  const ed=editaPersona(r);
+  const col=(x,t)=>{const src=x.foto?fotoSrc(x.foto):"";return `<div class="dupc"><small>${t}</small>
+    <button type="button" class="th${src?"":" miss"}" data-m="ver" data-ref="${esc(x.foto||"")}"${!src&&x.foto?` data-thref="${esc(x.foto)}"`:""} aria-label="Ver la foto en grande">${src?`<img src="${esc(src)}" alt="">`:x.foto?"Cargando…":"Sin foto"}</button>
+    <b>${esc(x.emisor||"Sin comercio")}</b><span>${x.fecha?fmtD(x.fecha):"Sin fecha"}${x.horaDoc?" · "+esc(x.horaDoc):""}</span><span>${fmtDoc(x)} · ${x.folio?"N° "+esc(x.folio):"sin N°"}</span>
+    ${ed&&r.docs[x.k]===x?`<button class="btn dupdel" data-m="del" data-k="${esc(x.k)}">Eliminar este</button>`:""}</div>`};
+  const m=document.createElement("div");m.className="modal dupmodal";
+  m.innerHTML=`<div class="sheet dupsh dupcsh" role="alertdialog" aria-modal="true" aria-label="Comparar documentos"><h3>${ICO_ALERTA}<span>¿Es el mismo?</span></h3>
+    <p>Mira el N°, la hora y el monto en las dos fotos.</p><div class="dupcmp">${col(d,"Este")}${col(y,"El otro")}</div>
+    <div class="btns col">${ed&&!d.noDup2?`<button class="btn" data-m="otro">Son distintos</button>`:""}<button class="btn" data-m="cerrar">Cerrar</button></div></div>`;
+  document.body.appendChild(m);document.body.style.overflow="hidden";const cerrar=()=>{m.remove();document.body.style.overflow=""};
+  m.addEventListener("click",async e=>{e.stopPropagation();const a=e.target.closest("[data-m]"),v=a&&a.dataset.m;if(!v&&e.target!==m)return;cerrar();if(!v||rdv!==r)return;
+    if(v==="del")await rdClick("rdDelDoc",{dataset:{k:a.dataset.k}});else if(v==="otro")dupOtro(r,d);else if(v==="ver"&&a.dataset.ref)verFoto(a.dataset.ref)})}
 function dupOtro(r,d){if(!r||!d||!editaPersona(r))return;d.noDup2={fecha:new Date().toISOString(),por:yo()};rdTouch();render();toast("Anotado: es otro gasto.")}
 const totalRend=r=>docsDe(r).reduce((s,d)=>s+valDoc(d),0); /* v230: la nota de crédito resta */
 const centroDoc=(r,d)=>{const y=ncRef(r,d);return y&&!esNC(y)?centroDoc(r,y):d.centro||PREDIO_CENTRO[d.predio]||""}; /* v230: la nota de crédito, el del documento que rebaja */
@@ -1478,7 +1509,7 @@ function problemasDoc2(r,d){
     if(s.seguro&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Documento duplicado: ${dupQuienC(s)}. Elimínalo para enviar.`); /* v233: corto */
     else if(!s.seguro){const m=`Posible duplicado: ${s.mia?"hay uno igual en otra rendición tuya":`${s.persona||"otra persona"} rindió uno igual${dupDM(s)?" el "+dupDM(s):""}`}. ¿Es el mismo?`; /* v233: rojo hasta que responda */
       if(DUP_ACT.has(r.estado||"borrador")&&!d.noDup2)b.push(m);else a.push(d.noDup2?m.replace(" ¿Es el mismo?"," Dijo que es otro gasto."):m)}}}
-  {const y=!b.some(m=>/^Documento duplicado|^Posible duplicado/.test(m))&&!a.some(m=>/^Posible duplicado/.test(m))&&dupIntDe(r,d); /* lo que ya avisa la v189 (no peajes) sigue con su pregunta */if(y){const m="Posible repetido: está dos veces en esta rendición. ¿Es el mismo?"; /* v233 */
+  {const y=!b.some(m=>/^Documento duplicado|^Posible duplicado/.test(m))&&!a.some(m=>/^Posible duplicado/.test(m))&&dupIntDe(r,d); /* lo que ya avisa la v189 (no peajes) sigue con su pregunta */if(y){const m=`Posible repetido con ${dupRef(y)}. ¿Es el mismo?`; /* v233; v234: con cuál */
     if(DUP_ACT.has(r.estado||"borrador")&&!d.noDup2)b.push(m);else a.push(d.noDup2?m.replace(" ¿Es el mismo?"," Dijo que es otro gasto."):m)}}
   /* v133 (M-16): la lectura con IA dice que la foto no se lee o no es una boleta o factura */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.legible===false)a.push("La lectura automática dice que la foto no se lee bien o no parece una boleta o factura: revisa que sea la foto correcta.");
@@ -1786,6 +1817,7 @@ async function leerDoc(r,d){
     if(!d.revisadoManual){if(x.tipo&&TIPO_DOC[x.tipo])d.tipo=x.tipo;if(x.emisor)d.emisor=String(x.emisor).slice(0,80);if(x.rut_emisor)d.rut=rutLimpio(x.rut_emisor);if(x.folio)d.folio=String(x.folio).trim();if(x.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(x.fecha))d.fecha=x.fecha;if(num(x.total)>0)d.total=Math.round(num(x.total));if(num(x.neto)>0)d.neto=Math.round(num(x.neto));if(num(x.iva)>0)d.iva=Math.round(num(x.iva));if(x.glosa&&(!d.glosa||d.glosaTimbre)){d.glosa=String(x.glosa).slice(0,120);delete d.glosaTimbre}}
     if(x.rut_receptor)d.rutReceptor=rutLimpio(x.rut_receptor);if(x.receptor)d.receptor=String(x.receptor).slice(0,80);
     if(num(x.propina)>0)d.propina=Math.round(num(x.propina));else delete d.propina; /* v135: propina aparte (el total la incluye) */
+    {const h=/^(\d{1,2}):(\d{2})/.exec(String(x.hora||""));if(h&&+h[1]<24&&+h[2]<60)d.horaDoc=h[1].padStart(2,"0")+":"+h[2];else delete d.horaDoc} /* v234: la hora impresa distingue dos pasadas del mismo peaje */
     if(!d.revisadoManual)rdAplicarCambio(d,x); /* v203: dólares o euros */
     if(d.timbre){const ti=num(x.total_impreso);if(ti>0&&Math.abs(ti-num(d.timbre.mnt))>1)d.lectura.totalImpreso=ti}
     if(d.timbre&&!d.revisadoManual)timbreAplicar(d,d.timbre);
@@ -2684,6 +2716,7 @@ async function rdClick(A,b){
   if(A==="rdIrDoc"){await rdIrDoc(b.dataset.k);return true}
   if(A==="rdVolver"){await flush();RD_ELIGE=null;rdd=null;RD_COLA=null;go("rdv");return true}
   if(A==="rdReleer"){if(!rdd||!editaPersona(rdv))return true;rdd.revisadoManual=false;await leerDoc(rdv,rdd);return true}
+  if(A==="rdDupComp"){if(rdv)dupComp(rdv,b.dataset.k);return true} /* v234 */
   if(A==="rdDupOtro"){const d=rdv&&rdv.docs[b.dataset.k];if(d)dupOtro(rdv,d);return true} /* v233 */
   if(A==="rdDelDoc"){if(!editaPersona(rdv))return true;const d=rdv.docs[b.dataset.k];if(!d)return true;/* v148: deshacer en vez de confirmar; la foto y el PDF se borran de verdad al terminar el plazo */
     const r=rdv;delete r.docs[d.k];rdd=null;rdTouch();go("rdv");
@@ -3058,4 +3091,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="233"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="234"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

@@ -2625,3 +2625,15 @@ mark.privph{background:#FFF1B8;color:#5A4300;border-radius:4px;padding:0 3px}
 .dupsh h3{display:flex;align-items:center;gap:8px;color:var(--m-ink)}.dupsh h3 svg{width:22px;height:22px;flex:none}
 .dupsh .dupq{background:var(--m-bg);color:var(--m-ink);border-radius:12px;padding:10px 12px;font-weight:600}
 .btns.col{flex-direction:column;align-items:stretch}.btns.col .btn{width:100%}
+
+/* ---------- v234: comparar dos documentos ---------- */
+.dupcsh{max-height:92vh;overflow:auto}
+.dupcmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 12px}
+.dupc{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dupc small{font-weight:700;color:var(--muted)}
+.dupcmp .dupc .th{display:flex;align-items:center;justify-content:center;width:100%;height:auto;aspect-ratio:3/4;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft);color:var(--muted);padding:0;margin:0 0 4px;font:inherit;cursor:zoom-in}
+.dupcmp .dupc .th img{width:100%;height:100%;object-fit:contain;background:#fff;border-radius:0}
+.dupc b{font-size:14px;color:var(--ink);overflow-wrap:anywhere}
+.dupc span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.dupc .btn{margin-top:6px;width:100%}
+@media (min-width:1100px){body.conlat .dupcsh{max-width:720px}}
