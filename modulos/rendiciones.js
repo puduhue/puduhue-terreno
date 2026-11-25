@@ -511,7 +511,7 @@ const rdcCorregido=(r,d)=>d.estadoRev==="obs"&&!!d.obsCampo&&d.obsValor!=null&&r
 function rdcItems(r,d,P,o){o=o||{};const L=[];
   if(!o.sinFalta)P.b.forEach(m=>{const c=campoDeMsg(m);L.push({c:RDC_DATO[c]?c:"",m,t:"falta"})});
   if(o.cont)(imputar(r,d).al||[]).filter(a=>a.n==="b"&&!P.b.includes(a.m)).forEach(a=>{const c=/tipo de gasto/i.test(a.m)?"rdGa":campoDeMsg(a.m);L.push({c:RDC_DATO[c]?c:"",m:a.m,t:"cont"})});
-  P.a.filter(m=>esNoBolMsg(m)||esNumMsg(m)||esMonMsg(m)).forEach(m=>L.push({c:esNoBolMsg(m)?"rdTd":esNumMsg(m)?"rdFol":"rdTot",m,t:"aviso"})); /* v202; v203: dólares */
+  P.a.filter(m=>esNoBolMsg(m)||esNumMsg(m)||esMonMsg(m)||esTotManMsg(m)).forEach(m=>L.push({c:esNoBolMsg(m)?"rdTd":esNumMsg(m)?"rdFol":"rdTot",m,t:"aviso"})); /* v202; v203: dólares */
   if(d.estadoRev==="obs"&&!o.sinPedido)L.push({c:RDC_DE_CAMPO[d.obsCampo]||"",m:d.obsRev||"Revisa este documento. Mira el comentario de la rendición.",t:"pedido",ok:rdcCorregido(r,d)});
   return L}
 function rdcResumenHTML(L,edita,quienRinde){if(!L.length)return"";const n=L.filter(x=>!x.ok).length,nA=L.filter(x=>!x.ok&&x.t==="aviso").length,nC=n-nA; /* v203 */
@@ -759,6 +759,9 @@ function gastoHistorial(rut,excluirK){
 }
 
 /* ---- lectura original, para medir ---- */
+/* v239: total que leyó la IA de la foto (antes de la v239, el que quedó al leer) */
+const dTotIA=d=>{const le=d&&d.lectura;if(!le||le.estado!=="ok")return 0;const t=Math.round(num(le.totalIA!=null?le.totalIA:(le.leido&&le.leido.total)));return t>0?t:0};
+const esTotManMsg=m=>/^Total cambiado a mano/.test(String(m||""));
 function lecturaGuardar(d){
   if(!d.lectura)return;
   d.lectura.leido={tipo:d.tipo||"",emisor:d.emisor||"",rut:d.rut||"",folio:String(d.folio||""),fecha:d.fecha||"",total:num(d.total),neto:num(d.neto),iva:num(d.iva),gasto:d.gasto||"",glosa:d.glosa||""};
@@ -1553,7 +1556,7 @@ const esMonMsg=m=>/^En (dólares|euros):/.test(m);
 /* v203: texto corto de un problema, para la lista (el detalle queda en la ficha) */
 function msgCorto(m){m=String(m||"");{const q=/^Documento duplicado: ya lo rindió (.+?)(?: el \d\d-\d\d)?\./.exec(m);if(q)return "Ya lo rindió "+q[1];const q2=/^Posible duplicado: (.+?) rindió uno igual/.exec(m);if(q2)return "¿El mismo que "+q2[1]+"?";if(/^Posible repetido/.test(m))return "¿Repetido aquí?";if(/^Documento duplicado: ya está en otra rendición tuya/.test(m))return "Ya está en otra rendición tuya"} /* v233: corto */
   const T=[[/^Falta el tipo de gasto/,"Falta el tipo de gasto"],[/^Falta el centro de costo/,"Falta el centro de costo"],[/^Falta la foto/,"Falta la foto"],[/^Falta el total/,"Falta el total"],
-    [/^Falta el RUT/,"Falta el RUT del emisor"],[/^Revisa el N°/,"N° repetido con otra boleta"],[/^No es boleta ni factura/,"No es boleta ni factura"],[/^Documento duplicado/,"Documento repetido"],
+    [/^Falta el RUT/,"Falta el RUT del emisor"],[/^Revisa el N°/,"N° repetido con otra boleta"],[/^Total cambiado a mano/,"Total cambiado a mano"],[/^No es boleta ni factura/,"No es boleta ni factura"],[/^Documento duplicado/,"Documento repetido"],
     [/^Posible duplicado/,"Posible duplicado"],[/^En (dólares|euros):.*= \$[\d.]+\.$/,"En dólares, pasado a pesos"],[/^En (dólares|euros)/,"En dólares: revisa el total en pesos"],[/^La fecha es futura/,"Fecha futura"],[/^Tipo de documento no válido/,"Tipo de documento no válido"],[/^El RUT .* no calza|^El RUT .* incompleto/,"RUT con error"]];
   const x=T.find(([r])=>r.test(m));if(x)return x[1];const s=m.split(/(?<=\.)\s/)[0].replace(/\.$/,"");return s.length>60?s.slice(0,57)+"…":s}
 const esNoBolMsg=m=>/^No es boleta ni factura/.test(m),esNumMsg=m=>/^Revisa el N°/.test(m);
@@ -1614,6 +1617,7 @@ function problemasDoc2(r,d){
   if(prop)a.push(`El total incluye una propina de ${fmtP(prop)}, que no forma parte del documento tributario.`);
   if(num(d.neto)>0&&num(d.iva)>0&&Math.abs(num(d.neto)+num(d.iva)-(num(d.total)-prop))>2)a.push("Neto más IVA no cuadra con el total.");
   timbreDiferencias(d).forEach(x=>a.push(x));
+  {const t0=dTotIA(d),t=Math.round(num(d.total));if(t0&&t>0&&t!==t0&&!d.timbre&&!esNC(d)&&!(d.moneda&&+d.montoMoneda>0)&&!(d.estadoRev==="obs"&&d.obsCampo==="total"))a.push(`Total cambiado a mano: la foto dice ${fmtP(t0)} y se rindió ${fmtP(t)}.`)} /* v239 */
   if(lecFacturaSinNeto(d)&&!(d.lectura&&/^(leyendo|pendiente)$/.test(d.lectura.estado)))a.push("Falta el neto y el IVA de la factura.");
   if(!String(d.glosa||"").trim()&&!esNC(d))a.push("Sin detalle del gasto.");
   if(colPideP(d)&&!colPersL(d).length){const m="Faltan las personas de la colación (cantidad y nombres).";if(DUP_ACT.has(r.estado||"borrador"))b.push(m);else a.push(m)} /* v238 */
@@ -1905,7 +1909,7 @@ async function leerDoc(r,d){
     finally{clearTimeout(tope)}
     if(!res.ok)throw j;
     const x=j.datos||{};
-    d.lectura={estado:"ok",confianza:+x.confianza||0,problemas:Array.isArray(x.problemas)?x.problemas:[],legible:x.legible!==false,hora:j.hora,modelo:j.modelo};if(j.revision)d.lectura.revision={modelo:j.revision.modelo,motivos:(j.revision.motivos||[]).slice(0,6),error:j.revision.error||undefined};
+    d.lectura={estado:"ok",totalIA:Math.round(num(x.total))||0,confianza:+x.confianza||0,problemas:Array.isArray(x.problemas)?x.problemas:[],legible:x.legible!==false,hora:j.hora,modelo:j.modelo};if(j.revision)d.lectura.revision={modelo:j.revision.modelo,motivos:(j.revision.motivos||[]).slice(0,6),error:j.revision.error||undefined};
     if(!d.revisadoManual){if(x.tipo&&TIPO_DOC[x.tipo])d.tipo=x.tipo;if(x.emisor)d.emisor=String(x.emisor).slice(0,80);if(x.rut_emisor)d.rut=rutLimpio(x.rut_emisor);if(x.folio)d.folio=String(x.folio).trim();if(x.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(x.fecha))d.fecha=x.fecha;if(num(x.total)>0)d.total=Math.round(num(x.total));if(num(x.neto)>0)d.neto=Math.round(num(x.neto));if(num(x.iva)>0)d.iva=Math.round(num(x.iva));if(x.glosa&&(!d.glosa||d.glosaTimbre)){d.glosa=String(x.glosa).slice(0,120);delete d.glosaTimbre}}
     if(d.revisadoManual){if(!d.emisor&&x.emisor)d.emisor=String(x.emisor).slice(0,80);if(!d.rut&&x.rut_emisor)d.rut=rutLimpio(x.rut_emisor);if(!d.folio&&x.folio)d.folio=String(x.folio).trim();if(!d.fecha&&x.fecha&&/^\d{4}-\d{2}-\d{2}$/.test(x.fecha))d.fecha=x.fecha} /* v235: al releer, solo lo que falta */
     if(x.rut_receptor)d.rutReceptor=rutLimpio(x.rut_receptor);if(x.receptor)d.receptor=String(x.receptor).slice(0,80);
@@ -3192,4 +3196,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="238"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="239"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
