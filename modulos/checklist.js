@@ -798,7 +798,7 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   const yP=(p,top,h)=>top+h-Math.min(1,Math.max(0,(p-40)/60))*h;
   /* tendencia por mes (línea) */
   const lineaMeses=(MS0)=>{const MS=MS0.slice(-12);if(MS.length<2){nota("Hace falta más de un mes con visitas para ver la tendencia por mes.");y+=2;return}
-    chk(66);const H=44,x0=L+12,wP=W-16,top=y+4,base=top+H,dx=wP/(MS.length-1||1),xs=MS.map((m,i)=>x0+i*dx);
+    chk(48);const H=30,x0=L+12,wP=W-16,top=y+4,base=top+H,dx=wP/(MS.length-1||1),xs=MS.map((m,i)=>x0+i*dx);
     d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(140);
     [40,60,80,100].forEach(p=>{const yy=yP(p,top,H);d.setDrawColor(232);d.line(x0,yy,x0+wP,yy);d.text(p+" %",L,yy+1)});
     d.setDrawColor(120,160,120);d.setLineDashPattern([1.2,1.2],0);const y9=yP(90,top,H);d.line(x0,y9,x0+wP,y9);d.setLineDashPattern([],0);d.setTextColor(...COL.v);d.text("90 %",L,y9+1);
@@ -809,34 +809,57 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
     d.setTextColor(0);d.setDrawColor(0);y=base+14};
   /* v242: cuadro «Todas las visitas» (una fila por predio, una columna por visita; de a 10 columnas), como hasta la v240 */
   const cuadro=(con)=>{const maxV=Math.max(1,...con.map(x=>x.vis.length)),POR=10;
-    for(let b=0;b<maxV;b+=POR){const nC=Math.min(POR,maxV-b),wU=40,wA=20,wc=(W-wU-wA)/POR;
-      sub2(b===0?`Todas las visitas${maxV>POR?` (visitas 1 a ${Math.min(POR,maxV)})`:""}`:`Todas las visitas (visitas ${b+1} a ${b+nC})`,"puntaje de cada visita",24);
+    for(let b=0;b<maxV;b+=POR){const nC=Math.min(POR,maxV-b),wU=40,wA=20,wc=Math.min(28,(W-wU-wA)/Math.max(nC,3)); /* v244 */
+      sub2(b===0?`Todas las visitas${maxV>POR?` (visitas 1 a ${Math.min(POR,maxV)})`:""}`:`Todas las visitas (visitas ${b+1} a ${b+nC})`,"puntaje de cada visita",Math.min(236,10+con.length*9.2)); /* v244: sin cortarse si cabe */
       const th=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.8,W,7,"F");d.setFont("helvetica","bold");d.setFontSize(8.6);d.text(U,L+1.5,y);for(let i=0;i<nC;i++)d.text(`${b+i+1}.ª`,L+wU+i*wc+wc/2,y,{align:"center"});d.text("A la fecha",L+W-wA/2,y,{align:"center"});d.setFont("helvetica","normal");y+=3};
       th();
-      con.forEach(x=>{const h=10.5;if(chk(h))th();d.setFont("helvetica","bold");d.setFontSize(9);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,wU-2)[0],L+1.5,y+6.2);
+      con.forEach(x=>{const h=9.2;if(chk(h))th();d.setFont("helvetica","bold");d.setFontSize(9);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,wU-2)[0],L+1.5,y+5.7);
         for(let i=0;i<nC;i++){const v=x.vis[b+i];const cx=L+wU+i*wc;if(!v)continue;const k=semColor(v.pct);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.6,y+1,wc-1.2,h-2,1,1,"F");
-          d.setFont("helvetica","bold");d.setFontSize(8.8);d.setTextColor(...COL[k]);d.text(v.pct===null?"-":v.pct+" %",cx+wc/2,y+5.2,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.6);d.setTextColor(90);d.text(rkFc(v.fecha),cx+wc/2,y+8.6,{align:"center"});d.setTextColor(0)}
-        const k=semColor(Math.round(x.acc));d.setFont("helvetica","bold");d.setFontSize(9.5);d.setTextColor(...COL[k]);d.text(rkNum(x.acc)+" %",L+W-wA/2,y+6.2,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
+          d.setFont("helvetica","bold");d.setFontSize(8.8);d.setTextColor(...COL[k]);d.text(v.pct===null?"-":v.pct+" %",cx+wc/2,y+4.6,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.6);d.setTextColor(90);d.text(rkFc(v.fecha),cx+wc/2,y+7.7,{align:"center"});d.setTextColor(0)}
+        const k=semColor(Math.round(x.acc));d.setFont("helvetica","bold");d.setFontSize(9.5);d.setTextColor(...COL[k]);d.text(rkNum(x.acc)+" %",L+W-wA/2,y+5.7,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
         d.setDrawColor(230);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
       y+=6}};
   /* v242: un cuadro pequeño por predio: sus secciones (filas) en cada visita (columnas, las últimas 8), el total y «A la fecha» */
   const VMAX=8,AC=A=>Object.fromEntries(A.map(a=>[a.id,Object.fromEntries(rkAreaDatos(R,a.id).con.map(z=>[z.u,z.acc]))]));
-  const campo=(x,A,ACC)=>{const P=x.vis.slice(-VMAX),wS=46,wc=14,wA=20,h=7.2;
+  /* v244: cuadro de un predio dibujado en (X0,Y0); sin dib solo mide. El ancho se ajusta a sus visitas, para poner dos lado a lado */
+  const campo=(x,A,ACC,X0,Y0,dib)=>{const P=x.vis.slice(-VMAX),wS=34,wc=12.5,wA=17,h=7;
     const filas=A.map(a=>{const g=it=>(it.areaOrig||it.area)===a.id;return{nom:a.nom,c:P.map(q=>{const v=VIS[q.id];if(!v)return null;const p=puntaje(v,g);return p.n?p.pct:null}),acc:ACC[a.id][x.u]}}).filter(f=>f.acc!==undefined&&f.acc!==null);
-    chk(20+(filas.length+1)*h);
-    d.setFont("helvetica","bold");d.setFontSize(10.5);d.setTextColor(30);d.text(`${x.pos}. ${x.u}`,L,y);
-    const k0=sc(x.acc);d.setFontSize(9.5);d.setTextColor(...COL[k0]);d.text(`${rkNum(x.acc)} %`,L+W,y,{align:"right"});d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(...GR);
-    d.text(`${x.vis.length} ${x.vis.length===1?"visita":"visitas"}${x.vis.length>VMAX?` (se muestran las últimas ${VMAX}; «A la fecha» cuenta todas)`:""}`,L+W-16,y,{align:"right"});y+=2.5;
-    const xA=L+wS+P.length*wc,ancho=wS+P.length*wc+wA;
-    d.setFillColor(236,240,250);d.rect(L,y,ancho,8.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(50);d.text("Sección",L+1.5,y+5.4);
-    P.forEach((q,i)=>{const cx=L+wS+i*wc+wc/2;d.setFont("helvetica","bold");d.setFontSize(8);d.text(`V${q.n}`,cx,y+3.8,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.5);d.text(rkFc(q.fecha),cx,y+7.2,{align:"center"})});
-    d.setFont("helvetica","bold");d.setFontSize(8);d.text("A la fecha",xA+wA/2,y+5.4,{align:"center"});y+=8.5;
-    const fila=(nom,c,acc,tot)=>{if(tot){d.setDrawColor(150);d.line(L,y,L+ancho,y)}d.setFont("helvetica",tot?"bold":"normal");d.setFontSize(8.5);d.setTextColor(30);d.text(d.splitTextToSize(nom,wS-2)[0],L+1.5,y+4.9);
-      c.forEach((p,i)=>{const cx=L+wS+i*wc;if(p===null||p===undefined){d.setTextColor(170);d.setFontSize(8);d.text("-",cx+wc/2,y+4.9,{align:"center"});return}const k=semColor(p);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.5,y+0.7,wc-1,h-1.4,0.8,0.8,"F");
-        d.setFont("helvetica","bold");d.setFontSize(8.3);d.setTextColor(...COL[k]);d.text(p+" %",cx+wc/2,y+4.9,{align:"center"})});
-      const k=sc(acc);d.setFont("helvetica","bold");d.setFontSize(8.8);d.setTextColor(...COL[k]);d.text(rkNum(acc)+" %",xA+wA/2,y+4.9,{align:"center"});d.setTextColor(0);
-      d.setDrawColor(232);d.line(L,y+h,L+ancho,y+h);d.setDrawColor(0);y+=h};
-    filas.forEach(f=>fila(f.nom,f.c,f.acc));fila("Total de la visita",P.map(q=>q.pct),x.acc,true);d.setFont("helvetica","normal");y+=7};
+    const ancho=Math.max(wS+P.length*wc+wA,78),mas=x.vis.length>VMAX,alto=6.5+8.5+(filas.length+1)*h+(mas?4.5:0);
+    if(!dib)return{w:ancho,h:alto};
+    let yy=Y0+4;const xA=X0+ancho-wA,pt=`${rkNum(x.acc)} %`;
+    d.setFont("helvetica","bold");d.setFontSize(10);d.setTextColor(30);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,ancho-34)[0],X0,yy);
+    d.setTextColor(...COL[sc(x.acc)]);d.text(pt,X0+ancho,yy,{align:"right"});const wp=d.getTextWidth(pt);
+    d.setFont("helvetica","normal");d.setFontSize(8);d.setTextColor(...GR);d.text(`${x.vis.length} visitas ·`,X0+ancho-wp-1.5,yy,{align:"right"});yy+=2.5;
+    d.setFillColor(236,240,250);d.rect(X0,yy,ancho,8.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(50);d.text("Sección",X0+1.5,yy+5.4);
+    P.forEach((q,i)=>{const cx=X0+wS+i*wc+wc/2;d.setFont("helvetica","bold");d.setFontSize(8);d.text(`V${q.n}`,cx,yy+3.8,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.5);d.text(rkFc(q.fecha),cx,yy+7.2,{align:"center"})});
+    d.setFont("helvetica","bold");d.setFontSize(8);d.text("A la fecha",xA+wA/2,yy+5.4,{align:"center"});yy+=8.5;
+    const fila=(nom,c,acc,tot)=>{if(tot){d.setDrawColor(150);d.line(X0,yy,X0+ancho,yy)}d.setFont("helvetica",tot?"bold":"normal");d.setFontSize(8.2);d.setTextColor(30);d.text(d.splitTextToSize(nom,wS-2)[0],X0+1.5,yy+4.7);
+      c.forEach((p,i)=>{const cx=X0+wS+i*wc;if(p===null||p===undefined){d.setTextColor(170);d.setFontSize(8);d.text("-",cx+wc/2,yy+4.7,{align:"center"});return}const k=semColor(p);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.5,yy+0.6,wc-1,h-1.2,0.8,0.8,"F");
+        d.setFont("helvetica","bold");d.setFontSize(8.2);d.setTextColor(...COL[k]);d.text(p+" %",cx+wc/2,yy+4.7,{align:"center"})});
+      const k=sc(acc);d.setFont("helvetica","bold");d.setFontSize(8.6);d.setTextColor(...COL[k]);d.text(rkNum(acc)+" %",xA+wA/2,yy+4.7,{align:"center"});d.setTextColor(0);
+      d.setDrawColor(232);d.line(X0,yy+h,X0+ancho,yy+h);d.setDrawColor(0);yy+=h};
+    filas.forEach(f=>fila(f.nom,f.c,f.acc));fila("Total de la visita",P.map(q=>q.pct),x.acc,true);
+    if(mas){d.setFont("helvetica","italic");d.setFontSize(7.3);d.setTextColor(...GR);d.text(`Últimas ${VMAX} de ${x.vis.length} visitas; «A la fecha» cuenta todas.`,X0,yy+3.5);d.setTextColor(0)}
+    d.setFont("helvetica","normal");return{w:ancho,h:alto}};
+  /* v244: los cuadros de los predios, uno al lado del otro cuando caben */
+  const detalle=(L2,A,ACC)=>{let cx=L,rh=0;y-=3;
+    L2.forEach(x=>{const m=campo(x,A,ACC,0,0,false);
+      if(cx>L&&cx+m.w>L+W+0.1){y+=rh+5;cx=L;rh=0}
+      if(y+m.h>282){if(cx>L){y+=rh+5;cx=L;rh=0}if(y+m.h>282){nueva();cx=L;rh=0}}
+      campo(x,A,ACC,cx,y,true);cx+=m.w+6;rh=Math.max(rh,m.h)});
+    y+=rh+6};
+  /* v244: un cuadro con todos los predios (filas) y las secciones (columnas), con el puntaje a la fecha */
+  const matriz=(A0,ACC)=>{const A=A0.filter(a=>R.con.some(x=>ACC[a.id][x.u]!==undefined&&ACC[a.id][x.u]!==null));if(!A.length)return;const wU=44,wT=20,wc=(W-wU-wT)/A.length,h=8;d.setFont("helvetica","bold");d.setFontSize(8);
+    const NL=A.map(a=>d.splitTextToSize(a.nom,wc-2)),hh=Math.max(...NL.map(l=>l.length))*3.4+4;
+    const th=()=>{chk(hh+h);d.setFillColor(228,234,248);d.rect(L,y,W,hh,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(30);d.text(U,L+1.5,y+hh/2+1.2);
+      NL.forEach((l,i)=>d.text(l,L+wU+i*wc+wc/2,y+hh/2+1.2-(l.length-1)*1.7,{align:"center"}));d.text("Total",L+W-wT/2,y+hh/2+1.2,{align:"center"});y+=hh};
+    y-=4.5;chk(Math.min(236,hh+R.con.length*h+2));th();
+    R.con.forEach(x=>{if(chk(h))th();d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(30);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,wU-2)[0],L+1.5,y+5.3);
+      A.forEach((a,i)=>{const p=ACC[a.id][x.u],cx=L+wU+i*wc;if(p===undefined||p===null){d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(170);d.text("-",cx+wc/2,y+5.3,{align:"center"});return}
+        const k=sc(p);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.8,y+0.8,wc-1.6,h-1.6,1,1,"F");d.setFont("helvetica","bold");d.setFontSize(8.8);d.setTextColor(...COL[k]);d.text(rkNum(p)+" %",cx+wc/2,y+5.3,{align:"center"})});
+      const k=sc(x.acc);d.setFont("helvetica","bold");d.setFontSize(9.3);d.setTextColor(...COL[k]);d.text(rkNum(x.acc)+" %",L+W-wT/2,y+5.3,{align:"center"});d.setTextColor(0);
+      d.setDrawColor(230);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
+    d.setFont("helvetica","normal");y+=6};
   /* encabezado */
   try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
   d.setFont("helvetica","bold");d.setFontSize(16);d.setTextColor(...AZ);d.text("Ranking de cumplimiento · "+clNom(R.tipo),L+28,y+9);
@@ -850,11 +873,13 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   resumen(R.gen,R.nv,R.con.length,R.con[0],R.sobre,R.bajo,R.mej);
   sub2(`Ranking (${R.con.length})`);tabla(R.con);
   if(R.sin.length)nota(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`);
-  sub2("Puntaje general por mes · Compañía",`todos los ${K.unis} · línea punteada: meta 90 %`,66);lineaMeses(R.meses); /* v243 */
+  sub2("Puntaje general por mes · Compañía",`todos los ${K.unis} · línea punteada: meta 90 %`,40);lineaMeses(R.meses); /* v243 */
   cuadro(R.con);
   /* 2. por campo */
-  if(conCampo){const ACC=AC(A);chk(60);y+=4;titulo(`${np++}. Por ${K.uni}`,`Puntaje de cada sección en cada visita (V1, V2…, con su fecha). «A la fecha» junta todas las visitas del período; «Total de la visita» es el puntaje de la visita completa.`);
-    R.con.forEach(x=>campo(x,A,ACC))}
+  if(conCampo){const ACC=AC(A);chk(Math.min(236,36+R.con.length*8));y+=2;titulo(`${np++}. Cada ${K.uni} por sección`,`Puntaje a la fecha de cada sección (todas las visitas cerradas del período). Un guion (-) es una sección que no se revisó.`); /* v244 */
+    y+=4.5;matriz(A,ACC);
+    const V2=R.con.filter(x=>x.vis.length>1);
+    if(V2.length){sub2("Detalle por visita",`${K.unis} con 2 visitas o más`,50);detalle(V2,A,ACC)}}
   /* 3. qué se revisa */
   if(A.length){chk(28+A.length*14);y+=2;titulo(`${np++}. Qué se revisa (${A.length} ${A.length===1?"sección":"secciones"})`,`Cumplimiento de cada sección en todas las visitas del período. Cada punto, con su código y cómo verificarlo, está en el Excel (hoja «Puntos del check list»).`);
     const cw=[40,16,100,24];
@@ -1512,4 +1537,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="243"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="244"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
