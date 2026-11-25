@@ -548,6 +548,7 @@ function disConfHTML(r,d,P,modo){
       ${esNC(d)?(y=>fila(`data-a="rdNcRef"`,"Rebaja a",y?esc(ncRefTxt(y)):"Elegir la boleta o factura",!y,!y?` <i class="xp nueva">Falta</i>`:"","rdNc"))(ncRef(r,d)):""}${esNC(d)?"":fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,!centro?` <i class="xp nueva">Falta</i>`:sugC?` <i class="xp sug">Sugerido</i>`:"","rdCe")}
       ${esNC(d)?"":fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Elegir",!cat,!cat?` <i class="xp nueva">Falta</i>`:sugG?` <i class="xp sug">Sugerido</i>`:"","rdGa")}
       ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):colSobre(r,d)?"Explica por qué se pasa del tope":"Agregar qué se compró",!d.glosa,d.glosaTimbre&&d.glosa?` <i class="xp sug">Sugerido</i>`:"","rdGl")}
+      ${colPideP(d)?fila(`data-a="rdPers"`,"Personas",colPersL(d).length?esc(colPersTxt(d)):"Indicar quiénes comieron",!colPersL(d).length,!colPersL(d).length?` <i class="xp nueva">Falta</i>`:"","rdPers"):""}
     </div>${le.estado==="pendiente"?`<p class="rdok-av">${ICO_ALERTA}<span>Sin señal: la app leerá el documento cuando vuelva la conexión. Si quieres, escribe los datos con «Corregir datos».</span></p>`:le.estado==="error"?`<p class="rdok-av">${ICO_ALERTA}<span>La lectura automática no funcionó. Escribe los datos con «Corregir datos».</span></p>`:""}
     ${lecTarjetaHTML(d,P)}
     ${dudas?`<div class="rdok-av">${ICO_ALERTA}<span>La lectura tiene dudas: compara con la foto.${le.problemas&&le.problemas.length?`<details class="rdok-det"><summary>Ver detalle</summary>${esc(le.problemas.join("; "))}</details>`:""}</span></div>`:le.estado==="ok"&&!d.revisadoManual?`<p class="rdok-ia">Leída automáticamente. Compara con la foto.</p>`:""}
@@ -582,6 +583,7 @@ function disFichaHTML(r,d,P,edita){
       ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Sin centro",!centro,"rdCe").replace(esNC(d)?/^<button/:/^$/,esNC(d)?'<button disabled':"")}
       ${esNC(d)?"":fila(`data-a="rdPick" data-f="gasto"`,"Tipo de gasto",cat?esc(cat.n):"Sin tipo de gasto",!cat,"rdGa")}
       ${fila(`data-a="rdDetalle"`,"Detalle",d.glosa?esc(d.glosa):"Sin detalle",!d.glosa,"rdGl")}
+      ${colPideP(d)?fila(`data-a="rdPers"`,"Personas",colPersL(d).length?esc(colPersTxt(d)):"Sin indicar",!colPersL(d).length,"rdPers"):""}
       ${d.bu?`<div class="rdok-r fija"><span class="rdok-et">Bien de uso</span><span class="rdok-v">${esc((maeTiene("bienes")&&MAE.bienes[d.bu])||d.bu)}</span></div>`:""}${d.dist?`<div class="rdok-r fija"><span class="rdok-et">Reparto</span><span class="rdok-v">Según la tabla de ${esc(d.dist)}</span></div>`:""}
     </div>
     ${av.length?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(av.slice(0,3).join(" "))}${av.length>3?` Y ${av.length-3} más.`:""}</span></p>`:""}
@@ -1285,9 +1287,9 @@ function colDia(r,f){
   const RS=(C.idx.get(p)||[]).filter(x=>x.id!==r.id).concat([r])
     .sort((a,b)=>String(a.enviada||a.creado||"9").localeCompare(String(b.enviada||b.creado||"9"))||(a===r?1:b===r?-1:0));
   const L=[];RS.forEach(x=>docsDe(x).forEach(d=>{if(colRige(d)&&d.fecha===f)L.push({r:x,d})}));
-  const suma=L.reduce((s,x)=>s+Math.round(num(x.d.total)),0),tope=colTope(),exc=Math.max(0,suma-tope);
+  const np=Math.max(1,...L.map(x=>colN(x.d))),suma=L.reduce((s,x)=>s+Math.round(num(x.d.total)),0),tope=colTope()*np,exc=Math.max(0,suma-tope); /* v238: tope × personas */
   const por=new Map();let rest=exc;for(let i=L.length-1;i>=0&&rest>0;i--){const q=Math.min(Math.round(num(L[i].d.total)),rest);por.set(L[i].d,q);rest-=q}
-  const o={f,L,suma,tope,exc,por};C.set(ck,o);return o}
+  const o={f,L,suma,tope,exc,por,np};C.set(ck,o);return o}
 const colSobre=(r,d)=>colRige(d)&&colDia(r,d.fecha).exc>0; /* el documento es de un día que pasa el tope */
 const COL_PH="Por qué se pasa del tope (ej.: almuerzo con proveedor de semillas)";
 const colPh=(r,d,ph)=>colSobre(r,d)?COL_PH:ph;
@@ -1296,7 +1298,7 @@ function colDiasDe(r){
   const fs=[...new Set(docsDe(r).filter(colRige).map(d=>d.fecha))].sort();
   return fs.map(f=>colDia(r,f)).filter(x=>x.exc>0&&x.L.some(y=>y.r===r))}
 function colMsg(r,d){const x=colDia(r,d.fecha);
-  return `Colación sobre el tope: el ${fmtD(d.fecha)} suma ${fmtP(x.suma)} y el tope es ${fmtP(x.tope)} al día (${fmtP(x.exc)} más). Quien aprueba revisa el detalle y puede pedir que se corrija.`}
+  return `Colación sobre el tope: el ${fmtD(d.fecha)} suma ${fmtP(x.suma)} y el tope es ${fmtP(x.tope)} al día${x.np>1?` (${x.np} personas)`:""} (${fmtP(x.exc)} más). Quien aprueba revisa el detalle y puede pedir que se corrija.`}
 function colBoxHTML(r,puede){const X=colDiasDe(r);if(!X.length)return "";
   const filas=X.map(x=>{
     const docs=x.L.map(y=>{const g=String(y.d.glosa||"").trim(),otra=y.r!==r;
@@ -1307,10 +1309,44 @@ function colBoxHTML(r,puede){const X=colDiasDe(r);if(!X.length)return "";
     :`Quien aprueba revisa el detalle y puede pedir que se corrija.`;
   return `<div class="coltope" id="colTope"><div class="coltc"><b>Colación sobre el tope</b><span>Tope: ${fmtP(colTope())} al día por quien rinde</span></div>${filas}<p class="colte">${pie}</p></div>`}
 function colFormHTML(r,d){const x=colRige(d)?colDia(r,d.fecha):null;
-  return `<p class="hint colhint">Tope de colación: ${fmtP(colTope())} al día.${x?` El ${esc(fmtD(d.fecha))} suma ${fmtP(x.suma)}${x.exc?`: <b>${fmtP(x.exc)} sobre el tope</b>. Explica en «Detalle» por qué (por ejemplo, con quién fue).`:"."}`:""}</p>`}
+  return `${colPersFilaHTML(r,d)}<p class="hint colhint">Tope de colación: ${fmtP(colTope())} al día por persona${x&&x.np>1?` (${fmtP(x.tope)} ese día: ${x.np} personas)`:""}.${x?` El ${esc(fmtD(d.fecha))} suma ${fmtP(x.suma)}${x.exc?`: <b>${fmtP(x.exc)} sobre el tope</b>. Explica en «Detalle» por qué (por ejemplo, con quién fue).`:"."}`:""}</p>`}
 function colTopeCfgHTML(){const x=(MAE&&MAE.topeCol)||{},puede=esAdmin()||esContab();
   return `<div class="fdcfg rdauto"><span><b>Tope de colación: ${fmtP(colTope())} al día por persona</b><small>Se suman las colaciones de cada persona por la fecha de la boleta. Si un día pasa el tope, quien rinde explica por qué en «Detalle» y quien aprueba lo revisa; si no corresponde, pide corregirlo. La app no descuenta nada sola. Rige para boletas desde el ${esc(fmtD(colDesde()))}.${x.hora?` Cambiado el ${esc(fmtD(String(x.hora)))}${x.por?" ("+esc(quien(x.por))+")":""}.`:""}</small></span>${puede?`<button class="btn" data-a="rdColTopeCfg">Cambiar</button>`:""}</div>`}
 /* ---------- v230: notas de crédito: rebajan una boleta o factura de la misma rendición ---------- */
+/* ---------- v238: personas de cada colación (obligatorio) ---------- */
+const colPersL=d=>Array.isArray(d&&d.pers)?d.pers.filter(p=>p&&String(p.nombre||"").trim()):[];
+const colN=d=>Math.max(1,colPersL(d).length);
+const colPersTxt=d=>{const P=colPersL(d);return P.length?`${P.length===1?"1 persona":P.length+" personas"}: ${P.map(p=>p.nombre).join(", ")}`:""};
+const colPideP=d=>!!d&&!esNC(d)&&esColacion(d);
+function colPersFilaHTML(r,d){if(!colPideP(d))return"";const P=colPersL(d),ed=editaPersona(r);
+  return `<div class="f colpf" id="rdPers"><label>Personas en la colación${P.length?` (${P.length})`:""}</label>${ed?`<button type="button" class="pkbtn" data-a="rdPers">`:`<div class="pkbtn ro">`}${P.length?`<span>${esc(P.map(p=>p.nombre).join(", "))}</span>`:`<span class="ph">Indicar quiénes comieron…</span>`}${ed?`</button>`:`</div>`}${P.length?"":`<span class="hint">Obligatorio: la cantidad de personas y el nombre de cada una.</span>`}</div>`}
+/* hoja para elegir las personas: quien rinde, colaboradores de la lista o alguien de afuera */
+function colPersHoja(r,d){if(!r||!d||!editaPersona(r)||document.querySelector(".colpmodal"))return;
+  const yo0={nombre:(r.persona&&r.persona.nombre)||"Quien rinde",rut:(r.persona&&r.persona.rut)||"",yo:true};
+  let P=colPersL(d).map(p=>Object.assign({},p));
+  const m=document.createElement("div");m.className="modal colpmodal";
+  const pinta=()=>{const usados=new Set(P.map(p=>normTxt(p.nombre)));
+    m.innerHTML=`<div class="sheet colpsh" role="dialog" aria-modal="true" aria-label="Personas en la colación"><h3>Personas en la colación</h3>
+      <p>Quiénes comieron con esta boleta. El tope del día se multiplica por la cantidad de personas.</p>
+      ${P.length?`<ul class="colpl">${P.map((p,i)=>`<li><span><b>${esc(p.nombre)}</b>${p.yo?"<small>quien rinde</small>":p.ext?"<small>de afuera</small>":""}</span><button type="button" class="btn" data-m="quitar" data-i="${i}" aria-label="Quitar a ${esc(p.nombre)}">Quitar</button></li>`).join("")}</ul>`:`<p class="hint">Todavía no hay nadie.</p>`}
+      ${P.some(p=>p.yo)?"":`<button type="button" class="btn" data-m="yo">Agregar ${esc(yo0.nombre)} (quien rinde)</button>`}
+      <div class="f colpadd"><label for="colpN">Agregar persona</label><input id="colpN" list="colpL" maxlength="60" placeholder="Nombre o colaborador" autocomplete="off">
+        <datalist id="colpL">${colabs().filter(c=>c&&c.nombre&&c.activo!==false&&!usados.has(normTxt(c.nombre))).map(c=>`<option value="${esc(c.nombre)}"></option>`).join("")}</datalist>
+        <button type="button" class="btn" data-m="add">Agregar</button></div>
+      <div class="btns"><button class="btn" data-m="no">Cancelar</button><button class="btn pri" data-m="ok" style="flex:1" ${P.length?"":"disabled"}>Guardar${P.length?` (${P.length})`:""}</button></div></div>`};
+  const add=()=>{const i=m.querySelector("#colpN"),v=String(i&&i.value||"").replace(/\s+/g," ").trim().slice(0,60);if(!v)return;
+    if(P.some(p=>normTxt(p.nombre)===normTxt(v))){toast("Esa persona ya está.");return}
+    const c=colabs().find(x=>x&&x.nombre&&normTxt(x.nombre)===normTxt(v));
+    if(!P.length&&!(c&&r.persona&&normRut(c.rut||"")===normRut(r.persona.rut||"")))P.push(yo0); /* quien rinde va primero */
+    P.push(c?{nombre:c.nombre,rut:c.rut||""}:{nombre:v,ext:true});pinta();const n=m.querySelector("#colpN");if(n)n.focus()};
+  pinta();document.body.appendChild(m);document.body.style.overflow="hidden";const cerrar=()=>{m.remove();document.body.style.overflow=""};
+  if(!P.length){P.push(yo0);pinta()} /* quien rinde ya incluida; puede quitarse si no comió */
+  m.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target&&e.target.id==="colpN"){e.preventDefault();add()}});
+  m.addEventListener("click",async e=>{e.stopPropagation();const a=e.target.closest("[data-m]"),v=a&&a.dataset.m;if(!v){if(e.target===m)cerrar();return}
+    if(v==="quitar"){P.splice(+a.dataset.i,1);pinta()}else if(v==="yo"){P.unshift(yo0);pinta()}else if(v==="add")add();
+    else if(v==="no")cerrar();
+    else if(v==="ok"&&P.length){cerrar();if(r.docs[d.k]!==d)return;d.pers=P.map(p=>{const o={nombre:p.nombre};if(p.rut)o.rut=p.rut;if(p.yo)o.yo=true;if(p.ext)o.ext=true;return o});rdTouch();render()}})}
+/* ---------- v238: fin ---------- */
 const esNC=d=>!!d&&d.tipo==="nota_credito";
 const valDoc=d=>esNC(d)?-(num(d.total)||0):(num(d.total)||0);
 const fmtDoc=d=>(esNC(d)&&num(d.total)?"-":"")+fmtP(num(d.total));
@@ -1580,6 +1616,7 @@ function problemasDoc2(r,d){
   timbreDiferencias(d).forEach(x=>a.push(x));
   if(lecFacturaSinNeto(d)&&!(d.lectura&&/^(leyendo|pendiente)$/.test(d.lectura.estado)))a.push("Falta el neto y el IVA de la factura.");
   if(!String(d.glosa||"").trim()&&!esNC(d))a.push("Sin detalle del gasto.");
+  if(colPideP(d)&&!colPersL(d).length){const m="Faltan las personas de la colación (cantidad y nombres).";if(DUP_ACT.has(r.estado||"borrador"))b.push(m);else a.push(m)} /* v238 */
   if(colRige(d)&&colDia(r,d.fecha).exc){if(!String(d.glosa||"").trim()&&r.estado!=="aprobada"&&r.estado!=="contabilizada"){b.push("Esta colación es de un día que pasa el tope: en «Detalle» explica por qué (por ejemplo, con quién fue).");const i=a.indexOf("Sin detalle del gasto.");if(i>=0)a.splice(i,1)}a.push(colMsg(r,d))} /* v225 */
   if(d.lectura&&d.lectura.estado==="ok"&&d.lectura.confianza!=null&&d.lectura.confianza<0.6&&!d.revisadoManual)a.push("Lectura automática con baja confianza: conviene revisar los datos.");
   return{b,a};
@@ -2778,6 +2815,7 @@ async function rdClick(A,b){
   if(A==="rdReleerTodo"){const r=rdv;if(!r||!(editaPersona(r)||rdRevLee(r)))return true;const L=docsLecFallo(r);if(!L.length)return true;toast(L.length===1?"Leyendo la foto…":`Leyendo ${L.length} fotos…`);
     for(const d of L){if(r.docs[d.k]===d)await leerDoc(r,d)}const n=L.filter(d=>d.lectura&&d.lectura.estado==="ok").length;
     toast(n===L.length?(n===1?"Listo: se leyó la foto.":`Listo: se leyeron las ${n} fotos.`):`Se leyeron ${n} de ${L.length}. Las otras: escribe los datos con «Corregir datos».`,6000);if(view==="rdv"&&rdv===r)render();return true}
+  if(A==="rdPers"){if(rdv&&rdd)colPersHoja(rdv,rdd);return true} /* v238 */
   if(A==="rdQuitComp"){if(rdv)quitComp(rdv,+b.dataset.i);return true} /* v235 */
   if(A==="rdDupComp"){if(rdv)dupComp(rdv,b.dataset.k);return true} /* v234 */
   if(A==="rdDupOtro"){const d=rdv&&rdv.docs[b.dataset.k];if(d)dupOtro(rdv,d);return true} /* v233 */
@@ -3097,7 +3135,7 @@ function rdXlsxLibro(RS,comoLibro){ /* v231: comoLibro devuelve el libro (datos 
   RS=RS.slice().sort((a,b)=>String(a.periodo).localeCompare(String(b.periodo))||String(a.persona&&a.persona.nombre).localeCompare(String(b.persona&&b.persona.nombre)));const wb=XLSX.utils.book_new();
   const h=["Período","Persona","RUT","Estado rendición","Tipo documento","Emisor","RUT emisor","Folio","Fecha","Neto","IVA","Total","Centro de costo","Código centro","Tipo de gasto","Detalle","Cuenta","Producto","Partida","Bien de uso","Tercero","Lectura","Datos en blanco","Revisión","Observación","Jefatura","Aprobación jefatura","Contabilidad","Aprobación contable","N° asiento","Contabilizada el","Contabilizada por","Forma de contabilizar","Documento"]; /* v166: contabilización */
   const rows=[h];const links=[];
-  RS.forEach(r=>docsDe(r).forEach(d=>{const le=d.lectura||{},cat=gastoDe(d),ce=centroDoc(r,d),im=imputar(r,ncRef(r,d)||d);rows.push([r.periodo,r.persona?r.persona.nombre:"",r.persona&&r.persona.rut||"",RD_ESTADO[r.estado]||r.estado,TIPO_DOC[d.tipo]||d.tipo||"",d.emisor||"",d.rut||"",d.folio||"",d.fecha?fmtD(d.fecha):"",(esNC(d)?-1:1)*num(d.neto)||"",(esNC(d)?-1:1)*num(d.iva)||"",valDoc(d),centroNombre(ce),ce,cat?cat.n:(d.gasto||""),d.glosa||"",im.cuenta,im.prod,im.part,im.bu,im.ter,le.estado==="ok"?(d.revisadoManual?"IA + corrección manual":"IA"):"Manual",docAdvertencias(r,d).join(" · "),d.estadoRev==="ok"?"Revisada":d.estadoRev==="obs"?"Por corregir":"",d.obsRev||"",r.aprobJef?quien(r.aprobJef.por):(r.jefatura&&r.jefatura.nombre)||"",r.aprobJef?fmtD(r.aprobJef.fecha):"",r.aprobCont?quien(r.aprobCont.por):(r.aprobadaPor?quien(r.aprobadaPor):""),r.aprobCont?fmtD(r.aprobCont.fecha):(r.aprobadaFecha?fmtD(r.aprobadaFecha):""),...rdContabCols(r),rdLinkDoc(r,d).t]);{const L=rdLinkDoc(r,d);if(L.u)links.push([rows.length-1,L.u])}}));
+  RS.forEach(r=>docsDe(r).forEach(d=>{const le=d.lectura||{},cat=gastoDe(d),ce=centroDoc(r,d),im=imputar(r,ncRef(r,d)||d);rows.push([r.periodo,r.persona?r.persona.nombre:"",r.persona&&r.persona.rut||"",RD_ESTADO[r.estado]||r.estado,TIPO_DOC[d.tipo]||d.tipo||"",d.emisor||"",d.rut||"",d.folio||"",d.fecha?fmtD(d.fecha):"",(esNC(d)?-1:1)*num(d.neto)||"",(esNC(d)?-1:1)*num(d.iva)||"",valDoc(d),centroNombre(ce),ce,cat?cat.n:(d.gasto||""),[d.glosa||"",colPersTxt(d)].filter(Boolean).join(" · "),im.cuenta,im.prod,im.part,im.bu,im.ter,le.estado==="ok"?(d.revisadoManual?"IA + corrección manual":"IA"):"Manual",docAdvertencias(r,d).join(" · "),d.estadoRev==="ok"?"Revisada":d.estadoRev==="obs"?"Por corregir":"",d.obsRev||"",r.aprobJef?quien(r.aprobJef.por):(r.jefatura&&r.jefatura.nombre)||"",r.aprobJef?fmtD(r.aprobJef.fecha):"",r.aprobCont?quien(r.aprobCont.por):(r.aprobadaPor?quien(r.aprobadaPor):""),r.aprobCont?fmtD(r.aprobCont.fecha):(r.aprobadaFecha?fmtD(r.aprobadaFecha):""),...rdContabCols(r),rdLinkDoc(r,d).t]);{const L=rdLinkDoc(r,d);if(L.u)links.push([rows.length-1,L.u])}}));
   const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=[9,24,12,18,16,30,14,10,11,10,10,12,22,16,30,36,9,9,9,11,12,10,30,10,30,20,12,20,12,12,12,20,22,10].map(w=>({wch:w}));ws["!freeze"]={xSplit:0,ySplit:1};ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:h.length-1}})};
   links.forEach(([rw,u])=>{const c=ws[XLSX.utils.encode_cell({r:rw,c:h.length-1})];if(c)c.l={Target:u,Tooltip:"Abrir en OneDrive"}});XLSX.utils.book_append_sheet(wb,ws,"Documentos");
   const res=[["Período","Persona","Estado","Documentos","Total","Jefatura","Contabilidad","N° asiento","Contabilizada por","Forma de contabilizar"]]; /* v166 */
@@ -3139,7 +3177,7 @@ async function rdPdf(r,subir){
     if(d.estadoRev==="obs"){doc.setFillColor(250,228,228);doc.rect(X,y-3.8,W,h,"F")}
     let x=X;doc.setFontSize(8.5);const v=[d.fecha?fmtD(d.fecha):"",null,d.rut||"",d.folio||"",null,fmtDoc(d)];
     cols.forEach((c,i)=>{if(i===1)doc.text(em,x+1.5,y);else if(i===4)doc.text(pg,x+1.5,y);else doc.text(String(v[i]),c.r?x+c.w-1.5:x+1.5,y,c.r?{align:"right"}:undefined);x+=c.w});
-    if(d.glosa||d.obsRev){doc.setTextColor(90);doc.setFontSize(7.8);doc.text(doc.splitTextToSize((d.glosa?d.glosa:"")+(d.obsRev?`  · Obs.: ${d.obsRev}`:""),W-22)[0],X+19.5,y+Math.max(em.length,pg.length)*4-0.5);doc.setTextColor(0)}
+    if(d.glosa||d.obsRev||colPersTxt(d)){doc.setTextColor(90);doc.setFontSize(7.8);doc.text(doc.splitTextToSize((d.glosa?d.glosa:"")+(colPersTxt(d)?`${d.glosa?"  · ":""}${colPersTxt(d)}`:"")+(d.obsRev?`  · Obs.: ${d.obsRev}`:""),W-22)[0],X+19.5,y+Math.max(em.length,pg.length)*4-0.5);doc.setTextColor(0)}
     y+=h});
   chk(8);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(`Total ${fmtP(totalRend(r))}`,X+W-1.5,y+1,{align:"right"});doc.setFont("helvetica","normal");y+=10;
   /* fotos, 2 por fila */
@@ -3154,4 +3192,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="237"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="238"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
