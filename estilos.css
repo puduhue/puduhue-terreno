@@ -2648,3 +2648,7 @@ mark.privph{background:#FFF1B8;color:#5A4300;border-radius:4px;padding:0 3px}
 .quitbox .dupi span{color:var(--muted);font-size:14px}
 .quitbox .btn{min-height:40px;padding:8px 14px}
 .dupsh .dupia{margin:0 0 10px;padding:8px 12px;border-radius:12px;background:var(--soft);color:var(--ink);font-size:14px}
+
+/* ---------- v236: volver a leer las fotos que fallaron ---------- */
+.relbox{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 14px}
+.relbox .btn{min-height:40px;padding:8px 14px}
