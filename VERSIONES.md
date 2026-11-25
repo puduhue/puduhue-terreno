@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 233 | 2026-11-24 | [606314d](https://github.com/puduhue/puduhue-terreno/tree/606314d) | Rendiciones: duplicados agrupados en un recuadro rojo arriba de la rendición (ya rendidos y posibles, con quién y cuándo) y una ventana corta al detectarlos; el posible duplicado también bloquea hasta responder («Es otro» queda anotado). Textos cortos. Servidor v233. |
 | 232 | 2026-11-24 | [bb8eb47](https://github.com/puduhue/puduhue-terreno/tree/bb8eb47) | Rendiciones: duplicados con las rendiciones de todas las personas. Al cargar la foto la app avisa al instante si ese documento ya lo rindió otra persona (quién, cuándo, mes y estado) y no deja enviar; mismo día y monto es solo aviso. Servidor v232: la rendición enviada con un documento ya rendido vuelve sola a quien rinde («Revisión automática»). Incluye la v231. |
 | 231 | 2026-11-24 | [bb8eb47](https://github.com/puduhue/puduhue-terreno/tree/bb8eb47) | Se publica junto con la v232. Administración › Protección de datos › «Datos de una persona»: Excel con todo lo que la app tiene de una persona (Ley 21.719). |
 | 230 | 2026-11-24 | [41c2424](https://github.com/puduhue/puduhue-terreno/tree/41c2424) | Rendiciones: notas de crédito. Tipo «Nota de crédito» (también desde el timbre del SII), asociada a una boleta o factura de la misma rendición («Rebaja a»); resta del total, del fondo, del PDF y del Excel, y en el asiento va al haber con la imputación del documento que rebaja. |
