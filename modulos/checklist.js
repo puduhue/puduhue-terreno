@@ -807,22 +807,36 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
     MS.forEach((m,i)=>{const p=m.pct===null?null:Math.round(m.pct),k=sc(p);if(p!==null){const yy=yP(p,top,H);d.setFillColor(...COL[k]);d.circle(xs[i],yy,1.4,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);d.setTextColor(...COL[k]);d.text(p+" %",xs[i],yy-2.6,{align:"center"})}
       d.setFont("helvetica","normal");d.setFontSize(7.8);d.setTextColor(...GR);d.text(RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):""),xs[i],base+5,{align:"center"});d.setFontSize(6.8);d.text(`${m.c} ${m.c===1?"visita":"visitas"}`,xs[i],base+8.5,{align:"center"})});
     d.setTextColor(0);d.setDrawColor(0);y=base+14};
-  /* tendencia de cada predio: un gráfico pequeño por predio, con sus visitas */
-  const mini=(x0,y0,w,h,x)=>{const P=x.vis.filter(q=>q.pct!==null);d.setDrawColor(222);d.roundedRect(x0,y0,w,h,1.5,1.5,"S");
-    d.setFont("helvetica","bold");d.setFontSize(9);d.setTextColor(30);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,w-22)[0],x0+3,y0+5.5);
-    const k0=sc(x.acc);d.setTextColor(...COL[k0]);d.text(rkNum(x.acc)+" %",x0+w-3,y0+5.5,{align:"right"});
-    const top=y0+11,H=h-22,px=x0+10,pw=w-16;d.setFont("helvetica","normal");d.setFontSize(6.5);d.setTextColor(150);
-    [40,70,100].forEach(p=>{const yy=yP(p,top,H);d.setDrawColor(236);d.line(px,yy,px+pw,yy);d.text(String(p),x0+2.5,yy+1)});
-    d.setDrawColor(120,160,120);d.setLineDashPattern([1,1],0);const y9=yP(90,top,H);d.line(px,y9,px+pw,y9);d.setLineDashPattern([],0);
-    if(!P.length){d.setFontSize(8);d.setTextColor(...GR);d.text("Sin puntaje",x0+w/2,top+H/2,{align:"center"});d.setTextColor(0);d.setDrawColor(0);return}
-    const xs=P.length===1?[px+pw/2]:P.map((q,i)=>px+i*pw/(P.length-1));d.setDrawColor(...AZ);d.setLineWidth(0.5);
-    for(let i=1;i<P.length;i++)d.line(xs[i-1],yP(P[i-1].pct,top,H),xs[i],yP(P[i].pct,top,H));d.setLineWidth(0.2);
-    const cada=Math.ceil(P.length/5);
-    P.forEach((q,i)=>{const k=sc(q.pct),yy=yP(q.pct,top,H);d.setFillColor(...COL[k]);d.circle(xs[i],yy,1.1,"F");
-      if(P.length<=8||i===P.length-1||i%cada===0){d.setFont("helvetica","bold");d.setFontSize(7);d.setTextColor(...COL[k]);d.text(String(q.pct),xs[i],yy-2,{align:"center"})}
-      if(i%cada===0||i===P.length-1){d.setFont("helvetica","normal");d.setFontSize(6.3);d.setTextColor(...GR);d.text(`V${q.n}`,xs[i],top+H+4,{align:"center"});d.text(rkFc(q.fecha).slice(0,5),xs[i],top+H+7.3,{align:"center"})}});
-    d.setTextColor(0);d.setDrawColor(0)};
-  const grilla=(con)=>{const n=3,g=4,w=(W-g*(n-1))/n,h=44;for(let i=0;i<con.length;i+=n){chk(h+3);for(let j=0;j<n&&con[i+j];j++)mini(L+j*(w+g),y,w,h,con[i+j]);y+=h+3}y+=3};
+  /* v242: cuadro «Todas las visitas» (una fila por predio, una columna por visita; de a 10 columnas), como hasta la v240 */
+  const cuadro=(con)=>{const maxV=Math.max(1,...con.map(x=>x.vis.length)),POR=10;
+    for(let b=0;b<maxV;b+=POR){const nC=Math.min(POR,maxV-b),wU=40,wA=20,wc=(W-wU-wA)/POR;
+      sub2(b===0?`Todas las visitas${maxV>POR?` (visitas 1 a ${Math.min(POR,maxV)})`:""}`:`Todas las visitas (visitas ${b+1} a ${b+nC})`,"puntaje de cada visita",24);
+      const th=()=>{chk(8);d.setFillColor(228,234,248);d.rect(L,y-4.8,W,7,"F");d.setFont("helvetica","bold");d.setFontSize(8.6);d.text(U,L+1.5,y);for(let i=0;i<nC;i++)d.text(`${b+i+1}.ª`,L+wU+i*wc+wc/2,y,{align:"center"});d.text("A la fecha",L+W-wA/2,y,{align:"center"});d.setFont("helvetica","normal");y+=3};
+      th();
+      con.forEach(x=>{const h=10.5;if(chk(h))th();d.setFont("helvetica","bold");d.setFontSize(9);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,wU-2)[0],L+1.5,y+6.2);
+        for(let i=0;i<nC;i++){const v=x.vis[b+i];const cx=L+wU+i*wc;if(!v)continue;const k=semColor(v.pct);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.6,y+1,wc-1.2,h-2,1,1,"F");
+          d.setFont("helvetica","bold");d.setFontSize(8.8);d.setTextColor(...COL[k]);d.text(v.pct===null?"-":v.pct+" %",cx+wc/2,y+5.2,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.6);d.setTextColor(90);d.text(rkFc(v.fecha),cx+wc/2,y+8.6,{align:"center"});d.setTextColor(0)}
+        const k=semColor(Math.round(x.acc));d.setFont("helvetica","bold");d.setFontSize(9.5);d.setTextColor(...COL[k]);d.text(rkNum(x.acc)+" %",L+W-wA/2,y+6.2,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
+        d.setDrawColor(230);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
+      y+=6}};
+  /* v242: un cuadro pequeño por predio: sus secciones (filas) en cada visita (columnas, las últimas 8), el total y «A la fecha» */
+  const VMAX=8,AC=A=>Object.fromEntries(A.map(a=>[a.id,Object.fromEntries(rkAreaDatos(R,a.id).con.map(z=>[z.u,z.acc]))]));
+  const campo=(x,A,ACC)=>{const P=x.vis.slice(-VMAX),wS=46,wc=14,wA=20,h=7.2;
+    const filas=A.map(a=>{const g=it=>(it.areaOrig||it.area)===a.id;return{nom:a.nom,c:P.map(q=>{const v=VIS[q.id];if(!v)return null;const p=puntaje(v,g);return p.n?p.pct:null}),acc:ACC[a.id][x.u]}}).filter(f=>f.acc!==undefined&&f.acc!==null);
+    chk(20+(filas.length+1)*h);
+    d.setFont("helvetica","bold");d.setFontSize(10.5);d.setTextColor(30);d.text(`${x.pos}. ${x.u}`,L,y);
+    const k0=sc(x.acc);d.setFontSize(9.5);d.setTextColor(...COL[k0]);d.text(`${rkNum(x.acc)} %`,L+W,y,{align:"right"});d.setFont("helvetica","normal");d.setFontSize(8.5);d.setTextColor(...GR);
+    d.text(`${x.vis.length} ${x.vis.length===1?"visita":"visitas"}${x.vis.length>VMAX?` (se muestran las últimas ${VMAX}; «A la fecha» cuenta todas)`:""}`,L+W-16,y,{align:"right"});y+=2.5;
+    const xA=L+wS+P.length*wc,ancho=wS+P.length*wc+wA;
+    d.setFillColor(236,240,250);d.rect(L,y,ancho,8.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(50);d.text("Sección",L+1.5,y+5.4);
+    P.forEach((q,i)=>{const cx=L+wS+i*wc+wc/2;d.setFont("helvetica","bold");d.setFontSize(8);d.text(`V${q.n}`,cx,y+3.8,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.5);d.text(rkFc(q.fecha),cx,y+7.2,{align:"center"})});
+    d.setFont("helvetica","bold");d.setFontSize(8);d.text("A la fecha",xA+wA/2,y+5.4,{align:"center"});y+=8.5;
+    const fila=(nom,c,acc,tot)=>{if(tot){d.setDrawColor(150);d.line(L,y,L+ancho,y)}d.setFont("helvetica",tot?"bold":"normal");d.setFontSize(8.5);d.setTextColor(30);d.text(d.splitTextToSize(nom,wS-2)[0],L+1.5,y+4.9);
+      c.forEach((p,i)=>{const cx=L+wS+i*wc;if(p===null||p===undefined){d.setTextColor(170);d.setFontSize(8);d.text("-",cx+wc/2,y+4.9,{align:"center"});return}const k=semColor(p);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.5,y+0.7,wc-1,h-1.4,0.8,0.8,"F");
+        d.setFont("helvetica","bold");d.setFontSize(8.3);d.setTextColor(...COL[k]);d.text(p+" %",cx+wc/2,y+4.9,{align:"center"})});
+      const k=sc(acc);d.setFont("helvetica","bold");d.setFontSize(8.8);d.setTextColor(...COL[k]);d.text(rkNum(acc)+" %",xA+wA/2,y+4.9,{align:"center"});d.setTextColor(0);
+      d.setDrawColor(232);d.line(L,y+h,L+ancho,y+h);d.setDrawColor(0);y+=h};
+    filas.forEach(f=>fila(f.nom,f.c,f.acc));fila("Total de la visita",P.map(q=>q.pct),x.acc,true);d.setFont("helvetica","normal");y+=7};
   /* encabezado */
   try{d.addImage(MARCA,"PNG",L,y,22.5,20.3)}catch(e){}
   d.setFont("helvetica","bold");d.setFontSize(16);d.setTextColor(...AZ);d.text("Ranking de cumplimiento · "+clNom(R.tipo),L+28,y+9);
@@ -831,15 +845,19 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   d.setFillColor(...AZ);d.rect(L,y+23.5,W*0.5,1.6,"F");d.setFillColor(...VE);d.rect(L+W*0.5,y+23.5,W*0.3,1.6,"F");d.setFillColor(...CA);d.rect(L+W*0.8,y+23.5,W*0.2,1.6,"F");y+=33;
   /* 1. consolidado */
   const A=rkAreas(R);
-  titulo("1. Consolidado",`Todas las secciones del check list juntas.${A.length>1?` Después viene cada sección por separado (${A.length}).`:""}`);
+  const conCampo=A.length>1;let np=1;
+  titulo(`${np++}. Consolidado`,`Todas las secciones del check list juntas.${conCampo?` Después, cada ${K.uni} con el puntaje de sus secciones en cada visita.`:""}`);
   resumen(R.gen,R.nv,R.con.length,R.con[0],R.sobre,R.bajo,R.mej);
   sub2(`Ranking (${R.con.length})`);tabla(R.con);
   if(R.sin.length)nota(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`);
   sub2("Puntaje general por mes","línea punteada: meta 90 %",66);lineaMeses(R.meses);
-  sub2(`Todas las visitas: tendencia de cada ${K.uni}`,"puntaje de cada visita",48);grilla(R.con);
-  /* 2. por sección */
-  if(A.length){chk(60+A.length*12);y+=4;titulo("2. Por sección",`Cumplimiento de cada sección en todas las visitas del período. Cada punto, con su código y cómo verificarlo, está en el Excel (hoja «Puntos del check list»).`);
-    sub2(`Qué se revisa (${A.length} ${A.length===1?"sección":"secciones"})`);const cw=[40,16,100,24];
+  cuadro(R.con);
+  /* 2. por campo */
+  if(conCampo){const ACC=AC(A);chk(60);y+=4;titulo(`${np++}. Por ${K.uni}`,`Puntaje de cada sección en cada visita (V1, V2…, con su fecha). «A la fecha» junta todas las visitas del período; «Total de la visita» es el puntaje de la visita completa.`);
+    R.con.forEach(x=>campo(x,A,ACC))}
+  /* 3. qué se revisa */
+  if(A.length){chk(28+A.length*14);y+=2;titulo(`${np++}. Qué se revisa (${A.length} ${A.length===1?"sección":"secciones"})`,`Cumplimiento de cada sección en todas las visitas del período. Cada punto, con su código y cómo verificarlo, está en el Excel (hoja «Puntos del check list»).`);
+    const cw=[40,16,100,24];
     const th=()=>{chk(9);d.setFillColor(228,234,248);d.rect(L,y-4.8,W,7,"F");d.setFont("helvetica","bold");d.setFontSize(8.8);d.text("Sección",L+1.5,y);d.text("Puntos",L+cw[0]+cw[1]/2,y,{align:"center"});d.text("Qué incluye",L+cw[0]+cw[1]+1.5,y);d.text("Cumplimiento",L+W-cw[3]/2,y,{align:"center"});d.setFont("helvetica","normal");y+=4};
     th();
     A.forEach(a=>{d.setFontSize(8.6);const tl=d.splitTextToSize(a.resumen.charAt(0).toUpperCase()+a.resumen.slice(1)+".",cw[2]-3);const h=Math.max(8,tl.length*3.9+3.8);if(chk(h))th();const yc=y+5;
@@ -847,16 +865,10 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
       d.setFontSize(8.6);d.setTextColor(60);d.text(tl,L+cw[0]+cw[1]+1.5,yc,{lineHeightFactor:1.25});d.setTextColor(0);
       const p=a.pct===null?null:Math.round(a.pct),k=semColor(p);d.setFont("helvetica","bold");d.setFontSize(9.5);d.setTextColor(...COL[k]);d.text(p===null?"-":p+" %",L+W-cw[3]/2,yc,{align:"center"});d.setTextColor(0);d.setFont("helvetica","normal");
       d.setDrawColor(225);d.line(L,y+h,L+W,y+h);d.setDrawColor(0);y+=h});
-    A.forEach((a,i)=>{const X=rkAreaDatos(R,a.id);y+=6;chk(80+X.con.length*9.5);
-      titulo(`2.${i+1} ${a.nom}`,`${a.n} ${a.n===1?"punto":"puntos"}: ${a.resumen}.`);
-      if(!X.con.length){nota("Ninguna visita del período revisó esta sección.");return}
-      resumen(X.gen,X.con.reduce((t,x)=>t+x.vis.length,0),X.con.length,X.con[0],X.sobre,X.bajo);
-      sub2(`Ranking en ${a.nom} (${X.con.length})`);tabla(X.con);
-      sub2(`Puntaje por mes en ${a.nom}`,"línea punteada: meta 90 %",66);lineaMeses(X.meses);
-      sub2(`Todas las visitas en ${a.nom}`,"puntaje de cada visita",48);grilla(X.con)})}
-  /* 3. cómo se calcula */
-  chk(30);titulo(`${A.length?"3":"2"}. Cómo se calcula`);d.setFont("helvetica","normal");d.setFontSize(9);d.setTextColor(60);
-  const tx=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. En cada sección se cuentan solo los puntos de esa sección. Los gráficos de cada ${K.uni} muestran el puntaje de cada visita (V1, V2…) con su fecha; la línea punteada es la meta de 90 %. Las visitas en curso y las anuladas no cuentan.`;
+    y+=6}
+  /* 4. cómo se calcula */
+  chk(30);titulo(`${np++}. Cómo se calcula`);d.setFont("helvetica","normal");d.setFontSize(9);d.setTextColor(60);
+  const tx=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. En cada sección se cuentan solo los puntos de esa sección; un guion (-) es una sección que esa visita no revisó. La línea punteada del gráfico por mes es la meta de 90 %. Las visitas en curso y las anuladas no cuentan.`;
   const nl=d.splitTextToSize(tx,W);chk(nl.length*4+4);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*4+3;d.setTextColor(0);
   const n=d.getNumberOfPages();const por=ME&&ME.nombre?`Emitido por ${ME.nombre} el ${fmtD(today())}`:`Emitido el ${fmtD(today())}`;
   for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});d.text(por,15,289);d.setTextColor(0)}
@@ -865,7 +877,7 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
 async function rkPdf(){
   if(!window.jspdf){toast("No se pudo cargar el generador de PDF.");return}
   const R=rkDatos(rkTipo,rkPer);if(!R.con.length)return;toast("Preparando el informe…");
-  let d;try{d=rkPdfBuild(R)}catch(e){console.error(e);toast("No se pudo generar el informe.");return}
+  let d;try{d=rkPdfBuild(R)}catch(e){console.error(e);toast("No se pudo generar el informe: "+((e&&e.message)||e),8000);return} /* v242: con el motivo */
   await guardarPDF(d,rkArchivo(R,"pdf"),"Informe listo.");
 }
 
@@ -1261,7 +1273,8 @@ async function clClick(A,b){
     const IT=itemsDe(v),S=seccionesDe(tipoDe(v),IT).filter(x=>IT.some(i=>x.f(i)&&!(v.items&&v.items[i.key]&&v.items[i.key].e==="NA")));
     if(S.length>1&&typeof mnHoja==="function"){mnHoja("Informe PDF",`${v.predio} · Visita ${v.n} · elige qué incluir`,[{a:"clPdfSec",id:v.id,t:"Todo el informe"}].concat(S.map(x=>({a:"clPdfSec",id:v.id,t:`Solo «${x.name}»`,t2:x.name}))));return true}
     await clPdf(v);return true}
-  if(A==="clPdfSec"){const v=VIS[b.dataset.id];if(v)await clPdf(v,false,b.dataset.t||"");return true}
+  if(A==="clPdfSec"){const v=VIS[b.dataset.id];if(!v)return true;toast("Preparando el informe…"); /* v242 */
+    try{await clPdf(v,false,b.dataset.t||"")}catch(e){console.error(e);toast("No se pudo generar el informe: "+((e&&e.message)||e),8000)}return true}
   if(A==="clXlsx"){await clXlsx(b.dataset.p,true,clTipo);return true}
   return false;
 }
@@ -1499,4 +1512,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="241"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="242"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
