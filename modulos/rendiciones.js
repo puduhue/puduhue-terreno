@@ -1430,6 +1430,11 @@ async function dupIARevisar(r){if(DUPIA_EN||!r||r.anulada||navigator.onLine===fa
   if(cambio){try{localStorage.setItem("rd-dupia",JSON.stringify(Object.fromEntries(Object.entries(DUPIA).slice(-400))))}catch(e){}
     if(rdv&&rdv.id===r.id&&/^rd[vd]$/.test(view))render()}}
 const dupIATxt=c=>c?`<p class="dupia">Revisión automática de las fotos: <b>${c.mismo?"es el mismo comprobante":"son comprobantes distintos"}</b>${c.razon?` (${esc(c.razon)})`:""}.</p>`:"";
+/* ---------- v236: volver a leer las fotos que fallaron ---------- */
+const rdRevLee=r=>!!r&&!r.anulada&&r.estado!=="contabilizada"&&r.estado!=="aprobada"&&(puedeContab(r)||esContab());
+const docsLecFallo=r=>docsDe(r).filter(d=>/^a:/.test(String(d.foto||""))&&d.lectura&&d.lectura.estado==="error"&&!LEYENDO[d.k]);
+function releerBoxHTML(r){if(!(editaPersona(r)||rdRevLee(r))||navigator.onLine===false)return"";const n=docsLecFallo(r).length;if(!n)return"";
+  return `<div class="info relbox"><span>${n===1?"1 foto no se pudo leer.":`${n} fotos no se pudieron leer.`}</span><button class="btn" data-a="rdReleerTodo">Volver a leer</button></div>`}
 /* ---------- v235: documentos quitados por repetidos ---------- */
 const quitadosDe=r=>Array.isArray(r&&r.quitados)?r.quitados.filter(q=>q&&q.doc):[];
 function dupColHTML(x,t,bt){const src=x&&x.foto?fotoSrc(x.foto):"";return `<div class="dupc"><small>${esc(t)}</small>
@@ -1842,6 +1847,7 @@ async function leerDoc(r,d){
   LEYENDO[d.k]=true;d.lectura={estado:"leyendo"};rdRefreshDoc(d.k);
   const turno=LEER_COLA;let listo;LEER_COLA=new Promise(o=>listo=o);
   try{await turno;
+    if(!FOTO[d.foto]&&/^a:/.test(String(d.foto||"")))await esperarFoto(d.foto,20000); /* v236: si no está en el teléfono, se baja */
     let dataURL=FOTO[d.foto];
     if(!dataURL||!dataURL.startsWith("data:")){let blob=null;if(IDB.db){const rec=await IDB.get("fotos",d.foto).catch(()=>null)||await IDB.get("cache",d.foto).catch(()=>null);blob=await recBlob(rec)}
       if(!blob&&dataURL){const rr=await fetch(dataURL);blob=await rr.blob()}
@@ -1870,7 +1876,7 @@ async function leerDoc(r,d){
     if(!d.revisadoManual&&(d.tipo==="vale"||d.tipo==="otro")&&(esGastoPeaje(d)||pareceePeaje([d.emisor,x.glosa].join(" ")))){d.tipo="peaje";if(!d.gasto&&catalogo().some(t=>t.id===GASTO_PEAJE)){d.gasto=GASTO_PEAJE;d.gastoIA=true}}
     lecturaGuardar(d);delete d.lecIntentos;
     try{const k="rd-lecturas-"+periodoActual();localStorage.setItem(k,String((+localStorage.getItem(k)||0)+1))}catch(e){}
-  }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento."};d.lecIntentos=(d.lecIntentos||0)+1;console.warn("lectura",e)} /* v235: intentos */
+  }catch(e){d.lectura={estado:"error",msg:(e&&e.error)||"No se pudo leer el documento.",det:String((e&&(e.detalle||e.message||e.code||e.status))||"").slice(0,160),hora:new Date().toISOString()};d.lecIntentos=(d.lecIntentos||0)+1; /* v236: detalle */console.warn("lectura",e)} /* v235: intentos */
   finally{listo();delete LEYENDO[d.k];r.actualizado=new Date().toISOString();await saveRend(r);if(editaPersona(r))rdDupSrvLuego(r); /* v232: al terminar de leer la foto */if((view==="rdd"&&rdd&&rdd.k===d.k)||(view==="rdv"&&rdv&&rdv.id===r.id&&!LEYENDO_ALGUNO()))render();else rdRefreshDoc(d.k)}
   /* v189: si se parece a otro documento, preguntar una vez (solo quien rinde, mientras la puede editar) */
   if(!d.dupPreg&&!d.noDup&&r.docs&&r.docs[d.k]===d&&editaPersona(r)){const x=rdDupDe(r,d);if(x)await rdPreguntarDup(r,d,x)}
@@ -2285,7 +2291,7 @@ function renderRDV(){
     ${acciones}
     ${rdRevisa(r)&&D.length?(n=>`<div class="start rdrevini" style="grid-template-columns:1fr"><button class="big dev acc" data-a="rdRevIni"><strong>${n===D.length?"Ver los documentos":n?"Seguir revisando":D.length===1?"Revisar el documento":`Revisar los ${D.length} documentos`}</strong><span>${n?`${n} de ${D.length} revisados`:"Foto y datos de cada uno, uno tras otro"}</span></button></div>`)(D.filter(d=>d.estadoRev).length):""}
     ${colBoxHTML(r,jef||con)}
-    ${quitBoxHTML(r)}${dupBoxHTML(r)}
+    ${releerBoxHTML(r)}${quitBoxHTML(r)}${dupBoxHTML(r)}
     <h2>Documentos<span class="cnt">${D.length}</span></h2>
     <div class="list">${D.map(d=>rdDocCard(r,d)).join("")||`<div class="empty">Todavía no hay documentos. Toca <b>Agregar documento</b> y saca la foto de la factura o boleta.</div>`}</div>
     ${asi}
@@ -2323,7 +2329,7 @@ function renderRDD(){
     ${rdNavHTML(r,d)}
     ${(()=>{const rev=rdRevisa(r);if(!editP&&!rev)return"";return rdcResumenHTML(rdcItems(r,d,P,{cont:rev&&verC,sinPedido:rev,sinFalta:!(conf||fic)||conf==="leyendo"}),editP||editC,editP)})()}
     <div class="rdfoto" id="rdFotoBox">${d.foto?(fotoSrc(d.foto)?`<img src="${esc(fotoSrc(d.foto))}" alt="Documento" data-a="foto" data-ref="${esc(d.foto)}" data-k="${esc(d.k)}">`:`<div class="empty">La foto se está cargando…</div>`):`<div class="empty">Sin foto</div>`}
-      ${rdPdfInfo(d)}${editP?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}</div>
+      ${rdPdfInfo(d)}${editP?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}${!editP&&rdRevLee(r)&&d.foto&&navigator.onLine!==false?`<div class="btns" style="margin-top:8px"><button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button></div>`:""}</div>
     ${conf?disConfHTML(r,d,P,conf):fic?disFichaHTML(r,d,P,editC):""}<div class="rdform"${conf||fic?" hidden":""}>
     ${le.estado==="leyendo"?`<div class="info">Leyendo el documento…</div>`:le.estado==="pendiente"?`<div class="info netbox">Sin señal: el documento se leerá automáticamente cuando vuelva la conexión. Mientras tanto puedes escribir los datos a mano.</div>`:le.estado==="error"?`<div class="info netbox"><b>La lectura automática no funcionó.</b> ${esc(le.msg||"")} Completa los datos a mano.</div>`:le.estado==="ok"&&editP?`<div class="info" style="border-left:5px solid ${le.confianza>=0.6?"var(--b-ink)":"var(--r-ink)"}"><b>Leída automáticamente</b>${le.confianza!=null?` · confianza ${Math.round(le.confianza*100)}%`:""}. ${le.problemas&&le.problemas.length?`La IA advierte: ${esc(le.problemas.join("; "))}. `:""}Revisa que los datos coincidan con el documento.</div>`:""}
     ${probs.length&&!ro&&!(editP&&(conf||fic)&&conf!=="leyendo"&&rdcItems(r,d,P).length)?`<div class="info netbox"><b>Para enviar falta:</b> <span class="hint">(toca cada aviso para ir al dato)</span><ul>${probs.map(liCampo).join("")}</ul></div>`:""}
@@ -2762,7 +2768,10 @@ async function rdClick(A,b){
   if(A==="rdDoc"){const d=rdv&&rdv.docs[b.dataset.k];if(!d)return true;RD_ELIGE=null;rdd=d;go("rdd");return true}
   if(A==="rdIrDoc"){await rdIrDoc(b.dataset.k);return true}
   if(A==="rdVolver"){await flush();RD_ELIGE=null;rdd=null;RD_COLA=null;go("rdv");return true}
-  if(A==="rdReleer"){if(!rdd||!editaPersona(rdv))return true;rdd.revisadoManual=false;await leerDoc(rdv,rdd);return true}
+  if(A==="rdReleer"){if(!rdd)return true;if(editaPersona(rdv)){rdd.revisadoManual=false;await leerDoc(rdv,rdd)}else if(rdRevLee(rdv))await leerDoc(rdv,rdd);return true} /* v236: también Contabilidad */
+  if(A==="rdReleerTodo"){const r=rdv;if(!r||!(editaPersona(r)||rdRevLee(r)))return true;const L=docsLecFallo(r);if(!L.length)return true;toast(L.length===1?"Leyendo la foto…":`Leyendo ${L.length} fotos…`);
+    for(const d of L){if(r.docs[d.k]===d)await leerDoc(r,d)}const n=L.filter(d=>d.lectura&&d.lectura.estado==="ok").length;
+    toast(n===L.length?(n===1?"Listo: se leyó la foto.":`Listo: se leyeron las ${n} fotos.`):`Se leyeron ${n} de ${L.length}. Las otras: escribe los datos con «Corregir datos».`,6000);if(view==="rdv"&&rdv===r)render();return true}
   if(A==="rdQuitComp"){if(rdv)quitComp(rdv,+b.dataset.i);return true} /* v235 */
   if(A==="rdDupComp"){if(rdv)dupComp(rdv,b.dataset.k);return true} /* v234 */
   if(A==="rdDupOtro"){const d=rdv&&rdv.docs[b.dataset.k];if(d)dupOtro(rdv,d);return true} /* v233 */
@@ -3139,4 +3148,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="235"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="236"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
