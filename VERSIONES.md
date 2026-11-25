@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 239 | 2026-11-25 | [1e24731](https://github.com/puduhue/puduhue-terreno/tree/1e24731) | Rendiciones: aviso «Total cambiado a mano: la foto dice $X y se rindió $Y» cuando el total rendido no es el que leyó la IA de la foto (no bloquea; lo ven quien rinde y quien revisa). |
 | 238 | 2026-11-25 | [ec151fb](https://github.com/puduhue/puduhue-terreno/tree/ec151fb) | Rendiciones: cada colación pide la cantidad de personas y el nombre de cada una (obligatorio para enviar); se eligen de la lista de colaboradores o se escriben. El tope del día se multiplica por las personas. Las personas salen en el PDF y el Excel. |
 | 237 | 2026-11-25 | [ec151fb](https://github.com/puduhue/puduhue-terreno/tree/ec151fb) | Se publica junto con la v238. Fondo por rendir › «Movimientos»: las líneas del mismo asiento van en una sola fila, con el total y el saldo después del asiento; al tocarla se ven las líneas. |
 | 236 | 2026-11-24 | [f243b48](https://github.com/puduhue/puduhue-terreno/tree/f243b48) | Rendiciones: Contabilidad y el administrador pueden «Volver a leer» una foto cuya lectura falló, también con la rendición en revisión (completa solo lo vacío); recuadro «N fotos no se pudieron leer · Volver a leer». Si la foto no está en el teléfono, se baja antes de leer. Servidor sin cambios (v235). |
