@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 241 | 2026-11-25 | [bf69e6e](https://github.com/puduhue/puduhue-terreno/tree/bf69e6e) | Check list: el informe PDF de una visita puede ser solo de una sección (ej.: Casa de huéspedes). Informe del ranking más grande: consolidado primero, puntaje por mes en línea, gráfico de tendencia por predio en vez del cuadro de notas y lo mismo por cada sección. |
 | 240 | 2026-11-25 | [dc3aee5](https://github.com/puduhue/puduhue-terreno/tree/dc3aee5) | Al cerrar sesión sin cambios por subir, se borra del teléfono la copia de los datos (lo bajado, fotos guardadas y claves con datos de personas); al volver a entrar se baja de nuevo (Ley 21.719). |
 | 239 | 2026-11-25 | [1e24731](https://github.com/puduhue/puduhue-terreno/tree/1e24731) | Rendiciones: aviso «Total cambiado a mano: la foto dice $X y se rindió $Y» cuando el total rendido no es el que leyó la IA de la foto (no bloquea; lo ven quien rinde y quien revisa). |
 | 238 | 2026-11-25 | [ec151fb](https://github.com/puduhue/puduhue-terreno/tree/ec151fb) | Rendiciones: cada colación pide la cantidad de personas y el nombre de cada una (obligatorio para enviar); se eligen de la lista de colaboradores o se escriben. El tope del día se multiplica por las personas. Las personas salen en el PDF y el Excel. |
