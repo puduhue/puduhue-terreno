@@ -655,21 +655,26 @@ function rkMesesHTML(meses){
 }
 /* v206: «Qué se revisa» en el ranking (pedido de Benja, 19-11-2026: que quien vea el ranking entienda qué se está revisando, con un
    mini resumen de cada área: Oficina, Sala de ordeña…). Áreas del catálogo activo de ese check list, con sus puntos y sus grupos, y
-   el cumplimiento de todas las visitas del período en cada área (Cumple 1, Parcial 0,5, No cumple 0; N/A no cuenta). En San
-   Francisco los puntos están en la sección «Predio» pero cuentan en su área de origen (areaOrig). */
+   el cumplimiento de todas las visitas del período en cada área (Cumple 1, Parcial 0,5, No cumple 0; N/A no cuenta).
+   v245: los predios con lista propia (San Francisco) cuentan solo en su sección «Predio», como en su check list (antes contaban en
+   el área de origen de cada punto: Oficina y Sala de ordeña). */
+const rkSec=it=>it.area===AREA_UNICA.id?AREA_UNICA.id:(it.areaOrig||it.area);
 const rkMin=(t,i)=>i&&!/^[A-ZÁÉÍÓÚÑ]{2}/.test(t)?t.charAt(0).toLowerCase()+t.slice(1):t; /* «Seguridad y EPP» → «seguridad y EPP» */
 function rkAreas(R){
-  const M={},orden=AREAS.map(a=>a.id);
+  const M={},orden=AREAS.map(a=>a.id).concat([AREA_UNICA.id]);
   catalogoActivo().filter(i=>enTipo(R.tipo,i.area)).forEach(i=>{const a=M[i.area]||(M[i.area]={id:i.area,nom:AREA_NAME[i.area]||i.areaName||i.area,n:0,grupos:[],items:[],s:0,e:0});
     a.n++;a.items.push(i);if(i.group&&!a.grupos.includes(i.group))a.grupos.push(i.group)});
-  R.V.forEach(x=>{const v=VIS[x.id];if(!v)return;itemsDe(v).forEach(it=>{const a=M[it.areaOrig||it.area],r=v.items&&v.items[it.key];if(!a||!r||!r.e||r.e==="NA")return;a.s+=SCORE[r.e];a.e++})});
+  if(R.tipo==="visitas"){const PS=[...new Set(R.V.map(x=>VIS[x.id]).filter(v=>v&&predSolo(v.predio)).map(v=>v.predio))]; /* v245 */
+    if(PS.length){const L=predItems(catalogoActivo().filter(i=>enTipo("visitas",i.area)),predSolo(PS[0])),a=M[AREA_UNICA.id]={id:AREA_UNICA.id,nom:AREA_UNICA.name,n:L.length,grupos:[],items:L,s:0,e:0,solo:PS};
+      L.forEach(i=>{if(i.group&&!a.grupos.includes(i.group))a.grupos.push(i.group)})}}
+  R.V.forEach(x=>{const v=VIS[x.id];if(!v)return;itemsDe(v).forEach(it=>{const a=M[rkSec(it)],r=v.items&&v.items[it.key];if(!a||!r||!r.e||r.e==="NA")return;a.s+=SCORE[r.e];a.e++})});
   return Object.values(M).filter(a=>a.n).sort((a,b)=>orden.indexOf(a.id)-orden.indexOf(b.id)).map(a=>Object.assign(a,{pct:a.e?a.s/a.e*100:null,
-    resumen:a.grupos.map((g,i)=>rkMin(g,i)).join(", ")}));
+    resumen:(a.solo?`lista propia de ${a.solo.join(", ")}: `:"")+a.grupos.map((g,i)=>rkMin(g,i||!!a.solo)).join(", ")}));
 }
 function rkAreasHTML(R){
-  const A=rkAreas(R);if(!A.length)return"";const T=A.reduce((t,a)=>t+a.n,0);
+  const A=rkAreas(R);if(!A.length)return"";const A0=A.filter(a=>!a.solo),T=A0.reduce((t,a)=>t+a.n,0); /* v245: sin la lista propia */
   return `<h2 class="rkh">Qué se revisa</h2>
-    <p class="rksub">El check list tiene ${T} puntos en ${A.length} ${A.length===1?"área":"áreas"} (los que no aplican se marcan N/A y no cuentan). El porcentaje es el cumplimiento de todas las visitas del período en esa área. Toca un área para ver sus puntos.</p>
+    <p class="rksub">El check list tiene ${T} puntos en ${A0.length} ${A0.length===1?"área":"áreas"}${A.length>A0.length?` (más la lista propia de ${esc(A.find(a=>a.solo).solo.join(", "))}, en «Predio»)`:""} (los que no aplican se marcan N/A y no cuentan). El porcentaje es el cumplimiento de todas las visitas del período en esa área. Toca un área para ver sus puntos.</p>
     <div class="rkareas">${A.map(a=>{const p=a.pct===null?null:Math.round(a.pct),c=semColor(p);let g0="";
       return `<details class="rkar"><summary><span class="rkat"><b>${esc(a.nom)}</b><span>${a.n} ${a.n===1?"punto":"puntos"} · ${esc(a.resumen)}</span>
         <span class="rkbar" aria-hidden="true">${p===null?"":`<i class="${c}" style="width:${Math.max(2,p)}%"></i>`}</span></span><span class="rkap ${c}">${p===null?"–":p+" %"}</span></summary>
@@ -744,7 +749,7 @@ async function rkXlsx(){
 /* Informe PDF: resumen, ranking, todas las visitas y puntaje por mes */
 /* v241: datos de una sección (área) para el ranking: cada predio con sus visitas y el puntaje de esa sección */
 function rkAreaDatos(R,aid){
-  const g=it=>(it.areaOrig||it.area)===aid;
+  const g=it=>rkSec(it)===aid;
   const con=R.con.map(x=>{let s=0,n=0;const pts=[];x.vis.forEach(vv=>{const v=VIS[vv.id];if(!v)return;const p=puntaje(v,g);if(!p.n)return;s+=p.s;n+=p.n;pts.push({id:vv.id,n:vv.n,fecha:vv.fecha,pct:p.pct,s:p.s,nn:p.n})});
       const ult=pts[pts.length-1]||null,ant=pts[pts.length-2]||null,P=pts.map(q=>q.pct);
       return{u:x.u,vis:pts,s,n,acc:n?s/n*100:null,ult,dif:ult&&ant?ult.pct-ant.pct:null,mejor:P.length?Math.max(...P):null,peor:P.length?Math.min(...P):null}})
@@ -823,7 +828,7 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   const VMAX=8,AC=A=>Object.fromEntries(A.map(a=>[a.id,Object.fromEntries(rkAreaDatos(R,a.id).con.map(z=>[z.u,z.acc]))]));
   /* v244: cuadro de un predio dibujado en (X0,Y0); sin dib solo mide. El ancho se ajusta a sus visitas, para poner dos lado a lado */
   const campo=(x,A,ACC,X0,Y0,dib)=>{const P=x.vis.slice(-VMAX),wS=34,wc=12.5,wA=17,h=7;
-    const filas=A.map(a=>{const g=it=>(it.areaOrig||it.area)===a.id;return{nom:a.nom,c:P.map(q=>{const v=VIS[q.id];if(!v)return null;const p=puntaje(v,g);return p.n?p.pct:null}),acc:ACC[a.id][x.u]}}).filter(f=>f.acc!==undefined&&f.acc!==null);
+    const filas=A.map(a=>{const g=it=>rkSec(it)===a.id;return{nom:a.nom,c:P.map(q=>{const v=VIS[q.id];if(!v)return null;const p=puntaje(v,g);return p.n?p.pct:null}),acc:ACC[a.id][x.u]}}).filter(f=>f.acc!==undefined&&f.acc!==null);
     const ancho=Math.max(wS+P.length*wc+wA,78),mas=x.vis.length>VMAX,alto=6.5+8.5+(filas.length+1)*h+(mas?4.5:0);
     if(!dib)return{w:ancho,h:alto};
     let yy=Y0+4;const xA=X0+ancho-wA,pt=`${rkNum(x.acc)} %`;
