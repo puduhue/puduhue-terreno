@@ -531,6 +531,7 @@ function rdcFilasCab(r,d,L,edita){
     const at=id==="rdFotoBox"?(edita?`data-a="disEditar" data-c="rdFotoBox"`:`data-a="rdIrCampo" data-c="rdFotoBox"`):`data-a="rdCorregir" data-c="${RDC_HOJA[id]}"`;
     return edita||id==="rdFotoBox"?`<button type="button" class="rdok-r${mk.cls}" data-dato="${id}" ${at}>${cu}${ICO_CHEV}${mk.msg}</button>`:`<div class="rdok-r fija${mk.cls}" data-dato="${id}">${cu}${mk.msg}</div>`}).join("")}
 function disConfHTML(r,d,P,modo){
+  if(esKm(d))return kmFichaHTML(r,d,P,true,true); /* v245 */
   if(modo==="leyendo")return `<section class="rdok leyendo" aria-busy="true" aria-label="Leyendo el documento"><div class="rdok-sk" aria-hidden="true"><i></i><i></i><i class="g"></i></div><p class="rdok-lee"><span class="spin" aria-hidden="true"></span>Leyendo el documento…</p><button type="button" class="lnk" data-a="disEditar">Escribir los datos a mano</button></section>`;
   const le=d.lectura||{},cat=gastoDe(d),centro=centroDoc(r,d),sugC=d.centroSug&&centro,sugG=(d.gastoIA||d.gastoHist)&&cat,tot=num(d.total);
   const meta=[TIPO_DOC[d.tipo]||"Sin tipo",d.fecha?fdF(d.fecha,true)||fmtD(d.fecha):"sin fecha",d.folio?`N° ${d.folio}`:""].filter(Boolean).map(esc).join(" · ");
@@ -560,6 +561,7 @@ function disConfHTML(r,d,P,modo){
 const rdRevisa=r=>!!r&&!editaPersona(r)&&(puedeJefatura(r)||puedeContab(r));
 const RDFIC_OK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
 function disFichaHTML(r,d,P,edita){
+  if(esKm(d)&&!(rdRevisa(r)&&RD_ELIGE===d.k))return kmFichaHTML(r,d,P,edita,false); /* v245 */
   const cat=gastoDe(d),centro=centroDoc(r,d),tot=num(d.total),rev=rdRevisa(r);
   const meta=[TIPO_DOC[d.tipo]||"Sin tipo",d.fecha?fmtD(d.fecha):"sin fecha",d.folio?`N° ${d.folio}`:"sin número"].map(esc).join(" · ");
   const L=rdcItems(r,d,P,{cont:esContab()&&rev});
@@ -913,14 +915,14 @@ const CATALOGO_DEF=[
 ];
 /* tipos de gasto de las versiones anteriores a la v62 */
 const GASTO_ANT={"Combustible":"combustible","Peajes y estacionamiento":"peajes","Alimentación":"colacion","Alojamiento":"alojamiento","Repuestos y mantención":"mant_maquina","Insumos veterinarios":"otro","Insumos agrícolas":"otro","Ferretería y materiales":"ferreteria","Oficina":"oficina","Otros":"otro"};
-const TIPO_DOC={boleta:"Boleta",factura:"Factura",boleta_honorarios:"Boleta de honorarios",peaje:"Comprobante de peaje",nota_credito:"Nota de crédito",vale:"Ticket / vale / comprobante",otro:"Otro"};
+const TIPO_DOC={boleta:"Boleta",factura:"Factura",boleta_honorarios:"Boleta de honorarios",peaje:"Comprobante de peaje",nota_credito:"Nota de crédito",vale:"Ticket / vale / comprobante",otro:"Otro",km:"Kilometraje"};
 /* v79: para rendir solo sirven facturas y boletas; «vale» y «otro» quedan solo para mostrar documentos antiguos */
 const TIPOS_RENDIR=["boleta","factura","boleta_honorarios","peaje","nota_credito"]; /* v230: nota de crédito */
 /* v110: el comprobante de peaje solo vale con el tipo de gasto «Peajes / barcaza» */
 const GASTO_PEAJE="peajes";
 const esGastoPeaje=d=>{const c=gastoDe(d);return !!c&&c.id===GASTO_PEAJE};
 const pareceePeaje=t=>/peaje|autopista|autov[ií]a|concesionari|barcaza|transbordador|ruta\s*(5|68|78)|tag\b|p[oó]rtico/i.test(String(t||""));
-const DOCABR={nota_credito:["NC","NC"],boleta:["BOLETA","BOLETAS"],factura:["FACT","FACTS"],boleta_honorarios:["BH","BH"],vale:["TICKET","TICKETS"],otro:["DOCUMENTO","DOCUMENTOS"]};
+const DOCABR={nota_credito:["NC","NC"],boleta:["BOLETA","BOLETAS"],factura:["FACT","FACTS"],boleta_honorarios:["BH","BH"],vale:["TICKET","TICKETS"],otro:["DOCUMENTO","DOCUMENTOS"],km:["KM","KM"]};
 const RD_ESTADO={borrador:"Borrador",enviada:"En revisión de jefatura",revcont:"En revisión contable",aprobada:"Aprobada, por contabilizar",contabilizada:"Contabilizada",observada:"Con observaciones"};
 let REND={},rdv=null,rdd=null,rdTab="mias",MAE=null,MAE_ETAG="";
 const periodoActual=()=>today().slice(0,7);
@@ -1381,7 +1383,7 @@ const dupQuien=x=>`${x.mia?"ya está en tu rendición":`ya lo rindió ${x.person
 async function rdDupSrvRevisar(r,forzar){
   if(!r||!r.id||navigator.onLine===false||typeof odPedir!=="function")return;const h=dupHuella(r),ya=DUPSRV[r.id];
   if(!forzar&&ya&&ya.h===h&&Date.now()-ya.t<300000)return;
-  const docs=docsDe(r).filter(d=>num(d.total)>0).map(d=>({k:d.k,tipo:d.tipo||"",rut:d.rut||"",folio:String(d.folio||""),fecha:d.fecha||"",total:Math.round(num(d.total)),creado:d.creado||""}));
+  const docs=docsDe(r).filter(d=>num(d.total)>0&&!esKm(d)).map(d=>({k:d.k,tipo:d.tipo||"",rut:d.rut||"",folio:String(d.folio||""),fecha:d.fecha||"",total:Math.round(num(d.total)),creado:d.creado||""}));
   if(!docs.length){DUPSRV[r.id]={h,t:Date.now(),res:{}};return}
   let j=null;try{j=await Promise.race([odPedir("/od/rend/dups",{rid:r.id,docs}),new Promise((_,no)=>setTimeout(()=>no({code:"tiempo"}),8000))])}catch(e){return} /* sin señal o sin servidor: no bloquea */
   const res=(j&&j.dups)||{},antes=(ya&&ya.res)||{};DUPSRV[r.id]={h,t:Date.now(),res};
@@ -1401,7 +1403,7 @@ const dupQuienC=x=>x.mia?"ya está en otra rendición tuya":`ya lo rindió ${x.p
    datos (sin fecha o sin N°) y, si tienen los mismos, el más nuevo */
 const dupHora=x=>{const m=/^(\d{1,2}):(\d{2})/.exec(String(x&&x.horaDoc||""));return m?(+m[1])*60+(+m[2]):null};
 const dupNota=x=>(x.fecha?2:0)+(folioNorm(x.folio)?1:0);
-function dupIntPar(d,y){if(!y||y===d||esNC(y)!==esNC(d)||Math.round(num(y.total))!==Math.round(num(d.total)))return false;
+function dupIntPar(d,y){if(!y||y===d||esKm(d)||esKm(y)||esNC(y)!==esNC(d)||Math.round(num(y.total))!==Math.round(num(d.total)))return false;
   if(folioNorm(d.folio)&&folioNorm(y.folio))return false; /* los dos con N°: si es el mismo, lo dice «Documento duplicado» */
   const hd=dupHora(d),hy=dupHora(y);if(hd!=null&&hy!=null&&hd!==hy)return false; /* v234: otra hora, otra pasada */
   const ra=rdDupRut(d),rb=rdDupRut(y);
@@ -1514,7 +1516,7 @@ const folioNorm=f=>{const s=String(f||"").trim(),n=s.replace(/\D/g,"").replace(/
 const rdDupRut=x=>x.rut&&rutValido(x.rut)?normRut(x.rut):"";
 function rdDupPar(d,y){
   if(!y||y===d)return false;const t=Math.round(num(d.total));if(!(t>0)||Math.round(num(y.total))!==t)return false;
-  if(d.tipo==="peaje"||y.tipo==="peaje")return false;
+  if(d.tipo==="peaje"||y.tipo==="peaje"||esKm(d)||esKm(y))return false; /* v245: el kilometraje no es duplicado */
   if(esNC(d)!==esNC(y))return false; /* v230: la nota de crédito y lo que rebaja no son duplicados */
   const ra=rdDupRut(d),rb=rdDupRut(y);if(ra&&rb&&ra!==rb)return false;
   const fo=f=>{const s=folioNorm(f);return /^\d{4,}$/.test(s)?s:""},fa=fo(d.folio),fb=fo(y.folio);
@@ -1564,7 +1566,8 @@ const docAntes=(x,y)=>{const a=String(x.creado||""),b=String(y.creado||"");retur
 /* Problemas de un documento: b impide enviar · a advertencia (se envía igual y quien revisa la ve) */
 function problemasDoc2(r,d){
   const b=[],a=[];
-  if(!d.foto)b.push("Falta la foto del documento.");
+  if(!d.foto)b.push(esKm(d)?"Falta la imagen del recorrido: márcalo de nuevo.":"Falta la foto del documento.");
+  if(esKm(d)){const k=d.km||{},c=gastoDe(d);if(!k.o||!k.d||!(num(k.km)>0))b.push("Falta el recorrido: marca el origen y el destino en el mapa.");if(c&&c.id!==KM_GASTO)b.push("El kilometraje se rinde con el tipo de gasto «Kilometraje en vehículo propio».")} /* v245 */
   if(!(num(d.total)>0))b.push("Falta el total.");
   if(esNC(d)){const y=ncRef(r,d); /* v230 */
     if(!y)b.push("Indica qué boleta o factura rebaja esta nota de crédito (tiene que estar en esta rendición).");
@@ -1574,7 +1577,7 @@ function problemasDoc2(r,d){
   /* v133 (M-16): con timbre de nota de crédito, guía o nota de débito no sirve aunque se cambie el tipo a mano */
   if(d.timbre&&d.timbre.td&&!TD_TIPO98[d.timbre.td]&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`El timbre del SII dice «${TD_NOMBRE98[d.timbre.td]||"otro documento"}», que no sirve para rendir aunque se cambie el tipo. Elimina el documento o cambia la foto.`);
   else if((d.tipo==="vale"||d.tipo==="otro")&&r.estado!=="aprobada"&&r.estado!=="contabilizada")a.push(noBolMsg(d,r)); /* v202: se envía igual; Contabilidad decide */
-  else if(!TIPOS_RENDIR.includes(d.tipo)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
+  else if(!TIPOS_RENDIR.includes(d.tipo)&&!esKm(d)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push(`Tipo de documento no válido: «${TIPO_DOC[d.tipo]||"sin tipo"}» no sirve para rendir; solo facturas, boletas y comprobantes de peaje. Cambia el tipo o elimina el documento.`);
   if(d.timbre&&TD_TIPO98[d.timbre.td]==="nota_credito"&&!esNC(d)&&r.estado!=="aprobada"&&r.estado!=="contabilizada")b.push("El timbre del SII dice «Nota de crédito»: cambia el tipo de documento a «Nota de crédito» e indica qué boleta o factura rebaja."); /* v230 */
   if(d.tipo==="peaje"&&gastoDe(d)&&!esGastoPeaje(d))b.push("Un comprobante de peaje solo se rinde con el tipo de gasto «Peajes / barcaza». Cambia el tipo de gasto o el tipo de documento.");
   /* en facturas y boletas de honorarios el RUT viene impreso y Finnegans lo exige; en boletas es opcional */
@@ -1609,8 +1612,8 @@ function problemasDoc2(r,d){
   if(d.lectura&&d.lectura.estado==="pendiente")a.push("La foto todavía no se ha leído (se lee al tener señal).");
   if(d.lectura&&d.lectura.estado==="error")a.push("La lectura automática falló; los datos quedan como los escribas.");
   if(d.moneda&&+d.montoMoneda>0)a.push(monMsg(d,r)); /* v203 */
-  if(!d.emisor)a.push("Sin nombre del emisor.");
-  if(d.tipo!=="vale"&&d.tipo!=="otro"&&d.tipo!=="peaje"){if(!d.rut&&!rutObl)a.push("Sin RUT del emisor.");if(!d.folio)a.push("Sin número de boleta o factura.")}
+  if(!d.emisor&&!esKm(d))a.push("Sin nombre del emisor.");
+  if(d.tipo!=="vale"&&d.tipo!=="otro"&&d.tipo!=="peaje"&&!esKm(d)){if(!d.rut&&!rutObl)a.push("Sin RUT del emisor.");if(!d.folio)a.push("Sin número de boleta o factura.")}
   if(!d.fecha){if(DUP_ACT.has(r.estado||"borrador")&&!(d.lectura&&/^(leyendo|pendiente)$/.test(d.lectura.estado)))b.push("Falta la fecha del documento.");else a.push("Sin fecha.")}else{ /* v235: obligatoria para enviar */const per=r.periodo;const f=String(d.fecha).slice(0,7);const [y,m]=per.split("-").map(Number);const ant=new Date(y,m-2,1);const antP=`${ant.getFullYear()}-${String(ant.getMonth()+1).padStart(2,"0")}`;if(f!==per&&f!==antP)a.push(`La fecha ${fmtD(d.fecha)} no corresponde al período (${periodoTxt(per)} o el mes anterior).`)}
   /* v135: propina incluida en el total (con timbre del SII el total es el del documento, sin propina) */
   const prop=num(d.propina)>0&&!(d.timbre&&d.timbre.mnt>0&&num(d.total)===d.timbre.mnt)?Math.round(num(d.propina)):0;
@@ -1890,7 +1893,7 @@ let LEYENDO={};const LEYENDO_ALGUNO=()=>Object.keys(LEYENDO).length>0;
 /* v114: las lecturas van de a una: con varias fotos juntas, subirlas todas a la vez llenaba la memoria del teléfono */
 let LEER_COLA=Promise.resolve();
 async function leerDoc(r,d){
-  if(!d.foto||LEYENDO[d.k])return;if(navigator.onLine===false){d.lectura={estado:"pendiente"};return}
+  if(!d.foto||esKm(d)||LEYENDO[d.k])return;if(navigator.onLine===false){d.lectura={estado:"pendiente"};return}
   LEYENDO[d.k]=true;d.lectura={estado:"leyendo"};rdRefreshDoc(d.k);
   const turno=LEER_COLA;let listo;LEER_COLA=new Promise(o=>listo=o);
   try{await turno;
@@ -2310,7 +2313,7 @@ function renderRDV(){
   const c=colabDe(r),jefE=r.jefatura||(c?jefaturaDe(c):null);
   const verAsi=esContab()&&r.estado!=="borrador"&&contPropiaOk(r)||con||ctz;const AX=verAsi&&D.length?rdAsientoExcel(r):null,A=AX?AX.A:null; /* v133 (M-18) */
   let acciones="";
-  if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>
+  if(edit)acciones=`<div class="btns">${ESCRITORIO()?`<label class="btn pri" style="flex:1;text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Agregar documentos<input class="vh" type="file" accept="image/*,application/pdf,.pdf" multiple data-rdfoto="1"></label>`:`<label class="btn pri rdcam" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> Agregar documento<input class="vh" type="file" accept="image/*" capture="environment" data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" multiple data-rdfoto="1"></label><label class="btn" style="text-align:center"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" multiple data-rdfoto="1"></label>`}</div>${kmBotonHTML(r)}
       ${disTip("rdsolo",`Solo sirven <b>facturas y boletas</b>, en foto o en PDF.${ESCRITORIO()?" También puedes arrastrar las fotos o los PDF a esta página.":""}`,"rdsolo")}
       ${D.length?`${inc?`<p class="note"><b>${inc} ${inc===1?"documento por completar":"documentos por completar"}</b> · <button class="lnk" data-a="rdDoc" data-k="${esc(D.find(d=>!docCompleto(r,d)).k)}">Ir ${inc===1?"al documento":"al primero"}</button></p>`:adv?`<p class="note">${adv} ${adv===1?"dato queda en blanco":"datos quedan en blanco"}; se puede enviar igual y quien revisa los completa.</p>`:""}`:""}`;
   else if(esContab()&&r.estado==="enviada"&&sinJefatura(r)&&!esPropia(r))acciones=`<div class="info netbox"><b>Falta asignar la jefatura.</b> Quien rinde no tiene jefatura en la lista de colaboradores. Asígnala en <button class="lnk" data-a="rdCol">Colaboradores y aprobadores</button> y la rendición pasa sola a esa jefatura, con su aviso. Si no tiene jefatura (por ejemplo, gerencia), elige «Sin jefatura»: pasa a revisión contable.</div>`; /* v199 */
@@ -2376,7 +2379,7 @@ function renderRDD(){
     ${rdNavHTML(r,d)}
     ${(()=>{const rev=rdRevisa(r);if(!editP&&!rev)return"";return rdcResumenHTML(rdcItems(r,d,P,{cont:rev&&verC,sinPedido:rev,sinFalta:!(conf||fic)||conf==="leyendo"}),editP||editC,editP)})()}
     <div class="rdfoto" id="rdFotoBox">${d.foto?(fotoSrc(d.foto)?`<img src="${esc(fotoSrc(d.foto))}" alt="Documento" data-a="foto" data-ref="${esc(d.foto)}" data-k="${esc(d.k)}">`:`<div class="empty">La foto se está cargando…</div>`):`<div class="empty">Sin foto</div>`}
-      ${rdPdfInfo(d)}${editP?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}${!editP&&rdRevLee(r)&&d.foto&&navigator.onLine!==false?`<div class="btns" style="margin-top:8px"><button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button></div>`:""}</div>
+      ${rdPdfInfo(d)}${editP&&!esKm(d)?`<div class="btns" style="margin-top:8px">${ESCRITORIO()?`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> ${d.foto?"Cambiar documento":"Subir documento"}<input class="vh" type="file" accept="image/*,application/pdf,.pdf" data-rdrefoto="1"></label>`:`<label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span> ${d.foto?"Tomar otra foto":"Tomar foto"}<input class="vh" type="file" accept="image/*" capture="environment" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg></span> Galería<input class="vh" type="file" accept="image/*" data-rdrefoto="1"></label><label class="btn"><span class="icw" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9.5 13h5M9.5 16.5h5"/></svg></span> PDF<input class="vh" type="file" accept="application/pdf,.pdf" data-rdrefoto="1"></label>`}${d.foto&&navigator.onLine!==false?`<button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button>`:""}</div>`:""}${!editP&&rdRevLee(r)&&d.foto&&navigator.onLine!==false?`<div class="btns" style="margin-top:8px"><button class="btn" data-a="rdReleer" ${le.estado==="leyendo"?"disabled":""}>${le.estado==="leyendo"?"Leyendo…":"Volver a leer"}</button></div>`:""}</div>
     ${conf?disConfHTML(r,d,P,conf):fic?disFichaHTML(r,d,P,editC):""}<div class="rdform"${conf||fic?" hidden":""}>
     ${le.estado==="leyendo"?`<div class="info">Leyendo el documento…</div>`:le.estado==="pendiente"?`<div class="info netbox">Sin señal: el documento se leerá automáticamente cuando vuelva la conexión. Mientras tanto puedes escribir los datos a mano.</div>`:le.estado==="error"?`<div class="info netbox"><b>La lectura automática no funcionó.</b> ${esc(le.msg||"")} Completa los datos a mano.</div>`:le.estado==="ok"&&editP?`<div class="info" style="border-left:5px solid ${le.confianza>=0.6?"var(--b-ink)":"var(--r-ink)"}"><b>Leída automáticamente</b>${le.confianza!=null?` · confianza ${Math.round(le.confianza*100)}%`:""}. ${le.problemas&&le.problemas.length?`La IA advierte: ${esc(le.problemas.join("; "))}. `:""}Revisa que los datos coincidan con el documento.</div>`:""}
     ${probs.length&&!ro&&!(editP&&(conf||fic)&&conf!=="leyendo"&&rdcItems(r,d,P).length)?`<div class="info netbox"><b>Para enviar falta:</b> <span class="hint">(toca cada aviso para ir al dato)</span><ul>${probs.map(liCampo).join("")}</ul></div>`:""}
@@ -2541,8 +2544,8 @@ function rdMaeParse(wb,nombre){
     if(tiene("NROSERIE")||(tiene("MARCA")&&tiene("MODELO"))){const ic=colIdx(h,"Codigo"),in_=colIdx(h,"Nombre"),ia=colIdx(h,"Activo");out.bienes={};R.forEach(r=>{const c=g(r,ic);if(c&&g(r,ia)!=="0")out.bienes[c]=g(r,in_)});continue}
     if(tiene("RAZONSOCIAL")&&(tiene("CUIT")||tiene("ESPROVEEDOR"))){const ic=colIdx(h,"Codigo"),in_=colIdx(h,"Nombre"),ia=colIdx(h,"Activo");out.orgs=out.orgs||{};R.forEach(r=>{const c=String(r[ic]==null?"":r[ic]);if(c.trim()&&g(r,ia)!=="0")orgsAgregar(out.orgs,c,g(r,in_))});continue}
     if(S==="COLABORADORES"||(tiene("RUT")&&tiene("NOMBRE")&&H.some(x=>x.startsWith("JEFATURA")))){
-      const iR=colIdx(h,"RUT"),iN=colIdx(h,"Nombre"),iC=colIdx(h,"Centro por defecto (codigo)","Centro (codigo)","Centro"),iF=colIdx(h,"Tipo de fondo"),iCu=colIdx(h,"Cuenta fondo"),iJ=colIdx(h,"Jefatura que aprueba","Jefatura"),iM=colIdx(h,"Correo Microsoft","Correo"),iO=colIdx(h,"Observaciones"),iA=colIdx(h,"Activo");
-      out.colab=R.filter(r=>g(r,iN)).map(r=>{const rut=g(r,iR);return{rut:rutValido(rut)?rut.replace(/\./g,"").toUpperCase():"",nombre:g(r,iN),centro:g(r,iC),fondo:g(r,iF),cuenta:g(r,iCu).replace(/\.0+$/,"")||"110106",jefe:g(r,iJ),correo:correosDe({correo:g(r,iM)}).join(", "),obs:g(r,iO),activo:iA<0||g(r,iA)===""||siNo(g(r,iA))}});continue}
+      const iR=colIdx(h,"RUT"),iN=colIdx(h,"Nombre"),iC=colIdx(h,"Centro por defecto (codigo)","Centro (codigo)","Centro"),iF=colIdx(h,"Tipo de fondo"),iCu=colIdx(h,"Cuenta fondo"),iJ=colIdx(h,"Jefatura que aprueba","Jefatura"),iM=colIdx(h,"Correo Microsoft","Correo"),iO=colIdx(h,"Observaciones"),iTk=colIdx(h,"Tarifa km"),iA=colIdx(h,"Activo");
+      out.colab=R.filter(r=>g(r,iN)).map(r=>{const rut=g(r,iR);return{rut:rutValido(rut)?rut.replace(/\./g,"").toUpperCase():"",nombre:g(r,iN),centro:g(r,iC),fondo:g(r,iF),cuenta:g(r,iCu).replace(/\.0+$/,"")||"110106",jefe:g(r,iJ),correo:correosDe({correo:g(r,iM)}).join(", "),obs:g(r,iO),tarifaKm:iTk<0?0:(+g(r,iTk).replace(/[^\d]/g,"")||0),activo:iA<0||g(r,iA)===""||siNo(g(r,iA))}});continue}
     if(S==="APROBADORES"||(tiene("NOMBRE")&&tiene("CORREO")&&tiene("ROL"))){const iN=colIdx(h,"Nombre"),iM=colIdx(h,"Correo"),iRo=colIdx(h,"Rol");out.aprob=R.filter(r=>g(r,iN)).map(r=>({nombre:g(r,iN),correo:(correosDe({correo:g(r,iM)})[0]||""),rol:/CONTAB/.test(normTxt(g(r,iRo)))?"cont":"jef"}));continue}
     if(S==="DISTRIBUCIONES"||(tiene("SERVICIO")&&tiene("DISPOSITIVOS"))){const iS=colIdx(h,"Servicio"),iC=colIdx(h,"Centro (codigo)","Centro"),iD=colIdx(h,"Dispositivos"),iCu=colIdx(h,"Cuenta"),iP=colIdx(h,"Producto"),iPa=colIdx(h,"Partida");out.dist={};
       R.forEach(r=>{const s=g(r,iS),c=g(r,iC);if(!s||!c||normTxt(c)==="TOTAL")return;(out.dist[s]=out.dist[s]||[]).push({centro:c,disp:num(g(r,iD)),cuenta:g(r,iCu).replace(/\.0+$/,""),prod:g(r,iP).toUpperCase(),part:g(r,iPa).toUpperCase()})});continue}
@@ -2611,8 +2614,8 @@ function rdOrgsAuto(){if(ORGS_AUTO||!esContab()||!DB||navigator.onLine===false)r
 const alertaOrgs=al=>al.some(a=>a.n==="p");
 function rdMaeColabXlsx(){
   const wb=XLSX.utils.book_new();
-  const c=[["RUT","Nombre","Centro por defecto (código)","Centro por defecto (nombre)","Tipo de fondo","Cuenta fondo","Jefatura que aprueba","Correo Microsoft","Observaciones","Activo"]].concat(colabs().map(x=>[x.rut,x.nombre,x.centro,centroNombre(x.centro),x.fondo||"Fondo por rendir",x.cuenta||"110106",x.jefe||"",x.correo||"",x.obs||"",x.activo===false?"No":"Sí"]));
-  const w1=XLSX.utils.aoa_to_sheet(c);w1["!cols"]=[13,24,20,24,16,12,22,30,40,8].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,w1,"Colaboradores");
+  const c=[["RUT","Nombre","Centro por defecto (código)","Centro por defecto (nombre)","Tipo de fondo","Cuenta fondo","Jefatura que aprueba","Correo Microsoft","Observaciones","Activo","Tarifa km ($ por km)"]].concat(colabs().map(x=>[x.rut,x.nombre,x.centro,centroNombre(x.centro),x.fondo||"Fondo por rendir",x.cuenta||"110106",x.jefe||"",x.correo||"",x.obs||"",x.activo===false?"No":"Sí",x.tarifaKm||""]));
+  const w1=XLSX.utils.aoa_to_sheet(c);w1["!cols"]=[13,24,20,24,16,12,22,30,40,8,14].map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,w1,"Colaboradores");
   const ap=aprobadores().length?aprobadores():contabDef().map(m=>({nombre:m,correo:m,rol:"cont"}));
   const w2=XLSX.utils.aoa_to_sheet([["Nombre","Correo","Rol"]].concat(ap.map(a=>[a.nombre,a.correo,a.rol==="cont"?"Revisión contable":"Jefatura"])));w2["!cols"]=[{wch:28},{wch:30},{wch:20}];XLSX.utils.book_append_sheet(wb,w2,"Aprobadores");
   const d=[["Servicio","Centro (código)","Centro (nombre)","Dispositivos","Cuenta","Producto","Partida"]];Object.entries((MAE&&MAE.dist)||{}).forEach(([s,rows])=>rows.forEach(x=>d.push([s,x.centro,centroNombre(x.centro),x.disp,x.cuenta,x.prod,x.part])));
@@ -2683,7 +2686,7 @@ function rdColPintar(){const L=$("#rdcoll");if(L)L.innerHTML=rdColListaHTML()}
 const rdColBuscar=k=>colabs().find(c=>(normRut(c.rut)||"n:"+c.nombre)===k)||null;
 /* formulario: se repite con los datos escritos si algo no está bien */
 async function rdColForm(c,nuevo){
-  let v={nombre:c.nombre||"",rut:c.rut?rutLimpio(c.rut):"",correo:c.correo||"",centro:c.centro||"",jefe:c.jefe||"",fondo:c.fondo||"Fondo por rendir",cuenta:c.cuenta||"110106",obs:c.obs||"",activo:c.activo===false?"no":"si"},err="";
+  let v={nombre:c.nombre||"",rut:c.rut?rutLimpio(c.rut):"",correo:c.correo||"",centro:c.centro||"",jefe:c.jefe||"",fondo:c.fondo||"Fondo por rendir",cuenta:c.cuenta||"110106",obs:c.obs||"",tarifaKm:c.tarifaKm?String(c.tarifaKm):"",activo:c.activo===false?"no":"si"},err="";
   const J=rdColJefes(),CE=rdColCentros();
   while(true){
     const op=(L,sel)=>L.map(([val,t])=>`<option value="${esc(val)}"${val===sel?" selected":""}>${esc(t)}</option>`).join("");
@@ -2696,16 +2699,17 @@ async function rdColForm(c,nuevo){
       <div class="f"><label for="rcF">Tipo de fondo</label><select id="rcF" data-v="fondo">${op([["Fondo por rendir","Fondo por rendir"],["Fondo fijo","Fondo fijo"]].concat(["Fondo por rendir","Fondo fijo"].includes(v.fondo)?[]:[[v.fondo,v.fondo]]),v.fondo)}</select></div>
       <div class="f"><label for="rcCu">Cuenta del fondo</label><input id="rcCu" data-v="cuenta" value="${esc(v.cuenta)}" inputmode="numeric" autocomplete="off"><span class="hint">110106 Fondos por rendir · 110105 Fondo fijo</span></div>
       <div class="f"><label for="rcO">Observaciones</label><input id="rcO" data-v="obs" value="${esc(v.obs)}" autocomplete="off"></div>
+      <div class="f"><label for="rcTk">Tarifa por km (vehículo propio)</label><input id="rcTk" data-v="tarifaKm" value="${esc(v.tarifaKm)}" inputmode="numeric" autocomplete="off" placeholder="Ej.: 350"><span class="hint">Pesos por km. Solo si rinde kilometraje en su vehículo; si no, déjalo vacío.</span></div>
       ${nuevo?"":`<div class="f"><label for="rcA">Estado</label><select id="rcA" data-v="activo">${op([["si","Activo: rinde"],["no","Inactivo: ya no rinde"]],v.activo)}</select></div>`}`;
     const o=await askVal(nuevo?"Agregar colaborador":"Editar colaborador","",nuevo?"Agregar":"Guardar",html);if(!o)return null;
     v=Object.assign(v,o);v.nombre=v.nombre.trim().replace(/\s+/g," ");v.cuenta=String(v.cuenta||"").replace(/\D/g,"");
     const rut=normRut(v.rut),cos=correosDe({correo:v.correo}),otro=rut&&colabs().find(x=>x!==c&&normRut(x.rut)===rut);
     err=!v.nombre?"Escribe el nombre.":!rut||!rutValido(v.rut)?"El RUT no es válido: revisa los números y el dígito verificador.":otro?`Ese RUT ya es de ${otro.nombre}.`:!cos.length?"Escribe el correo con el que entra a la app.":!v.centro?"Elige el centro por defecto.":!v.cuenta?"Escribe la cuenta del fondo.":(maeTiene("cuentas")&&!MAE.cuentas[v.cuenta])?`La cuenta ${v.cuenta} no está en el plan de cuentas.`:"";
     if(err)continue;
-    return{rut:rutLimpio(v.rut).replace(/\./g,""),nombre:v.nombre,centro:v.centro,fondo:v.fondo,cuenta:v.cuenta,jefe:v.jefe,correo:cos.join(", "),obs:v.obs.trim(),activo:v.activo!=="no"}
+    return{rut:rutLimpio(v.rut).replace(/\./g,""),nombre:v.nombre,centro:v.centro,fondo:v.fondo,cuenta:v.cuenta,jefe:v.jefe,correo:cos.join(", "),obs:v.obs.trim(),tarifaKm:+String(v.tarifaKm||"").replace(/[^\d]/g,"")||0,activo:v.activo!=="no"}
   }
 }
-const RDCOL_ETQ={nombre:"Nombre",rut:"RUT",correo:"Correo",centro:"Centro",jefe:"Jefatura",fondo:"Tipo de fondo",cuenta:"Cuenta",obs:"Observaciones",activo:"Estado"};
+const RDCOL_ETQ={nombre:"Nombre",rut:"RUT",correo:"Correo",centro:"Centro",jefe:"Jefatura",fondo:"Tipo de fondo",cuenta:"Cuenta",obs:"Observaciones",tarifaKm:"Tarifa por km",activo:"Estado"};
 function rdColDif(a,b){return Object.keys(RDCOL_ETQ).filter(k=>String(a[k]==null?"":a[k])!==String(b[k]==null?"":b[k])).map(k=>{const f=x=>k==="activo"?(x===false?"inactivo":"activo"):k==="centro"?centroNombre(x):String(x||"—");return `${RDCOL_ETQ[k]}: ${f(a[k])} → ${f(b[k])}`}).join("; ")}
 /* Excel: celdas que cambian, por hoja, buscando la fila por RUT (colaboradores) o correo/nombre (aprobadores) */
 function colLetra(n){let s="";n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s}
@@ -2717,7 +2721,7 @@ async function rdColExcelAplicar(ops){
     const hoja=RDCOL_HOJA[op.tipo];const ur=await odPedir("/od/celdas/leer",{archivo:nom,hoja}); /* v216 */
     const m=/!?\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(String(ur.address||"").split("!").pop()||"");if(!m)throw{error:"No se pudo leer la hoja "+hoja+"."};
     const c0=colNum(m[1]),r0=+m[2],V=ur.values||[];const h=(V[0]||[]).map(x=>String(x==null?"":x));let ancho=h.length;
-    const col=op.tipo==="colab"?{rut:colIdx(h,"RUT"),nombre:colIdx(h,"Nombre"),centro:colIdx(h,"Centro por defecto (codigo)","Centro (codigo)","Centro"),centroN:colIdx(h,"Centro por defecto (nombre)","Centro (nombre)"),fondo:colIdx(h,"Tipo de fondo"),cuenta:colIdx(h,"Cuenta fondo"),jefe:colIdx(h,"Jefatura que aprueba","Jefatura"),obs:colIdx(h,"Observaciones"),correo:colIdx(h,"Correo Microsoft","Correo"),activo:colIdx(h,"Activo")}
+    const col=op.tipo==="colab"?{rut:colIdx(h,"RUT"),nombre:colIdx(h,"Nombre"),centro:colIdx(h,"Centro por defecto (codigo)","Centro (codigo)","Centro"),centroN:colIdx(h,"Centro por defecto (nombre)","Centro (nombre)"),fondo:colIdx(h,"Tipo de fondo"),cuenta:colIdx(h,"Cuenta fondo"),jefe:colIdx(h,"Jefatura que aprueba","Jefatura"),obs:colIdx(h,"Observaciones"),correo:colIdx(h,"Correo Microsoft","Correo"),activo:colIdx(h,"Activo"),tarifaKm:colIdx(h,"Tarifa km")}
       :{nombre:colIdx(h,"Nombre"),correo:colIdx(h,"Correo"),rol:colIdx(h,"Rol")};
     const g=(r,i)=>i>=0?String(r[i]==null?"":r[i]).trim():"";
     let fi=V.slice(1).findIndex(r=>op.tipo==="colab"?(op.clave.rut?normRut(g(r,col.rut))===normRut(op.clave.rut):normTxt(g(r,col.nombre))===normTxt(op.clave.nombre)):(op.clave.correo&&(correosDe({correo:g(r,col.correo)})[0]||"")===op.clave.correo)||normTxt(g(r,col.nombre))===normTxt(op.clave.nombre));
@@ -2725,6 +2729,7 @@ async function rdColExcelAplicar(ops){
     if(!fila){let u=V.length;while(u>1&&!(V[u-1]||[]).some(x=>String(x==null?"":x).trim()))u--;fila=r0+u}
     const d=Object.assign({},op.datos);
     if(op.tipo==="colab"&&d.activo!==undefined){if(col.activo<0){if(d.activo)delete d.activo;else{col.activo=ancho;ancho++;await poner(hoja,colLetra(c0+col.activo)+r0,"Activo")}}if(d.activo!==undefined)d.activo=d.activo?"Sí":"No"}
+    if(op.tipo==="colab"&&d.tarifaKm!==undefined){if(!d.tarifaKm)d.tarifaKm="";if(col.tarifaKm<0){if(!d.tarifaKm)delete d.tarifaKm;else{col.tarifaKm=ancho;ancho++;await poner(hoja,colLetra(c0+col.tarifaKm)+r0,"Tarifa km ($ por km)")}}} /* v245 */
     if(op.tipo==="colab"&&d.centro!==undefined&&col.centroN>=0)d.centroN=centroNombre(d.centro);
     if(op.tipo==="aprob"&&d.rol!==undefined)d.rol=d.rol==="cont"?"Revisión contable":"Jefatura";
     for(const [k,val] of Object.entries(d)){const i=col[k];if(i===undefined||i<0)continue;await poner(hoja,colLetra(c0+i)+fila,val==null?"":String(val))}
@@ -2752,7 +2757,7 @@ async function rdColClick(A,b){
   if(A==="rdCol"){if(!esContab())return true;go("rdcol");window.scrollTo(0,0);if(rdColPend().length)rdColExcel([]).then(()=>{if(view==="rdcol")render()});return true}
   if(A==="rdColReint"){const ok=await rdColExcel([]);render();toast(ok?"Excel al día.":"Todavía no se pudo actualizar el Excel.");return true}
   if(A==="rdColNuevo"){if(!esContab())return true;const c={nombre:b.dataset.n||"",correo:b.dataset.c||""};const v=await rdColForm(c,true);if(!v)return true;
-    await rdColGuardar("colab",null,v,{rut:v.rut,nombre:v.nombre,centro:v.centro,fondo:v.fondo,cuenta:v.cuenta,jefe:v.jefe,obs:v.obs,correo:v.correo},v.nombre,"agregado a la lista");return true}
+    await rdColGuardar("colab",null,v,{rut:v.rut,nombre:v.nombre,centro:v.centro,fondo:v.fondo,cuenta:v.cuenta,jefe:v.jefe,obs:v.obs,correo:v.correo,tarifaKm:v.tarifaKm||""},v.nombre,"agregado a la lista");return true}
   if(A==="rdColEd"){if(!esContab())return true;const c=rdColBuscar(b.dataset.k);if(!c)return true;const v=await rdColForm(c,false);if(!v)return true;
     const dif=rdColDif(c,v);if(!dif){toast("Sin cambios.");return true}
     const datos={};Object.keys(RDCOL_ETQ).forEach(k=>{if(String(c[k]==null?"":c[k])!==String(v[k]==null?"":v[k]))datos[k]=v[k]});
@@ -2780,6 +2785,7 @@ function askVal(title,msg,ok,html){return new Promise(res=>{
   m.addEventListener("click",e=>{e.stopPropagation();const a=e.target.dataset&&e.target.dataset.m;if(a==="yes"){const o={};m.querySelectorAll("[data-v]").forEach(x=>{o[x.dataset.v]=x.value});done(o)}else if(a==="no"||e.target===m)done(null)});
   const f=m.querySelector("[data-v]")||m.querySelector('[data-m="yes"]');if(f)f.focus()})}
 async function rdClick(A,b){
+  if(/^rdKm/.test(A)&&await kmClick(A,b))return true; /* v245 */
   if(/^rd(Col|Apr(Nuevo|Ed)$)/.test(A)&&await rdColClick(A,b))return true; /* v117: colaboradores y aprobadores */
   if(A==="rdAutoCont"){if(!esAdmin())return true;const on=!rdAutoCont();
     if(on&&!await ask("¿Activar la revisión de las propias rendiciones?","Quien es de Contabilidad podrá revisar, aprobar y contabilizar también su propia rendición. Queda anotado en cada una. Apágalo cuando vuelva la persona que falta.","Activar"))return true;
@@ -2992,6 +2998,171 @@ async function rdChange(ev){const t=ev.target;
   if(t.dataset.rdfoto){if(!editaPersona(rdv))return true;const files=[...t.files];t.value="";const ok=files.filter(f=>esImagen(f)||esPdf(f));if(ok.length<files.length)toast(ok.length?"Se omiten los archivos que no son fotos ni PDF.":"Elige fotos o PDF de facturas y boletas.");const R=rdv,ks=[];for(const f of ok)ks.push(await rdAgregarDoc(R,f));rdTrasSubir(R,ks);return true}
   if(t.dataset.rdrefoto){const f=t.files[0];t.value="";if(f&&rdd&&editaPersona(rdv))await rdCambiarDoc(rdv,rdd,f);return true}
   return rdInput(ev)}
+/* ---------- v245: kilometraje en vehículo propio ----------
+   Benja (25-11-2026): «agregar un tipo de rendición para personas que rinden el uso de su vehículo: marcar en un mapa 2 puntos, y que
+   cada persona tenga una tarifa, por ejemplo 350 $/km». Decidió: km por camino calculados por el servidor (OpenRouteService, ruta
+   /ruta), sin corregirlos a mano. Es un documento sin boleta (tipo «km»): su «foto» es la imagen del mapa con la ruta, así sirve en el
+   PDF, en el Excel y al revisar. Monto = km × la tarifa de la persona (Colaboradores, «Tarifa km»), que queda guardada en el documento. */
+const KM_GASTO="kilometraje",KM_LIB="lib/leaflet-1.9.4/",KM_CENTRO=[-40.574,-73.133]; /* Osorno */
+const esKm=d=>!!d&&d.tipo==="km";
+const kmTarifa=r=>{const c=colabDe(r);const t=c?Math.round(num(c.tarifaKm)):0;return t>0?t:0};
+const kmTxt=n=>{n=Math.round(num(n)*10)/10;return n.toLocaleString("es-CL",{minimumFractionDigits:n%1?1:0,maximumFractionDigits:1})};
+const kmLinea=d=>{const k=d.km||{};if(!k.o||!k.d)return"";return `${d.glosa?"  · ":""}${k.o.n} – ${k.d.n}${k.ida?" (ida y vuelta)":""} · ${kmTxt(k.km)} km x ${fmtP(k.tarifa)}`};
+const kmPuede=()=>catalogo().some(t=>t.id===KM_GASTO);
+const ICO_KM=`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/><circle cx="7.5" cy="13.5" r="1"/><circle cx="16.5" cy="13.5" r="1"/></svg>`;
+function kmBotonHTML(r){if(!kmPuede()||!kmTarifa(r))return""; /* por ahora solo quien tiene tarifa en Colaboradores (Benja, 25-11-2026) */
+  return `<div class="btns"><button class="btn" data-a="rdKmNuevo" style="flex:1"><span class="icw" aria-hidden="true">${ICO_KM}</span> Kilometraje en vehículo propio</button></div>`}
+let KM_P=null;
+function kmLib(){if(window.L&&window.L.map)return Promise.resolve();if(KM_P)return KM_P;
+  KM_P=new Promise((res,rej)=>{if(!document.querySelector("link[data-km]")){const l=document.createElement("link");l.rel="stylesheet";l.href=KM_LIB+"leaflet.css";l.dataset.km="1";document.head.appendChild(l)}
+    const s=document.createElement("script");s.src=KM_LIB+"leaflet.js";s.onload=()=>res();s.onerror=()=>{KM_P=null;s.remove();rej(new Error("No se pudo cargar el mapa."))};document.head.appendChild(s)});
+  return KM_P}
+/* KMED: el recorrido que se está marcando. o/d = {lat,lon,n}; ruta = {km, geo:[[lat,lon]…]} del servidor */
+let KMED=null,KM_MAP=null,KM_CAPAS=null;
+function kmAbrir(r,d){const c=colabDe(r),k=d&&d.km||{};
+  KMED={rid:r.id,k:d?d.k:null,o:k.o||null,d:k.d||null,ida:d?!!k.ida:true,ruta:k.o&&k.d&&k.kmRuta?{km:k.kmRuta,geo:k.geo||[]}:null,est:"",err:"",activo:k.o?"d":"o",
+    fecha:d?d.fecha||today():today(),glosa:d?d.glosa||"":"",centro:d?d.centro||"":(c&&centroExiste(c.centro)?c.centro:""),res:null};
+  go("rdkm")}
+const kmPuntoTxt=p=>p?esc(p.n||`${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}`):"";
+function kmResumenHTML(){const E=KMED,r=REND[E.rid],t=kmTarifa(r);
+  if(!E.o||!E.d)return `<p class="kmres vacio">${E.o?"Ahora marca el destino (B): toca el mapa o búscalo.":"Marca el origen (A): toca el mapa, búscalo o usa tu ubicación."}</p>`;
+  if(E.est==="calculando")return `<p class="kmres"><span class="spin" aria-hidden="true"></span> Calculando los km por camino…</p>`;
+  if(E.est==="error"||!E.ruta)return `<p class="kmres err">${esc(E.err||"No se pudo calcular la ruta.")} <button type="button" class="lnk" data-a="rdKmCalc">Reintentar</button></p>`;
+  const km=Math.round(E.ruta.km*(E.ida?2:1)*10)/10,tot=Math.round(km*t);
+  return `<div class="kmres ok"><span>${kmTxt(E.ruta.km)} km por camino${E.ida?" × 2 (ida y vuelta)":""} = <b>${kmTxt(km)} km</b></span>
+    <span>${t?`${kmTxt(km)} km × ${fmtP(t)} por km = <b class="kmtot">${fmtP(tot)}</b>`:`<b class="kmsin">Tu tarifa por km no está registrada.</b> Pídela a Contabilidad.`}</span></div>`}
+function renderRDKm(){const E=KMED,r=E&&REND[E.rid];if(!r)return renderRD();const t=kmTarifa(r);
+  const seg=(v,l,p)=>`<button type="button" class="kmpt${E.activo===v?" act":""}" data-a="rdKmAct" data-v="${v}" aria-pressed="${E.activo===v}"><span class="kmlet ${v}">${l}</span><span class="kmpn${p?"":" vacio"}">${p?kmPuntoTxt(p):v==="o"?"Origen: toca para marcarlo":"Destino: toca para marcarlo"}</span></button>`;
+  return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rdKmVolver">${esc(rdTituloCorto(r))}</button><div class="ttl">Kilometraje</div>${estadoChip()}</div></div></div>
+  <main class="wrap kmw">
+    <p class="note">Marca dónde partiste (A) y adónde fuiste (B). La app calcula los km por camino y el monto con tu tarifa${t?` (${fmtP(t)} por km)`:""}.</p>
+    <div class="kmpts">${seg("o","A",E.o)}${seg("d","B",E.d)}</div>
+    <div class="kmbus"><input id="kmQ" type="search" placeholder="Buscar un lugar o dirección" autocomplete="off" enterkeyhint="search" value=""><button type="button" class="btn" data-a="rdKmBuscar">Buscar</button><button type="button" class="btn" data-a="rdKmYo" aria-label="Usar mi ubicación">Mi ubicación</button></div>
+    <div id="kmLug" class="kmlug"></div>
+    <div id="kmMapa" class="kmmapa" role="application" aria-label="Mapa: toca para marcar el punto ${E.activo==="o"?"A (origen)":"B (destino)"}"><div class="kmcarga">Cargando el mapa…</div></div>
+    <label class="kmida"><input type="checkbox" id="kmIda" ${E.ida?"checked":""}> Ida y vuelta (se cuentan los km dos veces)</label>
+    <div id="kmRes">${kmResumenHTML()}</div>
+    <div class="f"><label for="kmFe">Fecha del viaje</label><input id="kmFe" type="date" value="${esc(E.fecha)}" max="${today()}"></div>
+    <div class="f"><label for="kmGl">Motivo del viaje</label><input id="kmGl" value="${esc(E.glosa)}" placeholder="Ej.: visita a Coipomó por la revisión de la sala" autocomplete="off"></div>
+    <div class="btns"><button class="btn" data-a="rdKmVolver">Cancelar</button><button class="btn pri" data-a="rdKmGuardar" style="flex:1" ${t?"":"disabled"}>${E.k?"Guardar el recorrido":"Agregar a la rendición"}</button></div>
+    <p class="note kmatr">Mapa: © OpenStreetMap. Ruta: openrouteservice.org. Los km quedan como los calcula la app; si el camino fue otro, marca el recorrido de nuevo.</p>
+  </main>`}
+function kmPintar(){const el=document.getElementById("kmRes");if(el)el.innerHTML=kmResumenHTML();
+  document.querySelectorAll(".kmpt").forEach(b=>{const v=b.dataset.v,p=KMED[v];b.classList.toggle("act",KMED.activo===v);b.setAttribute("aria-pressed",KMED.activo===v);const s=b.querySelector(".kmpn");s.classList.toggle("vacio",!p);s.innerHTML=p?kmPuntoTxt(p):v==="o"?"Origen: toca para marcarlo":"Destino: toca para marcarlo"});
+  kmCapas()}
+/* el mapa (Leaflet): se arma de nuevo en cada render y dibuja lo que está en KMED */
+async function kmMontar(){if(view!=="rdkm"||!KMED)return;const el=document.getElementById("kmMapa");if(!el)return;
+  ["kmFe","kmGl"].forEach(id=>{const i=document.getElementById(id);if(i)i.addEventListener("input",()=>{if(id==="kmFe")KMED.fecha=i.value;else KMED.glosa=i.value})});
+  const ida=document.getElementById("kmIda");if(ida)ida.addEventListener("change",()=>{KMED.ida=ida.checked;kmPintar()});
+  const q=document.getElementById("kmQ");if(q)q.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();kmBuscar()}});
+  try{await kmLib()}catch(e){el.innerHTML=`<div class="kmcarga">No se pudo cargar el mapa. Revisa la señal y vuelve a intentar.</div>`;return}
+  if(view!=="rdkm"||!document.body.contains(el))return;
+  if(KM_MAP){try{KM_MAP.remove()}catch(e){}KM_MAP=null}el.innerHTML="";
+  const m=L.map(el,{zoomControl:true,attributionControl:true}).setView(KM_CENTRO,10);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(m);
+  m.on("click",e=>kmPoner({lat:e.latlng.lat,lon:e.latlng.lng}));
+  KM_MAP=m;KM_CAPAS=L.layerGroup().addTo(m);kmCapas(true)}
+function kmCapas(ajustar){if(!KM_MAP||!KM_CAPAS||!KMED)return;KM_CAPAS.clearLayers();const E=KMED,B=[];
+  const ic=(t,c)=>L.divIcon({className:"kmpin "+c,html:`<span>${t}</span>`,iconSize:[30,30],iconAnchor:[15,15]});
+  if(E.ruta&&E.ruta.geo&&E.ruta.geo.length>1){L.polyline(E.ruta.geo,{color:"#ffffff",weight:8,opacity:.9}).addTo(KM_CAPAS);L.polyline(E.ruta.geo,{color:"#2c4ca4",weight:5}).addTo(KM_CAPAS);E.ruta.geo.forEach(p=>B.push(p))}
+  if(E.o){L.marker([E.o.lat,E.o.lon],{icon:ic("A","o"),keyboard:false}).addTo(KM_CAPAS);B.push([E.o.lat,E.o.lon])}
+  if(E.d){L.marker([E.d.lat,E.d.lon],{icon:ic("B","d"),keyboard:false}).addTo(KM_CAPAS);B.push([E.d.lat,E.d.lon])}
+  if(ajustar&&B.length>1)KM_MAP.fitBounds(B,{padding:[30,30]});else if(ajustar&&B.length===1)KM_MAP.setView(B[0],13)}
+async function kmPoner(p,nombre){const E=KMED;if(!E)return;const v=E.activo;E[v]={lat:+p.lat,lon:+p.lon,n:nombre||"Buscando el nombre…"};
+  E.ruta=null;E.est="";if(v==="o"&&!E.d)E.activo="d";kmPintar();
+  if(!nombre){const pt=E[v];try{const x=await srvFetch(`/lugar?lat=${pt.lat.toFixed(6)}&lon=${pt.lon.toFixed(6)}`);const j=await x.json();pt.n=(x.ok&&j.lugares&&j.lugares[0]&&j.lugares[0].n)||`${pt.lat.toFixed(4)}, ${pt.lon.toFixed(4)}`}catch(e){pt.n=`${pt.lat.toFixed(4)}, ${pt.lon.toFixed(4)}`}
+    if(KMED!==E)return;kmPintar()}
+  if(E.o&&E.d)kmCalcular()}
+async function kmCalcular(){const E=KMED;if(!E||!E.o||!E.d)return;if(navigator.onLine===false){E.est="error";E.err="Sin señal: los km se calculan con conexión.";kmPintar();return}
+  E.est="calculando";E.ruta=null;kmPintar();
+  try{const x=await srvFetch("/ruta",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({puntos:[[E.o.lat,E.o.lon],[E.d.lat,E.d.lon]]})});const j=await x.json().catch(()=>({}));
+    if(KMED!==E)return;if(!x.ok||!(num(j.km)>0))throw{error:j.error||"No se pudo calcular la ruta."};E.ruta={km:Math.round(num(j.km)*10)/10,geo:Array.isArray(j.geo)?j.geo:[]};E.est=""}
+  catch(e){if(KMED!==E)return;E.est="error";E.err=(e&&e.error)||"No se pudo calcular la ruta. Revisa la señal y vuelve a intentar."}
+  kmPintar();kmCapas(true)}
+async function kmBuscar(){const q=(document.getElementById("kmQ")||{}).value||"",box=document.getElementById("kmLug");if(!box)return;
+  if(q.trim().length<3){box.innerHTML=`<p class="hint">Escribe al menos 3 letras.</p>`;return}box.innerHTML=`<p class="hint"><span class="spin" aria-hidden="true"></span> Buscando…</p>`;
+  try{const x=await srvFetch("/lugar?q="+encodeURIComponent(q.trim()));const j=await x.json();if(!x.ok)throw{error:j.error};KMED.res=j.lugares||[];
+    box.innerHTML=KMED.res.length?KMED.res.map((l,i)=>`<button type="button" class="kmlr" data-a="rdKmLugar" data-i="${i}">${esc(l.n)}</button>`).join(""):`<p class="hint">No se encontró. Prueba con otro nombre o toca el mapa.</p>`}
+  catch(e){box.innerHTML=`<p class="hint">${esc((e&&e.error)||"No se pudo buscar. Toca el lugar en el mapa.")}</p>`}}
+/* imagen del recorrido (la «foto» del documento): calles de OpenStreetMap si se pueden bajar; si no, fondo liso. Ruta, A, B y el cálculo abajo */
+async function kmImagen(E,tarifa){const W=900,H=600,PIE=118,MH=H-PIE,cv=document.createElement("canvas");cv.width=W;cv.height=H;const g=cv.getContext("2d");
+  const P=(E.ruta&&E.ruta.geo&&E.ruta.geo.length>1?E.ruta.geo:[]).concat([[E.o.lat,E.o.lon],[E.d.lat,E.d.lon]]);
+  const mx=lon=>(lon+180)/360,my=lat=>{const s=Math.sin(lat*Math.PI/180);return .5-Math.log((1+s)/(1-s))/(4*Math.PI)};
+  const X0=Math.min(...P.map(p=>mx(p[1]))),X1=Math.max(...P.map(p=>mx(p[1]))),Y0=Math.min(...P.map(p=>my(p[0]))),Y1=Math.max(...P.map(p=>my(p[0])));
+  let z=16;while(z>3&&((X1-X0)*256*2**z>W-90||(Y1-Y0)*256*2**z>MH-90))z--;
+  const S=256*2**z,cx=(X0+X1)/2*S,cy=(Y0+Y1)/2*S,ox=cx-W/2,oy=cy-MH/2,px=p=>[mx(p[1])*S-ox,my(p[0])*S-oy];
+  const fondo=()=>{g.fillStyle="#eef1ec";g.fillRect(0,0,W,MH);g.strokeStyle="#dde3dc";g.lineWidth=1;for(let x=0;x<W;x+=60){g.beginPath();g.moveTo(x,0);g.lineTo(x,MH);g.stroke()}for(let y=0;y<MH;y+=60){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke()}};
+  let calles=false;
+  try{const t0x=Math.floor(ox/256),t1x=Math.floor((ox+W)/256),t0y=Math.floor(oy/256),t1y=Math.floor((oy+MH)/256),L2=[];
+    for(let tx=t0x;tx<=t1x;tx++)for(let ty=t0y;ty<=t1y;ty++)L2.push({tx,ty});
+    if(L2.length>30||navigator.onLine===false)throw 0;
+    const im=await Promise.all(L2.map(t=>new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";const to=setTimeout(()=>rej(0),8000);i.onload=()=>{clearTimeout(to);res({t,i})};i.onerror=()=>{clearTimeout(to);rej(0)};i.src=`https://tile.openstreetmap.org/${z}/${t.tx}/${t.ty}.png`})));
+    g.fillStyle="#eef1ec";g.fillRect(0,0,W,MH);im.forEach(({t,i})=>g.drawImage(i,t.tx*256-ox,t.ty*256-oy));g.getImageData(0,0,1,1);calles=true}
+  catch(e){fondo()}
+  const geo=E.ruta&&E.ruta.geo&&E.ruta.geo.length>1?E.ruta.geo:[[E.o.lat,E.o.lon],[E.d.lat,E.d.lon]];
+  [["#ffffff",10],["#2c4ca4",6]].forEach(([c,w])=>{g.strokeStyle=c;g.lineWidth=w;g.lineJoin="round";g.lineCap="round";g.beginPath();geo.forEach((p,i)=>{const[x,y]=px(p);i?g.lineTo(x,y):g.moveTo(x,y)});g.stroke()});
+  [[E.o,"A","#1e6e32"],[E.d,"B","#aa2828"]].forEach(([p,t,c])=>{const[x,y]=px([p.lat,p.lon]);g.fillStyle="#ffffff";g.beginPath();g.arc(x,y,17,0,7);g.fill();g.fillStyle=c;g.beginPath();g.arc(x,y,14,0,7);g.fill();g.fillStyle="#fff";g.font="bold 16px Helvetica, Arial, sans-serif";g.textAlign="center";g.textBaseline="middle";g.fillText(t,x,y+1)});
+  if(calles){g.fillStyle="rgba(255,255,255,.8)";g.fillRect(W-150,MH-20,150,20);g.fillStyle="#333";g.font="12px Helvetica, Arial, sans-serif";g.textAlign="right";g.textBaseline="middle";g.fillText("© OpenStreetMap",W-8,MH-10)}
+  const km=Math.round(E.ruta.km*(E.ida?2:1)*10)/10,tot=Math.round(km*tarifa);
+  g.fillStyle="#ffffff";g.fillRect(0,MH,W,PIE);g.fillStyle="#2c4ca4";g.fillRect(0,MH,W,4);g.textAlign="left";g.textBaseline="alphabetic";
+  const corto=(s,n)=>{s=String(s||"");return s.length>n?s.slice(0,n-1)+"…":s};
+  g.fillStyle="#1e6e32";g.font="bold 17px Helvetica, Arial, sans-serif";g.fillText("A",18,MH+32);g.fillStyle="#222";g.font="16px Helvetica, Arial, sans-serif";g.fillText(corto(E.o.n,92),40,MH+32);
+  g.fillStyle="#aa2828";g.font="bold 17px Helvetica, Arial, sans-serif";g.fillText("B",18,MH+58);g.fillStyle="#222";g.font="16px Helvetica, Arial, sans-serif";g.fillText(corto(E.d.n,92),40,MH+58);
+  g.fillStyle="#222";g.font="bold 18px Helvetica, Arial, sans-serif";g.fillText(`${kmTxt(E.ruta.km)} km por camino${E.ida?" × 2 (ida y vuelta)":""} = ${kmTxt(km)} km × ${fmtP(tarifa)} por km = ${fmtP(tot)}`,18,MH+92);
+  g.fillStyle="#666";g.font="13px Helvetica, Arial, sans-serif";g.fillText(`Viaje del ${fmtD(E.fecha)} · ruta calculada por la app (openrouteservice.org)`,18,MH+111);
+  const dataURL=cv.toDataURL("image/jpeg",0.86),blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.86));return{dataURL,blob}}
+/* simplifica la ruta para guardarla (hasta ~120 puntos) */
+const kmGeoCorta=G=>{if(!Array.isArray(G)||G.length<=120)return G||[];const p=Math.ceil(G.length/120),o=G.filter((x,i)=>i%p===0);if(o[o.length-1]!==G[G.length-1])o.push(G[G.length-1]);return o.map(x=>[Math.round(x[0]*1e5)/1e5,Math.round(x[1]*1e5)/1e5])};
+async function kmGuardar(){const E=KMED,r=E&&REND[E.rid];if(!r||!editaPersona(r))return;const t=kmTarifa(r);
+  const fe=document.getElementById("kmFe"),gl=document.getElementById("kmGl");if(fe)E.fecha=fe.value;if(gl)E.glosa=gl.value.trim();
+  const falta=!E.o?"Marca el origen (A).":!E.d?"Marca el destino (B).":!E.ruta?"Espera a que se calculen los km.":!t?"Tu tarifa por km no está registrada: pídela a Contabilidad.":!E.fecha?"Indica la fecha del viaje.":E.fecha>today()?"La fecha no puede ser futura.":!E.glosa?"Escribe el motivo del viaje.":"";
+  if(falta){toast(falta,5000);return}
+  const km=Math.round(E.ruta.km*(E.ida?2:1)*10)/10,tot=Math.round(km*t);
+  let img;try{img=await kmImagen(E,t)}catch(e){console.warn(e);toast("No se pudo armar la imagen del recorrido.");return}
+  let d=E.k&&r.docs[E.k];const nuevo=!d,ant=d&&d.foto;
+  if(nuevo)d={k:"d"+uid(),creado:new Date().toISOString(),tipo:"km",emisor:"Vehículo propio",rut:"",folio:"",neto:0,iva:0,gasto:KM_GASTO,centro:E.centro||""};
+  Object.assign(d,{fecha:E.fecha,total:tot,glosa:E.glosa,revisadoManual:true,km:{o:E.o,d:E.d,ida:!!E.ida,kmRuta:E.ruta.km,km,tarifa:t,geo:kmGeoCorta(E.ruta.geo),hora:new Date().toISOString()}});
+  if(d.estadoRev==="obs"){d.corregido=true}
+  const foto=await rdGuardarFoto(r,d,img);if(!foto)return;
+  if(nuevo)r.docs[d.k]=d;d.foto=foto;if(ant&&ant!==foto)try{borrarFotoRef(ant)}catch(e){}
+  rdv=r;rdTouch();KMED=null;rdd=d;go("rdd");toast(nuevo?"Kilometraje agregado.":"Recorrido guardado.")}
+/* ficha del documento de kilometraje (quien rinde y quien revisa) */
+function kmFichaHTML(r,d,P,edita,persona){const k=d.km||{},cat=gastoDe(d),centro=centroDoc(r,d),rev=rdRevisa(r),tot=num(d.total);
+  const L=rdcItems(r,d,P,{cont:esContab()&&rev});
+  const fila=(attrs,et,val,vacio,id)=>{const mk=id&&rdcMarca(L,id),c=mk?mk.cls:"",m=mk?mk.msg:"",dd=id?` data-dato="${id}"`:"";return edita?`<button type="button" class="rdok-r${c}"${dd} ${attrs}><span class="rdok-et">${et}</span><span class="rdok-v${vacio?" vacio":""}">${val}</span>${ICO_CHEV}${m}</button>`
+    :`<div class="rdok-r fija${c}"${dd}><span class="rdok-et">${et}</span><span class="rdok-v${vacio?" vacio":""}">${val}</span>${m}</div>`};
+  const fija=(et,val)=>`<div class="rdok-r fija"><span class="rdok-et">${et}</span><span class="rdok-v">${val}</span></div>`;
+  const est=!rev?"":d.estadoRev==="ok"?`<p class="rdfic-e ok">${RDFIC_OK}Revisado</p>`
+    :d.estadoRev==="obs"?`<div class="rdfic-e obs"><span>${ICO_ALERTA}<span><b>Por corregir</b>${d.obsRev?`: ${esc(d.obsRev)}`:""}</span></span><button type="button" class="lnk" data-a="rdRevQuitar">Quitar</button></div>`:"";
+  const av=P.a;
+  return `<section class="rdok rdfic rdkmf" aria-label="Kilometraje en vehículo propio">${est}
+    <div class="rdok-cab fija"><span class="rdok-em">${ICO_KM} Kilometraje en vehículo propio</span><span class="rdok-meta">${esc(d.fecha?fmtD(d.fecha):"sin fecha")}</span><span class="rdok-tot">${tot?fmtP(tot):"Sin total"}</span>${k.km?`<span class="rdok-iva">${kmTxt(k.km)} km × ${fmtP(k.tarifa)} por km</span>`:""}</div>
+    <div class="rdok-l">
+      ${fija(`<span class="kmlet o">A</span> Origen`,k.o?kmPuntoTxt(k.o):"Sin marcar")}
+      ${fija(`<span class="kmlet d">B</span> Destino`,k.d?kmPuntoTxt(k.d):"Sin marcar")}
+      ${fija("Recorrido",k.kmRuta?`${kmTxt(k.kmRuta)} km por camino${k.ida?" · ida y vuelta":" · solo ida"}`:"Sin calcular")}
+      ${fila(`data-a="rdPick" data-f="centro"`,"Centro de costo",centro?esc(centroNombre(centro)):"Elegir",!centro,"rdCe")}
+      ${fija("Tipo de gasto",cat?esc(cat.n):"Kilometraje en vehículo propio")}
+      ${fila(`data-a="rdDetalle"`,"Motivo",d.glosa?esc(d.glosa):"Agregar el motivo del viaje",!d.glosa,"rdGl")}
+    </div>
+    ${av.length?`<p class="rdok-av">${ICO_ALERTA}<span>${esc(av.slice(0,3).join(" "))}</span></p>`:""}
+    ${persona&&edita?`<button type="button" class="btn rdok-ed" data-a="rdKmEditar">Cambiar el recorrido</button>`:""}
+  </section>`}
+async function kmClick(A,b){
+  if(A==="rdKmNuevo"){const r=rdv;if(!r||!editaPersona(r))return true;if(!kmTarifa(r)){await ask("Falta tu tarifa por km","Para rendir kilometraje, Contabilidad tiene que registrar tu tarifa (pesos por km) en la lista de colaboradores. Pídesela y vuelve a intentar.","Entendido");return true}
+    await flush();kmAbrir(r,null);return true}
+  if(A==="rdKmEditar"){if(!rdv||!rdd||!editaPersona(rdv)||!esKm(rdd))return true;kmAbrir(rdv,rdd);return true}
+  if(A==="rdKmVolver"){const E=KMED;KMED=null;if(KM_MAP){try{KM_MAP.remove()}catch(e){}KM_MAP=null}if(E&&E.k&&rdv&&rdv.docs[E.k]){rdd=rdv.docs[E.k];go("rdd")}else go("rdv");return true}
+  if(!KMED)return false;
+  if(A==="rdKmAct"){KMED.activo=b.dataset.v==="d"?"d":"o";kmPintar();return true}
+  if(A==="rdKmBuscar"){await kmBuscar();return true}
+  if(A==="rdKmLugar"){const l=KMED.res&&KMED.res[+b.dataset.i];if(!l)return true;const box=document.getElementById("kmLug");if(box)box.innerHTML="";const q=document.getElementById("kmQ");if(q)q.value="";
+    if(KM_MAP)KM_MAP.setView([l.lat,l.lon],13);await kmPoner({lat:l.lat,lon:l.lon},l.n);return true}
+  if(A==="rdKmYo"){if(!navigator.geolocation){toast("Este teléfono no entrega la ubicación.");return true}toast("Buscando tu ubicación…");
+    navigator.geolocation.getCurrentPosition(p=>{if(!KMED)return;if(KM_MAP)KM_MAP.setView([p.coords.latitude,p.coords.longitude],14);kmPoner({lat:p.coords.latitude,lon:p.coords.longitude})},()=>toast("No se pudo obtener tu ubicación. Toca el lugar en el mapa."),{enableHighAccuracy:true,timeout:15000});return true}
+  if(A==="rdKmCalc"){await kmCalcular();return true}
+  if(A==="rdKmGuardar"){await kmGuardar();return true}
+  return false}
 async function rdGuardarFoto(r,d,file){
   let img;try{img=file&&file.dataURL&&file.blob?file:await compress(file,2560,0.8)}catch(e){toast(msgImg(e,file),7000);return null}
   let ref=null;if(IDB.db){const t="q:"+uid();try{const buf=await img.blob.arrayBuffer();await IDB.put("fotos",t,{data:buf,type:"image/jpeg",actaId:r.id,k:d.k,col:"rendiciones"});QF[t]={actaId:r.id,k:d.k,col:"rendiciones"};ref=t}catch(e){}}
@@ -3181,7 +3352,7 @@ async function rdPdf(r,subir){
     if(d.estadoRev==="obs"){doc.setFillColor(250,228,228);doc.rect(X,y-3.8,W,h,"F")}
     let x=X;doc.setFontSize(8.5);const v=[d.fecha?fmtD(d.fecha):"",null,d.rut||"",d.folio||"",null,fmtDoc(d)];
     cols.forEach((c,i)=>{if(i===1)doc.text(em,x+1.5,y);else if(i===4)doc.text(pg,x+1.5,y);else doc.text(String(v[i]),c.r?x+c.w-1.5:x+1.5,y,c.r?{align:"right"}:undefined);x+=c.w});
-    if(d.glosa||d.obsRev||colPersTxt(d)){doc.setTextColor(90);doc.setFontSize(7.8);doc.text(doc.splitTextToSize((d.glosa?d.glosa:"")+(colPersTxt(d)?`${d.glosa?"  · ":""}${colPersTxt(d)}`:"")+(d.obsRev?`  · Obs.: ${d.obsRev}`:""),W-22)[0],X+19.5,y+Math.max(em.length,pg.length)*4-0.5);doc.setTextColor(0)}
+    if(d.glosa||d.obsRev||colPersTxt(d)||esKm(d)){doc.setTextColor(90);doc.setFontSize(7.8);doc.text(doc.splitTextToSize((d.glosa?d.glosa:"")+(esKm(d)?kmLinea(d):"")+(colPersTxt(d)?`${d.glosa?"  · ":""}${colPersTxt(d)}`:"")+(d.obsRev?`  · Obs.: ${d.obsRev}`:""),W-22)[0],X+19.5,y+Math.max(em.length,pg.length)*4-0.5);doc.setTextColor(0)}
     y+=h});
   chk(8);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(`Total ${fmtP(totalRend(r))}`,X+W-1.5,y+1,{align:"right"});doc.setFont("helvetica","normal");y+=10;
   /* fotos, 2 por fila */
@@ -3196,4 +3367,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="244"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="245"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
