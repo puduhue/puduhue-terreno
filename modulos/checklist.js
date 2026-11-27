@@ -836,10 +836,8 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
     const filas=A.map(a=>{const g=it=>rkSec(it)===a.id;return{nom:a.nom,c:P.map(q=>{const v=VIS[q.id];if(!v)return null;const p=puntaje(v,g);return p.n?p.pct:null}),acc:ACC[a.id][x.u]}}).filter(f=>f.acc!==undefined&&f.acc!==null);
     const ancho=Math.max(wS+P.length*wc+wA,78),mas=x.vis.length>VMAX,alto=6.5+8.5+(filas.length+1)*h+(mas?4.5:0);
     if(!dib)return{w:ancho,h:alto};
-    let yy=Y0+4;const xA=X0+ancho-wA,pt=`${rkNum(x.acc)} %`;
-    d.setFont("helvetica","bold");d.setFontSize(10);d.setTextColor(30);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,ancho-34)[0],X0,yy);
-    d.setTextColor(...COL[sc(x.acc)]);d.text(pt,X0+ancho,yy,{align:"right"});const wp=d.getTextWidth(pt);
-    d.setFont("helvetica","normal");d.setFontSize(8);d.setTextColor(...GR);d.text(`${x.vis.length} visitas ·`,X0+ancho-wp-1.5,yy,{align:"right"});yy+=2.5;
+    let yy=Y0+4;const xA=X0+ancho-wA;
+    d.setFont("helvetica","bold");d.setFontSize(10);d.setTextColor(30);d.text(d.splitTextToSize(`${x.pos}. ${x.u}`,ancho)[0],X0,yy);yy+=2.5; /* v251: sin «N visitas · X %» (Benja) */
     d.setFillColor(236,240,250);d.rect(X0,yy,ancho,8.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(50);d.text("Sección",X0+1.5,yy+5.4);
     P.forEach((q,i)=>{const cx=X0+wS+i*wc+wc/2;d.setFont("helvetica","bold");d.setFontSize(8);d.text(`${x.vis.length-P.length+i+1}.ª`,cx,yy+3.8,{align:"center"}); /* v247: por orden, como «Todas las visitas» */d.setFont("helvetica","normal");d.setFontSize(6.5);d.text(rkFc(q.fecha),cx,yy+7.2,{align:"center"})});
     d.setFont("helvetica","bold");d.setFontSize(8);d.text("A la fecha",xA+wA/2,yy+5.4,{align:"center"});yy+=8.5;
@@ -1549,4 +1547,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="250"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="251"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
