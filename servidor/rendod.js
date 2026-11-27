@@ -154,7 +154,7 @@ export function revisarRendicion(M, antes, despues, quien) {
       if (k === "aprobJef" && despues.aprobJef && String(despues.aprobJef.por || "").toLowerCase().indexOf("@") >= 0 && String(despues.aprobJef.por).toLowerCase() !== co) v.push("la aprobación debe quedar a nombre de quien aprueba");
       if (k === "docs") { const d0 = antes.docs || {}, d1 = despues.docs || {};
         if (!igual(Object.keys(d0).sort(), Object.keys(d1).sort())) { v.push("la jefatura no puede agregar ni quitar documentos"); return; }
-        for (const dk of Object.keys(d0)) for (const f of cambiadas(d0[dk], d1[dk])) if (!["estadoRev", "obsRev", "obsCampo", "obsValor"].includes(f)) v.push(`la jefatura no puede cambiar «docs.${dk}.${f}»`); }
+        for (const dk of Object.keys(d0)) for (const f of cambiadas(d0[dk], d1[dk])) if (!["estadoRev", "obsRev", "obsCampo", "obsValor", "noDup2"].includes(f)) v.push(`la jefatura no puede cambiar «docs.${dk}.${f}»`); } /* v238: «no es duplicado» */
     });
     return v;
   }
