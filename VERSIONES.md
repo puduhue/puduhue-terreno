@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 250 | 2026-11-27 | [7956ce9](https://github.com/puduhue/puduhue-terreno/tree/7956ce9) | Check list de visitas: Tradicional ya no muestra la sección Casa de huéspedes (no tiene; tampoco cuenta en sus visitas ya hechas ni en el ranking). |
 | 249 | 2026-11-27 | [c2f05aa](https://github.com/puduhue/puduhue-terreno/tree/c2f05aa) | Rendiciones: quien revisa (jefatura o Contabilidad) puede marcar «No es duplicado» en un posible duplicado (antes solo podía quitarlo); queda anotado con su nombre. Servidor v238. |
 | 248 | 2026-11-27 | [13063b1](https://github.com/puduhue/puduhue-terreno/tree/13063b1) | Informes con fotos (check list, actas, rendiciones): las fotos se bajan de a varias, con aviso del avance y tope de tiempo; antes, en el computador, el informe de una visita con muchas fotos podía tardar minutos sin decir nada. |
 | 247 | 2026-11-27 | [8c25d49](https://github.com/puduhue/puduhue-terreno/tree/8c25d49) | Check list, informe del ranking: «Puntaje general por visita · Compañía» (1.ª visita de todos los predios, 2.ª…) en vez de por mes, y el detalle por visita numerado por orden (1.ª, 2.ª), sin contar las anuladas. |
