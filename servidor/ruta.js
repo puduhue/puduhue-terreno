@@ -4,6 +4,23 @@
    La clave va como secreto ORS_CLAVE en Cloudflare (la crea Benja). Sin la clave, responde 503 con un mensaje claro. */
 const ORS = "https://api.heigit.org"; /* api.openrouteservice.org se retiró en noviembre de 2026 */
 const FOCO = { lat: -40.574, lon: -73.133 }; /* Osorno: los resultados de la búsqueda se ordenan desde aquí */
+/* v237: nombres de los lugares más claros (Benja: «¿por qué aparecen así y no como en Google Maps?»): la región con su nombre
+   completo (no «LR»), qué es cada resultado (ciudad, calle, sector…), la dirección con número y sin repetidos; la búsqueda solo
+   en el sur (RADIO_KM alrededor de Osorno). */
+const RADIO_KM = 350;
+const TIPO = { venue: "lugar", address: "dirección", street: "calle", neighbourhood: "sector", borough: "sector", locality: "ciudad", localadmin: "comuna", county: "provincia", region: "región" };
+const sinRegion = r => String(r || "").replace(/^Regi[oó]n( del| de)?\s+/i, "").trim(); /* «Región de Los Ríos» → «Los Ríos» */
+export function nombreLugar(pr, conTipo) {
+  pr = pr || {};
+  const base = pr.layer === "address" && pr.street ? `${pr.street}${pr.housenumber ? " " + pr.housenumber : ""}` : String(pr.name || pr.label || "").split(",")[0].trim();
+  const partes = [base];
+  const lugar = pr.locality || pr.localadmin || pr.county || "";
+  if (lugar && lugar.toLowerCase() !== base.toLowerCase()) partes.push(lugar);
+  const reg = sinRegion(pr.region);
+  if (reg && !partes.some(x => x.toLowerCase() === reg.toLowerCase())) partes.push(reg);
+  const n = partes.filter(Boolean).join(", ");
+  return conTipo && TIPO[pr.layer] ? `${n} · ${TIPO[pr.layer]}` : n;
+}
 const enChile = (lat, lon) => lat > -56.5 && lat < -17 && lon > -76.5 && lon < -66;
 const num = x => (typeof x === "number" ? x : parseFloat(x));
 
@@ -39,14 +56,19 @@ export async function buscarLugar(env, url) {
   let u;
   if (q) {
     if (q.length < 3) return { estado: 400, cuerpo: { error: "Escribe al menos 3 letras." } };
-    u = `${ORS}/pelias/v1/search?text=${encodeURIComponent(q)}&boundary.country=CL&focus.point.lat=${FOCO.lat}&focus.point.lon=${FOCO.lon}&size=6&lang=es`;
+    u = `${ORS}/pelias/v1/search?text=${encodeURIComponent(q)}&boundary.country=CL&boundary.circle.lat=${FOCO.lat}&boundary.circle.lon=${FOCO.lon}&boundary.circle.radius=${RADIO_KM}&focus.point.lat=${FOCO.lat}&focus.point.lon=${FOCO.lon}&size=10&lang=es`;
   } else if (isFinite(lat) && isFinite(lon) && enChile(lat, lon)) {
     u = `${ORS}/pelias/v1/reverse?point.lat=${lat}&point.lon=${lon}&size=1&lang=es`;
   } else return { estado: 400, cuerpo: { error: "Falta el texto o el punto." } };
   const r = await fetch(u, { headers: { Authorization: env.ORS_CLAVE, Accept: "application/json" } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { estado: 502, cuerpo: { error: "No se pudo buscar el lugar. Toca el lugar en el mapa." } };
-  const lugares = (j.features || []).map(f => ({ n: String((f.properties && (f.properties.label || f.properties.name)) || "").replace(/, Chile$/, ""), lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] }))
-    .filter(l => l.n && enChile(l.lat, l.lon));
+  const vistos = new Set(), lugares = [];
+  for (const f of j.features || []) {
+    const c = f.geometry && f.geometry.coordinates; if (!c) continue;
+    const l = { n: nombreLugar(f.properties, !!q), lat: c[1], lon: c[0] };
+    if (!l.n || !enChile(l.lat, l.lon) || vistos.has(l.n)) continue;
+    vistos.add(l.n); lugares.push(l); if (lugares.length >= 6) break;
+  }
   return { estado: 200, cuerpo: { ok: true, lugares } };
 }
