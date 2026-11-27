@@ -3020,18 +3020,18 @@ function kmLib(){if(window.L&&window.L.map)return Promise.resolve();if(KM_P)retu
 /* KMED: el recorrido que se está marcando. o/d = {lat,lon,n}; ruta = {km, geo:[[lat,lon]…]} del servidor */
 let KMED=null,KM_MAP=null,KM_CAPAS=null;
 function kmAbrir(r,d){const c=colabDe(r),k=d&&d.km||{};
-  KMED={rid:r.id,k:d?d.k:null,o:k.o||null,d:k.d||null,ida:d?!!k.ida:true,ruta:k.o&&k.d&&k.kmRuta?{km:k.kmRuta,geo:k.geo||[]}:null,est:"",err:"",activo:k.o?"d":"o",
+  KMED={rid:r.id,r,k:d?d.k:null, /* v246: la rendición abierta (una nueva no está en REND hasta guardar) */o:k.o||null,d:k.d||null,ida:d?!!k.ida:true,ruta:k.o&&k.d&&k.kmRuta?{km:k.kmRuta,geo:k.geo||[]}:null,est:"",err:"",activo:k.o?"d":"o",
     fecha:d?d.fecha||today():today(),glosa:d?d.glosa||"":"",centro:d?d.centro||"":(c&&centroExiste(c.centro)?c.centro:""),res:null};
   go("rdkm")}
 const kmPuntoTxt=p=>p?esc(p.n||`${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}`):"";
-function kmResumenHTML(){const E=KMED,r=REND[E.rid],t=kmTarifa(r);
+function kmResumenHTML(){const E=KMED,r=E.r,t=kmTarifa(r);
   if(!E.o||!E.d)return `<p class="kmres vacio">${E.o?"Ahora marca el destino (B): toca el mapa o búscalo.":"Marca el origen (A): toca el mapa, búscalo o usa tu ubicación."}</p>`;
   if(E.est==="calculando")return `<p class="kmres"><span class="spin" aria-hidden="true"></span> Calculando los km por camino…</p>`;
   if(E.est==="error"||!E.ruta)return `<p class="kmres err">${esc(E.err||"No se pudo calcular la ruta.")} <button type="button" class="lnk" data-a="rdKmCalc">Reintentar</button></p>`;
   const km=Math.round(E.ruta.km*(E.ida?2:1)*10)/10,tot=Math.round(km*t);
   return `<div class="kmres ok"><span>${kmTxt(E.ruta.km)} km por camino${E.ida?" × 2 (ida y vuelta)":""} = <b>${kmTxt(km)} km</b></span>
     <span>${t?`${kmTxt(km)} km × ${fmtP(t)} por km = <b class="kmtot">${fmtP(tot)}</b>`:`<b class="kmsin">Tu tarifa por km no está registrada.</b> Pídela a Contabilidad.`}</span></div>`}
-function renderRDKm(){const E=KMED,r=E&&REND[E.rid];if(!r)return renderRD();const t=kmTarifa(r);
+function renderRDKm(){const E=KMED,r=E&&E.r;if(!r)return renderRD();const t=kmTarifa(r);
   const seg=(v,l,p)=>`<button type="button" class="kmpt${E.activo===v?" act":""}" data-a="rdKmAct" data-v="${v}" aria-pressed="${E.activo===v}"><span class="kmlet ${v}">${l}</span><span class="kmpn${p?"":" vacio"}">${p?kmPuntoTxt(p):v==="o"?"Origen: toca para marcarlo":"Destino: toca para marcarlo"}</span></button>`;
   return `<div class="top"><div class="in"><div class="bar" style="padding-bottom:10px"><button class="back" data-a="rdKmVolver">${esc(rdTituloCorto(r))}</button><div class="ttl">Kilometraje</div>${estadoChip()}</div></div></div>
   <main class="wrap kmw">
@@ -3113,7 +3113,7 @@ async function kmImagen(E,tarifa){const W=900,H=600,PIE=118,MH=H-PIE,cv=document
   const dataURL=cv.toDataURL("image/jpeg",0.86),blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.86));return{dataURL,blob}}
 /* simplifica la ruta para guardarla (hasta ~120 puntos) */
 const kmGeoCorta=G=>{if(!Array.isArray(G)||G.length<=120)return G||[];const p=Math.ceil(G.length/120),o=G.filter((x,i)=>i%p===0);if(o[o.length-1]!==G[G.length-1])o.push(G[G.length-1]);return o.map(x=>[Math.round(x[0]*1e5)/1e5,Math.round(x[1]*1e5)/1e5])};
-async function kmGuardar(){const E=KMED,r=E&&REND[E.rid];if(!r||!editaPersona(r))return;const t=kmTarifa(r);
+async function kmGuardar(){const E=KMED,r=E&&E.r;if(!r||!editaPersona(r))return;const t=kmTarifa(r);
   const fe=document.getElementById("kmFe"),gl=document.getElementById("kmGl");if(fe)E.fecha=fe.value;if(gl)E.glosa=gl.value.trim();
   const falta=!E.o?"Marca el origen (A).":!E.d?"Marca el destino (B).":!E.ruta?"Espera a que se calculen los km.":!t?"Tu tarifa por km no está registrada: pídela a Contabilidad.":!E.fecha?"Indica la fecha del viaje.":E.fecha>today()?"La fecha no puede ser futura.":!E.glosa?"Escribe el motivo del viaje.":"";
   if(falta){toast(falta,5000);return}
@@ -3124,7 +3124,7 @@ async function kmGuardar(){const E=KMED,r=E&&REND[E.rid];if(!r||!editaPersona(r)
   Object.assign(d,{fecha:E.fecha,total:tot,glosa:E.glosa,revisadoManual:true,km:{o:E.o,d:E.d,ida:!!E.ida,kmRuta:E.ruta.km,km,tarifa:t,geo:kmGeoCorta(E.ruta.geo),hora:new Date().toISOString()}});
   if(d.estadoRev==="obs"){d.corregido=true}
   const foto=await rdGuardarFoto(r,d,img);if(!foto)return;
-  if(nuevo)r.docs[d.k]=d;d.foto=foto;if(ant&&ant!==foto)try{borrarFotoRef(ant)}catch(e){}
+  if(!r.docs)r.docs={};if(nuevo)r.docs[d.k]=d;d.foto=foto;if(ant&&ant!==foto)try{borrarFotoRef(ant)}catch(e){}
   rdv=r;rdTouch();KMED=null;rdd=d;go("rdd");toast(nuevo?"Kilometraje agregado.":"Recorrido guardado.")}
 /* ficha del documento de kilometraje (quien rinde y quien revisa) */
 function kmFichaHTML(r,d,P,edita,persona){const k=d.km||{},cat=gastoDe(d),centro=centroDoc(r,d),rev=rdRevisa(r),tot=num(d.total);
@@ -3367,4 +3367,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="245"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="246"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
