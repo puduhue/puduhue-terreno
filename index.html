@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-1fzLgvqqfjm13tWNUoICy4JoT3p92pGTZhSEWr3WOpw=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-UZ5CuqmqQrmVbNa84X1IUiDz9HVIqXOxzIK6hbIZ8qQ=' 'sha256-PlWTJ9+aRoLg9b5jbhn1J97pEx7ZcVZAZm4x85ADSmE=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://graph.microsoft.com https://login.microsoftonline.com https://login.microsoft.com https://login.windows.net https://*.sharepoint.com https://*.svc.ms https://*.1drv.com https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Puduhue Terreno</title>
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Puduhue Terreno">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#17375E">
-<link rel="stylesheet" href="estilos.css?v=247">
+<link rel="stylesheet" href="estilos.css?v=248">
 </head>
 <body>
 <div id="app"><div class="splash" role="status" aria-label="Abriendo Puduhue Terreno"><img src="icon-192.png" alt="" width="88" height="88"><span>Puduhue Terreno</span></div></div>
@@ -24,7 +24,7 @@
 <script src="lib/jspdf-2.5.1/jspdf.umd.min.js"></script>
 <script src="lib/marca-puduhue-2/marcas.js"></script>
 <script>
-const APP_VER="247";
+const APP_VER="248";
 const WORKER="https://puduhue-terreno.benjaminbarrientoscardenas.workers.dev";
 const PWA=true;
 const LOGO_R=420/380; /* v101: MARCA, MARCA_HZ y LOGO están en lib/marca-puduhue-2/marcas.js (v184: MARCA_HZ con el símbolo a color) */
@@ -2553,6 +2553,15 @@ async function pdfImg(ref){
   try{await esperarFoto(ref,20000);const im=await loadImg(fotoSrc(ref));let w=im.naturalWidth,h=im.naturalHeight;const s=Math.min(1,1100/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);
     const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);return{data:c.toDataURL("image/jpeg",0.8),w,h}}catch(e){return null}
 }
+/* v248: las fotos de un informe, de a 4 a la vez y con tope total; avisar = muestra el avance (al descargar, no al subir solo) */
+async function pdfImgs(refs,avisar,max){const L=[...new Set([...(refs||[])].filter(Boolean))],IM={},t0=Date.now(),tope=max||60000;let hechas=0,falta=0;
+  const pend=L.filter(r=>!FOTO[r]);if(avisar&&pend.length>2)toast(`Bajando las fotos: 0 de ${L.length}…`,tope);
+  let i=0;const uno=async()=>{while(i<L.length){const r=L[i++];if(Date.now()-t0>tope){IM[r]=null;falta++;continue}
+      IM[r]=await Promise.race([pdfImg(r),new Promise(res=>setTimeout(()=>res(null),Math.max(1000,tope-(Date.now()-t0))))]);if(!IM[r])falta++;hechas++;
+      if(avisar&&pend.length>2)toast(`Bajando las fotos: ${hechas} de ${L.length}…`,tope)}};
+  await Promise.all([uno(),uno(),uno(),uno()]);
+  if(avisar&&falta)toast(falta===1?"Una foto no se pudo bajar: el informe va sin ella (está en OneDrive).":`${falta} fotos no se pudieron bajar: el informe va sin ellas (están en OneDrive).`,6000);
+  return IM}
 /* ---------- PDF ---------- */
 function pdfKit(d){
   const L=15,W=180,C={band:[141,179,226],head:[221,235,247]};
@@ -2813,7 +2822,7 @@ async function descargarGeneral(a){
   prepActa(a);toast("Preparando el informe general…");await flush();
   const refs=new Set();Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>{if(!f.startsWith("p:"))refs.add(f)}));
   if(a.tipo==="devolucion"&&a.entregaId)ITEMS.forEach(i=>antesFotos(a,i.k).forEach(f=>refs.add(f)));
-  const IM={};for(const r of refs)IM[r]=await pdfImg(r);
+  const IM=await pdfImgs(refs,true); /* v248 */
   let doc;try{doc=buildGeneral(a,IM)}catch(e){console.error(e);toast("No se pudo generar el informe.");return}
   await guardarPDF(doc,nombreArchivo(a).replace(/^Acta_/,"Informe_general_"),"Informe general listo.");
 }
@@ -3230,7 +3239,7 @@ async function subirPDFsActa(a){
     const refs=new Set();Object.values(a.items||{}).forEach(r=>(r.fotos||[]).forEach(f=>{if(!f.startsWith("p:"))refs.add(f)}));
     if(a.tipo==="devolucion"&&a.entregaId)ITEMS.forEach(i=>antesFotos(a,i.k).forEach(f=>refs.add(f)));
     if([...refs].some(f=>QF[f]))return; /* todavía hay fotos por subir: se intenta de nuevo cuando terminen */
-    const IM={};for(const r of refs)IM[r]=await pdfImg(r);
+    const IM=await pdfImgs(refs,false); /* v248 */
     const d1=buildActa(a);await actaSubir(a,null,"Acta.pdf",d1.output("blob"),"application/pdf");
     const d2=buildGeneral(a,IM);await actaSubir(a,null,"Informe general.pdf",d2.output("blob"),"application/pdf");
     a.pdfs=new Date().toISOString();if(a.anulada)a.pdfsAnul=a.pdfs;else delete a.pdfsAnul;LOCAL[a.id]=a;await localPut(a);schedSync(500);
@@ -3975,10 +3984,10 @@ async function buscarUpdate(manual){
   finally{UPD_CHECKING=false}
 }
 </script>
-<script src="modulos/checklist.js?v=247"></script>
-<script src="modulos/bodega.js?v=247"></script>
-<script src="modulos/rendiciones.js?v=247"></script>
-<script src="modulos/actas-entrega.js?v=247"></script>
+<script src="modulos/checklist.js?v=248"></script>
+<script src="modulos/bodega.js?v=248"></script>
+<script src="modulos/rendiciones.js?v=248"></script>
+<script src="modulos/actas-entrega.js?v=248"></script>
 <script>
 /* v102: arranque. Va después de los módulos (modulos/*.js), para que todo el código esté cargado al iniciar. */
 const MOD_OK=["MOD_CHECKLIST","MOD_BODEGA","MOD_RENDICIONES","MOD_ACTAS_ENTREGA"].every(k=>window[k]===true); /* v103: todos los módulos */

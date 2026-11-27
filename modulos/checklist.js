@@ -1416,7 +1416,7 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
   const ITA=ITV.filter(it=>!esNA(it)),nNA=ITV.length-ITA.length;
   const conObs=ITA.filter(it=>{const r=v.items&&v.items[it.key];return r&&(clObs(r)||(r.fotos||[]).length||(esHallazgo(r.e)&&(r.acc||r.resp||r.plazo)))});
   const refs=[];conObs.forEach(it=>((v.items[it.key]||{}).fotos||[]).forEach(f=>refs.push(f)));
-  const IM={};for(const f of refs)IM[f]=await pdfImg(f);
+  const IM=await pdfImgs(refs,!subir); /* v248 */
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const L=15,W=180;let y=10;
   const nueva=()=>{d.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
   const COL={C:[30,110,50],P:[150,110,20],N:[170,40,40],NA:[110,110,110]};const FILL={C:[226,240,224],P:[244,236,206],N:[246,222,222],NA:[236,238,240]};
@@ -1544,4 +1544,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="247"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="248"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
