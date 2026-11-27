@@ -7,6 +7,7 @@ Se agrega una fila en cada publicación (ver CLAUDE.md, «Reglas fijas»).
 
 | Versión | Fecha | Commit | Resumen |
 |---|---|---|---|
+| 248 | 2026-11-27 | [13063b1](https://github.com/puduhue/puduhue-terreno/tree/13063b1) | Informes con fotos (check list, actas, rendiciones): las fotos se bajan de a varias, con aviso del avance y tope de tiempo; antes, en el computador, el informe de una visita con muchas fotos podía tardar minutos sin decir nada. |
 | 247 | 2026-11-27 | [8c25d49](https://github.com/puduhue/puduhue-terreno/tree/8c25d49) | Check list, informe del ranking: «Puntaje general por visita · Compañía» (1.ª visita de todos los predios, 2.ª…) en vez de por mes, y el detalle por visita numerado por orden (1.ª, 2.ª), sin contar las anuladas. |
 | 246 | 2026-11-27 | [f6490b1](https://github.com/puduhue/puduhue-terreno/tree/f6490b1) | Rendiciones: el kilometraje en vehículo propio funciona también en una rendición nueva (antes volvía a la misma página). |
 | 245 | 2026-11-26 | [8016580](https://github.com/puduhue/puduhue-terreno/tree/8016580) | Rendiciones: «Kilometraje en vehículo propio» con mapa (A y B, ida y vuelta, km por camino calculados por el servidor v236, monto = km × la tarifa de la persona; documento sin boleta con la imagen del recorrido); «Tarifa por km» en Colaboradores (solo quien la tiene ve el botón). Check list, ranking: San Francisco solo en «Predio». |
