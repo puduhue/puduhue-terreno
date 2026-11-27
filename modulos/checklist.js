@@ -260,6 +260,11 @@ const areasDe=tipo=>AREAS.filter(a=>enTipo(tipo,a.id));
    18-11-2026). San Francisco: todos los de Oficina y 3 de Sala de ordeña. Los demás predios y el catálogo no cambian. */
 const AREA_UNICA={id:"unico",name:"Predio",blocks:[]};
 const PRED_SOLO={"san francisco":{areas:["oficina"],claves:["cl-30","cl-31","cl-32"]}};
+/* v250: predios sin alguna sección (Benja, 27-11-2026: «Tradicional no tiene casa de huéspedes»): esas áreas no aparecen en sus visitas */
+const PRED_SIN={"tradicional":["casa"]};
+const predSin=p=>PRED_SIN[String(p||"").trim().toLowerCase()]||null;
+const PRED_SIN_C=new WeakMap();
+function predSinItems(L,Z){let m=PRED_SIN_C.get(L);if(!m){m={};PRED_SIN_C.set(L,m)}const k=Z.join("|");return m[k]||(m[k]=L.filter(i=>!Z.includes(i.area)))}
 const predSolo=p=>PRED_SOLO[String(p||"").trim().toLowerCase()]||null;
 /* áreas para las pestañas, el informe y el Excel: las del catálogo más «Predio» */
 const areasVis=tipo=>tipo==="visitas"?[AREA_UNICA].concat(areasDe(tipo)):areasDe(tipo);
@@ -278,11 +283,11 @@ function seccionesDe(tipo,items){const as=areasVis(tipo).filter(a=>items.some(i=
 /* Ítems de una visita: su copia propia (desde la v46) o el catálogo vigente, más los ítems retirados que esa visita sí evaluó; solo los de su check list */
 /* v116: los ítems del catálogo guardado en cada visita se arman una vez por visita (se usaban en cada tarjeta y predio) */
 const ITEMS_CAT=new WeakMap();
-function itemsDe(v){const L=itemsDe0(v),P=v&&tipoDe(v)==="visitas"&&predSolo(v.predio);return P?predItems(L,P):L}
+function itemsDe(v){const L=itemsDe0(v),P=v&&tipoDe(v)==="visitas"&&predSolo(v.predio);if(P)return predItems(L,P);const Z=v&&tipoDe(v)==="visitas"&&predSin(v.predio);return Z?predSinItems(L,Z):L}
 function itemsDe0(v){const t=tipoDe(v);if(v&&v.catalogo){let m=ITEMS_CAT.get(v.catalogo);if(!m){m={};ITEMS_CAT.set(v.catalogo,m)}return m[t]||(m[t]=v.catalogo.map(expandir).filter(i=>enTipo(t,i.area)))}return CL_ITEMS.filter(i=>enTipo(t,i.area)&&(!i.retirado||(v&&v.items&&v.items[i.key]&&v.items[i.key].e)))}
-function itemDe(v,key){if(v&&tipoDe(v)==="visitas"&&predSolo(v.predio))return itemsDe(v).find(i=>i.key===key)||null;if(v&&v.catalogo){const r=v.catalogo.find(x=>x[0]===key);if(r)return expandir(r)}return CL_BYKEY[key]||null}
+function itemDe(v,key){if(v&&tipoDe(v)==="visitas"&&(predSolo(v.predio)||predSin(v.predio)))return itemsDe(v).find(i=>i.key===key)||null; /* v250 */if(v&&v.catalogo){const r=v.catalogo.find(x=>x[0]===key);if(r)return expandir(r)}return CL_BYKEY[key]||null}
 function catalogoUnion(vs,tipo,predio){const P=(tipo||"visitas")==="visitas"&&predSolo(predio);if(P)return predItems(catalogoUnion(vs,tipo),P).map(i=>Object.assign({},i));
-  tipo=tipo||"visitas";const m={};CL_ITEMS.forEach(i=>{if(enTipo(tipo,i.area))m[i.key]=i});vs.forEach(v=>itemsDe(v).forEach(i=>{if(!m[i.key])m[i.key]=Object.assign({},i,{retirado:true})}));return Object.values(m).sort((a,b)=>(a.orden??999)-(b.orden??999))}
+  tipo=tipo||"visitas";const m={};CL_ITEMS.forEach(i=>{if(enTipo(tipo,i.area))m[i.key]=i});vs.forEach(v=>itemsDe(v).forEach(i=>{if(!m[i.key])m[i.key]=Object.assign({},i,{retirado:true})}));const Z=tipo==="visitas"&&predSin(predio);return Object.values(m).filter(i=>!Z||!Z.includes(i.area)).sort((a,b)=>(a.orden??999)-(b.orden??999))} /* v250 */
 const CAT_HEAD=["Código","Área","Tipo","Grupo","Nº","Ítem","Referencia","Cómo verificar","Clave","Retirado","Orden"];
 function catalogoAExcel(){const wb=XLSX.utils.book_new();const rows=[CAT_HEAD];
   CL_ITEMS.forEach(i=>rows.push([i.key,i.areaName,i.fam,i.group,i.n,i.txt,i.prot||"",i.evid||"",i.star?"Sí":"",i.retirado?"Sí":"",i.orden]));
@@ -1544,4 +1549,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="249"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="250"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
