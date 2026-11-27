@@ -763,7 +763,7 @@ function axNombre(a){
   if(a.tipo==="capacitacion")return ["Capacitacion",s(a.tema).slice(0,60),fmtD(a.fecha)].filter(Boolean).join("_")+".pdf";
   return (a.tipo==="vehiculo"?[esDev(a)?"Acta_Devolucion_Vehiculo":"Acta_Vehiculo",s((a.veh||{}).patente),s(a.conductor)]:["Entrega_Activos",s(a.recibe),s(((a.activos||[])[0]||{}).tipo)].map((x,i)=>i===0&&esDev(a)?"Devolucion_Activos":x)).concat([fmtD(a.fecha)]).filter(Boolean).join("_")+".pdf";
 }
-async function axImgs(a){const IM={};for(const r of Object.values(a.items||{}))for(const f of (r.fotos||[]))if(!String(f).startsWith("p:"))IM[f]=await pdfImg(f);
+async function axImgs(a){const rf=[];for(const r of Object.values(a.items||{}))for(const f of (r.fotos||[]))if(!String(f).startsWith("p:"))rf.push(f);const IM=await pdfImgs(rf,true); /* v248 */
   if(a.tipo==="capacitacion")for(const [k,f] of Object.entries(a.firmas||{}))if(f&&f.img)IM["firma:"+k]=await capFirmaChica(f.img);return IM}
 /* v109: en el registro de capacitaciones van muchas firmas; para el PDF se recortan los márgenes vacíos (la firma se ve más
    grande en su celda) y se achican a 360 × 120 px como máximo: 30 firmas a 600 px pesaban más de 20 MB */
@@ -825,4 +825,4 @@ function axXlsx(tipo,manual){return subirExcel("ax:"+tipo,manual,()=>axXlsxUploa
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_ACTAS_ENTREGA=true;
-window.MODV=window.MODV||{};window.MODV["actas-entrega"]="247"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["actas-entrega"]="248"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */

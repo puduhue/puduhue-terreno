@@ -3337,7 +3337,7 @@ async function rdArchivos(r){
 async function rdPdf(r,subir){
   if(!window.jspdf){toast("No se pudo cargar el generador de PDF.");return}
   await flush();if(!subir)toast("Preparando el resumen…");
-  const D=docsDe(r);const IM={};for(const d of D)if(d.foto)IM[d.foto]=await pdfImg(d.foto);
+  const D=docsDe(r);const IM=await pdfImgs(D.map(d=>d.foto),!subir); /* v248 */
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const X=15,W=180;let y=10;
   const nueva=()=>{doc.addPage();y=15};const chk=h=>{if(y+h>282)nueva()};
   const AZ=[44,76,164],VE=[36,140,60],CA=[100,60,20];try{doc.addImage(MARCA,"PNG",X,y,22.5,20.3)}catch(e){}
@@ -3367,4 +3367,4 @@ async function rdPdf(r,subir){
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_RENDICIONES=true;
-window.MODV=window.MODV||{};window.MODV["rendiciones"]="247"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["rendiciones"]="248"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
