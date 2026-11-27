@@ -802,15 +802,15 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   /* eje del puntaje: de 40 % a 100 % (lo bajo 40 % queda en la base) */
   const yP=(p,top,h)=>top+h-Math.min(1,Math.max(0,(p-40)/60))*h;
   /* tendencia por mes (línea) */
-  const lineaMeses=(MS0)=>{const MS=MS0.slice(-12);if(MS.length<2){nota("Hace falta más de un mes con visitas para ver la tendencia por mes.");y+=2;return}
+  const lineaMeses=(MS0,et)=>{const MS=et?MS0.slice(0,12):MS0.slice(-12);if(MS.length<2){nota(et?`Hace falta más de una visita por ${K.uni} para ver la tendencia por visita.`:"Hace falta más de un mes con visitas para ver la tendencia por mes.");y+=2;return} /* v247: et = etiquetas propias (por visita) */
     chk(48);const H=30,x0=L+12,wP=W-16,top=y+4,base=top+H,dx=wP/(MS.length-1||1),xs=MS.map((m,i)=>x0+i*dx);
     d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(140);
     [40,60,80,100].forEach(p=>{const yy=yP(p,top,H);d.setDrawColor(232);d.line(x0,yy,x0+wP,yy);d.text(p+" %",L,yy+1)});
     d.setDrawColor(120,160,120);d.setLineDashPattern([1.2,1.2],0);const y9=yP(90,top,H);d.line(x0,y9,x0+wP,y9);d.setLineDashPattern([],0);d.setTextColor(...COL.v);d.text("90 %",L,y9+1);
     d.setDrawColor(...AZ);d.setLineWidth(0.7);let pr=null;MS.forEach((m,i)=>{if(m.pct===null){pr=null;return}const pt=[xs[i],yP(m.pct,top,H)];if(pr)d.line(pr[0],pr[1],pt[0],pt[1]);pr=pt});d.setLineWidth(0.2);
     const anios=new Set(MS.map(m=>m.k.slice(0,4))).size>1;
-    MS.forEach((m,i)=>{const p=m.pct===null?null:Math.round(m.pct),k=sc(p);if(p!==null){const yy=yP(p,top,H);d.setFillColor(...COL[k]);d.circle(xs[i],yy,1.4,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);d.setTextColor(...COL[k]);d.text(p+" %",xs[i],yy-2.6,{align:"center"})}
-      d.setFont("helvetica","normal");d.setFontSize(7.8);d.setTextColor(...GR);d.text(RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):""),xs[i],base+5,{align:"center"});d.setFontSize(6.8);d.text(`${m.c} ${m.c===1?"visita":"visitas"}`,xs[i],base+8.5,{align:"center"})});
+    MS.forEach((m,i)=>{const p=m.pct===null?null:Math.round(m.pct),k=sc(p);if(p!==null){const yy=yP(p,top,H);d.setFillColor(...COL[k]);d.circle(xs[i],yy,1.4,"F");d.setFont("helvetica","bold");d.setFontSize(8.5);d.setTextColor(...COL[k]);d.text(et?rkNum(m.pct)+" %":p+" %",xs[i],yy-2.6,{align:"center"})} /* v247: por visita, con un decimal */
+      d.setFont("helvetica","normal");d.setFontSize(7.8);d.setTextColor(...GR);const E=et?et(m):[RK_MES[+m.k.slice(5,7)-1]+(anios?" "+m.k.slice(2,4):""),`${m.c} ${m.c===1?"visita":"visitas"}`];d.text(E[0],xs[i],base+5,{align:"center"});d.setFontSize(6.8);d.text(E[1],xs[i],base+8.5,{align:"center"})});
     d.setTextColor(0);d.setDrawColor(0);y=base+14};
   /* v242: cuadro «Todas las visitas» (una fila por predio, una columna por visita; de a 10 columnas), como hasta la v240 */
   const cuadro=(con)=>{const maxV=Math.max(1,...con.map(x=>x.vis.length)),POR=10;
@@ -836,7 +836,7 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
     d.setTextColor(...COL[sc(x.acc)]);d.text(pt,X0+ancho,yy,{align:"right"});const wp=d.getTextWidth(pt);
     d.setFont("helvetica","normal");d.setFontSize(8);d.setTextColor(...GR);d.text(`${x.vis.length} visitas ·`,X0+ancho-wp-1.5,yy,{align:"right"});yy+=2.5;
     d.setFillColor(236,240,250);d.rect(X0,yy,ancho,8.5,"F");d.setFont("helvetica","bold");d.setFontSize(8);d.setTextColor(50);d.text("Sección",X0+1.5,yy+5.4);
-    P.forEach((q,i)=>{const cx=X0+wS+i*wc+wc/2;d.setFont("helvetica","bold");d.setFontSize(8);d.text(`V${q.n}`,cx,yy+3.8,{align:"center"});d.setFont("helvetica","normal");d.setFontSize(6.5);d.text(rkFc(q.fecha),cx,yy+7.2,{align:"center"})});
+    P.forEach((q,i)=>{const cx=X0+wS+i*wc+wc/2;d.setFont("helvetica","bold");d.setFontSize(8);d.text(`${x.vis.length-P.length+i+1}.ª`,cx,yy+3.8,{align:"center"}); /* v247: por orden, como «Todas las visitas» */d.setFont("helvetica","normal");d.setFontSize(6.5);d.text(rkFc(q.fecha),cx,yy+7.2,{align:"center"})});
     d.setFont("helvetica","bold");d.setFontSize(8);d.text("A la fecha",xA+wA/2,yy+5.4,{align:"center"});yy+=8.5;
     const fila=(nom,c,acc,tot)=>{if(tot){d.setDrawColor(150);d.line(X0,yy,X0+ancho,yy)}d.setFont("helvetica",tot?"bold":"normal");d.setFontSize(8.2);d.setTextColor(30);d.text(d.splitTextToSize(nom,wS-2)[0],X0+1.5,yy+4.7);
       c.forEach((p,i)=>{const cx=X0+wS+i*wc;if(p===null||p===undefined){d.setTextColor(170);d.setFontSize(8);d.text("-",cx+wc/2,yy+4.7,{align:"center"});return}const k=semColor(p);d.setFillColor(...FILL[k]);d.roundedRect(cx+0.5,yy+0.6,wc-1,h-1.2,0.8,0.8,"F");
@@ -878,7 +878,9 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
   resumen(R.gen,R.nv,R.con.length,R.con[0],R.sobre,R.bajo,R.mej);
   sub2(`Ranking (${R.con.length})`);tabla(R.con);
   if(R.sin.length)nota(`Sin visitas cerradas${R.per==="todo"?"":" en el período"}: ${R.sin.join(", ")}.`);
-  sub2("Puntaje general por mes · Compañía",`todos los ${K.unis} · línea punteada: meta 90 %`,40);lineaMeses(R.meses); /* v243 */
+  { /* v247: por visita (1.ª de todos, 2.ª de todos…), en vez de por mes */
+    const RON=[];R.con.forEach(x=>x.vis.forEach((q,i)=>{const o=RON[i]||(RON[i]={k:"v"+(i+1),i:i+1,s:0,n:0,c:0});o.s+=q.s;o.n+=q.nn;o.c++}));RON.forEach(o=>{o.pct=o.n?o.s/o.n*100:null});
+    sub2("Puntaje general por visita · Compañía",`todos los ${K.unis} · línea punteada: meta 90 %`,40);lineaMeses(RON,m=>[`${m.i}.ª visita`,`${m.c} ${m.c===1?K.uni:K.unis}`])}
   cuadro(R.con);
   /* 2. por campo */
   if(conCampo){const ACC=AC(A);chk(Math.min(236,36+R.con.length*8));y+=2;titulo(`${np++}. Cada ${K.uni} por sección`,`Puntaje a la fecha de cada sección (todas las visitas cerradas del período). Un guion (-) es una sección que no se revisó.`); /* v244 */
@@ -898,7 +900,7 @@ function rkPdfBuild(R){ /* v241: más grande; consolidado, tendencias en gráfic
     y+=6}
   /* 4. cómo se calcula */
   chk(30);titulo(`${np++}. Cómo se calcula`);d.setFont("helvetica","normal");d.setFontSize(9);d.setTextColor(60);
-  const tx=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. En cada sección se cuentan solo los puntos de esa sección; un guion (-) es una sección que esa visita no revisó. La línea punteada del gráfico por mes es la meta de 90 %. Las visitas en curso y las anuladas no cuentan.`;
+  const tx=`Cada punto revisado vale: Cumple 1, Parcial 0,5 y No cumple 0; los N/A no cuentan. El puntaje a la fecha de cada ${K.uni} junta todos los puntos de todas sus visitas cerradas del período: puntos obtenidos dividido por puntos revisados (promedio ponderado: cada punto pesa lo mismo, así una visita con más puntos revisados pesa más). El puntaje general hace lo mismo con todas las visitas. En cada sección se cuentan solo los puntos de esa sección; un guion (-) es una sección que esa visita no revisó. El gráfico por visita junta la 1.ª visita de todos los ${K.unis}, la 2.ª, etc. (por orden de fecha), y su línea punteada es la meta de 90 %; las columnas 1.ª, 2.ª… también van por orden de fecha. Las visitas en curso y las anuladas no cuentan.`;
   const nl=d.splitTextToSize(tx,W);chk(nl.length*4+4);d.text(nl,L,y,{lineHeightFactor:1.25});y+=nl.length*4+3;d.setTextColor(0);
   const n=d.getNumberOfPages();const por=ME&&ME.nombre?`Emitido por ${ME.nombre} el ${fmtD(today())}`:`Emitido el ${fmtD(today())}`;
   for(let i=1;i<=n;i++){d.setPage(i);d.setFont("helvetica","normal");d.setFontSize(7.5);d.setTextColor(110);d.text(`Página ${i} de ${n}`,195,289,{align:"right"});d.text(por,15,289);d.setTextColor(0)}
@@ -1542,4 +1544,4 @@ async function clPdf(v,subir,sec){ /* v241: sec = nombre de una sección del res
 
 /* marca de que el módulo cargó completo (la revisa el arranque en index.html) */
 window.MOD_CHECKLIST=true;
-window.MODV=window.MODV||{};window.MODV["checklist"]="246"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
+window.MODV=window.MODV||{};window.MODV["checklist"]="247"; /* v137 (M-29): versión del módulo (se sube con APP_VER en cada versión) */
